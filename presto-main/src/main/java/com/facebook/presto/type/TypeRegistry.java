@@ -20,6 +20,7 @@ import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeParameter;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
+import com.facebook.presto.spi.type.VarcharType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
@@ -48,6 +49,7 @@ import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
 import static com.facebook.presto.type.ArrayParametricType.ARRAY;
 import static com.facebook.presto.type.ColorType.COLOR;
 import static com.facebook.presto.type.FunctionParametricType.FUNCTION;
@@ -88,7 +90,6 @@ public final class TypeRegistry
         addType(BOOLEAN);
         addType(BIGINT);
         addType(DOUBLE);
-        addType(VARCHAR);
         addType(VARBINARY);
         addType(DATE);
         addType(TIME);
@@ -104,6 +105,7 @@ public final class TypeRegistry
         addType(JSON_PATH);
         addType(COLOR);
         addType(JSON);
+        addParametricType(VarcharParametricType.VARCHAR);
         addParametricType(ROW);
         addParametricType(ARRAY);
         addParametricType(MAP);

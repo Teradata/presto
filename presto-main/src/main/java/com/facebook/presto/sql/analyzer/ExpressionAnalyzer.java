@@ -26,6 +26,7 @@ import com.facebook.presto.spi.StandardErrorCode;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
+import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.DependencyExtractor;
 import com.facebook.presto.sql.planner.Symbol;
@@ -538,14 +539,26 @@ public class ExpressionAnalyzer
         @Override
         protected Type visitLikePredicate(LikePredicate node, AnalysisContext context)
         {
-            coerceType(context, node.getValue(), VARCHAR, "Left side of LIKE expression");
-            coerceType(context, node.getPattern(), VARCHAR, "Pattern for LIKE expression");
+            Type valueType = getVarcharType(node.getValue(), context);
+            Type patternType = getVarcharType(node.getPattern(), context);
+            coerceType(context, node.getValue(), valueType, "Left side of LIKE expression");
+            coerceType(context, node.getPattern(), patternType, "Pattern for LIKE expression");
             if (node.getEscape() != null) {
-                coerceType(context, node.getEscape(), VARCHAR, "Escape for LIKE expression");
+                Type escapeType = getVarcharType(node.getEscape(), context);
+                coerceType(context, node.getEscape(), escapeType, "Escape for LIKE expression");
             }
 
             expressionTypes.put(node, BOOLEAN);
             return BOOLEAN;
+        }
+
+        private Type getVarcharType(Expression value, AnalysisContext context)
+        {
+            Type type = process(value, context);
+            if (!(type instanceof VarcharType)) {
+                return VARCHAR;
+            }
+            return type;
         }
 
         @Override
@@ -566,8 +579,9 @@ public class ExpressionAnalyzer
         @Override
         protected Type visitStringLiteral(StringLiteral node, AnalysisContext context)
         {
-            expressionTypes.put(node, VARCHAR);
-            return VARCHAR;
+            VarcharType type = VarcharType.createVarcharType(node.getValue().length());
+            expressionTypes.put(node, type);
+            return type;
         }
 
         @Override
@@ -906,6 +920,7 @@ public class ExpressionAnalyzer
             Type actualType = process(expression, context);
             if (!actualType.equals(expectedType)) {
                 if (!canCoerce(actualType, expectedType)) {
+                    canCoerce(actualType, expectedType);
                     throw new SemanticException(TYPE_MISMATCH, expression, message + " must evaluate to a %s (actual: %s)", expectedType, actualType);
                 }
                 expressionCoercions.put(expression, expectedType);

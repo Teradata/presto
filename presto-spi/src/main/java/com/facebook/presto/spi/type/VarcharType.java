@@ -16,21 +16,41 @@ package com.facebook.presto.spi.type;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
-import com.fasterxml.jackson.annotation.JsonCreator;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 
-import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
+import static java.util.Collections.singletonList;
 
 public class VarcharType
         extends AbstractVariableWidthType
 {
-    public static final VarcharType VARCHAR = new VarcharType();
+    public static final int MAX_LENGTH = Integer.MAX_VALUE;
+    public static final VarcharType VARCHAR = new VarcharType(MAX_LENGTH);
 
-    @JsonCreator
-    public VarcharType()
+    public static VarcharType createVarcharType(int length)
     {
-        super(parseTypeSignature(StandardTypes.VARCHAR), Slice.class);
+        return new VarcharType(length);
+    }
+
+    private final int length;
+
+    private VarcharType(int length)
+    {
+        super(
+                new TypeSignature(
+                        StandardTypes.VARCHAR,
+                        singletonList(TypeSignatureParameter.of((long) length))),
+                Slice.class);
+
+        if (length < 0) {
+            throw new IllegalArgumentException("Invalid VARCHAR length " + length);
+        }
+        this.length = length;
+    }
+
+    public int getLength()
+    {
+        return length;
     }
 
     @Override

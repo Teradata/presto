@@ -60,7 +60,8 @@ public class TestExecuteResource
     {
         String expected = "{\"columns\":[" +
                 "{\"name\":\"foo\",\"type\":\"bigint\",\"typeSignature\":{\"rawType\":\"bigint\",\"typeArguments\":[]}}," +
-                "{\"name\":\"bar\",\"type\":\"varchar\",\"typeSignature\":{\"rawType\":\"varchar\",\"typeArguments\":[]}}]," +
+                "{\"name\":\"bar\",\"type\":\"varchar(3)\",\"typeSignature\":" +
+                    "{\"rawType\":\"varchar\",\"typeArguments\":[{\"kind\":\"LONG_LITERAL\",\"value\":3}]}}]," +
                 "\"data\":[[123,\"abc\"]]}\n";
 
         StringResponse response = executeQuery("SELECT 123 foo, 'abc' bar");
