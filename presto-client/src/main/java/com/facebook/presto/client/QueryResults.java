@@ -251,7 +251,7 @@ public class QueryResults
             }
             return fixedValue;
         }
-        switch (type) {
+        switch (signature.getBase()) {
             case BIGINT:
                 if (value instanceof String) {
                     return Long.parseLong((String) value);
