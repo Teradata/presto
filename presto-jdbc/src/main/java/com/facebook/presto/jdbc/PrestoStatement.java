@@ -59,7 +59,11 @@ public class PrestoStatement
     public int executeUpdate(String sql)
             throws SQLException
     {
-        throw new NotImplementedException("Statement", "executeUpdate");
+        ResultSet result = executeQuery(sql);
+        while (result.next()) {
+            continue;
+        }
+        return 0;
     }
 
     @Override

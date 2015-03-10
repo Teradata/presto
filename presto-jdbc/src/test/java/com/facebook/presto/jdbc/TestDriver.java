@@ -693,6 +693,7 @@ public class TestDriver
             try (Statement statement = connection.createStatement()) {
                 assertTrue(statement.execute("SELECT 123 x, 'foo' y, CAST(NULL AS bigint) z"));
                 ResultSet rs = statement.getResultSet();
+
                 assertTrue(rs.next());
 
                 assertEquals(rs.getLong(1), 123);
@@ -712,6 +713,19 @@ public class TestDriver
                 assertEquals(rs.getString("y"), "foo");
                 assertFalse(rs.wasNull());
 
+                assertFalse(rs.next());
+            }
+        }
+    }
+
+    @Test
+    public void testExecuteUpdate()
+            throws Exception
+    {
+        try (Connection connection = createConnection()) {
+            try (Statement statement = connection.createStatement()) {
+                assertEquals(statement.executeUpdate("SELECT 123 x, 'foo' y, CAST(NULL AS bigint) z"), 0);
+                ResultSet rs = statement.getResultSet();
                 assertFalse(rs.next());
             }
         }
