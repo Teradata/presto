@@ -7,6 +7,8 @@ TBLPROPERTIES ('RETENTION'='-1')
 
 CREATE TABLE presto_test_partition_format (
   t_string STRING,
+  t_varchar VARCHAR(50),
+  t_char CHAR(25),
   t_tinyint TINYINT,
   t_smallint SMALLINT,
   t_int INT,
@@ -47,6 +49,8 @@ TBLPROPERTIES ('RETENTION'='-1')
 
 CREATE TABLE presto_test_bucketed_by_string_int (
   t_string STRING,
+  t_varchar VARCHAR(50),
+  t_char CHAR(25),
   t_tinyint TINYINT,
   t_smallint SMALLINT,
   t_int INT,
@@ -64,6 +68,8 @@ TBLPROPERTIES ('RETENTION'='-1')
 
 CREATE TABLE presto_test_bucketed_by_bigint_boolean (
   t_string STRING,
+  t_varchar VARCHAR(50),
+  t_char CHAR(25),
   t_tinyint TINYINT,
   t_smallint SMALLINT,
   t_int INT,
@@ -81,6 +87,8 @@ TBLPROPERTIES ('RETENTION'='-1')
 
 CREATE TABLE presto_test_bucketed_by_double_float (
   t_string STRING,
+  t_varchar VARCHAR(50),
+  t_char CHAR(25),
   t_tinyint TINYINT,
   t_smallint SMALLINT,
   t_int INT,
@@ -138,6 +146,8 @@ DROP TABLE tmp_presto_test_load;
 DROP TABLE IF EXISTS tmp_presto_test;
 CREATE TABLE tmp_presto_test (
   t_string STRING,
+  t_varchar VARCHAR(50),
+  t_char CHAR(25),
   t_tinyint TINYINT,
   t_smallint SMALLINT,
   t_int INT,
@@ -150,6 +160,8 @@ CREATE TABLE tmp_presto_test (
 INSERT INTO TABLE tmp_presto_test
 SELECT
   CASE n % 19 WHEN 0 THEN NULL WHEN 1 THEN '' ELSE 'test' END
+, CASE n % 39 WHEN 0 THEN NULL WHEN 1 THEN '' ELSE 'test varchar' END
+, CASE n % 41 WHEN 0 THEN NULL WHEN 1 THEN '' ELSE 'test char' END
 , 1 + n
 , 2 + n
 , 3 + n
@@ -207,19 +219,19 @@ SET hive.enforce.bucketing = true;
 
 INSERT OVERWRITE TABLE presto_test_bucketed_by_string_int
 PARTITION (ds='2012-12-29')
-SELECT t_string, t_tinyint, t_smallint, t_int, t_bigint, t_float, t_double, t_boolean
+SELECT t_string, t_varchar, t_char, t_tinyint, t_smallint, t_int, t_bigint, t_float, t_double, t_boolean
 FROM tmp_presto_test
 ;
 
 INSERT OVERWRITE TABLE presto_test_bucketed_by_bigint_boolean
 PARTITION (ds='2012-12-29')
-SELECT t_string, t_tinyint, t_smallint, t_int, t_bigint, t_float, t_double, t_boolean
+SELECT t_string, t_varchar, t_char, t_tinyint, t_smallint, t_int, t_bigint, t_float, t_double, t_boolean
 FROM tmp_presto_test
 ;
 
 INSERT OVERWRITE TABLE presto_test_bucketed_by_double_float
 PARTITION (ds='2012-12-29')
-SELECT t_string, t_tinyint, t_smallint, t_int, t_bigint, t_float, t_double, t_boolean
+SELECT t_string, t_varchar, t_char, t_tinyint, t_smallint, t_int, t_bigint, t_float, t_double, t_boolean
 FROM tmp_presto_test
 ;
 
