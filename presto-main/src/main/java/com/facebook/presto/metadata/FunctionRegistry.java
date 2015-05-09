@@ -424,7 +424,7 @@ public class FunctionRegistry
         }
 
         if (match != null) {
-            return match;
+            return match.resolveCalculatedTypes(parameterTypes);
         }
 
         // search for coerced match
@@ -500,7 +500,7 @@ public class FunctionRegistry
                 }
 
                 if (match != null) {
-                    return match;
+                    return match.resolveCalculatedTypes(parameterTypes);
                 }
             }
         }
