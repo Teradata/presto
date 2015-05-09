@@ -21,6 +21,7 @@ import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.type.FixedWidthType;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.TypeLiteralCalculation;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
@@ -30,13 +31,20 @@ import io.airlift.slice.Slice;
 
 import java.lang.invoke.MethodHandle;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
 
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 public final class TypeUtils
@@ -192,5 +200,93 @@ public final class TypeUtils
         if (isNull) {
             throw new PrestoException(NOT_SUPPORTED, errorMsg);
         }
+    }
+
+    public static TypeSignature resolveCalculatedType(TypeSignature typeSignature, Map<String, OptionalLong> inputs)
+    {
+        ImmutableList.Builder<TypeSignatureParameter> parametersBuilder = ImmutableList.builder();
+
+        boolean failedToCalculateLiteral = false;
+        for (TypeSignatureParameter parameter : typeSignature.getParameters()) {
+            if (parameter.getTypeSignature().isPresent()) {
+                parametersBuilder.add(TypeSignatureParameter.of(resolveCalculatedType(parameter.getTypeSignature().get(), inputs)));
+            }
+            else if (parameter.getLiteralCalculation().isPresent()) {
+                OptionalLong optionalLong = TypeCalculation.calculateLiteralValue(
+                        parameter.getLiteralCalculation().get().getCalculation(),
+                        inputs);
+                if (optionalLong.isPresent()) {
+                    parametersBuilder.add(TypeSignatureParameter.of(optionalLong.getAsLong()));
+                }
+                else {
+                    failedToCalculateLiteral = true;
+                }
+            }
+            else {
+                parametersBuilder.add(parameter);
+            }
+        }
+
+        List<TypeSignatureParameter> calculatedParameters = parametersBuilder.build();
+        if (failedToCalculateLiteral && !calculatedParameters.isEmpty()) {
+            throw new IllegalArgumentException(
+                    format("One of the literal has failed to calculate with non empty parameters [%s, %s]",
+                            typeSignature, inputs));
+        }
+        return new TypeSignature(typeSignature.getBase(), calculatedParameters);
+    }
+
+    public static Map<String, OptionalLong> extractCalculationInputs(TypeSignature typeSignature, TypeSignature actualType)
+    {
+        if (!typeSignature.isCalculated()) {
+            return emptyMap();
+        }
+        Map<String, OptionalLong> inputs = new HashMap<>();
+
+        List<TypeSignatureParameter> parameters = typeSignature.getParameters();
+        List<TypeSignatureParameter> actualParameters = actualType.getParameters();
+        if (parameters.size() != actualParameters.size()) {
+            if (actualParameters.isEmpty()) {
+                for (TypeSignatureParameter parameter : parameters) {
+                    Optional<TypeLiteralCalculation> literalCalculation = parameter.getLiteralCalculation();
+                    if (literalCalculation.isPresent()) {
+                        inputs.put(literalCalculation.get().getCalculation().toUpperCase(Locale.US), OptionalLong.empty());
+                    }
+                }
+            }
+            else {
+                throw new IllegalArgumentException(format(
+                        "Number of parameters for typeSignature [%s] and actualType [%s] don't match",
+                        typeSignature,
+                        actualType));
+            }
+        }
+
+        for (int index = 0; index < parameters.size(); index++) {
+            TypeSignatureParameter parameter = parameters.get(index);
+            TypeSignatureParameter actualParameter = actualParameters.get(index);
+
+            if (parameter.getTypeSignature().isPresent()) {
+                checkState(
+                        actualParameter.getTypeSignature().isPresent(),
+                        "typeSignature [%s] and actualType [%s] mismatch",
+                        typeSignature,
+                        actualType);
+
+                if (parameter.isCalculated()) {
+                    inputs.putAll(extractCalculationInputs(
+                            parameter.getTypeSignature().get(),
+                            actualParameter.getTypeSignature().get()));
+                }
+            }
+            else if (parameter.getLiteralCalculation().isPresent()) {
+                TypeLiteralCalculation calculation = parameter.getLiteralCalculation().get();
+                if (!actualParameter.getLongLiteral().isPresent()) {
+                    throw new IllegalArgumentException(format("Expected type %s parameter %s to be a number literal", actualType, index));
+                }
+                inputs.put(calculation.getCalculation().toUpperCase(Locale.US), OptionalLong.of(actualParameter.getLongLiteral().get()));
+            }
+        }
+        return inputs;
     }
 }

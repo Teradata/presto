@@ -191,8 +191,8 @@ import static com.facebook.presto.operator.scalar.RowHashCodeOperator.ROW_HASH_C
 import static com.facebook.presto.operator.scalar.RowNotEqualOperator.ROW_NOT_EQUAL;
 import static com.facebook.presto.operator.scalar.RowToJsonCast.ROW_TO_JSON;
 import static com.facebook.presto.operator.scalar.TryCastFunction.TRY_CAST;
-import static com.facebook.presto.operator.window.AggregateWindowFunction.supplier;
 import static com.facebook.presto.operator.scalar.VarcharToVarcharCast.VARCHAR_TO_VARCHAR_CAST;
+import static com.facebook.presto.operator.window.AggregateWindowFunction.supplier;
 import static com.facebook.presto.spi.StandardErrorCode.FUNCTION_IMPLEMENTATION_MISSING;
 import static com.facebook.presto.spi.StandardErrorCode.FUNCTION_NOT_FOUND;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
@@ -451,7 +451,7 @@ public class FunctionRegistry
         }
 
         if (match != null) {
-            return match;
+            return match.resolveCalculatedTypes(parameterTypes);
         }
 
         // search for coerced match

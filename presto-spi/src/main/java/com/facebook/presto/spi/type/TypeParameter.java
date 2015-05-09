@@ -24,41 +24,51 @@ public class TypeParameter
     private final Optional<Type> typeSignature;
     private final Optional<Long> longLiteral;
     private final Optional<NamedType> namedType;
+    private final Optional<TypeLiteralCalculation> literalCalculation;
 
     private TypeParameter(
             Optional<Type> typeSignature,
             Optional<Long> longLiteral,
-            Optional<NamedType> namedType)
+            Optional<NamedType> namedType,
+            Optional<TypeLiteralCalculation> literalCalculation)
     {
         int presentCount = (typeSignature.isPresent() ? 1 : 0) +
                 (longLiteral.isPresent() ? 1 : 0) +
-                (namedType.isPresent() ? 1 : 0);
+                (namedType.isPresent() ? 1 : 0) +
+                (literalCalculation.isPresent() ? 1 : 0);
 
         if (presentCount != 1) {
             throw new IllegalStateException(
-                    format("Parameters are mutual exclusive but [%s, %s, %s] was found",
+                    format("Parameters are mutual exclusive but [%s, %s, %s, %s] was found",
                             typeSignature,
                             longLiteral,
-                            namedType));
+                            namedType,
+                            literalCalculation));
         }
         this.typeSignature = typeSignature;
         this.longLiteral = longLiteral;
         this.namedType = namedType;
+        this.literalCalculation = literalCalculation;
     }
 
     public static TypeParameter of(Type type)
     {
-        return new TypeParameter(Optional.of(type), Optional.empty(), Optional.empty());
+        return new TypeParameter(Optional.of(type), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     public static TypeParameter of(long longLiteral)
     {
-        return new TypeParameter(Optional.empty(), Optional.of(longLiteral), Optional.empty());
+        return new TypeParameter(Optional.empty(), Optional.of(longLiteral), Optional.empty(), Optional.empty());
     }
 
     public static TypeParameter of(NamedType namedType)
     {
-        return new TypeParameter(Optional.empty(), Optional.empty(), Optional.of(namedType));
+        return new TypeParameter(Optional.empty(), Optional.empty(), Optional.of(namedType), Optional.empty());
+    }
+
+    public static TypeParameter of(TypeLiteralCalculation literalCalculation)
+    {
+        return new TypeParameter(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(literalCalculation));
     }
 
     public static TypeParameter of(TypeSignatureParameter parameter, TypeManager typeManager)
@@ -81,6 +91,9 @@ public class TypeParameter
             return of(new NamedType(
                     parameter.getNamedTypeSignature().get().getName(),
                     type));
+        }
+        else if (parameter.getLiteralCalculation().isPresent()) {
+            return of(parameter.getLiteralCalculation().get());
         }
         else {
             throw new UnsupportedOperationException(format("Unsupported parameter [%s]", parameter));

@@ -24,41 +24,51 @@ public class TypeSignatureParameter
     private final Optional<TypeSignature> typeSignature;
     private final Optional<Long> longLiteral;
     private final Optional<NamedTypeSignature> namedTypeSignature;
+    private final Optional<TypeLiteralCalculation> literalCalculation;
 
     private TypeSignatureParameter(
             Optional<TypeSignature> typeSignature,
             Optional<Long> longLiteral,
-            Optional<NamedTypeSignature> namedTypeSignature)
+            Optional<NamedTypeSignature> namedTypeSignature,
+            Optional<TypeLiteralCalculation> literalCalculation)
     {
         int presentCount = (typeSignature.isPresent() ? 1 : 0) +
                 (longLiteral.isPresent() ? 1 : 0) +
-                (namedTypeSignature.isPresent() ? 1 : 0);
+                (namedTypeSignature.isPresent() ? 1 : 0) +
+                (literalCalculation.isPresent() ? 1 : 0);
 
         if (presentCount != 1) {
             throw new IllegalStateException(
-                    format("Parameters are mutual exclusive but [%s, %s, %s] was found",
+                    format("Parameters are mutual exclusive but [%s, %s, %s, %s] was found",
                             typeSignature,
                             longLiteral,
-                            namedTypeSignature));
+                            namedTypeSignature,
+                            literalCalculation));
         }
         this.typeSignature = typeSignature;
         this.longLiteral = longLiteral;
         this.namedTypeSignature = namedTypeSignature;
+        this.literalCalculation = literalCalculation;
     }
 
     public static TypeSignatureParameter of(TypeSignature typeSignature)
     {
-        return new TypeSignatureParameter(Optional.of(typeSignature), Optional.empty(), Optional.empty());
+        return new TypeSignatureParameter(Optional.of(typeSignature), Optional.empty(), Optional.empty(), Optional.empty());
     }
 
     public static TypeSignatureParameter of(long longLiteral)
     {
-        return new TypeSignatureParameter(Optional.empty(), Optional.of(longLiteral), Optional.empty());
+        return new TypeSignatureParameter(Optional.empty(), Optional.of(longLiteral), Optional.empty(), Optional.empty());
     }
 
     public static TypeSignatureParameter of(NamedTypeSignature namedTypeSignature)
     {
-        return new TypeSignatureParameter(Optional.empty(), Optional.empty(), Optional.of(namedTypeSignature));
+        return new TypeSignatureParameter(Optional.empty(), Optional.empty(), Optional.of(namedTypeSignature), Optional.empty());
+    }
+
+    public static TypeSignatureParameter of(TypeLiteralCalculation literalCalculation)
+    {
+        return new TypeSignatureParameter(Optional.empty(), Optional.empty(), Optional.empty(), Optional.of(literalCalculation));
     }
 
     @Override
@@ -72,6 +82,9 @@ public class TypeSignatureParameter
         }
         else if (namedTypeSignature.isPresent()) {
             return namedTypeSignature.get().toString();
+        }
+        else if (literalCalculation.isPresent()) {
+            return literalCalculation.get().toString();
         }
         else {
             throw new UnsupportedOperationException("Unsupported TypeSignatureParameter in toString");
@@ -93,6 +106,11 @@ public class TypeSignatureParameter
         return namedTypeSignature;
     }
 
+    public Optional<TypeLiteralCalculation> getLiteralCalculation()
+    {
+        return literalCalculation;
+    }
+
     @Override
     public boolean equals(Object o)
     {
@@ -107,13 +125,14 @@ public class TypeSignatureParameter
 
         return Objects.equals(this.typeSignature, other.typeSignature) &&
                 Objects.equals(this.longLiteral, other.longLiteral) &&
-                Objects.equals(this.namedTypeSignature, other.namedTypeSignature);
+                Objects.equals(this.namedTypeSignature, other.namedTypeSignature) &&
+                Objects.equals(this.literalCalculation, other.literalCalculation);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(typeSignature, longLiteral, namedTypeSignature);
+        return Objects.hash(typeSignature, longLiteral, namedTypeSignature, literalCalculation);
     }
 
     public TypeSignatureParameter bindParameters(Map<String, Type> boundParameters)
@@ -128,6 +147,16 @@ public class TypeSignatureParameter
         }
         else {
             return this;
+        }
+    }
+
+    public boolean isCalculated()
+    {
+        if (typeSignature.isPresent()) {
+            return typeSignature.get().isCalculated();
+        }
+        else {
+            return literalCalculation.isPresent();
         }
     }
 }
