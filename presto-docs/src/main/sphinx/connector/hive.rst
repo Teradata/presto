@@ -26,7 +26,7 @@ Presto includes Hive connectors for multiple versions of Hadoop:
 * ``hive-cdh4``: Cloudera CDH 4
 * ``hive-cdh5``: Cloudera CDH 5
 
-Create ``etc/catalog/hive.properties`` with the following contents
+Create ``/etc/presto/catalog/hive.properties`` with the following contents
 to mount the ``hive-cdh4`` connector as the ``hive`` catalog,
 replacing ``hive-cdh4`` with the proper connector for your version
 of Hadoop and ``example.net:9083`` with the correct host and port
@@ -41,7 +41,7 @@ Multiple Hive Clusters
 ^^^^^^^^^^^^^^^^^^^^^^
 
 You can have as many catalogs as you need, so if you have additional
-Hive clusters, simply add another properties file to ``etc/catalog``
+Hive clusters, simply add another properties file to ``/etc/presto/catalog``
 with a different name (making sure it ends in ``.properties``). For
 example, if you name the property file ``sales.properties``, Presto
 will create a catalog named ``sales`` using the configured connector.
