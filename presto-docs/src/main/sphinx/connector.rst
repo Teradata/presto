@@ -9,13 +9,7 @@ from different data sources.
     :maxdepth: 1
 
     connector/blackhole
-    connector/cassandra
     connector/hive
     connector/jmx
-    connector/kafka
-    connector/kafka-tutorial
-    connector/mysql
-    connector/postgresql
-    connector/redis
     connector/system
     connector/tpch
