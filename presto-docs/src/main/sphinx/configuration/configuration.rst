@@ -1,22 +1,11 @@
-================
-Deploying Presto
-================
-
-Installing Presto
------------------
-
-Download the Presto server tarball, :download:`server`, and unpack it.
-The tarball will contain a single top-level directory,
-|presto_server_release|, which we will call the *installation* directory.
-
-Presto needs a *data* directory for storing logs, local metadata, etc.
-We recommend creating a data directory outside of the installation directory,
-which allows it to be easily preserved when upgrading Presto.
-
+==================
 Configuring Presto
-------------------
+==================
 
-Create an ``etc`` directory inside the installation directory.
+Configuration Files
+-------------------
+
+Create a ``/etc/presto`` directory.
 This will hold the following configuration:
 
 * Node Properties: environmental configuration specific to each node
@@ -29,10 +18,10 @@ This will hold the following configuration:
 Node Properties
 ^^^^^^^^^^^^^^^
 
-The node properties file, ``etc/node.properties``, contains configuration
+The node properties file, ``/etc/presto/node.properties``, contains configuration
 specific to each node. A *node* is a single installed instance of Presto
 on a machine. This file is typically created by the deployment system when
-Presto is first installed. The following is a minimal ``etc/node.properties``:
+Presto is first installed. The following is a minimal ``node.properties``:
 
 .. code-block:: none
 
@@ -62,14 +51,14 @@ The above properties are described below:
 JVM Config
 ^^^^^^^^^^
 
-The JVM config file, ``etc/jvm.config``, contains a list of command line
+The JVM config file, ``/etc/presto/jvm.config``, contains a list of command line
 options used for launching the Java Virtual Machine. The format of the file
 is a list of options, one per line. These options are not interpreted by
 the shell, so options containing spaces or other special characters should
 not be quoted (as demonstrated by the ``OnOutOfMemoryError`` option in the
 example below).
 
-The following provides a good starting point for creating ``etc/jvm.config``:
+The following provides a good starting point for creating ``jvm.config``:
 
 .. code-block:: none
 
@@ -92,7 +81,7 @@ terminate the process when this occurs.
 Config Properties
 ^^^^^^^^^^^^^^^^^
 
-The config properties file, ``etc/config.properties``, contains the
+The config properties file, ``/etc/presto/config.properties``, contains the
 configuration for the Presto server. Every Presto server can function
 as both a coordinator and a worker, but dedicating a single machine
 to only perform coordination work provides the best performance on
@@ -171,13 +160,10 @@ These properties require some explanation:
   the host and port of the Presto coordinator. This URI must not end
   in a slash.
 
-* ``query.queue-config-file``:
-  Specifies the file to read the :doc:`/admin/queue` from.
-
 Log Levels
 ^^^^^^^^^^
 
-The optional log levels file, ``etc/log.properties``, allows setting the
+The optional log levels file, ``/etc/presto/log.properties``, allows setting the
 minimum log level for named logger hierarchies. Every logger has a name,
 which is typically the fully qualified name of the class that uses the logger.
 Loggers have a hierarchy based on the dots in the name (like Java packages).
@@ -204,8 +190,8 @@ contains a table ``clicks`` in database ``web``, that table would be accessed
 in Presto as ``hive.web.clicks``.
 
 Catalogs are registered by creating a catalog properties file
-in the ``etc/catalog`` directory.
-For example, create ``etc/catalog/jmx.properties`` with the following
+in the ``/etc/presto/catalog`` directory.
+For example, create ``/etc/presto/catalog/jmx.properties`` with the following
 contents to mount the ``jmx`` connector as the ``jmx`` catalog:
 
 .. code-block:: none
@@ -214,43 +200,3 @@ contents to mount the ``jmx`` connector as the ``jmx`` catalog:
 
 See :doc:`/connector` for more information about configuring connectors.
 
-.. _running_presto:
-
-Running Presto
---------------
-
-The installation directory contains the launcher script in ``bin/launcher``.
-Presto can be started as a daemon by running running the following:
-
-.. code-block:: none
-
-    bin/launcher start
-
-Alternatively, it can be run in the foreground, with the logs and other
-output being written to stdout/stderr (both streams should be captured
-if using a supervision system like daemontools):
-
-.. code-block:: none
-
-    bin/launcher run
-
-Run the launcher with ``--help`` to see the supported commands and
-command line options. In particular, the ``--verbose`` option is
-very useful for debugging the installation.
-
-After launching, you can find the log files in ``var/log``:
-
-* ``launcher.log``:
-  This log is created by the launcher and is connected to the stdout
-  and stderr streams of the server. It will contain a few log messages
-  that occur while the server logging is being initialized and any
-  errors or diagnostics produced by the JVM.
-
-* ``server.log``:
-  This is the main log file used by Presto. It will typically contain
-  the relevant information if the server fails during initialization.
-  It is automatically rotated and compressed.
-
-* ``http-request.log``:
-  This is the HTTP request log which contains every HTTP request
-  received by the server. It is automatically rotated and compressed.

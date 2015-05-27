@@ -7,10 +7,11 @@ Presto Documentation
     :numbered: 2
 
     overview
-    installation
     admin
+    configuration
     connector
     functions
     language
     sql
+    querying
     migration
