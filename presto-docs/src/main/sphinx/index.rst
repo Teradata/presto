@@ -21,3 +21,4 @@ Presto Documentation
     functions
     language
     migration
+    release
