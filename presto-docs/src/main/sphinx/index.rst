@@ -16,3 +16,4 @@ Presto Documentation
     sql
     querying
     migration
+    release
