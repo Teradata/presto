@@ -16,6 +16,16 @@ data warehouse. Hive is a combination of three components:
 Presto only uses the first two components: the data and the metadata.
 It does not use HiveQL or any part of Hive's execution environment.
 
+Supported File Types
+--------------------
+
+The following file types are supported for the Hive connector:
+
+* ORC
+* RCFile
+* TEXT
+* Parquet
+
 Configuration
 -------------
 
