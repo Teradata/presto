@@ -17,41 +17,30 @@ from docutils import nodes, utils
 # noinspection PyUnresolvedReferences
 from sphinx.errors import SphinxError
 
+TD_LINK_SERVER = 'http://teradata-download.s3.amazonaws.com/aster/presto/presto/101t/presto-0.101-1.0.x86_64.rpm'
+TD_LINK_CLI = 'http://teradata-download.s3.amazonaws.com/aster/presto/cli/101t/presto-cli-0.101-executable.jar'
+TD_LINK_JDBC = 'http://teradata-download.s3.amazonaws.com/aster/presto/jdbc/101t/presto-jdbc-0.101.jar'
+
 GROUP_ID = 'com.facebook.presto'
 ARTIFACTS = {
-    'server': ('presto-server', 'tar.gz', None),
-    'cli': ('presto-cli', 'jar', 'executable'),
-    'jdbc': ('presto-jdbc', 'jar', None),
-    'verifier': ('presto-verifier', 'jar', 'executable'),
-    'benchmark-driver': ('presto-benchmark-driver', 'jar', 'executable'),
+    'server': ('presto-server', 'rpm', TD_LINK_SERVER),
+    'cli': ('presto-cli', 'jar', TD_LINK_CLI),
+    'jdbc': ('presto-jdbc', 'jar', TD_LINK_JDBC)
 }
-
-
-def maven_filename(artifact, version, packaging, classifier):
-    classifier = '-' + classifier if classifier else ''
-    return '%s-%s%s.%s' % (artifact, version, classifier, packaging)
-
-
-def maven_download(group, artifact, version, packaging, classifier):
-    base = 'https://repo1.maven.org/maven2/'
-    group_path = group.replace('.', '/')
-    filename = maven_filename(artifact, version, packaging, classifier)
-    return base + '/'.join((group_path, artifact, version, filename))
 
 
 def setup(app):
     # noinspection PyDefaultArgument,PyUnusedLocal
     def download_link_role(role, rawtext, text, lineno, inliner, options={}, content=[]):
-        version = app.config.release
 
         if not text in ARTIFACTS:
             inliner.reporter.error('Unsupported download type: ' + text)
             return [], []
 
-        artifact, packaging, classifier = ARTIFACTS[text]
+        artifact, packaging, uri = ARTIFACTS[text]
 
-        title = maven_filename(artifact, version, packaging, classifier)
-        uri = maven_download(GROUP_ID, artifact, version, packaging, classifier)
+        title = artifact + '.' + packaging
+        uri = uri
 
         node = nodes.reference(title, title, internal=False, refuri=uri)
 
