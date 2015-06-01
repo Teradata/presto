@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <artifactId>presto-root</artifactId>
+        <groupId>com.facebook.presto</groupId>
+        <version>0.115-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>presto-product-tests</artifactId>
+    <name>presto-product-tests</name>
+
+    <properties>
+        <air.main.basedir>${project.parent.basedir}</air.main.basedir>
+        <skip.product.tests>true</skip.product.tests>
+    </properties>
+
+    <dependencies>
+        <!-- don't add test scope dependencies since they won't be listed in product-tests jar as transitive -->
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-main</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-jdk14</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-product-tests-utils</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.facebook.presto</groupId>
+            <artifactId>presto-cli</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.teradata.tempto</groupId>
+            <artifactId>tempto-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.google.inject</groupId>
+            <artifactId>guice</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- build jar with test cases -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- download hive JDBC -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.4.0</version>
+                <executions>
+                    <execution>
+                        <id>download-ugly-libs</id>
+                        <phase>generate-test-resources</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <executable>./download.sh</executable>
+                    <workingDirectory>libs</workingDirectory>
+                </configuration>
+            </plugin>
+
+            <!-- run product tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <environmentVariables>
+                        <PRESTO_PRODUCT_TESTS_ROOT>${project.basedir}/</PRESTO_PRODUCT_TESTS_ROOT>
+                    </environmentVariables>
+                    <suiteXmlFiles>
+                        <suiteXmlFile>src/test/resources/testng.xml</suiteXmlFile>
+                    </suiteXmlFiles>
+                    <skipTests>${skip.product.tests}</skipTests>
+                </configuration>
+            </plugin>
+
+            <!-- exclude conflicting dependencies -->
+            <plugin>
+                <groupId>com.ning.maven.plugins</groupId>
+                <artifactId>maven-duplicate-finder-plugin</artifactId>
+                <version>1.0.9</version>
+                <configuration>
+                    <exceptions combine.children="append">
+                        <exception>
+                            <conflictingDependencies>
+                                <dependency>
+                                    <groupId>com.facebook.presto</groupId>
+                                    <artifactId>presto-jdbc</artifactId>
+                                </dependency>
+                                <dependency>
+                                    <groupId>org.apache.httpcomponents</groupId>
+                                    <artifactId>httpclient</artifactId>
+                                </dependency>
+                            </conflictingDependencies>
+                            <resources>
+                                <resource>mozilla/public-suffix-list.txt</resource>
+                            </resources>
+                        </exception>
+                        <exception>
+                            <conflictingDependencies>
+                                <dependency>
+                                    <groupId>net.minidev</groupId>
+                                    <artifactId>asm</artifactId>
+                                </dependency>
+                                <dependency>
+                                    <groupId>asm</groupId>
+                                    <artifactId>asm</artifactId>
+                                </dependency>
+                                <dependency>
+                                    <groupId>org.ow2.asm</groupId>
+                                    <artifactId>asm-all</artifactId>
+                                </dependency>
+                            </conflictingDependencies>
+                            <packages>
+                                <package>org.objectweb.asm</package>
+                            </packages>
+                        </exception>
+                    </exceptions>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>productTests</id>
+            <properties>
+                <skip.product.tests>false</skip.product.tests>
+            </properties>
+        </profile>
+    </profiles>
+</project>
