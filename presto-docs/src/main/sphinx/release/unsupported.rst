@@ -13,6 +13,8 @@ The following features from Presto 0.101 may work but are not officially support
     * Kafka
     * PostgreSQL
     * MySQL
+    * Hive-hadoop1
+    * Hive-cdh4
 
  * ROW data type
 
