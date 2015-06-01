@@ -57,8 +57,6 @@
         <air.test.parallel>methods</air.test.parallel>
         <air.test.thread-count>4</air.test.thread-count>
         <air.test.jvmsize>1792m</air.test.jvmsize>
-
-        <air.javadoc.lint>-missing</air.javadoc.lint>
     </properties>
 
     <modules>
@@ -86,6 +84,8 @@
         <module>presto-ml</module>
         <module>presto-benchmark</module>
         <module>presto-tests</module>
+        <module>presto-product-tests-utils</module>
+        <module>presto-product-tests</module>
         <module>presto-jdbc</module>
         <module>presto-cli</module>
         <module>presto-benchmark-driver</module>
@@ -236,6 +236,18 @@
             </dependency>
 
             <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-product-tests</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-product-tests-utils</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
                 <groupId>com.facebook.presto.hadoop</groupId>
                 <artifactId>hadoop-apache1</artifactId>
                 <version>0.2</version>
@@ -281,6 +293,24 @@
                         <artifactId>fastutil</artifactId>
                     </exclusion>
                 </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-core</artifactId>
+                <version>2.4.4</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.codehaus.jackson</groupId>
+                <artifactId>jackson-mapper-asl</artifactId>
+                <version>1.9.13</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>2.4.4</version>
             </dependency>
 
             <dependency>
@@ -482,6 +512,12 @@
             </dependency>
 
             <dependency>
+                <groupId>org.jruby.joni</groupId>
+                <artifactId>joni</artifactId>
+                <version>2.0.0</version>
+            </dependency>
+
+            <dependency>
                 <groupId>com.facebook.thirdparty</groupId>
                 <artifactId>libsvm</artifactId>
                 <version>3.18.1</version>
@@ -497,6 +533,12 @@
                 <groupId>org.postgresql</groupId>
                 <artifactId>postgresql</artifactId>
                 <version>9.3-1102-jdbc41</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.jruby.jcodings</groupId>
+                <artifactId>jcodings</artifactId>
+                <version>1.0.8</version>
             </dependency>
 
             <dependency>
@@ -646,6 +688,66 @@
                 <artifactId>jgrapht-core</artifactId>
                 <version>0.9.0</version>
             </dependency>
+
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpcore</artifactId>
+                <version>4.4</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpclient</artifactId>
+                <version>4.4</version>
+                <exclusions>
+                    <exclusion>
+                        <artifactId>commons-logging</artifactId>
+                        <groupId>commons-logging</groupId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>org.slf4j</groupId>
+                <artifactId>jcl-over-slf4j</artifactId>
+                <version>1.7.12</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.assertj</groupId>
+                <artifactId>assertj-core</artifactId>
+                <version>3.0.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.apache.httpcomponents</groupId>
+                <artifactId>httpasyncclient</artifactId>
+                <version>4.0.2</version>
+                <exclusions>
+                    <exclusion>
+                        <artifactId>commons-logging</artifactId>
+                        <groupId>commons-logging</groupId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-all</artifactId>
+                <version>1.8.4</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.teradata.tempto</groupId>
+                <artifactId>tempto-core</artifactId>
+                <version>1.0.32</version>
+                <exclusions>
+                    <exclusion>
+                        <artifactId>commons-logging</artifactId>
+                        <groupId>commons-logging</groupId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -716,7 +818,7 @@
                                         </goals>
                                     </pluginExecutionFilter>
                                     <action>
-                                        <ignore />
+                                        <ignore/>
                                     </action>
                                 </pluginExecution>
                                 <pluginExecution>
@@ -729,7 +831,7 @@
                                         </goals>
                                     </pluginExecutionFilter>
                                     <action>
-                                        <ignore />
+                                        <ignore/>
                                     </action>
                                 </pluginExecution>
                                 <pluginExecution>
@@ -742,7 +844,7 @@
                                         </goals>
                                     </pluginExecutionFilter>
                                     <action>
-                                        <ignore />
+                                        <ignore/>
                                     </action>
                                 </pluginExecution>
                                 <pluginExecution>
@@ -755,7 +857,7 @@
                                         </goals>
                                     </pluginExecutionFilter>
                                     <action>
-                                        <ignore />
+                                        <ignore/>
                                     </action>
                                 </pluginExecution>
                                 <pluginExecution>
@@ -768,7 +870,7 @@
                                         </goals>
                                     </pluginExecutionFilter>
                                     <action>
-                                        <ignore />
+                                        <ignore/>
                                     </action>
                                 </pluginExecution>
                                 <pluginExecution>
@@ -781,7 +883,7 @@
                                         </goals>
                                     </pluginExecutionFilter>
                                     <action>
-                                        <ignore />
+                                        <ignore/>
                                     </action>
                                 </pluginExecution>
                                 <pluginExecution>
@@ -810,7 +912,7 @@
                                         </goals>
                                     </pluginExecutionFilter>
                                     <action>
-                                        <ignore />
+                                        <ignore/>
                                     </action>
                                 </pluginExecution>
                             </pluginExecutions>
