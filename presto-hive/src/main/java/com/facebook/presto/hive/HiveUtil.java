@@ -63,6 +63,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_CANNOT_OPEN_SPLIT;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_INVALID_METADATA;
@@ -98,6 +99,7 @@ import static org.apache.hadoop.hive.metastore.MetaStoreUtils.getTableMetadata;
 import static org.apache.hadoop.hive.metastore.Warehouse.makePartName;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.FILE_INPUT_FORMAT;
 import static org.apache.hadoop.hive.serde.serdeConstants.SERIALIZATION_LIB;
+import static org.apache.hadoop.hive.serde.serdeConstants.VARCHAR_TYPE_NAME;
 import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.READ_ALL_COLUMNS;
 import static org.apache.hadoop.hive.serde2.ColumnProjectionUtils.READ_COLUMN_IDS_CONF_STR;
 import static org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
@@ -112,6 +114,8 @@ public final class HiveUtil
 
     private static final DateTimeFormatter HIVE_DATE_PARSER = ISODateTimeFormat.date().withZoneUTC();
     private static final DateTimeFormatter HIVE_TIMESTAMP_PARSER;
+
+    private static final Pattern SUPPORTED_VARCHAR_TYPE = Pattern.compile(VARCHAR_TYPE_NAME + "\\(\\d+\\)");
 
     static {
         DateTimeParser[] timestampWithoutTimeZoneParser = {
@@ -450,6 +454,11 @@ public final class HiveUtil
     public static boolean isStructuralType(HiveType hiveType)
     {
         return hiveType.getCategory() == Category.LIST || hiveType.getCategory() == Category.MAP || hiveType.getCategory() == Category.STRUCT;
+    }
+
+    public static boolean isVarcharType(HiveType hiveType)
+    {
+        return SUPPORTED_VARCHAR_TYPE.matcher(hiveType.getHiveTypeName()).matches();
     }
 
     public static boolean booleanPartitionKey(String value, String name)

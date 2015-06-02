@@ -57,10 +57,12 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.TimeZone;
+import java.util.stream.Collectors;
 
 import static com.facebook.presto.hive.HiveTestUtils.arrayBlockOf;
 import static com.facebook.presto.hive.HiveTestUtils.getTypes;
@@ -68,6 +70,7 @@ import static com.facebook.presto.hive.HiveTestUtils.rowBlockOf;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Predicates.not;
+import static com.google.common.collect.Iterables.any;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 import static java.util.Locale.ENGLISH;
@@ -157,15 +160,16 @@ public class TestHiveFileFormats
     public void testRCBinary()
             throws Exception
     {
+        List<TestColumn> testColumns = filterOutPrimitiveTypes(TEST_COLUMNS, Arrays.asList(PrimitiveCategory.VARCHAR));
         HiveOutputFormat<?, ?> outputFormat = new RCFileOutputFormat();
         InputFormat<?, ?> inputFormat = new RCFileInputFormat<>();
         @SuppressWarnings("deprecation")
         SerDe serde = new LazyBinaryColumnarSerDe();
         File file = File.createTempFile("presto_test", "rc-binary");
         try {
-            FileSplit split = createTestFile(file.getAbsolutePath(), outputFormat, serde, null, TEST_COLUMNS, NUM_ROWS);
-            testCursorProvider(new ColumnarBinaryHiveRecordCursorProvider(), split, inputFormat, serde, TEST_COLUMNS, NUM_ROWS);
-            testCursorProvider(new GenericHiveRecordCursorProvider(), split, inputFormat, serde, TEST_COLUMNS, NUM_ROWS);
+            FileSplit split = createTestFile(file.getAbsolutePath(), outputFormat, serde, null, testColumns, NUM_ROWS);
+            testCursorProvider(new ColumnarBinaryHiveRecordCursorProvider(), split, inputFormat, serde, testColumns, NUM_ROWS);
+            testCursorProvider(new GenericHiveRecordCursorProvider(), split, inputFormat, serde, testColumns, NUM_ROWS);
         }
         finally {
             //noinspection ResultOfMethodCallIgnored
@@ -197,6 +201,7 @@ public class TestHiveFileFormats
     public void testOrc()
             throws Exception
     {
+        List<TestColumn> testColumns = filterOutPrimitiveTypes(TEST_COLUMNS, Arrays.asList(PrimitiveCategory.VARCHAR));
         HiveOutputFormat<?, ?> outputFormat = new org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat();
         InputFormat<?, ?> inputFormat = new org.apache.hadoop.hive.ql.io.orc.OrcInputFormat();
         @SuppressWarnings("deprecation")
@@ -204,8 +209,8 @@ public class TestHiveFileFormats
         File file = File.createTempFile("presto_test", "orc");
         file.delete();
         try {
-            FileSplit split = createTestFile(file.getAbsolutePath(), outputFormat, serde, null, TEST_COLUMNS, NUM_ROWS);
-            testCursorProvider(new OrcRecordCursorProvider(), split, inputFormat, serde, TEST_COLUMNS, NUM_ROWS);
+            FileSplit split = createTestFile(file.getAbsolutePath(), outputFormat, serde, null, testColumns, NUM_ROWS);
+            testCursorProvider(new OrcRecordCursorProvider(), split, inputFormat, serde, testColumns, NUM_ROWS);
         }
         finally {
             //noinspection ResultOfMethodCallIgnored
@@ -217,6 +222,7 @@ public class TestHiveFileFormats
     public void testOrcDataStream()
             throws Exception
     {
+        List<TestColumn> testColumns = filterOutPrimitiveTypes(TEST_COLUMNS, Arrays.asList(PrimitiveCategory.VARCHAR));
         HiveOutputFormat<?, ?> outputFormat = new org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat();
         InputFormat<?, ?> inputFormat = new org.apache.hadoop.hive.ql.io.orc.OrcInputFormat();
         @SuppressWarnings("deprecation")
@@ -224,8 +230,8 @@ public class TestHiveFileFormats
         File file = File.createTempFile("presto_test", "orc");
         file.delete();
         try {
-            FileSplit split = createTestFile(file.getAbsolutePath(), outputFormat, serde, null, TEST_COLUMNS, NUM_ROWS);
-            testPageSourceFactory(new OrcPageSourceFactory(TYPE_MANAGER), split, inputFormat, serde, TEST_COLUMNS);
+            FileSplit split = createTestFile(file.getAbsolutePath(), outputFormat, serde, null, testColumns, NUM_ROWS);
+            testPageSourceFactory(new OrcPageSourceFactory(TYPE_MANAGER), split, inputFormat, serde, testColumns);
         }
         finally {
             //noinspection ResultOfMethodCallIgnored
@@ -326,16 +332,9 @@ public class TestHiveFileFormats
     public void testDwrf()
             throws Exception
     {
-        List<TestColumn> testColumns = ImmutableList.copyOf(filter(TEST_COLUMNS, new Predicate<TestColumn>()
-        {
-            @Override
-            public boolean apply(TestColumn testColumn)
-            {
-                ObjectInspector objectInspector = testColumn.getObjectInspector();
-                return !hasType(objectInspector, PrimitiveCategory.DATE);
-            }
-
-        }));
+        List<TestColumn> testColumns = filterOutPrimitiveTypes(
+                TEST_COLUMNS,
+                Arrays.asList(PrimitiveCategory.DATE, PrimitiveCategory.VARCHAR));
 
         HiveOutputFormat<?, ?> outputFormat = new com.facebook.hive.orc.OrcOutputFormat();
         InputFormat<?, ?> inputFormat = new com.facebook.hive.orc.OrcInputFormat();
@@ -357,16 +356,9 @@ public class TestHiveFileFormats
     public void testDwrfDataStream()
             throws Exception
     {
-        List<TestColumn> testColumns = ImmutableList.copyOf(filter(TEST_COLUMNS, new Predicate<TestColumn>()
-        {
-            @Override
-            public boolean apply(TestColumn testColumn)
-            {
-                ObjectInspector objectInspector = testColumn.getObjectInspector();
-                return !hasType(objectInspector, PrimitiveCategory.DATE);
-            }
-
-        }));
+        List<TestColumn> testColumns = filterOutPrimitiveTypes(
+                TEST_COLUMNS,
+                Arrays.asList(PrimitiveCategory.DATE, PrimitiveCategory.VARCHAR));
 
         HiveOutputFormat<?, ?> outputFormat = new com.facebook.hive.orc.OrcOutputFormat();
         InputFormat<?, ?> inputFormat = new com.facebook.hive.orc.OrcInputFormat();
@@ -482,5 +474,12 @@ public class TestHiveFileFormats
             return false;
         }
         throw new IllegalArgumentException("Unknown object inspector type " + objectInspector);
+    }
+
+    private List<TestColumn> filterOutPrimitiveTypes(List<TestColumn> testColumns, List<PrimitiveCategory> primitiveCategories)
+    {
+        return testColumns.stream().filter(
+                testColumn -> any(primitiveCategories,
+                        primitiveCategory -> hasType(testColumn.getObjectInspector(), primitiveCategory))).collect(Collectors.toList());
     }
 }

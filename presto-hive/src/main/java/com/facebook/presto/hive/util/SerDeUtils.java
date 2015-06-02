@@ -45,6 +45,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspect
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ShortObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.TimestampObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
 import org.joda.time.DateTimeZone;
 
 import java.sql.Timestamp;
@@ -114,6 +115,11 @@ public final class SerDeUtils
                 return;
             case STRING:
                 VarcharType.VARCHAR.writeSlice(builder, Slices.utf8Slice(((StringObjectInspector) inspector).getPrimitiveJavaObject(object)));
+                return;
+            case VARCHAR:
+                VarcharType.VARCHAR.writeSlice(
+                        builder,
+                        Slices.utf8Slice(((HiveVarcharObjectInspector) inspector).getPrimitiveJavaObject(object).getValue()));
                 return;
             case DATE:
                 DateType.DATE.writeLong(builder, formatDateAsLong(object, (DateObjectInspector) inspector));
