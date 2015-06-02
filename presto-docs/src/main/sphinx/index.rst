@@ -10,10 +10,10 @@ Presto Documentation
     admin
     configuration
     connector
+    querying
+    sql
     security
     functions
     language
-    sql
-    querying
     migration
     release
