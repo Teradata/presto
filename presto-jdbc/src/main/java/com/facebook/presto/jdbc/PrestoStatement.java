@@ -13,6 +13,9 @@
  */
 package com.facebook.presto.jdbc;
 
+import com.facebook.presto.client.QueryResults;
+import com.facebook.presto.client.StatementClient;
+
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -59,11 +62,27 @@ public class PrestoStatement
     public int executeUpdate(String sql)
             throws SQLException
     {
-        ResultSet result = executeQuery(sql);
-        while (result.next()) {
-            continue;
+        try {
+            StatementClient client = connection().startQuery(sql);
+            PrestoResultSet result = new PrestoResultSet(client);
+
+            while (result.next()) {
+                // we just care about update count
+            }
+
+            QueryResults results = client.finalResults();
+
+            // dml statement
+            if (results.getUpdateCount() != null) {
+                return results.getUpdateCount().intValue();
+            }
+
+            // ddl statement
+            return 0;
         }
-        return 0;
+        catch (RuntimeException e) {
+            throw new SQLException("Error executing update statement", e);
+        }
     }
 
     @Override

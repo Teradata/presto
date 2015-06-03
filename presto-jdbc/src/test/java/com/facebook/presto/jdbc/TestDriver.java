@@ -725,8 +725,7 @@ public class TestDriver
         try (Connection connection = createConnection()) {
             try (Statement statement = connection.createStatement()) {
                 assertEquals(statement.executeUpdate("SELECT 123 x, 'foo' y, CAST(NULL AS bigint) z"), 0);
-                ResultSet rs = statement.getResultSet();
-                assertFalse(rs.next());
+                assertNull(statement.getResultSet());
             }
         }
     }
