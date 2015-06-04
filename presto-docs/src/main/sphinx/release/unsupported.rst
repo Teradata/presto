@@ -51,6 +51,10 @@ Columns with the following types are not visible in a table:
  * ``DECIMAL`` with parentheses
  * ``CHAR``
 
+Some types are only partially supported.
+
+ * ``VARCHAR`` is not supported in ORC and RCBinary file formats.
+
 Additionally, Presto does not map Hive data types 1-to-1.
 
  * All integral types are mapped to ``BIGINT``
