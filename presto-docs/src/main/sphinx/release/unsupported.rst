@@ -35,10 +35,13 @@ Known Limitations
  * ``DECIMAL`` and ``NUMERIC`` datatypes are not supported
  * ``FULL OUTER JOIN`` is not supported
  * ``NATURAL JOIN`` is not supported
+ * ``SEMI JOIN`` is not supported.
  * Scalar subqueries are not supported -- e.g. ``WHERE x = (SELECT y FROM ...)``
  * Correlated subqueries are not supported
  * Non-equi joins are only supported for inner join -- e.g. ``"n_name" < "p_name"``
  * ``EXISTS``, ``EXCEPT``, and ``INTERSECT`` are not supported.
+ * ``DROP TABLE IF EXISTS`` is not supported.
+ * ``ROLLUP`` is not supported
 
 Hive Datatype Notes
 -------------------
