@@ -47,6 +47,10 @@ for your Hive metastore Thrift service:
     connector.name=hive-cdh4
     hive.metastore.uri=thrift://example.net:9083
 
+Additionally, you should add the following property to ``jvm.config``, replacing <hdfs_username> with your hdfs user name: ::
+
+    -DHADOOP_USER_NAME=<hdfs_username>
+
 Multiple Hive Clusters
 ^^^^^^^^^^^^^^^^^^^^^^
 
