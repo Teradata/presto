@@ -93,6 +93,7 @@ CREATE TABLE presto_test_types_parquet (
 , t_float FLOAT
 , t_double DOUBLE
 , t_boolean BOOLEAN
+, t_varchar VARCHAR(50)
 , t_map MAP<STRING, STRING>
 , t_array_string ARRAY<STRING>
 , t_array_struct ARRAY<STRUCT<s_string: STRING, s_double:DOUBLE>>
@@ -110,6 +111,7 @@ SELECT
 , t_float
 , t_double
 , t_boolean
+, t_varchar
 , t_map
 , t_array_string
 , t_array_struct

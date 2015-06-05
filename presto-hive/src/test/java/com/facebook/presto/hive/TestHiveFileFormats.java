@@ -70,7 +70,7 @@ import static com.facebook.presto.hive.HiveTestUtils.rowBlockOf;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Predicates.not;
-import static com.google.common.collect.Iterables.any;
+import static com.google.common.collect.Iterables.all;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 import static java.util.Locale.ENGLISH;
@@ -160,7 +160,8 @@ public class TestHiveFileFormats
     public void testRCBinary()
             throws Exception
     {
-        List<TestColumn> testColumns = filterOutPrimitiveTypes(TEST_COLUMNS, Arrays.asList(PrimitiveCategory.VARCHAR));
+        // RCBINARY interprets empty VARCHAR as nulls
+        List<TestColumn> testColumns = TEST_COLUMNS.stream().filter(column -> !column.getName().equals("t_empty_varchar")).collect(Collectors.toList());
         HiveOutputFormat<?, ?> outputFormat = new RCFileOutputFormat();
         InputFormat<?, ?> inputFormat = new RCFileInputFormat<>();
         @SuppressWarnings("deprecation")
@@ -201,7 +202,6 @@ public class TestHiveFileFormats
     public void testOrc()
             throws Exception
     {
-        List<TestColumn> testColumns = filterOutPrimitiveTypes(TEST_COLUMNS, Arrays.asList(PrimitiveCategory.VARCHAR));
         HiveOutputFormat<?, ?> outputFormat = new org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat();
         InputFormat<?, ?> inputFormat = new org.apache.hadoop.hive.ql.io.orc.OrcInputFormat();
         @SuppressWarnings("deprecation")
@@ -209,8 +209,8 @@ public class TestHiveFileFormats
         File file = File.createTempFile("presto_test", "orc");
         file.delete();
         try {
-            FileSplit split = createTestFile(file.getAbsolutePath(), outputFormat, serde, null, testColumns, NUM_ROWS);
-            testCursorProvider(new OrcRecordCursorProvider(), split, inputFormat, serde, testColumns, NUM_ROWS);
+            FileSplit split = createTestFile(file.getAbsolutePath(), outputFormat, serde, null, TEST_COLUMNS, NUM_ROWS);
+            testCursorProvider(new OrcRecordCursorProvider(), split, inputFormat, serde, TEST_COLUMNS, NUM_ROWS);
         }
         finally {
             //noinspection ResultOfMethodCallIgnored
@@ -222,7 +222,6 @@ public class TestHiveFileFormats
     public void testOrcDataStream()
             throws Exception
     {
-        List<TestColumn> testColumns = filterOutPrimitiveTypes(TEST_COLUMNS, Arrays.asList(PrimitiveCategory.VARCHAR));
         HiveOutputFormat<?, ?> outputFormat = new org.apache.hadoop.hive.ql.io.orc.OrcOutputFormat();
         InputFormat<?, ?> inputFormat = new org.apache.hadoop.hive.ql.io.orc.OrcInputFormat();
         @SuppressWarnings("deprecation")
@@ -230,8 +229,8 @@ public class TestHiveFileFormats
         File file = File.createTempFile("presto_test", "orc");
         file.delete();
         try {
-            FileSplit split = createTestFile(file.getAbsolutePath(), outputFormat, serde, null, testColumns, NUM_ROWS);
-            testPageSourceFactory(new OrcPageSourceFactory(TYPE_MANAGER), split, inputFormat, serde, testColumns);
+            FileSplit split = createTestFile(file.getAbsolutePath(), outputFormat, serde, null, TEST_COLUMNS, NUM_ROWS);
+            testPageSourceFactory(new OrcPageSourceFactory(TYPE_MANAGER), split, inputFormat, serde, TEST_COLUMNS);
         }
         finally {
             //noinspection ResultOfMethodCallIgnored
@@ -479,7 +478,7 @@ public class TestHiveFileFormats
     private List<TestColumn> filterOutPrimitiveTypes(List<TestColumn> testColumns, List<PrimitiveCategory> primitiveCategories)
     {
         return testColumns.stream().filter(
-                testColumn -> any(primitiveCategories,
-                        primitiveCategory -> hasType(testColumn.getObjectInspector(), primitiveCategory))).collect(Collectors.toList());
+                testColumn -> all(primitiveCategories,
+                        primitiveCategory -> !hasType(testColumn.getObjectInspector(), primitiveCategory))).collect(Collectors.toList());
     }
 }

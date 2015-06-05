@@ -42,6 +42,7 @@ public final class BlockReaders
                 return new DoubleBlockReader(streamDescriptor);
             case BINARY:
             case STRING:
+            case VARCHAR:
                 return new SliceBlockReader(streamDescriptor);
             case TIMESTAMP:
                 return new TimestampBlockReader(streamDescriptor, hiveStorageTimeZone);
@@ -55,7 +56,6 @@ public final class BlockReaders
                 return new MapBlockReader(streamDescriptor, checkForNulls, hiveStorageTimeZone);
             case UNION:
             case DECIMAL:
-            case VARCHAR:
             case CHAR:
             default:
                 throw new IllegalArgumentException("Unsupported type: " + streamDescriptor.getStreamType());
