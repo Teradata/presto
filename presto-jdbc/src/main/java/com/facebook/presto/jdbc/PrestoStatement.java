@@ -166,6 +166,8 @@ public class PrestoStatement
     public boolean execute(String sql)
             throws SQLException
     {
+        clearCurrentResults();
+
         checkOpen();
         checkNotNull(sql, "null sql statement");
 
@@ -214,6 +216,12 @@ public class PrestoStatement
                 }
             }
         }
+    }
+
+    private void clearCurrentResults()
+    {
+        currentResult.set(null);
+        currentUpdateCount.set(-1);
     }
 
     @Override

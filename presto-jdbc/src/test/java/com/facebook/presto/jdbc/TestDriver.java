@@ -816,6 +816,34 @@ public class TestDriver
     }
 
     @Test
+    public void testExecuteUpdateCountCurrentResultCleared()
+            throws Exception
+    {
+        try (Connection connection = createConnection("blackhole", "blackhole")) {
+            try (Statement statement = connection.createStatement()) {
+                // update statement
+                assertFalse(statement.execute("INSERT INTO test_table VALUES (1)"));
+                assertNull(statement.getResultSet());
+                assertEquals(statement.getUpdateCount(), 1);
+                assertEquals(statement.getLargeUpdateCount(), 1L);
+
+                // query statement
+                assertTrue(statement.execute("SELECT 123 x, 'foo' y, CAST(NULL AS bigint) z"));
+                assertNotNull(statement.getResultSet());
+                assertEquals(statement.getUpdateCount(), -1);
+                assertEquals(statement.getLargeUpdateCount(), -1L);
+                statement.getResultSet().close();
+
+                // update statement
+                assertFalse(statement.execute("INSERT INTO test_table VALUES (1)"));
+                assertNull(statement.getResultSet());
+                assertEquals(statement.getUpdateCount(), 1);
+                assertEquals(statement.getLargeUpdateCount(), 1L);
+            }
+        }
+    }
+
+    @Test
     public void testGetUpdateCount()
             throws Exception
     {
