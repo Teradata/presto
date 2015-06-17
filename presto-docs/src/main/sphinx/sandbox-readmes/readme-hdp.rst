@@ -3,7 +3,10 @@ Readme for HDP VM Sandbox
 =========================
 
 This is a VirtualBox sandbox image that can be used to experiment with the Presto distribution.
-The password to the root account on the VM is `presto`.
+The credentials for the VM are:
+
+    |  user: **root**
+    |  password: **presto**
 
 The image is based on Hortonworks HDP 2.2.4 and contains following components:
 
