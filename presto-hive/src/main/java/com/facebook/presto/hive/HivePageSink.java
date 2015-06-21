@@ -60,6 +60,7 @@ import static com.facebook.presto.hive.HiveErrorCode.HIVE_INVALID_METADATA;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PARTITION_SCHEMA_MISMATCH;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PATH_ALREADY_EXISTS;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_WRITER_ERROR;
+import static com.facebook.presto.hive.HiveType.toHiveTypes;
 import static com.facebook.presto.hive.HiveWriteUtils.getField;
 import static com.facebook.presto.hive.HiveWriteUtils.getTableDefaultLocation;
 import static com.facebook.presto.spi.StandardErrorCode.USER_ERROR;
@@ -275,6 +276,8 @@ public class HivePageSink
         if (!partition.isPresent()) {
             Properties schema;
             String target;
+            String outputFormat;
+            String serDe;
             if (table == null) {
                 // Write new a table either in a new partition or directly for an unpartitioned table
                 schema = new Properties();
@@ -296,6 +299,8 @@ public class HivePageSink
                                 newPartitionPath));
                     }
                 }
+                outputFormat = tableStorageFormat.getOutputFormat();
+                serDe = tableStorageFormat.getSerDe();
             }
             else {
                 // Write new partition in a partitioned table, or append to an existing unpartitioned table
@@ -307,6 +312,8 @@ public class HivePageSink
                         tableName,
                         table.getPartitionKeys());
                 target = table.getSd().getLocation();
+                outputFormat = table.getSd().getOutputFormat();
+                serDe = table.getSd().getSerdeInfo().getSerializationLib();
             }
             if (!partitionName.isEmpty()) {
                 target = new Path(target, partitionName).toString();
@@ -331,8 +338,8 @@ public class HivePageSink
                     true,
                     dataColumnNames,
                     dataColumnTypes,
-                    tableStorageFormat.getOutputFormat(),
-                    tableStorageFormat.getSerDe(),
+                    outputFormat,
+                    serDe,
                     schema,
                     generateRandomFileName(),
                     write,
@@ -450,8 +457,8 @@ public class HivePageSink
 
             // existing tables may have columns in a different order
             List<String> fileColumnNames = Splitter.on(',').trimResults().omitEmptyStrings().splitToList(schema.getProperty(META_TABLE_COLUMNS, ""));
-            List<Type> fileColumnTypes = Splitter.on(':').trimResults().omitEmptyStrings().splitToList(schema.getProperty(META_TABLE_COLUMN_TYPES, "")).stream()
-                    .map(hiveType -> HiveType.getType(hiveType, typeManager))
+            List<Type> fileColumnTypes = toHiveTypes(schema.getProperty(META_TABLE_COLUMN_TYPES, "")).stream()
+                    .map(hiveType -> hiveType.getType(typeManager))
                     .collect(toList());
 
             // verify we can write all input columns to the file

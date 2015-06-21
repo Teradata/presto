@@ -17,6 +17,7 @@ import com.facebook.presto.hive.metastore.HiveMetastore;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaNotFoundException;
 import com.facebook.presto.spi.SchemaTableName;
+import com.facebook.presto.spi.StandardErrorCode;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.BooleanType;
@@ -62,12 +63,15 @@ import static com.facebook.presto.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_INVALID_METADATA;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PATH_ALREADY_EXISTS;
 import static com.facebook.presto.hive.HiveSplitManager.PRESTO_OFFLINE;
+import static com.facebook.presto.hive.HiveUtil.checkCondition;
 import static com.facebook.presto.hive.HiveUtil.isArrayType;
 import static com.facebook.presto.hive.HiveUtil.isMapType;
+import static com.facebook.presto.hive.HiveUtil.isRowType;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.lang.String.format;
 import static java.util.UUID.randomUUID;
+import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hive.metastore.MetaStoreUtils.getProtectMode;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaBooleanObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaByteArrayObjectInspector;
@@ -134,6 +138,15 @@ public final class HiveWriteUtils
             ObjectInspector valueObjectInspector = getJavaObjectInspector(type.getTypeParameters().get(1));
             return ObjectInspectorFactory.getStandardMapObjectInspector(keyObjectInspector, valueObjectInspector);
         }
+        else if (isRowType(type)) {
+            return ObjectInspectorFactory.getStandardStructObjectInspector(
+                    type.getTypeSignature().getLiteralParameters().stream()
+                            .map(String.class::cast)
+                            .collect(toList()),
+                    type.getTypeParameters().stream()
+                            .map(HiveWriteUtils::getJavaObjectInspector)
+                            .collect(toList()));
+        }
         throw new IllegalArgumentException("unsupported type: " + type);
     }
 
@@ -171,13 +184,13 @@ public final class HiveWriteUtils
 
             Block arrayBlock = block.getObject(position, Block.class);
 
-            List<Object> values = Lists.newArrayListWithCapacity(arrayBlock.getPositionCount());
+            List<Object> list = Lists.newArrayListWithCapacity(arrayBlock.getPositionCount());
             for (int i = 0; i < arrayBlock.getPositionCount(); i++) {
                 Object element = getField(elementType, arrayBlock, i);
-                values.add(element);
+                list.add(element);
             }
 
-            return Collections.unmodifiableList(values);
+            return Collections.unmodifiableList(list);
         }
         if (isMapType(type)) {
             Type keyType = type.getTypeParameters().get(0);
@@ -192,6 +205,20 @@ public final class HiveWriteUtils
             }
 
             return Collections.unmodifiableMap(map);
+        }
+        if (isRowType(type)) {
+            Block rowBlock = block.getObject(position, Block.class);
+
+            List<Type> fieldTypes = type.getTypeParameters();
+            checkCondition(fieldTypes.size() == rowBlock.getPositionCount(), StandardErrorCode.INTERNAL_ERROR, "Expected row value field count does not match type field count");
+
+            List<Object> row = Lists.newArrayListWithCapacity(rowBlock.getPositionCount());
+            for (int i = 0; i < rowBlock.getPositionCount(); i++) {
+                Object element = getField(fieldTypes.get(i), rowBlock, i);
+                row.add(element);
+            }
+
+            return Collections.unmodifiableList(row);
         }
         throw new PrestoException(NOT_SUPPORTED, "unsupported type: " + type);
     }

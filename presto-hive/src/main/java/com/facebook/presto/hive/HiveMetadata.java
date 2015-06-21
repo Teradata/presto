@@ -28,7 +28,6 @@ import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.TableNotFoundException;
 import com.facebook.presto.spi.ViewNotFoundException;
 import com.facebook.presto.spi.type.TypeManager;
-import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -64,6 +63,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.function.Function;
 
 import static com.facebook.presto.hive.HiveColumnHandle.SAMPLE_WEIGHT_COLUMN_NAME;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
@@ -95,7 +95,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.Iterables.concat;
-import static com.google.common.collect.Iterables.transform;
 import static java.lang.String.format;
 import static java.util.Collections.emptyList;
 import static java.util.UUID.randomUUID;
@@ -210,8 +209,18 @@ public class HiveMetadata
         if (!table.isPresent() || table.get().getTableType().equals(TableType.VIRTUAL_VIEW.name())) {
             throw new TableNotFoundException(tableName);
         }
-        List<HiveColumnHandle> handles = hiveColumnHandles(typeManager, connectorId, table.get(), false);
-        List<ColumnMetadata> columns = ImmutableList.copyOf(transform(handles, columnMetadataGetter(table.get(), typeManager)));
+
+        Function<HiveColumnHandle, ColumnMetadata> metadataGetter = columnMetadataGetter(table.get(), typeManager);
+        boolean sampled = false;
+        ImmutableList.Builder<ColumnMetadata> columns = ImmutableList.builder();
+        for (HiveColumnHandle columnHandle : hiveColumnHandles(connectorId, table.get())) {
+            if (columnHandle.getName().equals(SAMPLE_WEIGHT_COLUMN_NAME)) {
+                sampled = true;
+            }
+            else {
+                columns.add(metadataGetter.apply(columnHandle));
+            }
+        }
 
         ImmutableMap.Builder<String, Object> properties = ImmutableMap.builder();
         try {
@@ -228,7 +237,7 @@ public class HiveMetadata
             properties.put(PARTITIONED_BY_PROPERTY, partitionedBy);
         }
 
-        return new ConnectorTableMetadata(tableName, columns, properties.build(), table.get().getOwner());
+        return new ConnectorTableMetadata(tableName, columns.build(), properties.build(), table.get().getOwner(), sampled);
     }
 
     @Override
@@ -259,7 +268,7 @@ public class HiveMetadata
         if (!table.isPresent()) {
             throw new TableNotFoundException(tableName);
         }
-        for (HiveColumnHandle columnHandle : hiveColumnHandles(typeManager, connectorId, table.get(), true)) {
+        for (HiveColumnHandle columnHandle : hiveColumnHandles(connectorId, table.get())) {
             if (columnHandle.getName().equals(SAMPLE_WEIGHT_COLUMN_NAME)) {
                 return columnHandle;
             }
@@ -282,8 +291,10 @@ public class HiveMetadata
             throw new TableNotFoundException(tableName);
         }
         ImmutableMap.Builder<String, ColumnHandle> columnHandles = ImmutableMap.builder();
-        for (HiveColumnHandle columnHandle : hiveColumnHandles(typeManager, connectorId, table.get(), false)) {
-            columnHandles.put(columnHandle.getName(), columnHandle);
+        for (HiveColumnHandle columnHandle : hiveColumnHandles(connectorId, table.get())) {
+            if (!columnHandle.getName().equals(SAMPLE_WEIGHT_COLUMN_NAME)) {
+                columnHandles.put(columnHandle.getName(), columnHandle);
+            }
         }
         return columnHandles.build();
     }
@@ -601,7 +612,7 @@ public class HiveMetadata
 
         HiveStorageFormat hiveStorageFormat = extractHiveStorageFormat(table.get());
 
-        List<HiveColumnHandle> handles = hiveColumnHandles(typeManager, connectorId, table.get(), false);
+        List<HiveColumnHandle> handles = hiveColumnHandles(connectorId, table.get());
 
         Path targetPath = new Path(table.get().getSd().getLocation());
         Optional<String> writePath;
@@ -675,6 +686,7 @@ public class HiveMetadata
                 .map(partitionUpdateCodec::fromJson)
                 .collect(toList());
 
+        HiveStorageFormat storageFormat = handle.getHiveStorageFormat();
         PartitionCommitter partitionCommitter = new PartitionCommitter(handle.getSchemaName(), handle.getTableName(), metastore, PARTITION_COMMIT_BATCH_SIZE);
         try {
             partitionUpdates = PartitionUpdate.mergePartitionUpdates(partitionUpdates);
@@ -682,6 +694,9 @@ public class HiveMetadata
             Optional<Table> table = metastore.getTable(handle.getSchemaName(), handle.getTableName());
             if (!table.isPresent()) {
                 throw new TableNotFoundException(new SchemaTableName(handle.getSchemaName(), handle.getTableName()));
+            }
+            if (!table.get().getSd().getInputFormat().equals(storageFormat.getInputFormat())) {
+                throw new IllegalStateException();
             }
 
             List<CompletableFuture<?>> fileRenameFutures = new ArrayList<>();
@@ -697,6 +712,9 @@ public class HiveMetadata
                     }
                     // add new partition
                     Partition partition = createPartition(table.get(), partitionUpdate);
+                    if (!partition.getSd().getInputFormat().equals(storageFormat.getInputFormat())) {
+                        throw new IllegalStateException();
+                    }
                     partitionCommitter.addPartition(partition);
                 }
                 else {
