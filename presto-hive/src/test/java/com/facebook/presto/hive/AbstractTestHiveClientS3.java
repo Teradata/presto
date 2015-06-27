@@ -68,6 +68,7 @@ import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.util.concurrent.MoreExecutors.newDirectExecutorService;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
+import static io.airlift.testing.Assertions.assertEqualsIgnoreOrder;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
 import static java.util.concurrent.Executors.newCachedThreadPool;
@@ -311,32 +312,27 @@ public abstract class AbstractTestHiveClientS3
         // table, which fails without explicit configuration for S3.
         // We work around that by using a dummy location when creating the
         // table and update it here to the correct S3 location.
-        metastoreClient.updateTableLocation(database, tableName.getTableName(), outputHandle.getWritePath().toString());
+        metastoreClient.updateTableLocation(database, tableName.getTableName(), outputHandle.getWritePath());
 
         // load the new table
         ConnectorTableHandle tableHandle = getTableHandle(tableName);
         List<ColumnHandle> columnHandles = ImmutableList.copyOf(metadata.getColumnHandles(SESSION, tableHandle).values());
 
+        // verify the metadata
+        tableMetadata = metadata.getTableMetadata(SESSION, getTableHandle(tableName));
+        assertEquals(tableMetadata.getOwner(), tableOwner);
+
+        assertEquals(tableMetadata.getColumns(), columns);
+
         // verify the data
-        ConnectorPartitionResult partitionResult = splitManager.getPartitions(SESSION, tableHandle, TupleDomain.<ColumnHandle>all());
+        ConnectorPartitionResult partitionResult = splitManager.getPartitions(SESSION, tableHandle, TupleDomain.all());
         assertEquals(partitionResult.getPartitions().size(), 1);
         ConnectorSplitSource splitSource = splitManager.getPartitionSplits(SESSION, tableHandle, partitionResult.getPartitions());
         ConnectorSplit split = getOnlyElement(getAllSplits(splitSource));
 
         try (ConnectorPageSource pageSource = pageSourceProvider.createPageSource(SESSION, split, columnHandles)) {
             MaterializedResult result = materializeSourceDataStream(SESSION, pageSource, getTypes(columnHandles));
-            assertEquals(result.getRowCount(), 3);
-
-            MaterializedRow row;
-
-            row = result.getMaterializedRows().get(0);
-            assertEquals(row.getField(0), 1L);
-
-            row = result.getMaterializedRows().get(1);
-            assertEquals(row.getField(0), 3L);
-
-            row = result.getMaterializedRows().get(2);
-            assertEquals(row.getField(0), 2L);
+            assertEqualsIgnoreOrder(result.getMaterializedRows(), data.getMaterializedRows());
         }
     }
 
