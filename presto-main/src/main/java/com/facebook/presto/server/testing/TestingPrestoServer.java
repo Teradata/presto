@@ -24,6 +24,7 @@ import com.facebook.presto.server.PluginManager;
 import com.facebook.presto.server.ServerMainModule;
 import com.facebook.presto.spi.Node;
 import com.facebook.presto.spi.Plugin;
+import com.facebook.presto.split.SplitManager;
 import com.facebook.presto.sql.parser.SqlParserOptions;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
@@ -78,6 +79,7 @@ public class TestingPrestoServer
     private final ConnectorManager connectorManager;
     private final TestingHttpServer server;
     private final Metadata metadata;
+    private final SplitManager splitManager;
     private final ClusterMemoryManager clusterMemoryManager;
     private final LocalMemoryManager localMemoryManager;
     private final InternalNodeManager nodeManager;
@@ -167,6 +169,7 @@ public class TestingPrestoServer
 
         server = injector.getInstance(TestingHttpServer.class);
         metadata = injector.getInstance(Metadata.class);
+        splitManager = injector.getInstance(SplitManager.class);
         clusterMemoryManager = injector.getInstance(ClusterMemoryManager.class);
         localMemoryManager = injector.getInstance(LocalMemoryManager.class);
         nodeManager = injector.getInstance(InternalNodeManager.class);
@@ -238,6 +241,11 @@ public class TestingPrestoServer
     public Metadata getMetadata()
     {
         return metadata;
+    }
+
+    public SplitManager getSplitManager()
+    {
+        return splitManager;
     }
 
     public LocalMemoryManager getLocalMemoryManager()

@@ -63,6 +63,11 @@ public final class ClassLoaderSafeConnectorSplitManager
         }
     }
 
+    public ConnectorSplitManager getDelegate()
+    {
+        return delegate;
+    }
+
     @Override
     public String toString()
     {

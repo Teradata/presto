@@ -16,6 +16,7 @@ package com.facebook.presto.hive;
 import com.facebook.presto.hive.metastore.HiveMetastore;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaNotFoundException;
+import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.BooleanType;
@@ -30,7 +31,13 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.metastore.ProtectMode;
 import org.apache.hadoop.hive.metastore.api.Database;
+import org.apache.hadoop.hive.metastore.api.Order;
+import org.apache.hadoop.hive.metastore.api.Partition;
+import org.apache.hadoop.hive.metastore.api.SkewedInfo;
+import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
+import org.apache.hadoop.hive.metastore.api.Table;
 import org.apache.hadoop.hive.ql.exec.FileSinkOperator.RecordWriter;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
@@ -46,18 +53,22 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
 
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_DATABASE_LOCATION_ERROR;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
+import static com.facebook.presto.hive.HiveErrorCode.HIVE_INVALID_METADATA;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PATH_ALREADY_EXISTS;
+import static com.facebook.presto.hive.HiveSplitManager.PRESTO_OFFLINE;
 import static com.facebook.presto.hive.HiveUtil.isArrayType;
 import static com.facebook.presto.hive.HiveUtil.isMapType;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.lang.String.format;
 import static java.util.UUID.randomUUID;
+import static org.apache.hadoop.hive.metastore.MetaStoreUtils.getProtectMode;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaBooleanObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaByteArrayObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaDateObjectInspector;
@@ -183,6 +194,82 @@ public final class HiveWriteUtils
             return Collections.unmodifiableMap(map);
         }
         throw new PrestoException(NOT_SUPPORTED, "unsupported type: " + type);
+    }
+
+    public static void checkTableIsWritable(Table table)
+    {
+        checkWritable(
+                new SchemaTableName(table.getDbName(), table.getTableName()),
+                Optional.empty(),
+                getProtectMode(table),
+                table.getParameters(),
+                table.getSd());
+    }
+
+    public static void checkPartitionIsWritable(String partitionName, Partition partition)
+    {
+        checkWritable(
+                new SchemaTableName(partition.getDbName(), partition.getTableName()),
+                Optional.of(partitionName),
+                getProtectMode(partition),
+                partition.getParameters(),
+                partition.getSd());
+    }
+
+    // todo how should we record the partition name
+    private static void checkWritable(
+            SchemaTableName tableName,
+            Optional<String> partitionName,
+            ProtectMode protectMode,
+            Map<String, String> parameters,
+            StorageDescriptor storageDescriptor)
+    {
+        // verify online
+        if (protectMode.offline) {
+            throw new TableOfflineException(tableName, "");
+        }
+        String prestoOffline = parameters.get(PRESTO_OFFLINE);
+        if (!isNullOrEmpty(prestoOffline)) {
+            throw new TableOfflineException(tableName,
+                    format("Table %s is offline for Presto: %s", tableName, prestoOffline));
+        }
+
+        // verify not read only
+        if (protectMode.readOnly) {
+            throw new HiveReadOnlyException(tableName, "");
+        }
+
+        // verify storage descriptor is valid
+        if (storageDescriptor == null) {
+            throw new PrestoException(HIVE_INVALID_METADATA, format("Table %s does not contain a valid storage descriptor", tableName));
+        }
+
+        // verify bucketing
+        List<String> bucketCols = storageDescriptor.getBucketCols();
+        if (bucketCols != null && !bucketCols.isEmpty()) {
+            throw new HiveReadOnlyException(
+                    tableName,
+                    "",
+                    "Can not insert into bucketed tables");
+        }
+
+        // verify sorting
+        List<Order> sortCols = storageDescriptor.getSortCols();
+        if (sortCols != null && !sortCols.isEmpty()) {
+            throw new HiveReadOnlyException(
+                    tableName,
+                    "",
+                    "Can not insert into bucketed tables");
+        }
+
+        // verify skew info
+        SkewedInfo skewedInfo = storageDescriptor.getSkewedInfo();
+        if (skewedInfo != null && skewedInfo.getSkewedColNames() != null && !skewedInfo.getSkewedColNames().isEmpty()) {
+            throw new HiveReadOnlyException(
+                    tableName,
+                    "",
+                    "Can not insert into bucketed tables");
+        }
     }
 
     public static Path getTableDefaultLocation(HiveMetastore metastore, HdfsEnvironment hdfsEnvironment, String schemaName, String tableName)
