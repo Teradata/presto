@@ -16,8 +16,8 @@ package com.facebook.presto.hive;
 import com.facebook.presto.spi.Connector;
 import com.facebook.presto.spi.ConnectorHandleResolver;
 import com.facebook.presto.spi.ConnectorMetadata;
+import com.facebook.presto.spi.ConnectorPageSinkProvider;
 import com.facebook.presto.spi.ConnectorPageSourceProvider;
-import com.facebook.presto.spi.ConnectorRecordSinkProvider;
 import com.facebook.presto.spi.ConnectorSplitManager;
 import com.facebook.presto.spi.SystemTable;
 import com.facebook.presto.spi.session.PropertyMetadata;
@@ -40,7 +40,7 @@ public class HiveConnector
     private final ConnectorMetadata metadata;
     private final ConnectorSplitManager splitManager;
     private final ConnectorPageSourceProvider pageSourceProvider;
-    private final ConnectorRecordSinkProvider recordSinkProvider;
+    private final ConnectorPageSinkProvider pageSinkProvider;
     private final ConnectorHandleResolver handleResolver;
     private final Set<SystemTable> systemTables;
     private final List<PropertyMetadata<?>> sessionProperties;
@@ -51,7 +51,7 @@ public class HiveConnector
             ConnectorMetadata metadata,
             ConnectorSplitManager splitManager,
             ConnectorPageSourceProvider pageSourceProvider,
-            ConnectorRecordSinkProvider recordSinkProvider,
+            ConnectorPageSinkProvider pageSinkProvider,
             ConnectorHandleResolver handleResolver,
             Set<SystemTable> systemTables,
             List<PropertyMetadata<?>> sessionProperties,
@@ -61,7 +61,7 @@ public class HiveConnector
         this.metadata = checkNotNull(metadata, "metadata is null");
         this.splitManager = checkNotNull(splitManager, "splitManager is null");
         this.pageSourceProvider = checkNotNull(pageSourceProvider, "pageSourceProvider is null");
-        this.recordSinkProvider = checkNotNull(recordSinkProvider, "recordSinkProvider is null");
+        this.pageSinkProvider = checkNotNull(pageSinkProvider, "recordSinkProvider is null");
         this.handleResolver = checkNotNull(handleResolver, "handleResolver is null");
         this.systemTables = ImmutableSet.copyOf(checkNotNull(systemTables, "systemTables is null"));
         this.sessionProperties = ImmutableList.copyOf(checkNotNull(sessionProperties, "sessionProperties is null"));
@@ -87,9 +87,9 @@ public class HiveConnector
     }
 
     @Override
-    public ConnectorRecordSinkProvider getRecordSinkProvider()
+    public ConnectorPageSinkProvider getPageSinkProvider()
     {
-        return recordSinkProvider;
+        return pageSinkProvider;
     }
 
     @Override

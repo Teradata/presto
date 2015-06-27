@@ -23,22 +23,20 @@ import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorTableHandle;
 import com.facebook.presto.spi.ConnectorTableMetadata;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.SchemaNotFoundException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.TableNotFoundException;
 import com.facebook.presto.spi.ViewNotFoundException;
-import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.google.common.base.Function;
-import com.google.common.base.StandardSystemProperty;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
+import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.TableType;
-import org.apache.hadoop.hive.metastore.api.Database;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
@@ -55,7 +53,6 @@ import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
 import static com.facebook.presto.hive.HiveColumnHandle.SAMPLE_WEIGHT_COLUMN_NAME;
-import static com.facebook.presto.hive.HiveErrorCode.HIVE_DATABASE_LOCATION_ERROR;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_INVALID_METADATA;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PATH_ALREADY_EXISTS;
@@ -63,11 +60,14 @@ import static com.facebook.presto.hive.HiveErrorCode.HIVE_TIMEZONE_MISMATCH;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_UNSUPPORTED_FORMAT;
 import static com.facebook.presto.hive.HiveTableProperties.STORAGE_FORMAT_PROPERTY;
 import static com.facebook.presto.hive.HiveTableProperties.getHiveStorageFormat;
+import static com.facebook.presto.hive.HiveType.toHiveType;
 import static com.facebook.presto.hive.HiveUtil.PRESTO_VIEW_FLAG;
 import static com.facebook.presto.hive.HiveUtil.decodeViewData;
 import static com.facebook.presto.hive.HiveUtil.encodeViewData;
 import static com.facebook.presto.hive.HiveUtil.hiveColumnHandles;
 import static com.facebook.presto.hive.HiveUtil.schemaTableName;
+import static com.facebook.presto.hive.HiveWriteUtils.createDirectory;
+import static com.facebook.presto.hive.HiveWriteUtils.getTableDefaultLocation;
 import static com.facebook.presto.hive.util.Types.checkType;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.StandardErrorCode.PERMISSION_DENIED;
@@ -300,33 +300,46 @@ public class HiveMetadata
         SchemaTableName schemaTableName = tableMetadata.getTable();
         String schemaName = schemaTableName.getSchemaName();
         String tableName = schemaTableName.getTableName();
+        List<HiveColumnHandle> columnHandles = getColumnHandles(connectorId, tableMetadata);
+        HiveStorageFormat hiveStorageFormat = getHiveStorageFormat(tableMetadata.getProperties());
+        createTable(schemaName, tableName, tableMetadata.getOwner(), columnHandles, hiveStorageFormat);
+    }
 
-        ImmutableList.Builder<String> columnNames = ImmutableList.builder();
-        ImmutableList.Builder<Type> columnTypes = ImmutableList.builder();
+    public void createTable(String schemaName, String tableName, String tableOwner, List<HiveColumnHandle> columnHandles, HiveStorageFormat hiveStorageFormat)
+    {
+        Path targetPath = getTableDefaultLocation(metastore, hdfsEnvironment, schemaName, tableName);
 
-        buildColumnInfo(tableMetadata, columnNames, columnTypes);
+        // verify the target directory for the table
+        if (HiveWriteUtils.pathExists(hdfsEnvironment, targetPath)) {
+            throw new PrestoException(HIVE_PATH_ALREADY_EXISTS, format("Target directory for table '%s.%s' already exists: %s", schemaName, tableName, targetPath));
+        }
 
-        ImmutableList.Builder<FieldSchema> partitionKeys = ImmutableList.builder();
-        ImmutableList.Builder<FieldSchema> columns = ImmutableList.builder();
+        createDirectory(hdfsEnvironment, targetPath);
+        createTable(schemaName, tableName, tableOwner, columnHandles, hiveStorageFormat, targetPath);
+    }
 
-        List<String> names = columnNames.build();
-        List<String> typeNames = columnTypes.build().stream()
-                .map(HiveType::toHiveType)
+    private void createTable(String schemaName, String tableName, String tableOwner, List<HiveColumnHandle> columnHandles, HiveStorageFormat hiveStorageFormat, Path targetPath)
+    {
+        // create the table in the metastore
+        List<String> types = columnHandles.stream()
+                .map(HiveColumnHandle::getHiveType)
                 .map(HiveType::getHiveTypeName)
                 .collect(toList());
 
-        for (int i = 0; i < names.size(); i++) {
-            if (tableMetadata.getColumns().get(i).isPartitionKey()) {
-                partitionKeys.add(new FieldSchema(names.get(i), typeNames.get(i), null));
+        boolean sampled = false;
+        ImmutableList.Builder<FieldSchema> columns = ImmutableList.builder();
+        for (int i = 0; i < columnHandles.size(); i++) {
+            String name = columnHandles.get(i).getName();
+            String type = types.get(i);
+            if (name.equals(SAMPLE_WEIGHT_COLUMN_NAME)) {
+                columns.add(new FieldSchema(name, type, "Presto sample weight column"));
+                sampled = true;
             }
             else {
-                columns.add(new FieldSchema(names.get(i), typeNames.get(i), null));
+                columns.add(new FieldSchema(name, type, null));
             }
         }
 
-        Path targetPath = getTargetPath(schemaName, tableName, schemaTableName);
-
-        HiveStorageFormat hiveStorageFormat = getHiveStorageFormat(tableMetadata.getProperties());
         SerDeInfo serdeInfo = new SerDeInfo();
         serdeInfo.setName(tableName);
         serdeInfo.setSerializationLib(hiveStorageFormat.getSerDe());
@@ -343,11 +356,14 @@ public class HiveMetadata
         Table table = new Table();
         table.setDbName(schemaName);
         table.setTableName(tableName);
-        table.setOwner(tableMetadata.getOwner());
+        table.setOwner(tableOwner);
         table.setTableType(TableType.MANAGED_TABLE.toString());
         String tableComment = "Created by Presto";
+        if (sampled) {
+            tableComment = "Sampled table created by Presto. Only query this table from Hive if you understand how Presto implements sampling.";
+        }
         table.setParameters(ImmutableMap.of("comment", tableComment));
-        table.setPartitionKeys(partitionKeys.build());
+        table.setPartitionKeys(ImmutableList.<FieldSchema>of());
         table.setSd(sd);
 
         metastore.createTable(table);
@@ -394,50 +410,38 @@ public class HiveMetadata
         checkArgument(!isNullOrEmpty(tableMetadata.getOwner()), "Table owner is null or empty");
 
         HiveStorageFormat hiveStorageFormat = getHiveStorageFormat(tableMetadata.getProperties());
-        ImmutableList.Builder<String> columnNames = ImmutableList.builder();
-        ImmutableList.Builder<Type> columnTypes = ImmutableList.builder();
 
         // get the root directory for the database
         SchemaTableName schemaTableName = tableMetadata.getTable();
         String schemaName = schemaTableName.getSchemaName();
         String tableName = schemaTableName.getTableName();
 
-        buildColumnInfo(tableMetadata, columnNames, columnTypes);
+        List<HiveColumnHandle> columnHandles = getColumnHandles(connectorId, tableMetadata);
 
-        Path targetPath = getTargetPath(schemaName, tableName, schemaTableName);
+        Path targetPath = getTableDefaultLocation(metastore, hdfsEnvironment, schemaName, tableName);
 
-        if (!useTemporaryDirectory(targetPath)) {
-            return new HiveOutputTableHandle(
-                    connectorId,
-                    schemaName,
-                    tableName,
-                    columnNames.build(),
-                    columnTypes.build(),
-                    tableMetadata.getOwner(),
-                    targetPath.toString(),
-                    targetPath.toString(),
-                    hiveStorageFormat);
+        // verify the target directory for the table
+        if (HiveWriteUtils.pathExists(hdfsEnvironment, targetPath)) {
+            throw new PrestoException(HIVE_PATH_ALREADY_EXISTS, format("Target directory for table '%s.%s' already exists: %s", schemaName, tableName, targetPath));
         }
 
-        // use a per-user temporary directory to avoid permission problems
-        // TODO: this should use Hadoop UserGroupInformation
-        String temporaryPrefix = "/tmp/presto-" + StandardSystemProperty.USER_NAME.value();
-
-        // create a temporary directory on the same filesystem
-        Path temporaryRoot = new Path(targetPath, temporaryPrefix);
-        Path temporaryPath = new Path(temporaryRoot, randomUUID().toString());
-        createDirectories(temporaryPath);
+        String writePath;
+        if (!useTemporaryDirectory(targetPath)) {
+            writePath = targetPath.toString();
+        }
+        else {
+            writePath = HiveWriteUtils.createTemporaryPath(hdfsEnvironment, targetPath);
+        }
 
         return new HiveOutputTableHandle(
                 connectorId,
                 schemaName,
                 tableName,
-                columnNames.build(),
-                columnTypes.build(),
-                tableMetadata.getOwner(),
-                targetPath.toString(),
-                temporaryPath.toString(),
-                hiveStorageFormat);
+                columnHandles,
+                randomUUID().toString(), // todo this should really be the queryId
+                writePath,
+                hiveStorageFormat,
+                tableMetadata.getOwner());
     }
 
     @Override
@@ -445,106 +449,36 @@ public class HiveMetadata
     {
         HiveOutputTableHandle handle = checkType(tableHandle, HiveOutputTableHandle.class, "tableHandle");
 
-        // verify no one raced us to create the target directory
-        Path targetPath = new Path(handle.getTargetPath());
+        Path targetPath = getTableDefaultLocation(metastore, hdfsEnvironment, handle.getSchemaName(), handle.getTableName());
+        Path writePath = new Path(handle.getWritePath());
 
         // rename if using a temporary directory
-        if (handle.hasTemporaryPath()) {
-            if (pathExists(targetPath)) {
-                SchemaTableName table = new SchemaTableName(handle.getSchemaName(), handle.getTableName());
-                throw new PrestoException(HIVE_PATH_ALREADY_EXISTS, format("Unable to commit creation of table '%s': target directory already exists: %s", table, targetPath));
+        if (!targetPath.equals(writePath)) {
+            // verify no one raced us to create the target directory
+            if (HiveWriteUtils.pathExists(hdfsEnvironment, targetPath)) {
+                throw new PrestoException(HIVE_PATH_ALREADY_EXISTS, format("Target directory for table '%s.%s' already exists: %s",
+                        handle.getSchemaName(),
+                        handle.getTableName(),
+                        targetPath));
             }
             // rename the temporary directory to the target
-            rename(new Path(handle.getTemporaryPath()), targetPath);
+            HiveWriteUtils.renameDirectory(hdfsEnvironment, handle.getSchemaName(), handle.getTableName(), writePath, targetPath);
         }
 
-        // create the table in the metastore
-        List<String> types = handle.getColumnTypes().stream()
-                .map(HiveType::toHiveType)
-                .map(HiveType::getHiveTypeName)
-                .collect(toList());
-
-        boolean sampled = false;
-        ImmutableList.Builder<FieldSchema> columns = ImmutableList.builder();
-        for (int i = 0; i < handle.getColumnNames().size(); i++) {
-            String name = handle.getColumnNames().get(i);
-            String type = types.get(i);
-            if (name.equals(SAMPLE_WEIGHT_COLUMN_NAME)) {
-                columns.add(new FieldSchema(name, type, "Presto sample weight column"));
-                sampled = true;
-            }
-            else {
-                columns.add(new FieldSchema(name, type, null));
-            }
-        }
-
-        HiveStorageFormat hiveStorageFormat = handle.getHiveStorageFormat();
-
-        SerDeInfo serdeInfo = new SerDeInfo();
-        serdeInfo.setName(handle.getTableName());
-        serdeInfo.setSerializationLib(hiveStorageFormat.getSerDe());
-        serdeInfo.setParameters(ImmutableMap.<String, String>of());
-
-        StorageDescriptor sd = new StorageDescriptor();
-        sd.setLocation(targetPath.toString());
-        sd.setCols(columns.build());
-        sd.setSerdeInfo(serdeInfo);
-        sd.setInputFormat(hiveStorageFormat.getInputFormat());
-        sd.setOutputFormat(hiveStorageFormat.getOutputFormat());
-        sd.setParameters(ImmutableMap.<String, String>of());
-
-        Table table = new Table();
-        table.setDbName(handle.getSchemaName());
-        table.setTableName(handle.getTableName());
-        table.setOwner(handle.getTableOwner());
-        table.setTableType(TableType.MANAGED_TABLE.toString());
-        String tableComment = "Created by Presto";
-        if (sampled) {
-            tableComment = "Sampled table created by Presto. Only query this table from Hive if you understand how Presto implements sampling.";
-        }
-        table.setParameters(ImmutableMap.of("comment", tableComment));
-        table.setPartitionKeys(ImmutableList.<FieldSchema>of());
-        table.setSd(sd);
-
-        metastore.createTable(table);
-    }
-
-    private Path getTargetPath(String schemaName, String tableName, SchemaTableName schemaTableName)
-    {
-        String location = getDatabase(schemaName).getLocationUri();
-        if (isNullOrEmpty(location)) {
-            throw new PrestoException(HIVE_DATABASE_LOCATION_ERROR, format("Database '%s' location is not set", schemaName));
-        }
-
-        Path databasePath = new Path(location);
-        if (!pathExists(databasePath)) {
-            throw new PrestoException(HIVE_DATABASE_LOCATION_ERROR, format("Database '%s' location does not exist: %s", schemaName, databasePath));
-        }
-        if (!isDirectory(databasePath)) {
-            throw new PrestoException(HIVE_DATABASE_LOCATION_ERROR, format("Database '%s' location is not a directory: %s", schemaName, databasePath));
-        }
-
-        // verify the target directory for the table
-        Path targetPath = new Path(databasePath, tableName);
-        if (pathExists(targetPath)) {
-            throw new PrestoException(HIVE_PATH_ALREADY_EXISTS, format("Target directory for table '%s' already exists: %s", schemaTableName, targetPath));
-        }
-        return targetPath;
-    }
-
-    private Database getDatabase(String database)
-    {
-        return metastore.getDatabase(database).orElseThrow(() -> new SchemaNotFoundException(database));
-    }
-
-    private boolean useTemporaryDirectory(Path path)
-    {
         try {
-            // skip using temporary directory for S3
-            return !(hdfsEnvironment.getFileSystem(path) instanceof PrestoS3FileSystem);
+            createTable(handle.getSchemaName(), handle.getTableName(), handle.getTableOwner(), handle.getInputColumns(), handle.getHiveStorageFormat(), targetPath);
         }
-        catch (IOException e) {
-            throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Failed checking path: " + path, e);
+        catch (Throwable throwable) {
+            // clean up the target directory
+            try {
+                FileSystem fileSystem = hdfsEnvironment.getFileSystem(targetPath);
+                fileSystem.delete(targetPath, true);
+            }
+            catch (IOException e) {
+                log.debug(e, "Error rolling back table creation. Can not table directory %s", targetPath);
+            }
+
+            throw throwable;
         }
     }
 
@@ -569,47 +503,43 @@ public class HiveMetadata
         throw new PrestoException(HIVE_UNSUPPORTED_FORMAT, format("Output format %s with SerDe %s is not supported", outputFormat, serializationLib));
     }
 
-    private boolean pathExists(Path path)
+    @Override
+    public void rollbackCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle)
     {
+        HiveOutputTableHandle handle = checkType(tableHandle, HiveOutputTableHandle.class, "tableHandle");
+
+        // create table only writes to the writePath which is a new temp dir
+        rollbackDataFiles(handle.getWritePath(), handle.getFilePrefix());
+
         try {
-            return hdfsEnvironment.getFileSystem(path).exists(path);
+            Path writePath = new Path(handle.getWritePath());
+            // todo is this correct
+            hdfsEnvironment.getFileSystem(writePath).delete(writePath, false);
         }
-        catch (IOException e) {
-            throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Failed checking path: " + path, e);
+        catch (IOException ignored) {
+            // this is temp data so an error isn't a big problem
         }
     }
 
-    private boolean isDirectory(Path path)
+    private void rollbackDataFiles(String location, String filePrefix)
     {
+        // delete data from target directory
+        Path targetPath = new Path(location);
         try {
-            return hdfsEnvironment.getFileSystem(path).isDirectory(path);
-        }
-        catch (IOException e) {
-            throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Failed checking path: " + path, e);
-        }
-    }
-
-    private void createDirectories(Path path)
-    {
-        try {
-            if (!hdfsEnvironment.getFileSystem(path).mkdirs(path)) {
-                throw new IOException("mkdirs returned false");
+            FileSystem fileSystem = hdfsEnvironment.getFileSystem(targetPath);
+            for (FileStatus fileStatus : fileSystem.listStatus(targetPath)) {
+                if (fileStatus.isFile() && fileStatus.getPath().getName().startsWith(filePrefix)) {
+                    try {
+                        fileSystem.delete(fileStatus.getPath(), true);
+                    }
+                    catch (IOException e) {
+                        log.error(e, "Error rolling back data file %s", fileStatus.getPath());
+                    }
+                }
             }
         }
         catch (IOException e) {
-            throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Failed to create directory: " + path, e);
-        }
-    }
-
-    private void rename(Path source, Path target)
-    {
-        try {
-            if (!hdfsEnvironment.getFileSystem(source).rename(source, target)) {
-                throw new IOException("rename returned false");
-            }
-        }
-        catch (IOException e) {
-            throw new PrestoException(HIVE_FILESYSTEM_ERROR, format("Failed to rename %s to %s", source, target), e);
+            log.error(e, "Error rolling back data files %s/%s*", location, filePrefix);
         }
     }
 
@@ -734,21 +664,44 @@ public class HiveMetadata
         }
     }
 
-    private static void buildColumnInfo(ConnectorTableMetadata tableMetadata, ImmutableList.Builder<String> names, ImmutableList.Builder<Type> types)
+    private boolean useTemporaryDirectory(Path path)
     {
-        for (ColumnMetadata column : tableMetadata.getColumns()) {
-            // TODO: also verify that the OutputFormat supports the type
-            if (!HiveRecordSink.isTypeSupported(column.getType())) {
-                throw new PrestoException(NOT_SUPPORTED, format("Cannot create table with unsupported type: %s", column.getType().getDisplayName()));
-            }
-            names.add(column.getName());
-            types.add(column.getType());
+        try {
+            // skip using temporary directory for S3
+            return !(hdfsEnvironment.getFileSystem(path) instanceof PrestoS3FileSystem);
         }
+        catch (IOException e) {
+            throw new PrestoException(HIVE_FILESYSTEM_ERROR, "Failed checking path: " + path, e);
+        }
+    }
 
-        if (tableMetadata.isSampled()) {
-            names.add(SAMPLE_WEIGHT_COLUMN_NAME);
-            types.add(BIGINT);
+    private static List<HiveColumnHandle> getColumnHandles(String connectorId, ConnectorTableMetadata tableMetadata)
+    {
+        ImmutableList.Builder<HiveColumnHandle> columnHandles = ImmutableList.builder();
+        int ordinal = 0;
+        for (ColumnMetadata column : tableMetadata.getColumns()) {
+            columnHandles.add(new HiveColumnHandle(
+                    connectorId,
+                    column.getName(),
+                    ordinal,
+                    toHiveType(column.getType()),
+                    column.getType().getTypeSignature(),
+                    ordinal,
+                    false));
+            ordinal++;
         }
+        if (tableMetadata.isSampled()) {
+            columnHandles.add(new HiveColumnHandle(
+                    connectorId,
+                    SAMPLE_WEIGHT_COLUMN_NAME,
+                    ordinal,
+                    toHiveType(BIGINT),
+                    BIGINT.getTypeSignature(),
+                    ordinal,
+                    false));
+            // ordinal++;
+        }
+        return columnHandles.build();
     }
 
     private static Function<HiveColumnHandle, ColumnMetadata> columnMetadataGetter(Table table, TypeManager typeManager)
