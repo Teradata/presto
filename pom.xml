@@ -5,12 +5,12 @@
     <parent>
         <groupId>io.airlift</groupId>
         <artifactId>airbase</artifactId>
-        <version>40</version>
+        <version>41</version>
     </parent>
 
     <groupId>com.facebook.presto</groupId>
     <artifactId>presto-root</artifactId>
-    <version>0.108-SNAPSHOT</version>
+    <version>0.111-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>presto-root</name>
@@ -43,7 +43,7 @@
         <air.check.skip-checkstyle>false</air.check.skip-checkstyle>
 
         <dep.antlr.version>4.3</dep.antlr.version>
-        <dep.airlift.version>0.110</dep.airlift.version>
+        <dep.airlift.version>0.112</dep.airlift.version>
         <dep.packaging.version>${dep.airlift.version}</dep.packaging.version>
         <dep.slice.version>0.14</dep.slice.version>
 
@@ -63,6 +63,7 @@
         <module>presto-spi</module>
         <module>presto-kafka</module>
         <module>presto-cassandra</module>
+        <module>presto-blackhole</module>
         <module>presto-orc</module>
         <module>presto-hive</module>
         <module>presto-hive-hadoop1</module>
@@ -86,6 +87,7 @@
         <module>presto-cli</module>
         <module>presto-benchmark-driver</module>
         <module>presto-server</module>
+        <module>presto-server-rpm</module>
         <module>presto-docs</module>
         <module>presto-verifier</module>
     </modules>
@@ -202,6 +204,12 @@
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-server</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-server-rpm</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

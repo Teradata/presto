@@ -94,17 +94,6 @@ public abstract class AbstractTestDistributedQueries
     }
 
     @Test
-    public void testCreateSampledTableAsSelectLimit()
-            throws Exception
-    {
-        assertCreateTable(
-                "test_limit_sampled",
-                "SELECT orderkey FROM tpch_sampled.tiny.orders ORDER BY orderkey LIMIT 10",
-                "SELECT orderkey FROM orders ORDER BY orderkey LIMIT 10",
-                "SELECT 10");
-    }
-
-    @Test
     public void testCreateTable()
             throws Exception
     {
@@ -120,37 +109,38 @@ public abstract class AbstractTestDistributedQueries
             throws Exception
     {
         assertCreateTable(
-                "test_simple",
+                "test_select",
                 "SELECT orderdate, orderkey, totalprice FROM orders",
                 "SELECT count(*) FROM orders");
-    }
 
-    @Test
-    public void testCreateTableAsSelectGroupBy()
-            throws Exception
-    {
         assertCreateTable(
                 "test_group",
                 "SELECT orderstatus, sum(totalprice) x FROM orders GROUP BY orderstatus",
                 "SELECT count(DISTINCT orderstatus) FROM orders");
-    }
 
-    @Test
-    public void testCreateTableAsSelectJoin()
-            throws Exception
-    {
         assertCreateTable(
                 "test_join",
                 "SELECT count(*) x FROM lineitem JOIN orders ON lineitem.orderkey = orders.orderkey",
                 "SELECT 1");
+
+        assertCreateTable(
+                "test_limit",
+                "SELECT orderkey FROM orders ORDER BY orderkey LIMIT 10",
+                "SELECT 10");
+
+        assertCreateTable(
+                "test_unicode",
+                "SELECT '\u2603' unicode",
+                "SELECT 1");
     }
 
     @Test
-    public void testCreateTableAsSelectLimit()
+    public void testCreateTableAsSelectSampled()
             throws Exception
     {
         assertCreateTable(
-                "test_limit",
+                "test_sampled",
+                "SELECT orderkey FROM tpch_sampled.tiny.orders ORDER BY orderkey LIMIT 10",
                 "SELECT orderkey FROM orders ORDER BY orderkey LIMIT 10",
                 "SELECT 10");
     }
@@ -239,6 +229,21 @@ public abstract class AbstractTestDistributedQueries
                 "SELECT * FROM test_delete",
                 "SELECT * FROM lineitem WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderstatus <> 'F')");
 
+        assertQueryTrue("DROP TABLE test_delete");
+
+        // delete using a constant property
+
+        assertQuery("CREATE TABLE test_delete AS SELECT * FROM orders", "SELECT count(*) FROM orders");
+
+        assertQuery("DELETE FROM test_delete WHERE orderstatus = 'O'", "SELECT count(*) FROM orders WHERE orderstatus = 'O'");
+        assertQuery("SELECT * FROM test_delete", "SELECT * FROM orders WHERE orderstatus <> 'O'");
+
+        assertQueryTrue("DROP TABLE test_delete");
+
+        // delete without matching any rows
+
+        assertQuery("CREATE TABLE test_delete AS SELECT * FROM orders", "SELECT count(*) FROM orders");
+        assertQuery("DELETE FROM test_delete WHERE rand() < 0", "SELECT 0");
         assertQueryTrue("DROP TABLE test_delete");
     }
 
@@ -380,6 +385,7 @@ public abstract class AbstractTestDistributedQueries
         assertEquals(emptySample.getMaterializedRows().size(), 0);
     }
 
+    @Override
     @Test
     public void testTableSamplePoissonizedRescaled()
             throws Exception
@@ -387,7 +393,7 @@ public abstract class AbstractTestDistributedQueries
         MaterializedResult sample = computeActual("SELECT * FROM orders TABLESAMPLE POISSONIZED (10) RESCALED");
         MaterializedResult all = computeExpected("SELECT * FROM orders", sample.getTypes());
 
-        assertTrue(sample.getMaterializedRows().size() > 0);
+        assertTrue(!sample.getMaterializedRows().isEmpty());
         assertTrue(all.getMaterializedRows().containsAll(sample.getMaterializedRows()));
     }
 

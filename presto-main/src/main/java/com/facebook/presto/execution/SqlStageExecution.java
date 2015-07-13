@@ -16,6 +16,7 @@ package com.facebook.presto.execution;
 import com.facebook.presto.HashPagePartitionFunction;
 import com.facebook.presto.OutputBuffers;
 import com.facebook.presto.PagePartitionFunction;
+import com.facebook.presto.PartitionedPagePartitionFunction;
 import com.facebook.presto.Session;
 import com.facebook.presto.UnpartitionedPagePartitionFunction;
 import com.facebook.presto.execution.NodeScheduler.NodeSelector;
@@ -285,7 +286,20 @@ public final class SqlStageExecution
             ImmutableMap.Builder<TaskId, PagePartitionFunction> buffers = ImmutableMap.builder();
             for (int nodeIndex = 0; nodeIndex < parentTasks.size(); nodeIndex++) {
                 TaskId taskId = parentTasks.get(nodeIndex);
-                buffers.put(taskId, new HashPagePartitionFunction(nodeIndex, parentTasks.size(), getPartitioningChannels(fragment), getHashChannel(fragment), fragment.getTypes()));
+                buffers.put(taskId, new HashPagePartitionFunction(nodeIndex, parentTasks.size(), getPartitioningChannels(fragment).get(), getHashChannel(fragment), fragment.getTypes()));
+            }
+
+            newOutputBuffers = startingOutputBuffers
+                    .withBuffers(buffers.build())
+                    .withNoMoreBufferIds();
+        }
+        else if (fragment.getOutputPartitioning() == OutputPartitioning.ROUND_ROBIN) {
+            checkArgument(noMoreParentNodes, "Round-robin partitioned output requires all parent nodes be added in a single call");
+
+            ImmutableMap.Builder<TaskId, PagePartitionFunction> buffers = ImmutableMap.builder();
+            for (int nodeIndex = 0; nodeIndex < parentTasks.size(); nodeIndex++) {
+                TaskId taskId = parentTasks.get(nodeIndex);
+                buffers.put(taskId, new PartitionedPagePartitionFunction(nodeIndex, parentTasks.size()));
             }
 
             newOutputBuffers = startingOutputBuffers
@@ -578,7 +592,7 @@ public final class SqlStageExecution
         return scheduleTask(id, node, null, ImmutableList.<Split>of());
     }
 
-    private RemoteTask scheduleTask(int id, Node node, PlanNodeId sourceId, Iterable<? extends Split> sourceSplits)
+    private RemoteTask scheduleTask(int id, Node node, PlanNodeId sourceId, Iterable<Split> sourceSplits)
     {
         // before scheduling a new task update all existing tasks with new exchanges and output buffers
         addNewExchangesAndBuffers();
@@ -684,22 +698,30 @@ public final class SqlStageExecution
     {
         for (RemoteSourceNode remoteSourceNode : fragment.getRemoteSourceNodes()) {
             if (!completeSources.contains(remoteSourceNode.getId())) {
-                boolean exchangeFinished = true;
-                for (PlanFragmentId planFragmentId : remoteSourceNode.getSourceFragmentIds()) {
-                    SqlStageExecution subStage = subStages.get(planFragmentId);
-                    switch (subStage.getState()) {
-                        case PLANNED:
-                        case SCHEDULING:
-                            exchangeFinished = false;
-                            break;
-                    }
-                }
+                boolean exchangeFinished = remoteSourceNode.getSourceFragmentIds().stream()
+                        .allMatch(this::isExchangeFinished);
                 if (exchangeFinished) {
                     completeSources.add(remoteSourceNode.getId());
                 }
             }
         }
         return completeSources;
+    }
+
+    private boolean isExchangeFinished(PlanFragmentId planFragmentId)
+    {
+        SqlStageExecution subStage = subStages.get(planFragmentId);
+        switch (subStage.getState()) {
+            case SCHEDULED:
+            case RUNNING:
+            case FINISHED:
+            case CANCELED:
+                return true;
+            // DO NOT complete a FAILED or ABORTED stage.  This will cause the
+            // stage above to finish normally, which will result in a query
+            // completing successfully when it should fail..
+        }
+        return false;
     }
 
     @SuppressWarnings("NakedNotify")
@@ -809,12 +831,13 @@ public final class SqlStageExecution
         return fragment.getHash().map(symbol -> fragment.getOutputLayout().indexOf(symbol));
     }
 
-    private static List<Integer> getPartitioningChannels(PlanFragment fragment)
+    private static Optional<List<Integer>> getPartitioningChannels(PlanFragment fragment)
     {
         checkState(fragment.getOutputPartitioning() == OutputPartitioning.HASH, "fragment is not hash partitioned");
         // We can convert the symbols directly into channels, because the root must be a sink and therefore the layout is fixed
-        return fragment.getPartitionBy().stream()
-                .map(symbol -> fragment.getOutputLayout().indexOf(symbol))
-                .collect(toImmutableList());
+        return fragment.getPartitionBy().map(
+                t -> t.stream()
+                        .map(symbol -> fragment.getOutputLayout().indexOf(symbol))
+                        .collect(toImmutableList()));
     }
 }

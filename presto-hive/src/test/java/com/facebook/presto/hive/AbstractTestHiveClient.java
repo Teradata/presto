@@ -460,18 +460,17 @@ public abstract class AbstractTestHiveClient
         ConnectorTableMetadata tableMetadata = metadata.getTableMetadata(getTableHandle(tablePartitionFormat));
         Map<String, ColumnMetadata> map = uniqueIndex(tableMetadata.getColumns(), ColumnMetadata::getName);
 
-        int i = 0;
-        assertPrimitiveField(map, i++, "t_string", VARCHAR, false);
-        assertPrimitiveField(map, i++, "t_tinyint", BIGINT, false);
-        assertPrimitiveField(map, i++, "t_smallint", BIGINT, false);
-        assertPrimitiveField(map, i++, "t_int", BIGINT, false);
-        assertPrimitiveField(map, i++, "t_bigint", BIGINT, false);
-        assertPrimitiveField(map, i++, "t_float", DOUBLE, false);
-        assertPrimitiveField(map, i++, "t_double", DOUBLE, false);
-        assertPrimitiveField(map, i++, "t_boolean", BOOLEAN, false);
-        assertPrimitiveField(map, i++, "ds", VARCHAR, true);
-        assertPrimitiveField(map, i++, "file_format", VARCHAR, true);
-        assertPrimitiveField(map, i++, "dummy", BIGINT, true);
+        assertPrimitiveField(map, "t_string", VARCHAR, false);
+        assertPrimitiveField(map, "t_tinyint", BIGINT, false);
+        assertPrimitiveField(map, "t_smallint", BIGINT, false);
+        assertPrimitiveField(map, "t_int", BIGINT, false);
+        assertPrimitiveField(map, "t_bigint", BIGINT, false);
+        assertPrimitiveField(map, "t_float", DOUBLE, false);
+        assertPrimitiveField(map, "t_double", DOUBLE, false);
+        assertPrimitiveField(map, "t_boolean", BOOLEAN, false);
+        assertPrimitiveField(map, "ds", VARCHAR, true);
+        assertPrimitiveField(map, "file_format", VARCHAR, true);
+        assertPrimitiveField(map, "dummy", BIGINT, true);
     }
 
     @Test
@@ -482,8 +481,8 @@ public abstract class AbstractTestHiveClient
         ConnectorTableMetadata tableMetadata = metadata.getTableMetadata(tableHandle);
         Map<String, ColumnMetadata> map = uniqueIndex(tableMetadata.getColumns(), ColumnMetadata::getName);
 
-        assertPrimitiveField(map, 0, "t_string", VARCHAR, false);
-        assertPrimitiveField(map, 1, "t_tinyint", BIGINT, false);
+        assertPrimitiveField(map, "t_string", VARCHAR, false);
+        assertPrimitiveField(map, "t_tinyint", BIGINT, false);
     }
 
     @Test
@@ -494,7 +493,7 @@ public abstract class AbstractTestHiveClient
         ConnectorTableMetadata tableMetadata = metadata.getTableMetadata(tableHandle);
         Map<String, ColumnMetadata> map = uniqueIndex(tableMetadata.getColumns(), ColumnMetadata::getName);
 
-        assertPrimitiveField(map, 0, "t_string", VARCHAR, false);
+        assertPrimitiveField(map, "t_string", VARCHAR, false);
     }
 
     @Test
@@ -505,7 +504,7 @@ public abstract class AbstractTestHiveClient
         ConnectorTableMetadata tableMetadata = metadata.getTableMetadata(tableHandle);
         Map<String, ColumnMetadata> map = uniqueIndex(tableMetadata.getColumns(), ColumnMetadata::getName);
 
-        assertPrimitiveField(map, 0, "t_string", VARCHAR, false);
+        assertPrimitiveField(map, "t_string", VARCHAR, false);
     }
 
     @Test
@@ -1121,7 +1120,7 @@ public abstract class AbstractTestHiveClient
     {
         for (HiveStorageFormat storageFormat : createTableFormats) {
             try {
-                doCreateTable(storageFormat);
+                doCreateTable(temporaryCreateTable, storageFormat);
             }
             finally {
                 dropTable(temporaryCreateTable);
@@ -1134,7 +1133,7 @@ public abstract class AbstractTestHiveClient
             throws Exception
     {
         try {
-            doCreateSampledTable();
+            doCreateSampledTable(temporaryCreateSampledTable);
         }
         finally {
             dropTable(temporaryCreateSampledTable);
@@ -1147,7 +1146,7 @@ public abstract class AbstractTestHiveClient
     {
         for (HiveStorageFormat storageFormat : createTableFormats) {
             try {
-                doCreateEmptyTable(storageFormat);
+                doCreateEmptyTable(temporaryCreateEmptyTable, storageFormat);
             }
             finally {
                 dropTable(temporaryCreateEmptyTable);
@@ -1244,7 +1243,7 @@ public abstract class AbstractTestHiveClient
         assertTrue(metadata.listViews(SESSION, viewName.getSchemaName()).contains(viewName));
     }
 
-    private void doCreateSampledTable()
+    protected void doCreateSampledTable(SchemaTableName tableName)
             throws Exception
     {
         // begin creating the table
@@ -1252,7 +1251,7 @@ public abstract class AbstractTestHiveClient
                 .add(new ColumnMetadata("sales", BIGINT, false))
                 .build();
 
-        ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(temporaryCreateSampledTable, columns, SESSION.getUser(), true);
+        ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(tableName, columns, SESSION.getUser(), true);
         ConnectorOutputTableHandle outputHandle = metadata.beginCreateTable(SESSION, tableMetadata);
 
         // write the records
@@ -1276,7 +1275,7 @@ public abstract class AbstractTestHiveClient
         metadata.commitCreateTable(outputHandle, fragments);
 
         // load the new table
-        ConnectorTableHandle tableHandle = getTableHandle(temporaryCreateSampledTable);
+        ConnectorTableHandle tableHandle = getTableHandle(tableName);
         List<ColumnHandle> columnHandles = ImmutableList.<ColumnHandle>builder()
                 .addAll(metadata.getColumnHandles(tableHandle).values())
                 .add(metadata.getSampleWeightColumnHandle(tableHandle))
@@ -1284,13 +1283,13 @@ public abstract class AbstractTestHiveClient
         assertEquals(columnHandles.size(), 2);
 
         // verify the metadata
-        tableMetadata = metadata.getTableMetadata(getTableHandle(temporaryCreateSampledTable));
+        tableMetadata = metadata.getTableMetadata(getTableHandle(tableName));
         assertEquals(tableMetadata.getOwner(), SESSION.getUser());
 
         Map<String, ColumnMetadata> columnMap = uniqueIndex(tableMetadata.getColumns(), ColumnMetadata::getName);
         assertEquals(columnMap.size(), 1);
 
-        assertPrimitiveField(columnMap, 0, "sales", BIGINT, false);
+        assertPrimitiveField(columnMap, "sales", BIGINT, false);
 
         // verify the data
         ConnectorPartitionResult partitionResult = splitManager.getPartitions(tableHandle, TupleDomain.<ColumnHandle>all());
@@ -1319,7 +1318,7 @@ public abstract class AbstractTestHiveClient
         }
     }
 
-    private void doCreateTable(HiveStorageFormat storageFormat)
+    protected void doCreateTable(SchemaTableName tableName, HiveStorageFormat storageFormat)
             throws Exception
     {
         // begin creating the table
@@ -1331,7 +1330,7 @@ public abstract class AbstractTestHiveClient
                 .add(new ColumnMetadata("t_boolean", BOOLEAN, false))
                 .build();
 
-        ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(temporaryCreateTable, columns, SESSION.getUser());
+        ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(tableName, columns, SESSION.getUser());
 
         ConnectorSession session = createSession(storageFormat);
 
@@ -1370,20 +1369,20 @@ public abstract class AbstractTestHiveClient
         metadata.commitCreateTable(outputHandle, fragments);
 
         // load the new table
-        ConnectorTableHandle tableHandle = getTableHandle(temporaryCreateTable);
+        ConnectorTableHandle tableHandle = getTableHandle(tableName);
         List<ColumnHandle> columnHandles = ImmutableList.copyOf(metadata.getColumnHandles(tableHandle).values());
 
         // verify the metadata
-        tableMetadata = metadata.getTableMetadata(getTableHandle(temporaryCreateTable));
+        tableMetadata = metadata.getTableMetadata(getTableHandle(tableName));
         assertEquals(tableMetadata.getOwner(), session.getUser());
 
         Map<String, ColumnMetadata> columnMap = uniqueIndex(tableMetadata.getColumns(), ColumnMetadata::getName);
 
-        assertPrimitiveField(columnMap, 0, "id", BIGINT, false);
-        assertPrimitiveField(columnMap, 1, "t_string", VARCHAR, false);
-        assertPrimitiveField(columnMap, 2, "t_bigint", BIGINT, false);
-        assertPrimitiveField(columnMap, 3, "t_double", DOUBLE, false);
-        assertPrimitiveField(columnMap, 4, "t_boolean", BOOLEAN, false);
+        assertPrimitiveField(columnMap, "id", BIGINT, false);
+        assertPrimitiveField(columnMap, "t_string", VARCHAR, false);
+        assertPrimitiveField(columnMap, "t_bigint", BIGINT, false);
+        assertPrimitiveField(columnMap, "t_double", DOUBLE, false);
+        assertPrimitiveField(columnMap, "t_boolean", BOOLEAN, false);
 
         // verify the data
         ConnectorPartitionResult partitionResult = splitManager.getPartitions(tableHandle, TupleDomain.<ColumnHandle>all());
@@ -1421,7 +1420,7 @@ public abstract class AbstractTestHiveClient
         }
     }
 
-    private void doCreateEmptyTable(HiveStorageFormat storageFormat)
+    protected void doCreateEmptyTable(SchemaTableName tableName, HiveStorageFormat storageFormat)
             throws Exception
     {
         // create the table
@@ -1435,27 +1434,27 @@ public abstract class AbstractTestHiveClient
                 .add(new ColumnMetadata("t_array_string", arrayStringType, false))
                 .build();
 
-        ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(temporaryCreateEmptyTable, columns, SESSION.getUser());
+        ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(tableName, columns, SESSION.getUser());
 
         ConnectorSession session = createSession(storageFormat);
 
         metadata.createTable(session, tableMetadata);
 
         // load the new table
-        ConnectorTableHandle tableHandle = getTableHandle(temporaryCreateEmptyTable);
+        ConnectorTableHandle tableHandle = getTableHandle(tableName);
 
         // verify the metadata
-        tableMetadata = metadata.getTableMetadata(getTableHandle(temporaryCreateEmptyTable));
+        tableMetadata = metadata.getTableMetadata(getTableHandle(tableName));
         assertEquals(tableMetadata.getOwner(), session.getUser());
 
         Map<String, ColumnMetadata> columnMap = uniqueIndex(tableMetadata.getColumns(), ColumnMetadata::getName);
 
-        assertPrimitiveField(columnMap, 0, "id", BIGINT, false);
-        assertPrimitiveField(columnMap, 1, "t_string", VARCHAR, false);
-        assertPrimitiveField(columnMap, 2, "t_bigint", BIGINT, false);
-        assertPrimitiveField(columnMap, 3, "t_double", DOUBLE, false);
-        assertPrimitiveField(columnMap, 4, "t_boolean", BOOLEAN, false);
-        assertPrimitiveField(columnMap, 5, "t_array_string", arrayStringType, false);
+        assertPrimitiveField(columnMap, "id", BIGINT, false);
+        assertPrimitiveField(columnMap, "t_string", VARCHAR, false);
+        assertPrimitiveField(columnMap, "t_bigint", BIGINT, false);
+        assertPrimitiveField(columnMap, "t_double", DOUBLE, false);
+        assertPrimitiveField(columnMap, "t_boolean", BOOLEAN, false);
+        assertPrimitiveField(columnMap, "t_array_string", arrayStringType, false);
 
         // verify the table is empty
         ConnectorPartitionResult partitionResult = splitManager.getPartitions(tableHandle, TupleDomain.<ColumnHandle>all());
@@ -1682,7 +1681,7 @@ public abstract class AbstractTestHiveClient
         }
     }
 
-    private void dropTable(SchemaTableName table)
+    protected void dropTable(SchemaTableName table)
     {
         try {
             ConnectorTableHandle handle = metadata.getTableHandle(SESSION, table);
@@ -1805,7 +1804,7 @@ public abstract class AbstractTestHiveClient
         }
     }
 
-    private static void assertPrimitiveField(Map<String, ColumnMetadata> map, int position, String name, Type type, boolean partitionKey)
+    private static void assertPrimitiveField(Map<String, ColumnMetadata> map, String name, Type type, boolean partitionKey)
     {
         assertTrue(map.containsKey(name));
         ColumnMetadata column = map.get(name);
@@ -1836,7 +1835,7 @@ public abstract class AbstractTestHiveClient
         return index.build();
     }
 
-    private static ConnectorSession createSession(HiveStorageFormat storageFormat)
+    protected static ConnectorSession createSession(HiveStorageFormat storageFormat)
     {
         return new ConnectorSession(
                 SESSION.getUser(),
@@ -1846,7 +1845,7 @@ public abstract class AbstractTestHiveClient
                 ImmutableMap.of(STORAGE_FORMAT_PROPERTY, storageFormat.name().toLowerCase()));
     }
 
-    private static String randomName()
+    protected static String randomName()
     {
         return UUID.randomUUID().toString().toLowerCase(ENGLISH).replace("-", "");
     }

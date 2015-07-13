@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.gen;
 
 import com.facebook.presto.spi.block.Block;
+import io.airlift.slice.Slice;
 
 import javax.annotation.Nullable;
 
@@ -62,6 +63,11 @@ public final class CompilerOperations
     public static boolean in(Object value, Set<?> set)
     {
         return set.contains(value);
+    }
+
+    public static void setBytes(int index, Slice source, Slice destination)
+    {
+        destination.setBytes(index, source);
     }
 
     public static boolean testMask(@Nullable Block masks, int index)

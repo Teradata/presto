@@ -253,7 +253,7 @@ public class DatabaseShardManager
         Set<String> identifiers = shards.stream()
                 .map(ShardInfo::getNodeIdentifiers)
                 .flatMap(Collection::stream)
-            .collect(toSet());
+                .collect(toSet());
         return Maps.toMap(identifiers, this::getOrCreateNodeId);
     }
 
@@ -273,24 +273,6 @@ public class DatabaseShardManager
     public Set<UUID> getNodeShards(String nodeIdentifier)
     {
         return dao.getNodeShards(nodeIdentifier);
-    }
-
-    @Override
-    public void dropTableShards(long tableId)
-    {
-        dbi.inTransaction((handle, status) -> {
-            ShardManagerDao dao = handle.attach(ShardManagerDao.class);
-            dao.dropShardNodes(tableId);
-            dao.dropShards(tableId);
-            return null;
-        });
-
-        try (Handle handle = dbi.open()) {
-            handle.execute("DROP TABLE " + shardIndexTable(tableId));
-        }
-        catch (DBIException e) {
-            log.warn(e, "Failed to drop table %s", shardIndexTable(tableId));
-        }
     }
 
     @Override
@@ -374,7 +356,7 @@ public class DatabaseShardManager
         handle.execute(sql, intArrayToBytes(nodeIds), uuidToBytes(shardUuid));
     }
 
-    static String shardIndexTable(long tableId)
+    public static String shardIndexTable(long tableId)
     {
         return INDEX_TABLE_PREFIX + tableId;
     }

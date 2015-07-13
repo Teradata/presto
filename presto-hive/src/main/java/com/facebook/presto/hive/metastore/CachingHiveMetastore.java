@@ -20,6 +20,7 @@ import com.facebook.presto.hive.HiveMetastoreClient;
 import com.facebook.presto.hive.HiveViewNotSupportedException;
 import com.facebook.presto.hive.TableAlreadyExistsException;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.SchemaNotFoundException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.TableNotFoundException;
 import com.google.common.base.Throwables;
@@ -58,6 +59,7 @@ import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
 
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_METASTORE_ERROR;
 import static com.facebook.presto.hive.HiveUtil.PRESTO_VIEW_FLAG;
@@ -294,7 +296,7 @@ public class CachingHiveMetastore
         return get(databaseCache, databaseName, NoSuchObjectException.class);
     }
 
-    private Database loadDatabase(final String databaseName)
+    private Database loadDatabase(String databaseName)
             throws Exception
     {
         try {
@@ -322,16 +324,16 @@ public class CachingHiveMetastore
         return get(tableNamesCache, databaseName, NoSuchObjectException.class);
     }
 
-    private List<String> loadAllTables(final String databaseName)
+    private List<String> loadAllTables(String databaseName)
             throws Exception
     {
-        final Callable<List<String>> getAllTables = stats.getGetAllTables().wrap(() -> {
+        Callable<List<String>> getAllTables = stats.getGetAllTables().wrap(() -> {
             try (HiveMetastoreClient client = clientProvider.createMetastoreClient()) {
                 return client.get_all_tables(databaseName);
             }
         });
 
-        final Callable<Void> getDatabase = stats.getGetDatabase().wrap(() -> {
+        Callable<Void> getDatabase = stats.getGetDatabase().wrap(() -> {
             try (HiveMetastoreClient client = clientProvider.createMetastoreClient()) {
                 client.get_database(databaseName);
                 return null;
@@ -373,7 +375,7 @@ public class CachingHiveMetastore
         return get(viewNamesCache, databaseName, NoSuchObjectException.class);
     }
 
-    private List<String> loadAllViews(final String databaseName)
+    private List<String> loadAllViews(String databaseName)
             throws Exception
     {
         try {
@@ -396,10 +398,11 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void createTable(final Table table)
+    public void createTable(Table table)
     {
         try {
             retry()
+                    .exceptionMapper(getExceptionMapper())
                     .stopOn(AlreadyExistsException.class, InvalidObjectException.class, MetaException.class, NoSuchObjectException.class)
                     .stopOnIllegalExceptions()
                     .run("createTable", stats.getCreateTable().wrap(() -> {
@@ -412,8 +415,8 @@ public class CachingHiveMetastore
         catch (AlreadyExistsException e) {
             throw new TableAlreadyExistsException(new SchemaTableName(table.getDbName(), table.getTableName()));
         }
-        catch (InvalidObjectException | NoSuchObjectException | MetaException e) {
-            throw Throwables.propagate(e);
+        catch (NoSuchObjectException e) {
+            throw new SchemaNotFoundException(table.getDbName());
         }
         catch (TException e) {
             throw new PrestoException(HIVE_METASTORE_ERROR, e);
@@ -431,7 +434,7 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void dropTable(final String databaseName, final String tableName)
+    public void dropTable(String databaseName, String tableName)
     {
         try {
             retry()
@@ -464,10 +467,11 @@ public class CachingHiveMetastore
     }
 
     @Override
-    public void renameTable(final String databaseName, final String tableName, final String newDatabaseName, final String newTableName)
+    public void renameTable(String databaseName, String tableName, String newDatabaseName, String newTableName)
     {
         try {
             retry()
+                    .exceptionMapper(getExceptionMapper())
                     .stopOn(InvalidOperationException.class, MetaException.class)
                     .stopOnIllegalExceptions()
                     .run("renameTable", stats.getRenameTable().wrap(() -> {
@@ -479,9 +483,6 @@ public class CachingHiveMetastore
                         }
                         return null;
                     }));
-        }
-        catch (InvalidOperationException | MetaException e) {
-            throw Throwables.propagate(e);
         }
         catch (TException e) {
             throw new PrestoException(HIVE_METASTORE_ERROR, e);
@@ -499,7 +500,7 @@ public class CachingHiveMetastore
         }
     }
 
-    private Table loadTable(final HiveTableName hiveTableName)
+    private Table loadTable(HiveTableName hiveTableName)
             throws Exception
     {
         try {
@@ -531,7 +532,12 @@ public class CachingHiveMetastore
         return get(partitionNamesCache, HiveTableName.table(databaseName, tableName), NoSuchObjectException.class);
     }
 
-    private List<String> loadPartitionNames(final HiveTableName hiveTableName)
+    protected Function<Exception, Exception> getExceptionMapper()
+    {
+        return Function.identity();
+    }
+
+    private List<String> loadPartitionNames(HiveTableName hiveTableName)
             throws Exception
     {
         try {
@@ -559,7 +565,7 @@ public class CachingHiveMetastore
         return get(partitionFilterCache, PartitionFilter.partitionFilter(databaseName, tableName, parts), NoSuchObjectException.class);
     }
 
-    private List<String> loadPartitionNamesByParts(final PartitionFilter partitionFilter)
+    private List<String> loadPartitionNamesByParts(PartitionFilter partitionFilter)
             throws Exception
     {
         try {
@@ -583,6 +589,7 @@ public class CachingHiveMetastore
         }
     }
 
+    @Override
     public Map<String, Partition> getPartitionsByNames(String databaseName, String tableName, List<String> partitionNames)
             throws NoSuchObjectException
     {
@@ -596,7 +603,7 @@ public class CachingHiveMetastore
         return partitionsByName.build();
     }
 
-    private Partition loadPartitionByName(final HivePartitionName partitionName)
+    private Partition loadPartitionByName(HivePartitionName partitionName)
             throws Exception
     {
         checkNotNull(partitionName, "partitionName is null");
@@ -629,16 +636,16 @@ public class CachingHiveMetastore
         HivePartitionName firstPartition = Iterables.get(partitionNames, 0);
 
         HiveTableName hiveTableName = firstPartition.getHiveTableName();
-        final String databaseName = hiveTableName.getDatabaseName();
-        final String tableName = hiveTableName.getTableName();
+        String databaseName = hiveTableName.getDatabaseName();
+        String tableName = hiveTableName.getTableName();
 
-        final List<String> partitionsToFetch = new ArrayList<>();
+        List<String> partitionsToFetch = new ArrayList<>();
         for (HivePartitionName partitionName : partitionNames) {
             checkArgument(partitionName.getHiveTableName().equals(hiveTableName), "Expected table name %s but got %s", hiveTableName, partitionName.getHiveTableName());
             partitionsToFetch.add(partitionName.getPartitionName());
         }
 
-        final List<String> partitionColumnNames = ImmutableList.copyOf(Warehouse.makeSpecFromName(firstPartition.getPartitionName()).keySet());
+        List<String> partitionColumnNames = ImmutableList.copyOf(Warehouse.makeSpecFromName(firstPartition.getPartitionName()).keySet());
 
         try {
             return retry()

@@ -63,10 +63,12 @@ public class TestStringFunctions
         assertFunction("CONCAT('', 'what')", VARCHAR, "what");
         assertFunction("CONCAT(CONCAT('this', ' is'), ' cool')", VARCHAR, "this is cool");
         assertFunction("CONCAT('this', CONCAT(' is', ' cool'))", VARCHAR, "this is cool");
+        assertFunction("CONCAT('this ', 'is ', 'cool ', 'foo ', 'bar')", VARCHAR, "this is cool foo bar");
         //
         // Test concat for non-ASCII
         assertFunction("CONCAT('hello na\u00EFve', ' world')", VARCHAR, "hello na\u00EFve world");
         assertFunction("CONCAT('\uD801\uDC2D', 'end')", VARCHAR, "\uD801\uDC2Dend");
+        assertFunction("CONCAT('\uD801\uDC2D', 'end', '\uD801\uDC2D')", VARCHAR, "\uD801\uDC2Dend\uD801\uDC2D");
         assertFunction("CONCAT(CONCAT('\u4FE1\u5FF5', ',\u7231'), ',\u5E0C\u671B')", VARCHAR, "\u4FE1\u5FF5,\u7231,\u5E0C\u671B");
     }
 
@@ -367,6 +369,19 @@ public class TestStringFunctions
         assertFunction("CAST(UPPER(utf8(from_hex('CE'))) AS VARBINARY)", VARBINARY, new SqlVarbinary(new byte[] {(byte) 0xCE}));
         assertFunction("CAST(UPPER('hello' || utf8(from_hex('CE'))) AS VARBINARY)", VARBINARY, new SqlVarbinary(new byte[] {'H', 'E', 'L', 'L', 'O', (byte) 0xCE}));
         assertFunction("CAST(UPPER(utf8(from_hex('CE')) || 'hello') AS VARBINARY)", VARBINARY, new SqlVarbinary(new byte[] {(byte) 0xCE, 'H', 'E', 'L', 'L', 'O'}));
+    }
+
+    @Test
+    public void testNormalize()
+    {
+        assertFunction("normalize('sch\u00f6n', NFD)", VARCHAR, "scho\u0308n");
+        assertFunction("normalize('sch\u00f6n')", VARCHAR, "sch\u00f6n");
+        assertFunction("normalize('sch\u00f6n', NFC)", VARCHAR, "sch\u00f6n");
+        assertFunction("normalize('sch\u00f6n', NFKD)", VARCHAR, "scho\u0308n");
+
+        assertFunction("normalize('sch\u00f6n', NFKC)", VARCHAR, "sch\u00f6n");
+        assertFunction("normalize('\u3231\u3327\u3326\u2162', NFKC)", VARCHAR, "(\u682a)\u30c8\u30f3\u30c9\u30ebIII");
+        assertFunction("normalize('\uff8a\uff9d\uff76\uff78\uff76\uff85', NFKC)", VARCHAR, "\u30cf\u30f3\u30ab\u30af\u30ab\u30ca");
     }
 
     // We do not use String toLowerCase or toUpperCase here because they can do multi character transforms

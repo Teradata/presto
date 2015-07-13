@@ -19,7 +19,6 @@ import com.facebook.presto.UnpartitionedPagePartitionFunction;
 import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.memory.VersionedMemoryPoolId;
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.spi.NodeManager;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.split.SplitManager;
 import com.facebook.presto.sql.analyzer.Analysis;
@@ -53,7 +52,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static com.facebook.presto.OutputBuffers.INITIAL_EMPTY_OUTPUT_BUFFERS;
 import static com.facebook.presto.SystemSessionProperties.getHashPartitionCount;
-import static com.facebook.presto.SystemSessionProperties.isBigQueryEnabled;
 import static com.facebook.presto.spi.StandardErrorCode.INTERNAL_ERROR;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.StandardErrorCode.USER_CANCELED;
@@ -115,7 +113,6 @@ public final class SqlQueryExecution
             this.splitManager = checkNotNull(splitManager, "splitManager is null");
             this.nodeScheduler = checkNotNull(nodeScheduler, "nodeScheduler is null");
             this.planOptimizers = checkNotNull(planOptimizers, "planOptimizers is null");
-            this.remoteTaskFactory = checkNotNull(remoteTaskFactory, "remoteTaskFactory is null");
             this.locationFactory = checkNotNull(locationFactory, "locationFactory is null");
             this.queryExecutor = checkNotNull(queryExecutor, "queryExecutor is null");
             this.experimentalSyntaxEnabled = experimentalSyntaxEnabled;
@@ -150,6 +147,8 @@ public final class SqlQueryExecution
                 finalQueryInfo.compareAndSet(null, getQueryInfo(stage));
                 outputStage.set(null);
             });
+
+            this.remoteTaskFactory = new MemoryTrackingRemoteTaskFactory(checkNotNull(remoteTaskFactory, "remoteTaskFactory is null"), stateMachine);
 
             this.queryExplainer = new QueryExplainer(session, planOptimizers, metadata, sqlParser, experimentalSyntaxEnabled);
         }
@@ -315,18 +314,18 @@ public final class SqlQueryExecution
                 if (stateMachine.isDone()) {
                     return;
                 }
-                if (stateMachine.getQueryState() == QueryState.STARTING) {
-                    // if any stage has at least one task, we are running
-                    if (!stage.getStageInfo().getTasks().isEmpty()) {
-                        stateMachine.transitionToRunning();
-                    }
-                }
-                else if (state == StageState.FAILED) {
+                if (state == StageState.FAILED) {
                     stateMachine.transitionToFailed(stage.getStageInfo().getFailureCause().toException());
                 }
                 else if (state == StageState.ABORTED) {
                     // this should never happen, since abort can only be triggered in query clean up after the query is finished
                     stateMachine.transitionToFailed(new PrestoException(INTERNAL_ERROR, "Query stage was aborted"));
+                }
+                else if (stateMachine.getQueryState() == QueryState.STARTING) {
+                    // if any stage has at least one task, we are running
+                    if (!stage.getStageInfo().getTasks().isEmpty()) {
+                        stateMachine.transitionToRunning();
+                    }
                 }
             });
         }
@@ -484,7 +483,6 @@ public final class SqlQueryExecution
     {
         private final int scheduleSplitBatchSize;
         private final int initialHashPartitions;
-        private final Integer bigQueryInitialHashPartitions;
         private final boolean experimentalSyntaxEnabled;
         private final Metadata metadata;
         private final SqlParser sqlParser;
@@ -495,7 +493,6 @@ public final class SqlQueryExecution
         private final LocationFactory locationFactory;
         private final ExecutorService executor;
         private final NodeTaskMap nodeTaskMap;
-        private final NodeManager nodeManager;
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
@@ -505,7 +502,6 @@ public final class SqlQueryExecution
                 LocationFactory locationFactory,
                 SplitManager splitManager,
                 NodeScheduler nodeScheduler,
-                NodeManager nodeManager,
                 List<PlanOptimizer> planOptimizers,
                 RemoteTaskFactory remoteTaskFactory,
                 @ForQueryExecution ExecutorService executor,
@@ -514,7 +510,6 @@ public final class SqlQueryExecution
             checkNotNull(config, "config is null");
             this.scheduleSplitBatchSize = config.getScheduleSplitBatchSize();
             this.initialHashPartitions = config.getInitialHashPartitions();
-            this.bigQueryInitialHashPartitions = config.getBigQueryInitialHashPartitions();
             this.metadata = checkNotNull(metadata, "metadata is null");
             this.sqlParser = checkNotNull(sqlParser, "sqlParser is null");
             this.locationFactory = checkNotNull(locationFactory, "locationFactory is null");
@@ -526,19 +521,12 @@ public final class SqlQueryExecution
             this.experimentalSyntaxEnabled = featuresConfig.isExperimentalSyntaxEnabled();
             this.executor = checkNotNull(executor, "executor is null");
             this.nodeTaskMap = checkNotNull(nodeTaskMap, "nodeTaskMap is null");
-            this.nodeManager = checkNotNull(nodeManager, "nodeManager is null");
         }
 
         @Override
         public SqlQueryExecution createQueryExecution(QueryId queryId, String query, Session session, Statement statement)
         {
-            int initialHashPartitions = this.initialHashPartitions;
-            if (isBigQueryEnabled(session, false)) {
-                initialHashPartitions = (bigQueryInitialHashPartitions == null) ? nodeManager.getActiveNodes().size() : bigQueryInitialHashPartitions;
-            }
-            initialHashPartitions = getHashPartitionCount(session, initialHashPartitions);
-
-            SqlQueryExecution queryExecution = new SqlQueryExecution(queryId,
+            return new SqlQueryExecution(queryId,
                     query,
                     session,
                     locationFactory.createQueryLocation(queryId),
@@ -551,12 +539,10 @@ public final class SqlQueryExecution
                     remoteTaskFactory,
                     locationFactory,
                     scheduleSplitBatchSize,
-                    initialHashPartitions,
+                    getHashPartitionCount(session, this.initialHashPartitions),
                     experimentalSyntaxEnabled,
                     executor,
                     nodeTaskMap);
-
-            return queryExecution;
         }
     }
 }
