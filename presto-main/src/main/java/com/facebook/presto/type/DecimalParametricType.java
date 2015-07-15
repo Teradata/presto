@@ -18,6 +18,7 @@ import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.ShortDecimalType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.TypeParameter;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -36,26 +37,26 @@ public class DecimalParametricType
     }
 
     @Override
-    public Type createType(List<Type> types, List<Object> literals)
+    public Type createType(List<TypeParameter> parameters)
     {
-        checkArgument(types.isEmpty(), "Type parameters not allowed for DECIMAL");
-        if (literals.size() == 0) {
+        if (parameters.size() == 0) {
             // we need support for that for support of unparametrized TypeSignatures which are
             // used for defining DECIMAL related functions. See e.g. DecimalOperators class.
             return ShortDecimalType.createUnparametrizedDecimal();
         }
 
-        return createParametrizedDecimal(literals);
+        return createParametrizedDecimal(parameters);
     }
 
     @NotNull
-    private Type createParametrizedDecimal(List<Object> literals)
+    private Type createParametrizedDecimal(List<TypeParameter> parameters)
     {
-        checkArgument(literals.size() == 2, "Expected 2 literal parameters for DECIMAL");
-        checkArgument(literals.get(0) instanceof Long &&
-                literals.get(1) instanceof Long, "Expected both literal parameters for DECIMAL to be numbers");
-        long precision = (long) literals.get(0);
-        long scale = (long) literals.get(1);
-        return DecimalType.createDecimalType((int) precision, (int) scale);
+        checkArgument(parameters.size() == 2, "Expected 2 literal parameters for DECIMAL");
+        TypeParameter precision = parameters.get(0);
+        TypeParameter scale = parameters.get(1);
+        checkArgument(precision.isLongLiteral() &&
+                scale.isLongLiteral(), "Expected both literal parameters for DECIMAL to be numbers");
+
+        return DecimalType.createDecimalType(precision.getLongLiteral().intValue(), scale.getLongLiteral().intValue());
     }
 }
