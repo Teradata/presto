@@ -36,6 +36,8 @@ import static com.facebook.presto.metadata.FunctionRegistry.operatorInfo;
 import static com.facebook.presto.metadata.OperatorType.ADD;
 import static com.facebook.presto.metadata.OperatorType.SUBTRACT;
 import static com.facebook.presto.metadata.Signature.comparableWithVariadicBound;
+import static com.facebook.presto.spi.type.LongDecimalType.MAX_DECIMAL_UNSCALED_VALUE;
+import static com.facebook.presto.spi.type.LongDecimalType.MIN_DECIMAL_UNSCALED_VALUE;
 import static com.facebook.presto.spi.type.StandardTypes.DECIMAL;
 import static com.facebook.presto.util.Reflection.methodHandle;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -47,9 +49,6 @@ public final class DecimalOperators
 {
     public static final DecimalAddOperator DECIMAL_ADD_OPERATOR = new DecimalAddOperator();
     public static final DecimalSubtractOperator DECIMAL_SUBTRACT_OPERATOR = new DecimalSubtractOperator();
-
-    private static final BigInteger MAX_DECIMAL_UNSCALED_VALUE = new BigInteger("99999999999999999999999999999999999999");
-    private static final BigInteger MIN_DECIMAL_UNSCALED_VALUE = MAX_DECIMAL_UNSCALED_VALUE.negate();
 
     private DecimalOperators()
     {

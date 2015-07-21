@@ -201,6 +201,14 @@ import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
+import static com.facebook.presto.type.DecimalCasts.BIGINT_TO_DECIMAL_CAST;
+import static com.facebook.presto.type.DecimalCasts.BOOLEAN_TO_DECIMAL_CAST;
+import static com.facebook.presto.type.DecimalCasts.DECIMAL_TO_BIGINT_CAST;
+import static com.facebook.presto.type.DecimalCasts.DECIMAL_TO_BOOLEAN_CAST;
+import static com.facebook.presto.type.DecimalCasts.DECIMAL_TO_DOUBLE_CAST;
+import static com.facebook.presto.type.DecimalCasts.DECIMAL_TO_VARCHAR_CAST;
+import static com.facebook.presto.type.DecimalCasts.DOUBLE_TO_DECIMAL_CAST;
+import static com.facebook.presto.type.DecimalCasts.VARCHAR_TO_DECIMAL_CAST;
 import static com.facebook.presto.type.DecimalOperators.DECIMAL_ADD_OPERATOR;
 import static com.facebook.presto.type.DecimalOperators.DECIMAL_SUBTRACT_OPERATOR;
 import static com.facebook.presto.type.JsonPathType.JSON_PATH;
@@ -351,6 +359,14 @@ public class FunctionRegistry
                 .functions(ARRAY_CONSTRUCTOR, ARRAY_SUBSCRIPT, ARRAY_CARDINALITY, ARRAY_POSITION, ARRAY_SORT_FUNCTION, ARRAY_INTERSECT_FUNCTION, ARRAY_TO_JSON, JSON_TO_ARRAY, ARRAY_DISTINCT_FUNCTION, ARRAY_REMOVE_FUNCTION, ARRAY_SLICE_FUNCTION)
                 .functions(MAP_CONSTRUCTOR, MAP_CARDINALITY, MAP_SUBSCRIPT, MAP_TO_JSON, JSON_TO_MAP, MAP_KEYS, MAP_VALUES, MAP_AGG)
                 .functions(DECIMAL_ADD_OPERATOR, DECIMAL_SUBTRACT_OPERATOR)
+                .function(DECIMAL_TO_VARCHAR_CAST)
+                .function(BOOLEAN_TO_DECIMAL_CAST)
+                .function(DECIMAL_TO_BIGINT_CAST)
+                .function(DOUBLE_TO_DECIMAL_CAST)
+                .function(DECIMAL_TO_DOUBLE_CAST)
+                .function(DECIMAL_TO_BOOLEAN_CAST)
+                .function(BIGINT_TO_DECIMAL_CAST)
+                .function(VARCHAR_TO_DECIMAL_CAST)
                 .function(HISTOGRAM)
                 .function(VARCHAR_TO_VARCHAR_CAST)
                 .function(IDENTITY_CAST)
@@ -441,9 +457,9 @@ public class FunctionRegistry
         List<String> expectedParameters = new ArrayList<>();
         for (ParametricFunction function : candidates) {
             expectedParameters.add(format("%s(%s) %s",
-                                    name,
-                                    Joiner.on(", ").join(function.getSignature().getArgumentTypes()),
-                                    Joiner.on(", ").join(function.getSignature().getTypeParameters())));
+                    name,
+                    Joiner.on(", ").join(function.getSignature().getArgumentTypes()),
+                    Joiner.on(", ").join(function.getSignature().getTypeParameters())));
         }
         String parameters = Joiner.on(", ").join(parameterTypes);
         String message = format("Function %s not registered", name);

@@ -29,6 +29,8 @@ public final class LongDecimalType
         extends DecimalType
 {
     public static final int LONG_DECIMAL_LENGTH = 2 * SIZE_OF_LONG;
+    public static final BigInteger MAX_DECIMAL_UNSCALED_VALUE = new BigInteger("99999999999999999999999999999999999999");
+    public static final BigInteger MIN_DECIMAL_UNSCALED_VALUE = MAX_DECIMAL_UNSCALED_VALUE.negate();
 
     protected LongDecimalType(int precision, int scale)
     {
@@ -124,5 +126,10 @@ public final class LongDecimalType
     public Slice bigDecimalToSlice(BigDecimal value)
     {
         return unscaledValueToSlice(value.unscaledValue());
+    }
+
+    public static String toString(Slice unscaledValue, int precision, int scale)
+    {
+        return DecimalType.toString(unscaledValueToBigInteger(unscaledValue).toString(), precision, scale);
     }
 }
