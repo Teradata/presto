@@ -18,6 +18,7 @@ import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.ConnectorSplit;
+import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.RecordPageSource;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
@@ -45,6 +46,14 @@ public final class BlackHolePageSourceProvider
         }
         List<Type> types = builder.build();
 
-        return new RecordPageSource(types, new BlackHoleRecordCursor(types, blackHoleSplit.getRowsCount()));
+        return new ConstantPageSource(
+                generateZeroPage(types, blackHoleSplit.getRowsPerPage()),
+                blackHoleSplit.getPagesCount());
+    }
+
+    private Page generateZeroPage(List<Type> types, int rowsCount)
+    {
+        ConnectorPageSource pageSource = new RecordPageSource(types, new BlackHoleRecordCursor(types, rowsCount));
+        return pageSource.getNextPage();
     }
 }

@@ -46,6 +46,7 @@ import static com.facebook.presto.plugin.blackhole.Types.checkType;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static java.lang.String.format;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
@@ -54,7 +55,8 @@ public class BlackHoleMetadata
 {
     public static final String SCHEMA_NAME = "default";
     public static final String SPLITS_COUNT_PROPERTY = "splits_count";
-    public static final String ROWS_PER_SPLIT_PROPERTY = "rows_per_split";
+    public static final String PAGES_PER_SPLIT_PROPERTY = "pages_per_split";
+    public static final String ROWS_PER_PAGE_PROPERTY = "rows_per_page";
 
     private final Map<String, BlackHoleTableHandle> tables = new ConcurrentHashMap<>();
 
@@ -140,7 +142,8 @@ public class BlackHoleMetadata
                 newTableName.getTableName(),
                 oldTableHandle.getColumnHandles(),
                 oldTableHandle.getSplitsCount(),
-                oldTableHandle.getRowsPerSplit()
+                oldTableHandle.getPagesPerSplit(),
+                oldTableHandle.getRowsPerPage()
         );
         synchronized (tables) {
             tables.remove(oldTableHandle.getTableName());
@@ -158,10 +161,22 @@ public class BlackHoleMetadata
     @Override
     public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata)
     {
+        int splitsCount = getIntProperty(session, SPLITS_COUNT_PROPERTY);
+        int pagesPerSplit = getIntProperty(session, PAGES_PER_SPLIT_PROPERTY);
+        int rowsPerPage = getIntProperty(session, ROWS_PER_PAGE_PROPERTY);
+
+        if (splitsCount > 0 || pagesPerSplit > 0 || rowsPerPage > 0) {
+            checkArgument(
+                    splitsCount * pagesPerSplit * rowsPerPage > 0,
+                    format("You have to set all of the properties [%s, %s and %s] or none",
+                            SPLITS_COUNT_PROPERTY, PAGES_PER_SPLIT_PROPERTY, ROWS_PER_PAGE_PROPERTY));
+        }
+
         return new BlackHoleOutputTableHandle(new BlackHoleTableHandle(
                 tableMetadata,
-                getIntProperty(session, SPLITS_COUNT_PROPERTY),
-                getIntProperty(session, ROWS_PER_SPLIT_PROPERTY)));
+                splitsCount,
+                pagesPerSplit,
+                rowsPerPage));
     }
 
     private int getIntProperty(ConnectorSession session, String propertyName)
@@ -230,7 +245,10 @@ public class BlackHoleMetadata
 
         return ImmutableList.of(
                 new ConnectorTableLayoutResult(
-                        getTableLayout(new BlackHoleTableLayoutHandle(blackHoleHandle.getSplitsCount(), blackHoleHandle.getRowsPerSplit())),
+                        getTableLayout(new BlackHoleTableLayoutHandle(
+                                blackHoleHandle.getSplitsCount(),
+                                blackHoleHandle.getPagesPerSplit(),
+                                blackHoleHandle.getRowsPerPage())),
                         TupleDomain.all()));
     }
 

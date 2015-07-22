@@ -53,6 +53,7 @@ public class BlackHoleSmokeTest
 
             queryRunner.installPlugin(new TpchPlugin());
             queryRunner.createCatalog("tpch", "tpch", ImmutableMap.of());
+            assertThatNoBlackHoleTableIsCreated();
         }
         catch (Throwable e) {
             closeAllSuppress(e, queryRunner);
@@ -63,6 +64,7 @@ public class BlackHoleSmokeTest
     @AfterTest
     public void tearDown()
     {
+        assertThatNoBlackHoleTableIsCreated();
         queryRunner.close();
     }
 
@@ -78,7 +80,7 @@ public class BlackHoleSmokeTest
                 .build();
     }
 
-    //@Test
+    @Test
     public void createTableWhenTableIsAlreadyCreated()
             throws SQLException
     {
@@ -91,14 +93,15 @@ public class BlackHoleSmokeTest
         catch (RuntimeException ex) { // it has to RuntimeException as FailureInfo$FailureException is private
             assertTrue(ex.getMessage().equals("Destination table 'blackhole.default.nation' already exists"));
         }
+        finally {
+            assertThatQueryReturnsValue("DROP TABLE nation", true);
+        }
     }
 
-    //@Test
+    @Test
     public void blackHoleConnectorUsage()
             throws SQLException
     {
-        assertThatNoBlackHoleTableIsCreated();
-
         assertThatQueryReturnsValue("CREATE TABLE nation as SELECT * FROM tpch.tiny.nation", 25L);
 
         List<QualifiedTableName> tableNames = listBlackHoleTables();
@@ -112,8 +115,30 @@ public class BlackHoleSmokeTest
         assertThatQueryReturnsValue("SELECT count(*) FROM nation", 0L);
 
         assertThatQueryReturnsValue("DROP TABLE nation", true);
+    }
 
-        assertThatNoBlackHoleTableIsCreated();
+    @Test
+    public void incorrectDevZeroUsage()
+    {
+        Session session = Session.builder()
+                .setUser("user")
+                .setSource("test")
+                .setCatalog("blackhole")
+                .setSchema("default")
+                .setTimeZoneKey(UTC_KEY)
+                .setLocale(ENGLISH)
+                .setCatalogProperties("blackhole", ImmutableMap.of(
+                        BlackHoleMetadata.ROWS_PER_PAGE_PROPERTY, "3",
+                        BlackHoleMetadata.SPLITS_COUNT_PROPERTY, "1"))
+                .build();
+
+        try {
+            assertThatQueryReturnsValue("CREATE TABLE nation as SELECT * FROM tpch.tiny.nation", 25L, session);
+            fail("Expected exception to be thrown here!");
+        }
+        catch (RuntimeException ex) {
+            // expected exception
+        }
     }
 
     @Test
@@ -127,14 +152,16 @@ public class BlackHoleSmokeTest
                 .setTimeZoneKey(UTC_KEY)
                 .setLocale(ENGLISH)
                 .setCatalogProperties("blackhole", ImmutableMap.of(
-                        BlackHoleMetadata.ROWS_PER_SPLIT_PROPERTY, "2",
-                        BlackHoleMetadata.SPLITS_COUNT_PROPERTY, "3"))
+                        BlackHoleMetadata.ROWS_PER_PAGE_PROPERTY, "3",
+                        BlackHoleMetadata.PAGES_PER_SPLIT_PROPERTY, "2",
+                        BlackHoleMetadata.SPLITS_COUNT_PROPERTY, "1"))
                 .build();
 
         assertThatQueryReturnsValue("CREATE TABLE nation as SELECT * FROM tpch.tiny.nation", 25L, session);
         assertThatQueryReturnsValue("SELECT count(*) FROM nation", 6L, session);
         assertThatQueryReturnsValue("INSERT INTO nation SELECT * FROM tpch.tiny.nation", 25L, session);
         assertThatQueryReturnsValue("SELECT count(*) FROM nation", 6L, session);
+        assertThatQueryReturnsValue("DROP TABLE nation", true);
     }
 
     private void assertThatNoBlackHoleTableIsCreated()

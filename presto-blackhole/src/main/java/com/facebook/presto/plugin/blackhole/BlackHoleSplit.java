@@ -20,25 +20,35 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
 
 import java.util.List;
+import java.util.Objects;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public final class BlackHoleSplit
         implements ConnectorSplit
 {
-    private final int rowsCount;
+    private int pagesCount;
+    private final int rowsPerPage;
 
     @JsonCreator
     public BlackHoleSplit(
-            @JsonProperty("rowsCount") int rowsCount)
+            @JsonProperty("pagesCount") int pagesCount,
+            @JsonProperty("rowsPerPage") int rowsPerPage)
     {
-        this.rowsCount = checkNotNull(rowsCount, "connector id is null");
+        this.rowsPerPage = checkNotNull(rowsPerPage, "rowsPerPage is null");
+        this.pagesCount = checkNotNull(pagesCount, "pagesCount is null");
     }
 
     @JsonProperty
-    public int getRowsCount()
+    public int getPagesCount()
     {
-        return rowsCount;
+        return pagesCount;
+    }
+
+    @JsonProperty
+    public int getRowsPerPage()
+    {
+        return rowsPerPage;
     }
 
     @Override
@@ -57,5 +67,25 @@ public final class BlackHoleSplit
     public Object getInfo()
     {
         return this;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(getPagesCount(), getRowsPerPage());
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        BlackHoleSplit other = (BlackHoleSplit) obj;
+        return Objects.equals(this.getPagesCount(), other.getPagesCount()) &&
+                Objects.equals(this.getRowsPerPage(), other.getRowsPerPage());
     }
 }
