@@ -18,7 +18,6 @@ import com.facebook.presto.spi.ConnectorOutputTableHandle;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorTableMetadata;
 import com.facebook.presto.spi.SchemaTableName;
-import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import org.testng.annotations.Test;
@@ -32,7 +31,7 @@ import static org.testng.Assert.assertTrue;
 
 public class BlackHoleMetadataTest
 {
-    private final BlackHoleMetadata metadata = new BlackHoleMetadata(new TypeRegistry());
+    private final BlackHoleMetadata metadata = new BlackHoleMetadata();
     private final ConnectorSession connectorSession = new ConnectorSession("user", UTC_KEY, Locale.ENGLISH, currentTimeMillis(), ImmutableMap.of());
 
     @Test

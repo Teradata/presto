@@ -30,7 +30,6 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.TupleDomain;
-import com.facebook.presto.spi.type.TypeManager;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slice;
@@ -43,10 +42,10 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static com.facebook.presto.plugin.blackhole.BlackHoleInsertTableHandle.BLACK_HOLE_INSERT_TABLE_HANDLE;
-import static com.facebook.presto.plugin.blackhole.BlackHoleTableLayoutHandle.BLACK_HOLE_TABLE_LAYOUT_HANDLE;
 import static com.facebook.presto.plugin.blackhole.Types.checkType;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
@@ -54,14 +53,10 @@ public class BlackHoleMetadata
         implements ConnectorMetadata
 {
     public static final String SCHEMA_NAME = "default";
+    public static final String SPLITS_COUNT_PROPERTY = "splits_count";
+    public static final String ROWS_PER_SPLIT_PROPERTY = "rows_per_split";
 
     private final Map<String, BlackHoleTableHandle> tables = new ConcurrentHashMap<>();
-    private final TypeManager typeManager;
-
-    public BlackHoleMetadata(TypeManager typeManager)
-    {
-        this.typeManager = typeManager;
-    }
 
     @Override
     public List<String> listSchemaNames(ConnectorSession session)
@@ -79,7 +74,7 @@ public class BlackHoleMetadata
     public ConnectorTableMetadata getTableMetadata(ConnectorTableHandle tableHandle)
     {
         BlackHoleTableHandle blackHoleTableHandle = checkType(tableHandle, BlackHoleTableHandle.class, "tableHandle");
-        return blackHoleTableHandle.toTableMetadata(typeManager);
+        return blackHoleTableHandle.toTableMetadata();
     }
 
     @Override
@@ -118,7 +113,7 @@ public class BlackHoleMetadata
     public ColumnMetadata getColumnMetadata(ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
     {
         BlackHoleColumnHandle blackHoleColumnHandle = checkType(columnHandle, BlackHoleColumnHandle.class, "columnHandle");
-        return blackHoleColumnHandle.toColumnMetadata(typeManager);
+        return blackHoleColumnHandle.toColumnMetadata();
     }
 
     @Override
@@ -126,7 +121,7 @@ public class BlackHoleMetadata
     {
         return tables.values().stream()
                 .filter(table -> prefix.matches(table.toSchemaTableName()))
-                .collect(toMap(BlackHoleTableHandle::toSchemaTableName, handle -> handle.toTableMetadata(typeManager).getColumns()));
+                .collect(toMap(BlackHoleTableHandle::toSchemaTableName, handle -> handle.toTableMetadata().getColumns()));
     }
 
     @Override
@@ -143,7 +138,9 @@ public class BlackHoleMetadata
         BlackHoleTableHandle newTableHandle = new BlackHoleTableHandle(
                 oldTableHandle.getSchemaName(),
                 newTableName.getTableName(),
-                oldTableHandle.getColumnHandles()
+                oldTableHandle.getColumnHandles(),
+                oldTableHandle.getSplitsCount(),
+                oldTableHandle.getRowsPerSplit()
         );
         synchronized (tables) {
             tables.remove(oldTableHandle.getTableName());
@@ -161,7 +158,19 @@ public class BlackHoleMetadata
     @Override
     public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata)
     {
-        return new BlackHoleOutputTableHandle(new BlackHoleTableHandle(tableMetadata));
+        return new BlackHoleOutputTableHandle(new BlackHoleTableHandle(
+                tableMetadata,
+                getIntProperty(session, SPLITS_COUNT_PROPERTY),
+                getIntProperty(session, ROWS_PER_SPLIT_PROPERTY)));
+    }
+
+    private int getIntProperty(ConnectorSession session, String propertyName)
+    {
+        String property = session.getProperties().get(propertyName);
+        if (property == null) {
+            return 0;
+        }
+        return Integer.valueOf(property);
     }
 
     @Override
@@ -213,9 +222,16 @@ public class BlackHoleMetadata
     }
 
     @Override
-    public List<ConnectorTableLayoutResult> getTableLayouts(ConnectorTableHandle table, Constraint<ColumnHandle> constraint, Optional<Set<ColumnHandle>> desiredColumns)
+    public List<ConnectorTableLayoutResult> getTableLayouts(ConnectorTableHandle handle, Constraint<ColumnHandle> constraint, Optional<Set<ColumnHandle>> desiredColumns)
     {
-        return ImmutableList.of(new ConnectorTableLayoutResult(getTableLayout(BLACK_HOLE_TABLE_LAYOUT_HANDLE), TupleDomain.none()));
+        checkNotNull(handle);
+        checkArgument(handle instanceof BlackHoleTableHandle);
+        BlackHoleTableHandle blackHoleHandle = (BlackHoleTableHandle) handle;
+
+        return ImmutableList.of(
+                new ConnectorTableLayoutResult(
+                        getTableLayout(new BlackHoleTableLayoutHandle(blackHoleHandle.getSplitsCount(), blackHoleHandle.getRowsPerSplit())),
+                        TupleDomain.all()));
     }
 
     @Override

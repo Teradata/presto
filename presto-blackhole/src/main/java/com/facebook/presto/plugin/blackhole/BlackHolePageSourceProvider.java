@@ -18,11 +18,14 @@ import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorPageSource;
 import com.facebook.presto.spi.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.ConnectorSplit;
-import com.facebook.presto.spi.InMemoryRecordSet;
 import com.facebook.presto.spi.RecordPageSource;
+import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
 
 import java.util.List;
+
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 
 public final class BlackHolePageSourceProvider
         implements ConnectorPageSourceProvider
@@ -30,6 +33,18 @@ public final class BlackHolePageSourceProvider
     @Override
     public ConnectorPageSource createPageSource(ConnectorSplit split, List<ColumnHandle> columns)
     {
-        return new RecordPageSource(new InMemoryRecordSet(ImmutableList.of(), ImmutableList.of()));
+        checkNotNull(split);
+        checkArgument(split instanceof BlackHoleSplit);
+        BlackHoleSplit blackHoleSplit = (BlackHoleSplit) split;
+
+        ImmutableList.Builder<Type> builder = ImmutableList.builder();
+
+        for (ColumnHandle column : columns) {
+            checkArgument(column instanceof BlackHoleColumnHandle);
+            builder.add(((BlackHoleColumnHandle) column).getColumnType());
+        }
+        List<Type> types = builder.build();
+
+        return new RecordPageSource(types, new BlackHoleRecordCursor(types, blackHoleSplit.getRowsCount()));
     }
 }

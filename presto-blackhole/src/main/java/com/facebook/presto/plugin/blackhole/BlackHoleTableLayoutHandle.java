@@ -15,10 +15,55 @@
 package com.facebook.presto.plugin.blackhole;
 
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-// HACK: this class is an enum to make this class to be auto serializable
-enum BlackHoleTableLayoutHandle
+import java.util.Objects;
+
+public final class BlackHoleTableLayoutHandle
         implements ConnectorTableLayoutHandle
 {
-        BLACK_HOLE_TABLE_LAYOUT_HANDLE
+    private final int splitsCount;
+    private final int rowsPerSplit;
+
+    @JsonCreator
+    public BlackHoleTableLayoutHandle(
+            @JsonProperty("splitsCount") int splitsCount,
+            @JsonProperty("rowsPerSplit") int rowsPerSplit)
+    {
+        this.splitsCount = splitsCount;
+        this.rowsPerSplit = rowsPerSplit;
+    }
+
+    @JsonProperty
+    public int getSplitsCount()
+    {
+        return splitsCount;
+    }
+
+    @JsonProperty
+    public int getRowsPerSplit()
+    {
+        return rowsPerSplit;
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(getSplitsCount(), getRowsPerSplit());
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null || getClass() != obj.getClass()) {
+            return false;
+        }
+        BlackHoleTableLayoutHandle other = (BlackHoleTableLayoutHandle) obj;
+        return Objects.equals(this.getSplitsCount(), other.getSplitsCount()) &&
+                Objects.equals(this.getRowsPerSplit(), other.getRowsPerSplit());
+    }
 }

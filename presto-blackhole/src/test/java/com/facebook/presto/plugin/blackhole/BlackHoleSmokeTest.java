@@ -78,7 +78,7 @@ public class BlackHoleSmokeTest
                 .build();
     }
 
-    @Test
+    //@Test
     public void createTableWhenTableIsAlreadyCreated()
             throws SQLException
     {
@@ -93,7 +93,7 @@ public class BlackHoleSmokeTest
         }
     }
 
-    @Test
+    //@Test
     public void blackHoleConnectorUsage()
             throws SQLException
     {
@@ -116,6 +116,27 @@ public class BlackHoleSmokeTest
         assertThatNoBlackHoleTableIsCreated();
     }
 
+    @Test
+    public void devZeroUsage()
+    {
+        Session session = Session.builder()
+                .setUser("user")
+                .setSource("test")
+                .setCatalog("blackhole")
+                .setSchema("default")
+                .setTimeZoneKey(UTC_KEY)
+                .setLocale(ENGLISH)
+                .setCatalogProperties("blackhole", ImmutableMap.of(
+                        BlackHoleMetadata.ROWS_PER_SPLIT_PROPERTY, "2",
+                        BlackHoleMetadata.SPLITS_COUNT_PROPERTY, "3"))
+                .build();
+
+        assertThatQueryReturnsValue("CREATE TABLE nation as SELECT * FROM tpch.tiny.nation", 25L, session);
+        assertThatQueryReturnsValue("SELECT count(*) FROM nation", 6L, session);
+        assertThatQueryReturnsValue("INSERT INTO nation SELECT * FROM tpch.tiny.nation", 25L, session);
+        assertThatQueryReturnsValue("SELECT count(*) FROM nation", 6L, session);
+    }
+
     private void assertThatNoBlackHoleTableIsCreated()
     {
         assertTrue(listBlackHoleTables().size() == 0, "No blackhole tables expected");
@@ -128,7 +149,12 @@ public class BlackHoleSmokeTest
 
     private void assertThatQueryReturnsValue(String sql, Object expected)
     {
-        MaterializedResult rows = queryRunner.execute(sql);
+        assertThatQueryReturnsValue(sql, expected, null);
+    }
+
+    private void assertThatQueryReturnsValue(String sql, Object expected, Session session)
+    {
+        MaterializedResult rows = session == null ? queryRunner.execute(sql) : queryRunner.execute(session, sql);
         MaterializedRow materializedRow = Iterables.getOnlyElement(rows);
         int fieldCount = materializedRow.getFieldCount();
         assertTrue(fieldCount == 1, format("Expected only one column, but got '%d'", fieldCount));

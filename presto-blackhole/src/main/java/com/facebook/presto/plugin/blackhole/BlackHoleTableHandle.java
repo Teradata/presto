@@ -17,7 +17,6 @@ package com.facebook.presto.plugin.blackhole;
 import com.facebook.presto.spi.ConnectorTableHandle;
 import com.facebook.presto.spi.ConnectorTableMetadata;
 import com.facebook.presto.spi.SchemaTableName;
-import com.facebook.presto.spi.type.TypeManager;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -32,25 +31,33 @@ public final class BlackHoleTableHandle
     private final String schemaName;
     private final String tableName;
     private final List<BlackHoleColumnHandle> columnHandles;
+    private final int splitsCount;
+    private final int rowsPerSplit;
 
-    public BlackHoleTableHandle(ConnectorTableMetadata tableMetadata)
+    public BlackHoleTableHandle(ConnectorTableMetadata tableMetadata, int splitsCount, int rowsPerSplit)
     {
         schemaName = tableMetadata.getTable().getSchemaName();
         tableName = tableMetadata.getTable().getTableName();
         columnHandles = tableMetadata.getColumns().stream()
                 .map(BlackHoleColumnHandle::new)
                 .collect(toList());
+        this.splitsCount = splitsCount;
+        this.rowsPerSplit = rowsPerSplit;
     }
 
     @JsonCreator
     public BlackHoleTableHandle(
             @JsonProperty("schemaName") String schemaName,
             @JsonProperty("tableName") String tableName,
-            @JsonProperty("columnHandles") List<BlackHoleColumnHandle> columnHandles)
+            @JsonProperty("columnHandles") List<BlackHoleColumnHandle> columnHandles,
+            @JsonProperty("splitsCount") int splitsCount,
+            @JsonProperty("rowsPerSplit") int rowsPerSplit)
     {
         this.schemaName = schemaName;
         this.tableName = tableName;
         this.columnHandles = columnHandles;
+        this.splitsCount = splitsCount;
+        this.rowsPerSplit = rowsPerSplit;
     }
 
     @JsonProperty
@@ -71,11 +78,23 @@ public final class BlackHoleTableHandle
         return columnHandles;
     }
 
-    public ConnectorTableMetadata toTableMetadata(TypeManager typeManager)
+    @JsonProperty
+    public int getSplitsCount()
+    {
+        return splitsCount;
+    }
+
+    @JsonProperty
+    public int getRowsPerSplit()
+    {
+        return rowsPerSplit;
+    }
+
+    public ConnectorTableMetadata toTableMetadata()
     {
         return new ConnectorTableMetadata(
                 toSchemaTableName(),
-                columnHandles.stream().map(columnHandle -> columnHandle.toColumnMetadata(typeManager)).collect(toList()));
+                columnHandles.stream().map(BlackHoleColumnHandle::toColumnMetadata).collect(toList()));
     }
 
     public SchemaTableName toSchemaTableName()
