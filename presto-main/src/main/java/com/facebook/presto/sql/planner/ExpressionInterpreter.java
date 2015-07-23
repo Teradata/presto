@@ -18,10 +18,12 @@ import com.facebook.presto.metadata.FunctionInfo;
 import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.OperatorType;
+import com.facebook.presto.operator.scalar.ArraySubscriptOperator;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.tree.ArithmeticBinaryExpression;
 import com.facebook.presto.sql.tree.ArithmeticUnaryExpression;
@@ -68,6 +70,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -279,38 +282,34 @@ public class ExpressionInterpreter
         protected Object visitSimpleCaseExpression(SimpleCaseExpression node, Object context)
         {
             Object operand = process(node.getOperand(), context);
-            if (operand instanceof Expression) {
-                // TODO: optimize this case
+            if (operand == null) {
+                return node.getDefaultValue().map(defaultValue -> process(defaultValue, context)).orElse(null);
+            }
+            else if (operand instanceof Expression) {
                 return node;
             }
 
-            Expression resultClause = node.getDefaultValue().orElse(null);
-            if (operand != null) {
-                for (WhenClause whenClause : node.getWhenClauses()) {
-                    Object value = process(whenClause.getOperand(), context);
-                    if (value == null) {
-                        continue;
-                    }
+            List<WhenClause> whenClauses = new ArrayList<>();
+            Expression defaultClause = node.getDefaultValue().orElse(null);
+            for (WhenClause whenClause : node.getWhenClauses()) {
+                Object value = process(whenClause.getOperand(), context);
+                if (value != null) {
                     if (value instanceof Expression) {
-                        // TODO: optimize this case
-                        return node;
+                        whenClauses.add(whenClause);
                     }
-
-                    if ((Boolean) invokeOperator(OperatorType.EQUAL, types(node.getOperand(), whenClause.getOperand()), ImmutableList.of(operand, value))) {
-                        resultClause = whenClause.getResult();
+                    else if ((Boolean) invokeOperator(OperatorType.EQUAL, types(node.getOperand(), whenClause.getOperand()), ImmutableList.of(operand, value))) {
+                        defaultClause = whenClause.getResult();
                         break;
                     }
                 }
             }
-            if (resultClause == null) {
-                return null;
-            }
 
-            Object result = process(resultClause, context);
-            if (result instanceof Expression) {
-                return node;
+            if (whenClauses.isEmpty()) {
+                return defaultClause == null ? null : process(defaultClause, context);
             }
-            return result;
+            else {
+                return new SimpleCaseExpression(node.getOperand(), whenClauses, Optional.ofNullable(defaultClause));
+            }
         }
 
         @Override
@@ -803,6 +802,9 @@ public class ExpressionInterpreter
             if (index == null) {
                 return null;
             }
+            if ((index instanceof Long) && isArray(expressionTypes.get(node.getBase()))) {
+                ArraySubscriptOperator.checkArrayIndex((Long) index);
+            }
 
             if (hasUnresolvedValue(base, index)) {
                 return new SubscriptExpression(toExpression(base, expressionTypes.get(node.getBase())), toExpression(index, expressionTypes.get(node.getIndex())));
@@ -886,5 +888,10 @@ public class ExpressionInterpreter
     private static boolean isNullLiteral(Expression entry)
     {
         return entry instanceof Literal && !(entry instanceof NullLiteral);
+    }
+
+    private static boolean isArray(Type type)
+    {
+        return type.getTypeSignature().getBase().equals(StandardTypes.ARRAY);
     }
 }

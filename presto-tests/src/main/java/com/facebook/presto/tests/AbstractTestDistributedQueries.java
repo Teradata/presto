@@ -19,16 +19,20 @@ import com.facebook.presto.testing.MaterializedResult;
 import com.facebook.presto.testing.MaterializedRow;
 import com.facebook.presto.testing.QueryRunner;
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
+
+import java.util.List;
 
 import static com.facebook.presto.connector.informationSchema.InformationSchemaMetadata.INFORMATION_SCHEMA;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.sql.SqlFormatter.formatSql;
 import static com.facebook.presto.testing.MaterializedResult.resultBuilder;
+import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Iterables.transform;
 import static java.lang.String.format;
@@ -94,25 +98,26 @@ public abstract class AbstractTestDistributedQueries
     }
 
     @Test
-    public void testCreateSampledTableAsSelectLimit()
-            throws Exception
-    {
-        assertCreateTable(
-                "test_limit_sampled",
-                "SELECT orderkey FROM tpch_sampled.tiny.orders ORDER BY orderkey LIMIT 10",
-                "SELECT orderkey FROM orders ORDER BY orderkey LIMIT 10",
-                "SELECT 10");
-    }
-
-    @Test
     public void testCreateTable()
             throws Exception
     {
         assertQueryTrue("CREATE TABLE test_create (a bigint, b double, c varchar)");
         assertTrue(queryRunner.tableExists(getSession(), "test_create"));
+        assertTableColumnNames("test_create", "a", "b", "c");
 
         assertQueryTrue("DROP TABLE test_create");
         assertFalse(queryRunner.tableExists(getSession(), "test_create"));
+
+        assertQueryTrue("CREATE TABLE test_create_table_if_not_exists (a bigint, b varchar, c double)");
+        assertTrue(queryRunner.tableExists(getSession(), "test_create_table_if_not_exists"));
+        assertTableColumnNames("test_create_table_if_not_exists", "a", "b", "c");
+
+        assertQueryTrue("CREATE TABLE IF NOT EXISTS test_create_table_if_not_exists (d bigint, e varchar)");
+        assertTrue(queryRunner.tableExists(getSession(), "test_create_table_if_not_exists"));
+        assertTableColumnNames("test_create_table_if_not_exists", "a", "b", "c");
+
+        assertQueryTrue("DROP TABLE test_create_table_if_not_exists");
+        assertFalse(queryRunner.tableExists(getSession(), "test_create_table_if_not_exists"));
     }
 
     @Test
@@ -120,37 +125,38 @@ public abstract class AbstractTestDistributedQueries
             throws Exception
     {
         assertCreateTable(
-                "test_simple",
+                "test_select",
                 "SELECT orderdate, orderkey, totalprice FROM orders",
                 "SELECT count(*) FROM orders");
-    }
 
-    @Test
-    public void testCreateTableAsSelectGroupBy()
-            throws Exception
-    {
         assertCreateTable(
                 "test_group",
                 "SELECT orderstatus, sum(totalprice) x FROM orders GROUP BY orderstatus",
                 "SELECT count(DISTINCT orderstatus) FROM orders");
-    }
 
-    @Test
-    public void testCreateTableAsSelectJoin()
-            throws Exception
-    {
         assertCreateTable(
                 "test_join",
                 "SELECT count(*) x FROM lineitem JOIN orders ON lineitem.orderkey = orders.orderkey",
                 "SELECT 1");
+
+        assertCreateTable(
+                "test_limit",
+                "SELECT orderkey FROM orders ORDER BY orderkey LIMIT 10",
+                "SELECT 10");
+
+        assertCreateTable(
+                "test_unicode",
+                "SELECT '\u2603' unicode",
+                "SELECT 1");
     }
 
     @Test
-    public void testCreateTableAsSelectLimit()
+    public void testCreateTableAsSelectSampled()
             throws Exception
     {
         assertCreateTable(
-                "test_limit",
+                "test_sampled",
+                "SELECT orderkey FROM tpch_sampled.tiny.orders ORDER BY orderkey LIMIT 10",
                 "SELECT orderkey FROM orders ORDER BY orderkey LIMIT 10",
                 "SELECT 10");
     }
@@ -228,18 +234,73 @@ public abstract class AbstractTestDistributedQueries
 
         assertQueryTrue("DROP TABLE test_delete");
 
-        // delete using a subquery
+        // delete using a constant property
 
-        assertQuery("CREATE TABLE test_delete AS SELECT * FROM lineitem", "SELECT count(*) FROM lineitem");
+        assertQuery("CREATE TABLE test_delete AS SELECT * FROM orders", "SELECT count(*) FROM orders");
 
-        assertQuery(
-                "DELETE FROM test_delete WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderstatus = 'F')",
-                "SELECT count(*) FROM lineitem WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderstatus = 'F')");
-        assertQuery(
-                "SELECT * FROM test_delete",
-                "SELECT * FROM lineitem WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderstatus <> 'F')");
+        assertQuery("DELETE FROM test_delete WHERE orderstatus = 'O'", "SELECT count(*) FROM orders WHERE orderstatus = 'O'");
+        assertQuery("SELECT * FROM test_delete", "SELECT * FROM orders WHERE orderstatus <> 'O'");
 
         assertQueryTrue("DROP TABLE test_delete");
+
+        // delete without matching any rows
+
+        assertQuery("CREATE TABLE test_delete AS SELECT * FROM orders", "SELECT count(*) FROM orders");
+        assertQuery("DELETE FROM test_delete WHERE rand() < 0", "SELECT 0");
+        assertQueryTrue("DROP TABLE test_delete");
+    }
+
+    @Test
+    public void testDeleteSemiJoin()
+            throws Exception
+    {
+        // delete using a subquery
+
+        assertQuery("CREATE TABLE test_delete_semi_join AS SELECT * FROM lineitem", "SELECT count(*) FROM lineitem");
+
+        assertQuery(
+                "DELETE FROM test_delete_semi_join WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderstatus = 'F')",
+                "SELECT count(*) FROM lineitem WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderstatus = 'F')");
+        assertQuery(
+                "SELECT * FROM test_delete_semi_join",
+                "SELECT * FROM lineitem WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderstatus <> 'F')");
+
+        assertQueryTrue("DROP TABLE test_delete_semi_join");
+
+        // delete with multiple SemiJoin
+
+        assertQuery("CREATE TABLE test_delete_semi_join AS SELECT * FROM lineitem", "SELECT count(*) FROM lineitem");
+
+        assertQuery(
+                "DELETE FROM test_delete_semi_join\n" +
+                "WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderstatus = 'F')\n" +
+                "  AND orderkey IN (SELECT orderkey FROM orders WHERE custkey % 5 = 0)\n",
+                "SELECT count(*) FROM lineitem\n" +
+                "WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderstatus = 'F')\n" +
+                "  AND orderkey IN (SELECT orderkey FROM orders WHERE custkey % 5 = 0)");
+        assertQuery(
+                "SELECT * FROM test_delete_semi_join",
+                "SELECT * FROM lineitem\n" +
+                "WHERE orderkey IN (SELECT orderkey FROM orders WHERE orderstatus <> 'F')\n" +
+                "  OR orderkey IN (SELECT orderkey FROM orders WHERE custkey % 5 <> 0)");
+
+        assertQueryTrue("DROP TABLE test_delete_semi_join");
+
+        // delete with SemiJoin null handling
+
+        assertQuery("CREATE TABLE test_delete_semi_join AS SELECT * FROM orders", "SELECT count(*) FROM orders");
+
+        assertQuery(
+                "DELETE FROM test_delete_semi_join\n" +
+                        "WHERE (orderkey IN (SELECT CASE WHEN orderkey % 3 = 0 THEN NULL ELSE orderkey END FROM lineitem)) IS NULL\n",
+                "SELECT count(*) FROM orders\n" +
+                        "WHERE (orderkey IN (SELECT CASE WHEN orderkey % 3 = 0 THEN NULL ELSE orderkey END FROM lineitem)) IS NULL\n");
+        assertQuery(
+                "SELECT * FROM test_delete_semi_join",
+                "SELECT * FROM orders\n" +
+                        "WHERE (orderkey IN (SELECT CASE WHEN orderkey % 3 = 0 THEN NULL ELSE orderkey END FROM lineitem)) IS NOT NULL\n");
+
+        assertQueryTrue("DROP TABLE test_delete_semi_join");
     }
 
     @Test
@@ -380,6 +441,7 @@ public abstract class AbstractTestDistributedQueries
         assertEquals(emptySample.getMaterializedRows().size(), 0);
     }
 
+    @Override
     @Test
     public void testTableSamplePoissonizedRescaled()
             throws Exception
@@ -387,7 +449,7 @@ public abstract class AbstractTestDistributedQueries
         MaterializedResult sample = computeActual("SELECT * FROM orders TABLESAMPLE POISSONIZED (10) RESCALED");
         MaterializedResult all = computeExpected("SELECT * FROM orders", sample.getTypes());
 
-        assertTrue(sample.getMaterializedRows().size() > 0);
+        assertTrue(!sample.getMaterializedRows().isEmpty());
         assertTrue(all.getMaterializedRows().containsAll(sample.getMaterializedRows()));
     }
 
@@ -398,6 +460,16 @@ public abstract class AbstractTestDistributedQueries
         assertQueryTrue("CREATE TABLE test_symbol_aliasing AS SELECT 1 foo_1, 2 foo_2_4");
         assertQuery("SELECT foo_1, foo_2_4 FROM test_symbol_aliasing", "SELECT 1, 2");
         assertQueryTrue("DROP TABLE test_symbol_aliasing");
+    }
+
+    private void assertTableColumnNames(String tableName, String... columnNames)
+    {
+        MaterializedResult result = computeActual("DESCRIBE " + tableName);
+        List<String> expected = ImmutableList.copyOf(columnNames);
+        List<String> actual = result.getMaterializedRows().stream()
+            .map(row -> (String) row.getField(0))
+            .collect(toImmutableList());
+        assertEquals(actual, expected);
     }
 
     private static void assertContains(MaterializedResult actual, MaterializedResult expected)

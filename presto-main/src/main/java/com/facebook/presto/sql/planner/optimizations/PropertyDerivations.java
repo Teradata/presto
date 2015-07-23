@@ -74,6 +74,7 @@ import static com.facebook.presto.sql.planner.optimizations.ActualProperties.Glo
 import static com.facebook.presto.sql.planner.optimizations.ActualProperties.Global.distributed;
 import static com.facebook.presto.sql.planner.optimizations.ActualProperties.Global.undistributed;
 import static com.facebook.presto.sql.planner.optimizations.ActualProperties.Partitioning.hashPartitioned;
+import static com.facebook.presto.sql.planner.optimizations.ActualProperties.Partitioning.hashPartitionedWithReplicatedNulls;
 import static com.facebook.presto.sql.planner.optimizations.ActualProperties.Partitioning.partitioned;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
@@ -241,7 +242,8 @@ class PropertyDerivations
         @Override
         public ActualProperties visitDelete(DeleteNode node, List<ActualProperties> inputProperties)
         {
-            return Iterables.getOnlyElement(inputProperties);
+            // drop all symbols in property because delete doesn't pass on any of the columns
+            return Iterables.getOnlyElement(inputProperties).translate(symbol -> Optional.empty());
         }
 
         @Override
@@ -316,8 +318,19 @@ class PropertyDerivations
                             .constants(constants)
                             .build();
                 case REPARTITION:
+                    if (!node.getPartitionKeys().isPresent()) {
+                        return ActualProperties.builder()
+                                .global(distributed())
+                                .constants(constants)
+                                .build();
+                    }
                     return ActualProperties.builder()
-                            .global(distributed(hashPartitioned(node.getPartitionKeys())))
+                            .global(distributed(hashPartitioned(node.getPartitionKeys().get())))
+                            .constants(constants)
+                            .build();
+                case REPARTITION_WITH_NULL_REPLICATION:
+                    return ActualProperties.builder()
+                            .global(distributed(hashPartitionedWithReplicatedNulls(node.getPartitionKeys().get())))
                             .constants(constants)
                             .build();
                 case REPLICATE:
@@ -412,7 +425,14 @@ class PropertyDerivations
         @Override
         public ActualProperties visitUnnest(UnnestNode node, List<ActualProperties> inputProperties)
         {
-            return Iterables.getOnlyElement(inputProperties);
+            Set<Symbol> passThroughInputs = ImmutableSet.copyOf(node.getReplicateSymbols());
+
+            return Iterables.getOnlyElement(inputProperties).translate(column -> {
+                if (passThroughInputs.contains(column)) {
+                    return Optional.of(column);
+                }
+                return Optional.empty();
+            });
         }
 
         @Override

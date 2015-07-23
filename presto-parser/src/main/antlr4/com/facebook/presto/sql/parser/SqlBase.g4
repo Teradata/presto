@@ -31,7 +31,7 @@ statement
     | USE schema=identifier                                            #use
     | USE catalog=identifier '.' schema=identifier                     #use
     | CREATE TABLE qualifiedName AS query                              #createTableAsSelect
-    | CREATE TABLE qualifiedName
+    | CREATE TABLE (IF NOT EXISTS)? qualifiedName
         '(' tableElement (',' tableElement)* ')'                       #createTable
     | DROP TABLE (IF EXISTS)? qualifiedName                            #dropTable
     | INSERT INTO qualifiedName query                                  #insertInto
@@ -231,6 +231,7 @@ primaryExpression
     | name=LOCALTIME ('(' precision=INTEGER_VALUE ')')?                              #specialDateTimeFunction
     | name=LOCALTIMESTAMP ('(' precision=INTEGER_VALUE ')')?                         #specialDateTimeFunction
     | SUBSTRING '(' valueExpression FROM valueExpression (FOR valueExpression)? ')'  #substring
+    | NORMALIZE '(' valueExpression (',' normalForm)? ')'                            #normalize
     | EXTRACT '(' identifier FROM valueExpression ')'                                #extract
     | POSITION '(' valueExpression IN valueExpression ')'                            #position
     | '(' expression ')'                                                             #parenthesizedExpression
@@ -334,6 +335,12 @@ nonReserved
     | SET | RESET
     | VIEW | REPLACE
     | IF | NULLIF | COALESCE
+    | normalForm
+    | POSITION
+    ;
+
+normalForm
+    : NFD | NFC | NFKD | NFKC
     ;
 
 SELECT: 'SELECT';
@@ -464,6 +471,12 @@ MAP: 'MAP';
 SET: 'SET';
 RESET: 'RESET';
 SESSION: 'SESSION';
+
+NORMALIZE: 'NORMALIZE';
+NFD : 'NFD';
+NFC : 'NFC';
+NFKD : 'NFKD';
+NFKC : 'NFKC';
 
 IF: 'IF';
 NULLIF: 'NULLIF';

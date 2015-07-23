@@ -155,12 +155,6 @@ public class TestDatabaseShardManager
             Set<UUID> actualUuids = shardMetadata.stream().map(ShardMetadata::getShardUuid).collect(toSet());
             assertEquals(actualUuids, expectedUuids);
         }
-
-        shardManager.dropTableShards(tableId);
-        for (String node : nodes) {
-            Set<ShardMetadata> shardMetadata = shardManager.getNodeTableShards(node, tableId);
-            assertEquals(shardMetadata.size(), 0);
-        }
     }
 
     @Test
@@ -488,12 +482,12 @@ public class TestDatabaseShardManager
         }
     }
 
-    static ShardInfo shardInfo(UUID shardUuid, String nodeIdentifier)
+    public static ShardInfo shardInfo(UUID shardUuid, String nodeIdentifier)
     {
         return shardInfo(shardUuid, nodeIdentifier, ImmutableList.of());
     }
 
-    private static ShardInfo shardInfo(UUID shardUuid, String nodeId, List<ColumnStats> columnStats)
+    public static ShardInfo shardInfo(UUID shardUuid, String nodeId, List<ColumnStats> columnStats)
     {
         return new ShardInfo(shardUuid, ImmutableSet.of(nodeId), columnStats, 0, 0, 0);
     }

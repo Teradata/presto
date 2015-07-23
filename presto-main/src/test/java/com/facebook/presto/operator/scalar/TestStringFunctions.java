@@ -353,6 +353,7 @@ public class TestStringFunctions
         assertFunction("CAST(LOWER(utf8(from_hex('CE'))) AS VARBINARY)", VARBINARY, new SqlVarbinary(new byte[] {(byte) 0xCE}));
         assertFunction("CAST(LOWER('HELLO' || utf8(from_hex('CE'))) AS VARBINARY)", VARBINARY, new SqlVarbinary(new byte[] {'h', 'e', 'l', 'l', 'o', (byte) 0xCE}));
         assertFunction("CAST(LOWER(utf8(from_hex('CE')) || 'HELLO') AS VARBINARY)", VARBINARY, new SqlVarbinary(new byte[] {(byte) 0xCE, 'h', 'e', 'l', 'l', 'o'}));
+        assertFunction("CAST(LOWER(utf8(from_hex('C8BAFF'))) AS VARBINARY)", VARBINARY, new SqlVarbinary(new byte[] {(byte) 0xE2, (byte) 0xB1, (byte) 0xA5, (byte) 0xFF}));
     }
 
     @Test
@@ -367,6 +368,19 @@ public class TestStringFunctions
         assertFunction("CAST(UPPER(utf8(from_hex('CE'))) AS VARBINARY)", VARBINARY, new SqlVarbinary(new byte[] {(byte) 0xCE}));
         assertFunction("CAST(UPPER('hello' || utf8(from_hex('CE'))) AS VARBINARY)", VARBINARY, new SqlVarbinary(new byte[] {'H', 'E', 'L', 'L', 'O', (byte) 0xCE}));
         assertFunction("CAST(UPPER(utf8(from_hex('CE')) || 'hello') AS VARBINARY)", VARBINARY, new SqlVarbinary(new byte[] {(byte) 0xCE, 'H', 'E', 'L', 'L', 'O'}));
+    }
+
+    @Test
+    public void testNormalize()
+    {
+        assertFunction("normalize('sch\u00f6n', NFD)", VARCHAR, "scho\u0308n");
+        assertFunction("normalize('sch\u00f6n')", VARCHAR, "sch\u00f6n");
+        assertFunction("normalize('sch\u00f6n', NFC)", VARCHAR, "sch\u00f6n");
+        assertFunction("normalize('sch\u00f6n', NFKD)", VARCHAR, "scho\u0308n");
+
+        assertFunction("normalize('sch\u00f6n', NFKC)", VARCHAR, "sch\u00f6n");
+        assertFunction("normalize('\u3231\u3327\u3326\u2162', NFKC)", VARCHAR, "(\u682a)\u30c8\u30f3\u30c9\u30ebIII");
+        assertFunction("normalize('\uff8a\uff9d\uff76\uff78\uff76\uff85', NFKC)", VARCHAR, "\u30cf\u30f3\u30ab\u30af\u30ab\u30ca");
     }
 
     // We do not use String toLowerCase or toUpperCase here because they can do multi character transforms

@@ -19,6 +19,7 @@ import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.metadata.TableLayout;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
+import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.Domain;
 import com.facebook.presto.spi.Marker;
 import com.facebook.presto.spi.Range;
@@ -83,6 +84,7 @@ import java.util.stream.Stream;
 
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.sql.planner.DomainUtils.simplifyDomain;
+import static com.facebook.presto.sql.planner.PlanFragment.NullPartitioning.REPLICATE;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.String.format;
 
@@ -133,18 +135,25 @@ public class PlanPrinter
     {
         StringBuilder builder = new StringBuilder();
         for (PlanFragment fragment : plan.getAllFragments()) {
-            builder.append(String.format("Fragment %s [%s]\n",
+            builder.append(format("Fragment %s [%s]\n",
                     fragment.getId(),
                     fragment.getDistribution()));
 
             builder.append(indentString(1))
-                    .append(String.format("Output layout: [%s]\n",
+                    .append(format("Output layout: [%s]\n",
                             Joiner.on(", ").join(fragment.getOutputLayout())));
 
             if (fragment.getOutputPartitioning() == OutputPartitioning.HASH) {
-                builder.append(indentString(1))
-                        .append(String.format("Output partitioning: [%s]\n",
-                                Joiner.on(", ").join(fragment.getPartitionBy())));
+                List<Symbol> symbols = fragment.getPartitionBy().orElseGet(() -> ImmutableList.of(new Symbol("(absent)")));
+                builder.append(indentString(1));
+                if (Optional.of(REPLICATE).equals(fragment.getNullPartitionPolicy())) {
+                    builder.append(format("Output partitioning: (replicate nulls) [%s]\n",
+                            Joiner.on(", ").join(symbols)));
+                }
+                else {
+                    builder.append(format("Output partitioning: [%s]\n",
+                            Joiner.on(", ").join(symbols)));
+                }
             }
 
             builder.append(textLogicalPlan(fragment.getRoot(), fragment.getSymbols(), metadata, 1))
@@ -156,7 +165,7 @@ public class PlanPrinter
 
     public static String graphvizLogicalPlan(PlanNode plan, Map<Symbol, Type> types)
     {
-        PlanFragment fragment = new PlanFragment(new PlanFragmentId("graphviz_plan"), plan, types, plan.getOutputSymbols(), PlanDistribution.SINGLE, plan.getId(), OutputPartitioning.NONE, ImmutableList.<Symbol>of(), Optional.empty());
+        PlanFragment fragment = new PlanFragment(new PlanFragmentId("graphviz_plan"), plan, types, plan.getOutputSymbols(), PlanDistribution.SINGLE, plan.getId(), OutputPartitioning.NONE, Optional.empty(), Optional.empty(), Optional.empty());
         return GraphvizPrinter.printLogical(ImmutableList.of(fragment));
     }
 
@@ -188,6 +197,7 @@ public class PlanPrinter
     {
         private final Map<Symbol, Type> types;
 
+        @SuppressWarnings("AssignmentToCollectionOrArrayFieldFromParameter")
         public Visitor(Map<Symbol, Type> types)
         {
             this.types = types;
@@ -301,7 +311,7 @@ public class PlanPrinter
         }
 
         @Override
-        public Void visitWindow(final WindowNode node, Integer indent)
+        public Void visitWindow(WindowNode node, Integer indent)
         {
             List<String> partitionBy = Lists.transform(node.getPartitionBy(), Functions.toStringFunction());
 
@@ -351,7 +361,7 @@ public class PlanPrinter
         }
 
         @Override
-        public Void visitTopNRowNumber(final TopNRowNumberNode node, Integer indent)
+        public Void visitTopNRowNumber(TopNRowNumberNode node, Integer indent)
         {
             List<String> partitionBy = Lists.transform(node.getPartitionBy(), Functions.toStringFunction());
 
@@ -368,16 +378,16 @@ public class PlanPrinter
         }
 
         @Override
-        public Void visitRowNumber(final RowNumberNode node, Integer indent)
+        public Void visitRowNumber(RowNumberNode node, Integer indent)
         {
             List<String> partitionBy = Lists.transform(node.getPartitionBy(), Functions.toStringFunction());
             List<String> args = new ArrayList<>();
             if (!partitionBy.isEmpty()) {
-                args.add(format("partition by (%s) ", Joiner.on(", ").join(partitionBy)));
+                args.add(format("partition by (%s)", Joiner.on(", ").join(partitionBy)));
             }
 
             if (node.getMaxRowCountPerPartition().isPresent()) {
-                args.add(format("limit (%s) ", node.getMaxRowCountPerPartition().get()));
+                args.add(format("limit = %s", node.getMaxRowCountPerPartition().get()));
             }
 
             print(indent, "- RowNumber[%s] => [%s]", Joiner.on(", ").join(args), formatOutputs(node.getOutputSymbols()));
@@ -390,7 +400,7 @@ public class PlanPrinter
         public Void visitTableScan(TableScanNode node, Integer indent)
         {
             TableHandle table = node.getTable();
-            print(indent, "- TableScan[%s, original constraint=%s] => [%s]", table, node.getOriginalConstraint(), formatOutputs(node.getOutputSymbols()));
+            print(indent, "- TableScan[%s, originalConstraint = %s] => [%s]", table, node.getOriginalConstraint(), formatOutputs(node.getOutputSymbols()));
 
             TupleDomain<ColumnHandle> predicate = node.getLayout()
                     .map(metadata::getLayout)
@@ -398,7 +408,11 @@ public class PlanPrinter
                     .orElse(TupleDomain.<ColumnHandle>all());
 
             if (node.getLayout().isPresent()) {
-                print(indent + 2, "LAYOUT: %s", node.getLayout().get().getConnectorHandle());
+                // TODO: find a better way to do this
+                ConnectorTableLayoutHandle layout = node.getLayout().get().getConnectorHandle();
+                if (!table.getConnectorHandle().toString().equals(layout.toString())) {
+                    print(indent + 2, "LAYOUT: %s", layout);
+                }
             }
 
             if (predicate.isNone()) {
@@ -486,7 +500,7 @@ public class PlanPrinter
         }
 
         @Override
-        public Void visitTopN(final TopNNode node, Integer indent)
+        public Void visitTopN(TopNNode node, Integer indent)
         {
             Iterable<String> keys = Iterables.transform(node.getOrderBy(), input -> input + " " + node.getOrderings().get(input));
 
@@ -495,7 +509,7 @@ public class PlanPrinter
         }
 
         @Override
-        public Void visitSort(final SortNode node, Integer indent)
+        public Void visitSort(SortNode node, Integer indent)
         {
             Iterable<String> keys = Iterables.transform(node.getOrderBy(), input -> input + " " + node.getOrderings().get(input));
 

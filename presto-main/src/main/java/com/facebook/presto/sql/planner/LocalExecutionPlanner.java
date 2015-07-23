@@ -172,6 +172,7 @@ import static com.facebook.presto.sql.planner.plan.TableWriterNode.CreateHandle;
 import static com.facebook.presto.sql.planner.plan.TableWriterNode.InsertHandle;
 import static com.facebook.presto.sql.planner.plan.TableWriterNode.WriterTarget;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
+import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
 import static com.google.common.base.Functions.forMap;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -774,14 +775,11 @@ public class LocalExecutionPlanner
             PlanNode sourceNode = node.getSource();
 
             Expression filterExpression = node.getPredicate();
-
-            List<Expression> projectionExpressions = new ArrayList<>();
-            for (int i = 0; i < node.getOutputSymbols().size(); i++) {
-                Symbol symbol = node.getOutputSymbols().get(i);
-                projectionExpressions.add(new QualifiedNameReference(symbol.toQualifiedName()));
-            }
-
             List<Symbol> outputSymbols = node.getOutputSymbols();
+
+            List<Expression> projectionExpressions = outputSymbols.stream()
+                    .map(Symbol::toQualifiedNameReference)
+                    .collect(toImmutableList());
 
             return visitScanFilterAndProject(context, sourceNode, filterExpression, projectionExpressions, outputSymbols);
         }
@@ -1106,8 +1104,7 @@ public class LocalExecutionPlanner
                 Set<Integer> potentialProbeInputs = indexLookupToProbeInput.get(lookupSymbol);
                 checkState(!potentialProbeInputs.isEmpty(), "Must have at least one source from the probe input");
                 if (potentialProbeInputs.size() > 1) {
-                    overlappingFieldSetsBuilder.add(FluentIterable.from(potentialProbeInputs)
-                            .toSet());
+                    overlappingFieldSetsBuilder.add(potentialProbeInputs.stream().collect(toImmutableSet()));
                 }
                 remappedProbeKeyChannelsBuilder.add(Iterables.getFirst(potentialProbeInputs, null));
             }
@@ -1115,7 +1112,7 @@ public class LocalExecutionPlanner
             List<Integer> remappedProbeKeyChannels = remappedProbeKeyChannelsBuilder.build();
             Function<RecordSet, RecordSet> probeKeyNormalizer = recordSet -> {
                 if (!overlappingFieldSets.isEmpty()) {
-                    recordSet = new FieldSetFilteringRecordSet(recordSet, overlappingFieldSets);
+                    recordSet = new FieldSetFilteringRecordSet(metadata.getFunctionRegistry(), recordSet, overlappingFieldSets);
                 }
                 return new MappedRecordSet(recordSet, remappedProbeKeyChannels);
             };
@@ -1136,9 +1133,9 @@ public class LocalExecutionPlanner
          */
         private SetMultimap<Symbol, Integer> mapIndexSourceLookupSymbolToProbeKeyInput(IndexJoinNode node, Map<Symbol, Integer> probeKeyLayout)
         {
-            Set<Symbol> indexJoinSymbols = FluentIterable.from(node.getCriteria())
-                    .transform(IndexJoinNode.EquiJoinClause::getIndex)
-                    .toSet();
+            Set<Symbol> indexJoinSymbols = node.getCriteria().stream()
+                    .map(IndexJoinNode.EquiJoinClause::getIndex)
+                    .collect(toImmutableSet());
 
             // Trace the index join symbols to the index source lookup symbols
             // Map: Index join symbol => Index source lookup symbol
@@ -1425,7 +1422,6 @@ public class LocalExecutionPlanner
             int probeChannel = probeSource.getLayout().get(node.getSourceJoinSymbol());
             int buildChannel = buildSource.getLayout().get(node.getFilteringSourceJoinSymbol());
 
-            Optional<Integer> probeHashChannel = node.getSourceHashSymbol().map(channelGetter(probeSource));
             Optional<Integer> buildHashChannel = node.getFilteringSourceHashSymbol().map(channelGetter(buildSource));
 
             SetBuilderOperatorFactory setBuilderOperatorFactory = new SetBuilderOperatorFactory(buildContext.getNextOperatorId(), buildSource.getTypes(), buildChannel, buildHashChannel, 10_000);
@@ -1445,7 +1441,7 @@ public class LocalExecutionPlanner
                     .put(node.getSemiJoinOutput(), probeSource.getLayout().size())
                     .build();
 
-            HashSemiJoinOperatorFactory operator = new HashSemiJoinOperatorFactory(context.getNextOperatorId(), setProvider, probeSource.getTypes(), probeChannel, probeHashChannel);
+            HashSemiJoinOperatorFactory operator = new HashSemiJoinOperatorFactory(context.getNextOperatorId(), setProvider, probeSource.getTypes(), probeChannel);
             PhysicalOperation operation = new PhysicalOperation(operator, outputMappings, probeSource);
 
             // merge parallel joiners back into a single stream

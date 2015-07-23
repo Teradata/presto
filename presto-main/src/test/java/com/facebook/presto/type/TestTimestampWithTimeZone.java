@@ -44,6 +44,8 @@ import static org.joda.time.DateTimeZone.UTC;
 
 public class TestTimestampWithTimeZone
 {
+    private static final TimeZoneKey TIME_ZONE_KEY = getTimeZoneKeyForOffset(6 * 60 + 9);
+    private static final DateTimeZone DATE_TIME_ZONE = getDateTimeZone(TIME_ZONE_KEY);
     private static final TimeZoneKey WEIRD_TIME_ZONE_KEY = getTimeZoneKeyForOffset(7 * 60 + 9);
     private static final DateTimeZone WEIRD_ZONE = getDateTimeZone(WEIRD_TIME_ZONE_KEY);
     private static final TimeZoneKey BERLIN_TIME_ZONE_KEY = getTimeZoneKey("Europe/Berlin");
@@ -60,7 +62,7 @@ public class TestTimestampWithTimeZone
                 .setSource("test")
                 .setCatalog("catalog")
                 .setSchema("schema")
-                .setTimeZoneKey(getTimeZoneKey("+06:09"))
+                .setTimeZoneKey(TIME_ZONE_KEY)
                 .setLocale(ENGLISH)
                 .build();
         functionAssertions = new FunctionAssertions(session);
@@ -287,6 +289,59 @@ public class TestTimestampWithTimeZone
         assertFunction("cast(TIMESTAMP '2001-1-22 03:04:05 +07:09' as varchar)", VARCHAR, "2001-01-22 03:04:05.000 +07:09");
         assertFunction("cast(TIMESTAMP '2001-1-22 03:04 +07:09' as varchar)", VARCHAR, "2001-01-22 03:04:00.000 +07:09");
         assertFunction("cast(TIMESTAMP '2001-1-22 +07:09' as varchar)", VARCHAR, "2001-01-22 00:00:00.000 +07:09");
+    }
+
+    @Test
+    public void testCastFromSlice()
+    {
+        assertFunction("cast('2001-1-22 03:04:05.321' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 5, 321, DATE_TIME_ZONE).getMillis(), TIME_ZONE_KEY));
+        assertFunction("cast('2001-1-22 03:04:05' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 5, 0, DATE_TIME_ZONE).getMillis(), TIME_ZONE_KEY));
+        assertFunction("cast('2001-1-22 03:04' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 0, 0, DATE_TIME_ZONE).getMillis(), TIME_ZONE_KEY));
+        assertFunction("cast('2001-1-22' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 0, 0, 0, 0, DATE_TIME_ZONE).getMillis(), TIME_ZONE_KEY));
+
+        assertFunction("cast('2001-1-22 03:04:05.321 +07:09' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 5, 321, WEIRD_ZONE).getMillis(), WEIRD_TIME_ZONE_KEY));
+        assertFunction("cast('2001-1-22 03:04:05 +07:09' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 5, 0, WEIRD_ZONE).getMillis(), WEIRD_TIME_ZONE_KEY));
+        assertFunction("cast('2001-1-22 03:04 +07:09' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 0, 0, WEIRD_ZONE).getMillis(), WEIRD_TIME_ZONE_KEY));
+        assertFunction("cast('2001-1-22 +07:09' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 0, 0, 0, 0, WEIRD_ZONE).getMillis(), WEIRD_TIME_ZONE_KEY));
+
+        assertFunction("cast('2001-1-22 03:04:05.321 Europe/Berlin' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 5, 321, BERLIN_ZONE).getMillis(), BERLIN_TIME_ZONE_KEY));
+        assertFunction("cast('2001-1-22 03:04:05 Europe/Berlin' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 5, 0, BERLIN_ZONE).getMillis(), BERLIN_TIME_ZONE_KEY));
+        assertFunction("cast('2001-1-22 03:04 Europe/Berlin' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 0, 0, BERLIN_ZONE).getMillis(), BERLIN_TIME_ZONE_KEY));
+        assertFunction("cast('2001-1-22 Europe/Berlin' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 0, 0, 0, 0, BERLIN_ZONE).getMillis(), BERLIN_TIME_ZONE_KEY));
+
+        assertFunction("cast('\n\t 2001-1-22 03:04:05.321 Europe/Berlin' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 5, 321, BERLIN_ZONE).getMillis(), BERLIN_TIME_ZONE_KEY));
+        assertFunction("cast('2001-1-22 03:04:05.321 Europe/Berlin \t\n' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 5, 321, BERLIN_ZONE).getMillis(), BERLIN_TIME_ZONE_KEY));
+        assertFunction("cast('\n\t 2001-1-22 03:04:05.321 Europe/Berlin \t\n' as timestamp with time zone)",
+                TIMESTAMP_WITH_TIME_ZONE,
+                new SqlTimestampWithTimeZone(new DateTime(2001, 1, 22, 3, 4, 5, 321, BERLIN_ZONE).getMillis(), BERLIN_TIME_ZONE_KEY));
     }
 
     @Test

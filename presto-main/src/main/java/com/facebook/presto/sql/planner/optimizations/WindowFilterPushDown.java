@@ -145,7 +145,7 @@ public class WindowFilterPushDown
             PlanNode rewrittenSource = context.rewrite(node.getSource(), constraint);
 
             if (rewrittenSource != node.getSource()) {
-                return rewrittenSource;
+                return new LimitNode(idAllocator.getNextId(), rewrittenSource, node.getCount());
             }
 
             return context.defaultRewrite(node);

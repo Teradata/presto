@@ -153,7 +153,7 @@ class AstBuilder
     @Override
     public Node visitCreateTable(@NotNull SqlBaseParser.CreateTableContext context)
     {
-        return new CreateTable(getQualifiedName(context.qualifiedName()), visit(context.tableElement(), TableElement.class));
+        return new CreateTable(getQualifiedName(context.qualifiedName()), visit(context.tableElement(), TableElement.class), context.EXISTS() != null);
     }
 
     @Override
@@ -799,6 +799,13 @@ class AstBuilder
     {
         List<Expression> arguments = Lists.reverse(visit(context.valueExpression(), Expression.class));
         return new FunctionCall(new QualifiedName("strpos"), arguments);
+    }
+
+    public Node visitNormalize(@NotNull SqlBaseParser.NormalizeContext context)
+    {
+        Expression str = (Expression) visit(context.valueExpression());
+        String normalForm = Optional.ofNullable(context.normalForm()).map(ParserRuleContext::getText).orElse("NFC");
+        return new FunctionCall(new QualifiedName("normalize"), ImmutableList.of(str, new StringLiteral(normalForm)));
     }
 
     @Override

@@ -353,19 +353,27 @@ function taskData(d) {
     });
 
     return [
-        d.taskId,
-        d.self.replace(/http:\/\/([a-z0-9-.]+)[\/:].*/, '$1'),
-        formatState(d.state, d.stats.fullyBlocked),
-        formatCount(rows),
-        formatCount(computeRate(rows, elapsed)),
-        formatDataSize(bytes),
-        formatDataSize(computeRate(bytes, elapsed)),
-        d.stats.queuedDrivers,
-        d.stats.runningDrivers,
-        d.stats.completedDrivers,
-        finishedBuffers + ' / ' + allBuffers,
-        bufferedPages
+        "<a href=" + d.self + "?pretty>" + htmlEscape(d.taskId) + "</a>",
+        htmlEscape(urlHostname(d.self)),
+        htmlEscape(formatState(d.state, d.stats.fullyBlocked)),
+        htmlEscape(formatCount(rows)),
+        htmlEscape(formatCount(computeRate(rows, elapsed))),
+        htmlEscape(formatDataSize(bytes)),
+        htmlEscape(formatDataSize(computeRate(bytes, elapsed))),
+        htmlEscape(d.stats.queuedDrivers),
+        htmlEscape(d.stats.runningDrivers),
+        htmlEscape(d.stats.completedDrivers),
+        htmlEscape(finishedBuffers + ' / ' + allBuffers),
+        htmlEscape(bufferedPages)
     ];
+}
+
+function urlHostname(url) {
+    var s = new URL(url).hostname;
+    if ((s.charAt(0) == '[') && (s.charAt(s.length - 1) == ']')) {
+        s = s.substr(1, s.length - 2);
+    }
+    return s;
 }
 
 function formatState(state, fullyBlocked) {
@@ -514,7 +522,7 @@ function renderTable(id, data) {
             })
             .enter()
             .append("td")
-            .text(function (d) {
+            .html(function (d) {
                 return d;
             });
 }

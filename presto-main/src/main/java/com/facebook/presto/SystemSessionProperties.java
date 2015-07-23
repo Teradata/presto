@@ -17,7 +17,6 @@ import io.airlift.units.DataSize;
 
 public final class SystemSessionProperties
 {
-    public static final String BIG_QUERY = "experimental_big_query";
     private static final String OPTIMIZE_HASH_GENERATION = "optimize_hash_generation";
     private static final String DISTRIBUTED_JOIN = "distributed_join";
     private static final String HASH_PARTITION_COUNT = "hash_partition_count";
@@ -28,13 +27,9 @@ public final class SystemSessionProperties
     private static final String TASK_HASH_BUILD_CONCURRENCY = "task_hash_build_concurrency";
     private static final String TASK_AGGREGATION_CONCURRENCY = "task_aggregation_concurrency";
     private static final String QUERY_MAX_MEMORY = "query_max_memory";
+    private static final String REDISTRIBUTE_WRITES = "redistribute_writes";
 
     private SystemSessionProperties() {}
-
-    public static boolean isBigQueryEnabled(Session session, boolean defaultValue)
-    {
-        return isEnabled(BIG_QUERY, session, defaultValue);
-    }
 
     private static boolean isEnabled(String propertyName, Session session, boolean defaultValue)
     {
@@ -122,5 +117,10 @@ public final class SystemSessionProperties
     public static DataSize getQueryMaxMemory(Session session, DataSize defaultValue)
     {
         return getDataSize(QUERY_MAX_MEMORY, session, defaultValue);
+    }
+
+    public static boolean isRedistributeWrites(Session session, boolean defaultValue)
+    {
+        return isEnabled(REDISTRIBUTE_WRITES, session, defaultValue);
     }
 }
