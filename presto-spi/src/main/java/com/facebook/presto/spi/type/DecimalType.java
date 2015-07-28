@@ -25,7 +25,7 @@ public abstract class DecimalType
 {
     protected static final int UNSET = -1;
     public static final int MAX_PRECISION = 38;
-    public static final int MAX_SHORT_PRECISION = 18;
+    public static final int MAX_SHORT_PRECISION = 17;
 
     public static DecimalType createDecimalType(int precision, int scale)
     {

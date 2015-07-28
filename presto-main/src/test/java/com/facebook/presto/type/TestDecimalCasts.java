@@ -58,14 +58,14 @@ public class TestDecimalCasts
         assertDecimalFunction("CAST(-234 AS DECIMAL(4,1))", decimal("-234.0"));
         assertDecimalFunction("CAST(0 AS DECIMAL(4,2))", decimal("00.00"));
         assertDecimalFunction("CAST(0 AS DECIMAL(0,0))", new SqlDecimal(new BigInteger("0"), 0, 0));
-        assertDecimalFunction("CAST(123456789012345678 AS DECIMAL(18, 0))", decimal("123456789012345678"));
+        assertDecimalFunction("CAST(12345678901234567 AS DECIMAL(17, 0))", decimal("12345678901234567"));
         assertDecimalFunction("CAST(1234567890 AS DECIMAL(20, 10))", decimal("1234567890.0000000000"));
         assertDecimalFunction("CAST(-1234567890 AS DECIMAL(20, 10))", decimal("-1234567890.0000000000"));
 
-        assertInvalidCast("CAST(1234567890 AS DECIMAL(18,10))", "Cannot cast BIGINT '1234567890' to DECIMAL(18, 10)");
+        assertInvalidCast("CAST(1234567890 AS DECIMAL(17,10))", "Cannot cast BIGINT '1234567890' to DECIMAL(17, 10)");
         assertInvalidCast("CAST(123 AS DECIMAL(2,1))", "Cannot cast BIGINT '123' to DECIMAL(2, 1)");
         assertInvalidCast("CAST(-123 AS DECIMAL(2,1))", "Cannot cast BIGINT '-123' to DECIMAL(2, 1)");
-        assertInvalidCast("CAST(123456789012345678 AS DECIMAL(18,1))", "Cannot cast BIGINT '123456789012345678' to DECIMAL(18, 1)");
+        assertInvalidCast("CAST(123456789012345678 AS DECIMAL(17,1))", "Cannot cast BIGINT '123456789012345678' to DECIMAL(17, 1)");
         assertInvalidCast("CAST(12345678901 AS DECIMAL(20, 10))", "Cannot cast BIGINT '12345678901' to DECIMAL(20, 10)");
     }
 
@@ -82,8 +82,8 @@ public class TestDecimalCasts
         assertFunction("CAST(DECIMAL -1 AS BIGINT)", BIGINT, -1L);
         assertFunction("CAST(DECIMAL -2.49 AS BIGINT)", BIGINT, -2L);
         assertFunction("CAST(DECIMAL -2.5 AS BIGINT)", BIGINT, -3L);
-        assertFunction("CAST(DECIMAL 0.12345678901234567 AS BIGINT)", BIGINT, 0L);
-        assertFunction("CAST(DECIMAL 0.99999999999999999 AS BIGINT)", BIGINT, 1L);
+        assertFunction("CAST(DECIMAL 0.1234567890123456 AS BIGINT)", BIGINT, 0L);
+        assertFunction("CAST(DECIMAL 0.9999999999999999 AS BIGINT)", BIGINT, 1L);
 
         assertFunction("CAST(DECIMAL 1234567890.1234567890 AS BIGINT)", BIGINT, 1234567890L);
         assertFunction("CAST(DECIMAL -1234567890.1234567890 AS BIGINT)", BIGINT, -1234567890L);
@@ -101,8 +101,8 @@ public class TestDecimalCasts
         assertDecimalFunction("CAST(1000 AS DECIMAL(4,0))", decimal("1000"));
         assertDecimalFunction("CAST(1000.01 AS DECIMAL(7,2))", decimal("01000.01"));
         assertDecimalFunction("CAST(-234.0 AS DECIMAL(3,0))", decimal("-234"));
-        assertDecimalFunction("CAST(123456789012345678 AS DECIMAL(18,0))", decimal("123456789012345678"));
-        assertDecimalFunction("CAST(-123456789012345678 AS DECIMAL(18,0))", decimal("-123456789012345678"));
+        assertDecimalFunction("CAST(12345678901234567 AS DECIMAL(17,0))", decimal("12345678901234567"));
+        assertDecimalFunction("CAST(-12345678901234567 AS DECIMAL(17,0))", decimal("-12345678901234567"));
         assertDecimalFunction("CAST(1234567890 AS DECIMAL(20,10))", decimal("1234567890.0000000000"));
         assertDecimalFunction("CAST(-1234567890 AS DECIMAL(20,10))", decimal("-1234567890.0000000000"));
 
@@ -135,8 +135,8 @@ public class TestDecimalCasts
         assertDecimalFunction("CAST('1000' AS DECIMAL(4,0))", decimal("1000"));
         assertDecimalFunction("CAST('1000.01' AS DECIMAL(7,2))", decimal("01000.01"));
         assertDecimalFunction("CAST('-234.0' AS DECIMAL(3,0))", decimal("-234"));
-        assertDecimalFunction("CAST('123456789012345678' AS DECIMAL(18,0))", decimal("123456789012345678"));
-        assertDecimalFunction("CAST('-123456789012345678' AS DECIMAL(18,0))", decimal("-123456789012345678"));
+        assertDecimalFunction("CAST('12345678901234567' AS DECIMAL(17,0))", decimal("12345678901234567"));
+        assertDecimalFunction("CAST('-12345678901234567' AS DECIMAL(17,0))", decimal("-12345678901234567"));
         assertDecimalFunction("CAST('1234567890' AS DECIMAL(20,10))", decimal("1234567890.0000000000"));
         assertDecimalFunction("CAST('-1234567890' AS DECIMAL(20,10))", decimal("-1234567890.0000000000"));
 
@@ -153,7 +153,7 @@ public class TestDecimalCasts
         assertFunction("CAST(DECIMAL 23400 AS VARCHAR)", VARCHAR, "23400");
         assertFunction("CAST(DECIMAL 0.0034 AS VARCHAR)", VARCHAR, "0.0034");
         assertFunction("CAST(DECIMAL 0 AS VARCHAR)", VARCHAR, "0");
-        assertFunction("CAST(DECIMAL 0.12345678901234567 AS VARCHAR)", VARCHAR, "0.12345678901234567");
+        assertFunction("CAST(DECIMAL 0.1234567890123456 AS VARCHAR)", VARCHAR, "0.1234567890123456");
 
         assertFunction("CAST(DECIMAL -10 AS VARCHAR)", VARCHAR, "-10");
         assertFunction("CAST(DECIMAL -1.0 AS VARCHAR)", VARCHAR, "-1.0");
@@ -161,7 +161,7 @@ public class TestDecimalCasts
         assertFunction("CAST(DECIMAL -1.00000 AS VARCHAR)", VARCHAR, "-1.00000");
         assertFunction("CAST(DECIMAL -0.1 AS VARCHAR)", VARCHAR, "-0.1");
         assertFunction("CAST(DECIMAL -.001 AS VARCHAR)", VARCHAR, "-.001");
-        assertFunction("CAST(DECIMAL -1234567890.12345678 AS VARCHAR)", VARCHAR, "-1234567890.12345678");
+        assertFunction("CAST(DECIMAL -1234567890.1234567 AS VARCHAR)", VARCHAR, "-1234567890.1234567");
 
         assertFunction("CAST(DECIMAL 1234567890.1234567890 AS VARCHAR)", VARCHAR, "1234567890.1234567890");
         assertFunction("CAST(DECIMAL -1234567890.1234567890 AS VARCHAR)", VARCHAR, "-1234567890.1234567890");
