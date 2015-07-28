@@ -35,23 +35,29 @@ import java.util.Map;
 
 import static com.facebook.presto.metadata.FunctionRegistry.operatorInfo;
 import static com.facebook.presto.metadata.OperatorType.ADD;
+import static com.facebook.presto.metadata.OperatorType.DIVIDE;
 import static com.facebook.presto.metadata.OperatorType.MULTIPLY;
 import static com.facebook.presto.metadata.OperatorType.SUBTRACT;
 import static com.facebook.presto.metadata.Signature.comparableWithVariadicBound;
+import static com.facebook.presto.spi.StandardErrorCode.DIVISION_BY_ZERO;
 import static com.facebook.presto.spi.type.LongDecimalType.MAX_DECIMAL_UNSCALED_VALUE;
+import static com.facebook.presto.spi.type.LongDecimalType.MAX_PRECISION;
 import static com.facebook.presto.spi.type.LongDecimalType.MIN_DECIMAL_UNSCALED_VALUE;
 import static com.facebook.presto.spi.type.StandardTypes.DECIMAL;
 import static com.facebook.presto.util.Reflection.methodHandle;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Integer.max;
 import static java.lang.Integer.min;
+import static java.math.BigInteger.ONE;
 import static java.math.BigInteger.TEN;
+import static java.math.BigInteger.ZERO;
 
 public final class DecimalOperators
 {
     public static final DecimalAddOperator DECIMAL_ADD_OPERATOR = new DecimalAddOperator();
     public static final DecimalSubtractOperator DECIMAL_SUBTRACT_OPERATOR = new DecimalSubtractOperator();
     public static final DecimalMultiplyOperator DECIMAL_MULTIPLY_OPERATOR = new DecimalMultiplyOperator();
+    public static final DecimalDivideOperator DECIMAL_DIVIDE_OPERATOR = new DecimalDivideOperator();
 
     private DecimalOperators()
     {
@@ -406,6 +412,167 @@ public final class DecimalOperators
             BigInteger result = aBigInteger.multiply(bBigInteger);
             checkOverflow(result);
             return LongDecimalType.unscaledValueToSlice(result);
+        }
+    }
+
+    public static class DecimalDivideOperator
+            extends BaseDecimalBinaryOperator
+    {
+        private static final MethodHandle SHORT_SHORT_SHORT_DIVIDE_METHOD_HANDLE =
+                methodHandle(DecimalDivideOperator.class, "divideShortShortShort", long.class, long.class, long.class);
+        private static final MethodHandle SHORT_SHORT_LONG_DIVIDE_METHOD_HANDLE =
+                methodHandle(DecimalDivideOperator.class, "divideShortShortLong", long.class, long.class, BigInteger.class);
+        private static final MethodHandle LONG_LONG_LONG_DIVIDE_METHOD_HANDLE =
+                methodHandle(DecimalDivideOperator.class, "divideLongLongLong", Slice.class, Slice.class, BigInteger.class);
+        private static final MethodHandle LONG_SHORT_LONG_DIVIDE_METHOD_HANDLE =
+                methodHandle(DecimalDivideOperator.class, "divideLongShortLong", Slice.class, long.class, BigInteger.class);
+        private static final MethodHandle SHORT_LONG_LONG_DIVIDE_METHOD_HANDLE =
+                methodHandle(DecimalDivideOperator.class, "divideShortLongLong", long.class, Slice.class, BigInteger.class);
+
+        protected DecimalDivideOperator()
+        {
+            super(DIVIDE);
+        }
+
+        @Override
+        protected MethodHandle getBaseMethodHandle(DecimalType aType, DecimalType bType, DecimalType resultType)
+        {
+            if (aType instanceof ShortDecimalType && bType instanceof ShortDecimalType && resultType instanceof ShortDecimalType) {
+                return SHORT_SHORT_SHORT_DIVIDE_METHOD_HANDLE;
+            }
+            else if (aType instanceof ShortDecimalType && bType instanceof ShortDecimalType && resultType instanceof LongDecimalType) {
+                return SHORT_SHORT_LONG_DIVIDE_METHOD_HANDLE;
+            }
+            else if (aType instanceof ShortDecimalType && bType instanceof LongDecimalType) {
+                return SHORT_LONG_LONG_DIVIDE_METHOD_HANDLE;
+            }
+            else if (aType instanceof LongDecimalType && bType instanceof ShortDecimalType) {
+                return LONG_SHORT_LONG_DIVIDE_METHOD_HANDLE;
+            }
+            else {
+                return LONG_LONG_LONG_DIVIDE_METHOD_HANDLE;
+            }
+        }
+
+        @Override
+        protected List<Object> getExtraArguments(int aPrecision, int aScale, int bPrecision, int bScale, int resultPrecision, int resultScale, MethodHandle baseMethodHandle)
+        {
+            // +1 because we want to do computations with one extra decimal field to be able to handle
+            // rounding of the result.
+            BigInteger aRescale = TEN.pow(resultScale - aScale + bScale + 1);
+            if (rescaleParamIsLong(baseMethodHandle)) {
+                return ImmutableList.of(aRescale.longValue());
+            }
+            else {
+                return ImmutableList.of(aRescale);
+            }
+        }
+
+        protected int getResultPrecision(int aPrecision, int aScale, int bPrecision, int bScale)
+        {
+            // we extend target precision by bScale. This is upper bound on how much division result will grow.
+            // pessimistic case is a / 0.0000001            int precision = aPrecision + bScale;
+            int precision = aPrecision + bScale;
+
+            // if scale of divisor is greater than scale of dividend we extend scale further as we
+            // want result scale to be maximum of scales of divisor and dividend.
+            if (bScale > aScale) {
+                precision += bScale - aScale;
+            }
+            return min(precision, MAX_PRECISION);
+        }
+
+        protected int getResultScale(int aPrecision, int aScale, int bPrecision, int bScale)
+        {
+            return max(aScale, bScale);
+        }
+
+        public static long divideShortShortShort(long a, long b, long aRescale)
+        {
+            try {
+                long ret = a * aRescale / b;
+                if (ret > 0) {
+                    if (ret % 10 >= 5) {
+                        return ret / 10 + 1;
+                    }
+                    else {
+                        return ret / 10;
+                    }
+                }
+                else {
+                    if (ret % 10 <= -5) {
+                        return ret / 10 - 1;
+                    }
+                    else {
+                        return ret / 10;
+                    }
+                }
+            }
+            catch (ArithmeticException e) {
+                throw new PrestoException(DIVISION_BY_ZERO, e);
+            }
+        }
+
+        public static Slice divideShortShortLong(long a, long b, BigInteger aRescale)
+        {
+            BigInteger aBigInteger = BigInteger.valueOf(a).multiply(aRescale);
+            BigInteger bBigInteger = BigInteger.valueOf(b);
+            return internalDivideLongLongLong(aBigInteger, bBigInteger);
+        }
+
+        public static Slice divideLongLongLong(Slice a, Slice b, BigInteger aRescale)
+        {
+            BigInteger aBigInteger = LongDecimalType.unscaledValueToBigInteger(a).multiply(aRescale);
+            BigInteger bBigInteger = LongDecimalType.unscaledValueToBigInteger(b);
+            return internalDivideLongLongLong(aBigInteger, bBigInteger);
+        }
+
+        public static Slice divideShortLongLong(long a, Slice b, BigInteger aRescale)
+        {
+            BigInteger aBigInteger = BigInteger.valueOf(a).multiply(aRescale);
+            BigInteger bBigInteger = LongDecimalType.unscaledValueToBigInteger(b);
+            return internalDivideLongLongLong(aBigInteger, bBigInteger);
+        }
+
+        public static Slice divideLongShortLong(Slice a, long b, BigInteger aRescale)
+        {
+            BigInteger aBigInteger = LongDecimalType.unscaledValueToBigInteger(a).multiply(aRescale);
+            BigInteger bBigInteger = BigInteger.valueOf(b);
+            return internalDivideLongLongLong(aBigInteger, bBigInteger);
+        }
+
+        private boolean rescaleParamIsLong(MethodHandle baseMethodHandle)
+        {
+            return baseMethodHandle.type().parameterType(baseMethodHandle.type().parameterCount() - 1).isAssignableFrom(long.class);
+        }
+
+        private static Slice internalDivideLongLongLong(BigInteger aBigInteger, BigInteger bBigInteger)
+        {
+            try {
+                BigInteger result = aBigInteger.divide(bBigInteger);
+                BigInteger resultModTen = result.mod(TEN);
+                if (result.signum() > 0) {
+                    if (resultModTen.compareTo(BigInteger.valueOf(5)) >= 0) {
+                        result = result.divide(TEN).add(ONE);
+                    }
+                    else {
+                        result = result.divide(TEN);
+                    }
+                }
+                else {
+                    if (resultModTen.compareTo(BigInteger.valueOf(5)) < 0 && !resultModTen.equals(ZERO)) {
+                        result = result.divide(TEN).subtract(ONE);
+                    }
+                    else {
+                        result = result.divide(TEN);
+                    }
+                }
+                checkOverflow(result);
+                return LongDecimalType.unscaledValueToSlice(result);
+            }
+            catch (ArithmeticException e) {
+                throw new PrestoException(DIVISION_BY_ZERO, e);
+            }
         }
     }
 

@@ -16,6 +16,8 @@ package com.facebook.presto.type;
 
 import org.testng.annotations.Test;
 
+import static com.facebook.presto.spi.StandardErrorCode.DIVISION_BY_ZERO;
+
 public class TestDecimalOperators
         extends AbstractTestDecimalFunctions
 {
@@ -141,5 +143,52 @@ public class TestDecimalOperators
         assertInvalidFunction("DECIMAL .12345678901234567890123456789012345678 * DECIMAL 9", "DECIMAL result exceeds 38 digits");
         assertInvalidFunction("DECIMAL 12345678901234567890123456789012345678 * DECIMAL -9", "DECIMAL result exceeds 38 digits");
         assertInvalidFunction("DECIMAL .12345678901234567890123456789012345678 * DECIMAL -9", "DECIMAL result exceeds 38 digits");
+    }
+
+    @Test
+    public void testDivide()
+            throws Exception
+    {
+        // short short -> short
+        assertDecimalFunction("DECIMAL 1 / DECIMAL 3", decimal("0"));
+        assertDecimalFunction("DECIMAL 1.0 / DECIMAL 3", decimal("0.3"));
+        assertDecimalFunction("DECIMAL 1.0 / DECIMAL 0.1", decimal("10.0"));
+        assertDecimalFunction("DECIMAL 1.0 / DECIMAL 9.0", decimal("00.1"));
+        assertDecimalFunction("DECIMAL 500.00 / DECIMAL 0.1", decimal("5000.00"));
+        assertDecimalFunction("DECIMAL 100.00 / DECIMAL 0.3", decimal("0333.33"));
+        assertDecimalFunction("DECIMAL 100.00 / DECIMAL 0.30", decimal("00333.33"));
+        assertDecimalFunction("DECIMAL 100.00 / DECIMAL -0.30", decimal("-00333.33"));
+        assertDecimalFunction("DECIMAL 200.00 / DECIMAL 0.3", decimal("0666.67"));
+        assertDecimalFunction("DECIMAL 200.00000 / DECIMAL 0.3", decimal("0666.66667"));
+        assertDecimalFunction("DECIMAL 200.00000 / DECIMAL -0.3", decimal("-0666.66667"));
+        assertDecimalFunction("DECIMAL 10 / DECIMAL .00000001", decimal("1000000000.00000000"));
+
+        // long short -> long
+        assertDecimalFunction("DECIMAL 200000000000000000000000000000000000 / DECIMAL 0.30", decimal("666666666666666666666666666666666666.67"));
+        assertDecimalFunction("DECIMAL 200000000000000000000000000000000000 / DECIMAL -0.30", decimal("-666666666666666666666666666666666666.67"));
+        assertDecimalFunction("DECIMAL -.20000000000000000000000000000000000000 / DECIMAL 0.30", decimal("-.66666666666666666666666666666666666667"));
+        assertDecimalFunction("DECIMAL -.20000000000000000000000000000000000000 / DECIMAL -0.30", decimal(".66666666666666666666666666666666666667"));
+        assertDecimalFunction("DECIMAL .20000000000000000000000000000000000000 / DECIMAL 0.30", decimal(".66666666666666666666666666666666666667"));
+
+        // short long -> long
+        assertDecimalFunction("DECIMAL 1 / DECIMAL .000000000000000001", decimal("1000000000000000000.000000000000000000"));
+        assertDecimalFunction("DECIMAL -1 / DECIMAL .000000000000000001", decimal("-1000000000000000000.000000000000000000"));
+
+        // long long -> long
+        assertDecimalFunction("DECIMAL 99999999999999999999999999999999999999 / DECIMAL 11111111111111111111111111111111111111", decimal("00000000000000000000000000000000000009"));
+        assertDecimalFunction("DECIMAL 99999999999999999999999999999999999999 / DECIMAL -11111111111111111111111111111111111111", decimal("-00000000000000000000000000000000000009"));
+        assertDecimalFunction("DECIMAL 9999999999999999999999.9 / DECIMAL 1111111111111111111111.100", decimal("0000000000000000000000009.000"));
+
+        // runtime overflow
+        assertInvalidFunction("DECIMAL 12345678901234567890123456789012345678 / DECIMAL .1", "DECIMAL result exceeds 38 digits");
+        assertInvalidFunction("DECIMAL .12345678901234567890123456789012345678 / DECIMAL .1", "DECIMAL result exceeds 38 digits");
+        assertInvalidFunction("DECIMAL 12345678901234567890123456789012345678 / DECIMAL .12345678901234567890123456789012345678", "DECIMAL result exceeds 38 digits");
+        assertInvalidFunction("DECIMAL 1 / DECIMAL .12345678901234567890123456789012345678", "DECIMAL result exceeds 38 digits");
+
+        // division by zero tests
+        assertInvalidFunction("DECIMAL 1 / DECIMAL 0", DIVISION_BY_ZERO);
+        assertInvalidFunction("DECIMAL 1.000000000000000000000000000000000000 / DECIMAL 0", DIVISION_BY_ZERO);
+        assertInvalidFunction("DECIMAL 1.000000000000000000000000000000000000 / DECIMAL 0.0000000000000000000000000000000000000", DIVISION_BY_ZERO);
+        assertInvalidFunction("DECIMAL 1 / DECIMAL 0.0000000000000000000000000000000000000", DIVISION_BY_ZERO);
     }
 }
