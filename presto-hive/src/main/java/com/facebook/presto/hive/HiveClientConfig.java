@@ -91,6 +91,9 @@ public class HiveClientConfig
     private boolean useParquetColumnNames;
 
     private HiveStorageFormat hiveStorageFormat = HiveStorageFormat.RCBINARY;
+    private boolean respectTableFormat = true;
+    private boolean immutablePartitions;
+    private int maxWriters = 100;
 
     private List<String> resourceConfigFiles;
 
@@ -423,6 +426,42 @@ public class HiveClientConfig
     public HiveClientConfig setHiveStorageFormat(HiveStorageFormat hiveStorageFormat)
     {
         this.hiveStorageFormat = hiveStorageFormat;
+        return this;
+    }
+
+    public boolean isRespectTableFormat()
+    {
+        return respectTableFormat;
+    }
+
+    @Config("hive.respect-table-format")
+    public HiveClientConfig setRespectTableFormat(boolean respectTableFormat)
+    {
+        this.respectTableFormat = respectTableFormat;
+        return this;
+    }
+
+    public boolean isImmutablePartitions()
+    {
+        return immutablePartitions;
+    }
+
+    @Config("hive.immutable-partitions")
+    public HiveClientConfig setImmutablePartitions(boolean immutablePartitions)
+    {
+        this.immutablePartitions = immutablePartitions;
+        return this;
+    }
+
+    public int getMaxWriters()
+    {
+        return maxWriters;
+    }
+
+    @Config("hive.max-writers")
+    public HiveClientConfig setMaxWriters(int maxWriters)
+    {
+        this.maxWriters = maxWriters;
         return this;
     }
 

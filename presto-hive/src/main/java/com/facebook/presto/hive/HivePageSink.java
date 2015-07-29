@@ -57,6 +57,7 @@ import java.util.stream.Collectors;
 
 import static com.facebook.presto.hive.HiveColumnHandle.SAMPLE_WEIGHT_COLUMN_NAME;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_INVALID_METADATA;
+import static com.facebook.presto.hive.HiveErrorCode.HIVE_PARTITION_READ_ONLY;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PARTITION_SCHEMA_MISMATCH;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_PATH_ALREADY_EXISTS;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_WRITER_ERROR;
@@ -108,6 +109,8 @@ public class HivePageSink
     private final List<Object> partitionRow;
 
     private final Table table;
+    private final boolean immutablePartitions;
+    private final boolean respectTableFormat;
 
     private HiveRecordWriter[] writers = new HiveRecordWriter[0];
 
@@ -123,7 +126,9 @@ public class HivePageSink
             PageIndexerFactory pageIndexerFactory,
             TypeManager typeManager,
             HdfsEnvironment hdfsEnvironment,
+            boolean respectTableFormat,
             int maxWriters,
+            boolean immutablePartitions,
             JsonCodec<PartitionUpdate> partitionUpdateCodec)
     {
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
@@ -142,7 +147,9 @@ public class HivePageSink
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
 
         this.hdfsEnvironment = requireNonNull(hdfsEnvironment, "hdfsEnvironment is null");
+        this.respectTableFormat = respectTableFormat;
         this.maxWriters = maxWriters;
+        this.immutablePartitions = immutablePartitions;
         this.partitionUpdateCodec = requireNonNull(partitionUpdateCodec, "partitionUpdateCodec is null");
 
         // divide input columns into partition and data columns
@@ -312,7 +319,12 @@ public class HivePageSink
                         tableName,
                         table.getPartitionKeys());
                 target = table.getSd().getLocation();
-                outputFormat = table.getSd().getOutputFormat();
+                if (respectTableFormat) {
+                    outputFormat = table.getSd().getOutputFormat();
+                }
+                else {
+                    outputFormat = tableStorageFormat.getOutputFormat();
+                }
                 serDe = table.getSd().getSerdeInfo().getSerializationLib();
             }
             if (!partitionName.isEmpty()) {
@@ -348,6 +360,10 @@ public class HivePageSink
                     conf);
         }
         else {
+            if (immutablePartitions) {
+                throw new PrestoException(HIVE_PARTITION_READ_ONLY, "Hive partitions are immutable");
+            }
+
             // Append to an existing partition
             HiveWriteUtils.checkPartitionIsWritable(partitionName, partition.get());
 
