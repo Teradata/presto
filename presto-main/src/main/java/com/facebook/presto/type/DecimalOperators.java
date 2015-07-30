@@ -36,6 +36,7 @@ import java.util.Map;
 import static com.facebook.presto.metadata.FunctionRegistry.operatorInfo;
 import static com.facebook.presto.metadata.OperatorType.ADD;
 import static com.facebook.presto.metadata.OperatorType.DIVIDE;
+import static com.facebook.presto.metadata.OperatorType.MODULUS;
 import static com.facebook.presto.metadata.OperatorType.MULTIPLY;
 import static com.facebook.presto.metadata.OperatorType.SUBTRACT;
 import static com.facebook.presto.metadata.Signature.comparableWithVariadicBound;
@@ -58,6 +59,7 @@ public final class DecimalOperators
     public static final DecimalSubtractOperator DECIMAL_SUBTRACT_OPERATOR = new DecimalSubtractOperator();
     public static final DecimalMultiplyOperator DECIMAL_MULTIPLY_OPERATOR = new DecimalMultiplyOperator();
     public static final DecimalDivideOperator DECIMAL_DIVIDE_OPERATOR = new DecimalDivideOperator();
+    public static final DecimalModulusOperator DECIMAL_MODULUS_OPERATOR = new DecimalModulusOperator();
 
     private DecimalOperators()
     {
@@ -568,6 +570,136 @@ public final class DecimalOperators
                     }
                 }
                 checkOverflow(result);
+                return LongDecimalType.unscaledValueToSlice(result);
+            }
+            catch (ArithmeticException e) {
+                throw new PrestoException(DIVISION_BY_ZERO, e);
+            }
+        }
+    }
+
+    public static class DecimalModulusOperator
+            extends BaseDecimalBinaryOperator
+    {
+        private static final MethodHandle SHORT_SHORT_SHORT_MODULUS_METHOD_HANDLE =
+                methodHandle(DecimalModulusOperator.class, "modulusShortShortShort", long.class, long.class, BigInteger.class, BigInteger.class);
+        private static final MethodHandle SHORT_LONG_SHORT_MODULUS_METHOD_HANDLE =
+                methodHandle(DecimalModulusOperator.class, "modulusShortLongShort", long.class, Slice.class, BigInteger.class, BigInteger.class);
+        private static final MethodHandle SHORT_LONG_LONG_MODULUS_METHOD_HANDLE =
+                methodHandle(DecimalModulusOperator.class, "modulusShortLongLong", long.class, Slice.class, BigInteger.class, BigInteger.class);
+        private static final MethodHandle LONG_SHORT_SHORT_MODULUS_METHOD_HANDLE =
+                methodHandle(DecimalModulusOperator.class, "modulusLongShortShort", Slice.class, long.class, BigInteger.class, BigInteger.class);
+        private static final MethodHandle LONG_SHORT_LONG_MODULUS_METHOD_HANDLE =
+                methodHandle(DecimalModulusOperator.class, "modulusLongShortLong", Slice.class, long.class, BigInteger.class, BigInteger.class);
+        private static final MethodHandle LONG_LONG_LONG_MODULUS_METHOD_HANDLE =
+                methodHandle(DecimalModulusOperator.class, "modulusLongLongLong", Slice.class, Slice.class, BigInteger.class, BigInteger.class);
+
+        protected DecimalModulusOperator()
+        {
+            super(MODULUS);
+        }
+
+        @Override
+        protected MethodHandle getBaseMethodHandle(DecimalType aType, DecimalType bType, DecimalType resultType)
+        {
+            // TODO currently all methods take rescale parameters as BigInteger and all intermediate
+            // calculations use BigIntegers. There are some cases when we know that intermediate result would
+            // fit in long. Expoiting that is possible optimization
+
+            if (aType instanceof ShortDecimalType && bType instanceof ShortDecimalType && resultType instanceof ShortDecimalType) {
+                return SHORT_SHORT_SHORT_MODULUS_METHOD_HANDLE;
+            }
+            else if (aType instanceof ShortDecimalType && bType instanceof LongDecimalType && resultType instanceof ShortDecimalType) {
+                return SHORT_LONG_SHORT_MODULUS_METHOD_HANDLE;
+            }
+            else if (aType instanceof ShortDecimalType && bType instanceof LongDecimalType && resultType instanceof LongDecimalType) {
+                return SHORT_LONG_LONG_MODULUS_METHOD_HANDLE;
+            }
+            else if (aType instanceof LongDecimalType && bType instanceof ShortDecimalType && resultType instanceof ShortDecimalType) {
+                return LONG_SHORT_SHORT_MODULUS_METHOD_HANDLE;
+            }
+            else if (aType instanceof LongDecimalType && bType instanceof ShortDecimalType && resultType instanceof LongDecimalType) {
+                return LONG_SHORT_LONG_MODULUS_METHOD_HANDLE;
+            }
+            else {
+                return LONG_LONG_LONG_MODULUS_METHOD_HANDLE;
+            }
+        }
+
+        @Override
+        protected List<Object> getExtraArguments(int aPrecision, int aScale, int bPrecision, int bScale, int resultPrecision, int resultScale, MethodHandle baseMethodHandle)
+        {
+            BigInteger aRescale = TEN.pow(max(0, bScale - aScale));
+            BigInteger bRescale = TEN.pow(max(0, aScale - bScale));
+            return ImmutableList.of(aRescale, bRescale);
+        }
+
+        protected int getResultPrecision(int aPrecision, int aScale, int bPrecision, int bScale)
+        {
+            return min(bPrecision - bScale, aPrecision - aScale) + max(aScale, bScale);
+        }
+
+        protected int getResultScale(int aPrecision, int aScale, int bPrecision, int bScale)
+        {
+            return max(aScale, bScale);
+        }
+
+        public static long modulusShortShortShort(long a, long b, BigInteger aRescale, BigInteger bRescale)
+        {
+            BigInteger aBigInteger = BigInteger.valueOf(a);
+            BigInteger bBigInteger = BigInteger.valueOf(b);
+            return internalModulusShortResult(aBigInteger, bBigInteger, aRescale, bRescale);
+        }
+
+        public static Slice modulusLongLongLong(Slice a, Slice b, BigInteger aRescale, BigInteger bRescale)
+        {
+            BigInteger aBigInteger = LongDecimalType.unscaledValueToBigInteger(a);
+            BigInteger bBigInteger = LongDecimalType.unscaledValueToBigInteger(b);
+            return internalModulusLongResult(aBigInteger, bBigInteger, aRescale, bRescale);
+        }
+
+        public static Slice modulusShortLongLong(long a, Slice b, BigInteger aRescale, BigInteger bRescale)
+        {
+            BigInteger aBigInteger = BigInteger.valueOf(a);
+            BigInteger bBigInteger = LongDecimalType.unscaledValueToBigInteger(b);
+            return internalModulusLongResult(aBigInteger, bBigInteger, aRescale, bRescale);
+        }
+
+        public static long modulusShortLongShort(long a, Slice b, BigInteger aRescale, BigInteger bRescale)
+        {
+            BigInteger aBigInteger = BigInteger.valueOf(a).multiply(aRescale);
+            BigInteger bBigInteger = LongDecimalType.unscaledValueToBigInteger(b).multiply(bRescale);
+            return internalModulusShortResult(aBigInteger, bBigInteger, aRescale, bRescale);
+        }
+
+        public static long modulusLongShortShort(Slice a, long b, BigInteger aRescale, BigInteger bRescale)
+        {
+            BigInteger aBigInteger = LongDecimalType.unscaledValueToBigInteger(a);
+            BigInteger bBigInteger = BigInteger.valueOf(b);
+            return internalModulusShortResult(aBigInteger, bBigInteger, aRescale, bRescale);
+        }
+
+        public static Slice modulusLongShortLong(Slice a, long b, BigInteger aRescale, BigInteger bRescale)
+        {
+            BigInteger aBigInteger = LongDecimalType.unscaledValueToBigInteger(a);
+            BigInteger bBigInteger = BigInteger.valueOf(b);
+            return internalModulusLongResult(aBigInteger, bBigInteger, aRescale, bRescale);
+        }
+
+        private static long internalModulusShortResult(BigInteger aBigInteger, BigInteger bBigInteger, BigInteger aRescale, BigInteger bRescale)
+        {
+            try {
+                return aBigInteger.multiply(aRescale).remainder(bBigInteger.multiply(bRescale)).longValue();
+            }
+            catch (ArithmeticException e) {
+                throw new PrestoException(DIVISION_BY_ZERO, e);
+            }
+        }
+
+        private static Slice internalModulusLongResult(BigInteger aBigInteger, BigInteger bBigInteger, BigInteger aRescale, BigInteger bRescale)
+        {
+            try {
+                BigInteger result = aBigInteger.multiply(aRescale).remainder(bBigInteger.multiply(bRescale));
                 return LongDecimalType.unscaledValueToSlice(result);
             }
             catch (ArithmeticException e) {
