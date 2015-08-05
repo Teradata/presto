@@ -24,6 +24,7 @@ import com.facebook.presto.spi.type.LongDecimalType;
 import com.facebook.presto.spi.type.ShortDecimalType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
+import com.facebook.presto.spi.type.TypeSignature;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 
@@ -79,9 +80,9 @@ public final class DecimalOperators
         }
 
         @Override
-        public FunctionInfo specialize(Map<String, Type> types, int arity, TypeManager typeManager, FunctionRegistry functionRegistry)
+        public FunctionInfo specialize(Map<String, Type> types, List<TypeSignature> parameterTypes, TypeManager typeManager, FunctionRegistry functionRegistry)
         {
-            checkArgument(arity == 2, "Expected arity to be 2");
+            checkArgument(parameterTypes.size() == 2, "Expected arity to be 2");
             DecimalType aType = (DecimalType) types.get("A");
             DecimalType bType = (DecimalType) types.get("B");
 
