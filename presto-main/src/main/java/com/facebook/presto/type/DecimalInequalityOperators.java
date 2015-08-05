@@ -33,6 +33,7 @@ import io.airlift.slice.Slice;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.math.BigInteger;
+import java.util.List;
 import java.util.Map;
 
 import static com.facebook.presto.metadata.FunctionRegistry.operatorInfo;
@@ -172,7 +173,7 @@ public class DecimalInequalityOperators
         }
 
         @Override
-        public FunctionInfo specialize(Map<String, Type> types, int arity, TypeManager typeManager, FunctionRegistry functionRegistry)
+        public FunctionInfo specialize(Map<String, Type> types, List<TypeSignature> parameterTypes, TypeManager typeManager, FunctionRegistry functionRegistry)
         {
             DecimalType aType = (DecimalType) types.get("A");
             DecimalType bType = (DecimalType) types.get("B");
@@ -244,7 +245,7 @@ public class DecimalInequalityOperators
         }
 
         @Override
-        public FunctionInfo specialize(Map<String, Type> types, int arity, TypeManager typeManager, FunctionRegistry functionRegistry)
+        public FunctionInfo specialize(Map<String, Type> types, List<TypeSignature> parameterTypes, TypeManager typeManager, FunctionRegistry functionRegistry)
         {
             DecimalType vType = (DecimalType) types.get("V");
             DecimalType aType = (DecimalType) types.get("A");
@@ -279,8 +280,12 @@ public class DecimalInequalityOperators
                 throw new IllegalArgumentException(format("unsuported argument types (%s, %s, %s)", vType, aType, bType));
             }
 
-            MethodHandle lowerBoundTestMethodHandle = DECIMAL_LESS_THAN_OR_EQUAL_OPERATOR.specialize(ImmutableMap.<String, Type>of("A", aType, "B", vType), 2, typeManager, functionRegistry).getMethodHandle();
-            MethodHandle upperBoundTestMethodHandle = DECIMAL_GREATER_THAN_OR_EQUAL_OPERATOR.specialize(ImmutableMap.<String, Type>of("A", bType, "B", vType), 2, typeManager, functionRegistry).getMethodHandle();
+            MethodHandle lowerBoundTestMethodHandle = DECIMAL_LESS_THAN_OR_EQUAL_OPERATOR.specialize(
+                    ImmutableMap.<String, Type>of("A", aType, "B", vType), ImmutableList.of(aType.getTypeSignature(), vType.getTypeSignature()),
+                    typeManager, functionRegistry).getMethodHandle();
+            MethodHandle upperBoundTestMethodHandle = DECIMAL_GREATER_THAN_OR_EQUAL_OPERATOR.specialize(
+                    ImmutableMap.<String, Type>of("A", bType, "B", vType), ImmutableList.of(bType.getTypeSignature(), vType.getTypeSignature()),
+                    typeManager, functionRegistry).getMethodHandle();
 
             MethodHandle methodHandle = MethodHandles.insertArguments(baseMethodHandle, 3, lowerBoundTestMethodHandle, upperBoundTestMethodHandle);
             return operatorInfo(BETWEEN, BOOLEAN_SIGNATURE, ImmutableList.of(vType.getTypeSignature(), aType.getTypeSignature(), bType.getTypeSignature()),
