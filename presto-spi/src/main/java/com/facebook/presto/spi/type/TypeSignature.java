@@ -20,12 +20,19 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.lang.String.format;
 import static java.util.Collections.unmodifiableList;
 
 public class TypeSignature
 {
+    private static final Pattern ALIASED_LITERAL_PATTERN = Pattern.compile("(.*)\\s+as\\s+(\\w+)");
+    private static final int LITERAL_GROUP_INDEX = 1;
+    private static final int ALIAS_GROUP_INDEX = 2;
+
     private final String base;
     private final List<TypeSignature> parameters;
     private final List<Object> literalParameters;
@@ -196,10 +203,9 @@ public class TypeSignature
 
     private static Object parseLiteral(String literal)
     {
-        checkArgument(literal != null, "Null literal", literal);
-
+        checkArgument(literal != null, "Null literal: '%s'", literal);
         literal = literal.trim();
-        checkArgument(!literal.isEmpty(), "Bad literal: '%s'", literal);
+        checkArgument(!literal.isEmpty(), "Empty literal: '%s'", literal);
 
         if (literal.startsWith("'") || literal.endsWith("'")) {
             checkArgument(literal.startsWith("'") && literal.endsWith("'"), "Bad literal: '%s'", literal);
@@ -210,7 +216,14 @@ public class TypeSignature
         }
         catch (NumberFormatException ignored) {
         }
-        return new TypeLiteralCalculation(literal);
+
+        Matcher match = ALIASED_LITERAL_PATTERN.matcher(literal);
+        if (match.matches()) {
+            return new TypeLiteralCalculation(match.group(LITERAL_GROUP_INDEX), Optional.of(match.group(ALIAS_GROUP_INDEX)));
+        }
+        else {
+            return new TypeLiteralCalculation(literal, Optional.<String>empty());
+        }
     }
 
     @Override
@@ -236,7 +249,7 @@ public class TypeSignature
         return Objects.hash(base.toLowerCase(Locale.ENGLISH), parameters, literalParameters);
     }
 
-    private static void checkArgument(boolean argument, String format, Object...args)
+    private static void checkArgument(boolean argument, String format, Object... args)
     {
         if (!argument) {
             throw new IllegalArgumentException(format(format, args));

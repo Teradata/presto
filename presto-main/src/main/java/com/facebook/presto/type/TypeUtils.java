@@ -339,15 +339,16 @@ public final class TypeUtils
             Object literal = typeSignature.getLiteralParameters().get(index);
             if (literal instanceof TypeLiteralCalculation) {
                 TypeLiteralCalculation calculation = (TypeLiteralCalculation) literal;
+                String name = calculation.getAlias().orElse(calculation.getCalculation()).toUpperCase(Locale.US);
                 if (actualType.getLiteralParameters().isEmpty()) {
-                    inputs.put(calculation.getCalculation().toUpperCase(Locale.US), OptionalLong.empty());
+                    inputs.put(name, OptionalLong.empty());
                 }
                 else {
                     Object actualLiteral = actualType.getLiteralParameters().get(index);
                     if (!(actualLiteral instanceof Long)) {
                         throw new IllegalArgumentException(format("Expected type %s literal parameter %s to be a number", actualType, index));
                     }
-                    inputs.put(calculation.getCalculation().toUpperCase(Locale.US), OptionalLong.of((Long) actualLiteral));
+                    inputs.put(name, OptionalLong.of((Long) actualLiteral));
                 }
             }
         }

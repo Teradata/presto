@@ -14,16 +14,19 @@
 package com.facebook.presto.spi.type;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
 public class TypeLiteralCalculation
 {
     private final String calculation;
+    private final Optional<String> alias;
 
-    public TypeLiteralCalculation(String calculation)
+    public TypeLiteralCalculation(String calculation, Optional<String> alias)
     {
         this.calculation = requireNonNull(calculation, "calculation is null");
+        this.alias = requireNonNull(alias, "alias is null");
     }
 
     public String getCalculation()
@@ -31,10 +34,15 @@ public class TypeLiteralCalculation
         return calculation;
     }
 
+    public Optional<String> getAlias()
+    {
+        return alias;
+    }
+
     @Override
     public String toString()
     {
-        return calculation;
+        return calculation + alias.map(alias -> " as " + alias).orElse("");
     }
 
     @Override
@@ -47,12 +55,13 @@ public class TypeLiteralCalculation
             return false;
         }
         TypeLiteralCalculation that = (TypeLiteralCalculation) o;
-        return Objects.equals(calculation, that.calculation);
+        return Objects.equals(calculation, that.calculation) &&
+                Objects.equals(alias, that.alias);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(calculation);
+        return Objects.hash(calculation, alias);
     }
 }
