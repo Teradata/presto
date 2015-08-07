@@ -259,6 +259,24 @@ public class TestDecimalOperators
     }
 
     @Test
+    public void testNegation()
+            throws Exception
+    {
+        // short
+        assertDecimalFunction("-DECIMAL 1 ", decimal("-1"));
+        assertDecimalFunction("-DECIMAL -1 ", decimal("1"));
+        assertDecimalFunction("-DECIMAL 00000001.00000010 ", decimal("-00000001.00000010"));
+        assertDecimalFunction("-DECIMAL 0 ", decimal("0"));
+
+        // long
+        assertDecimalFunction("-DECIMAL 12345678901234567890123456789012345678", decimal("-12345678901234567890123456789012345678"));
+        assertDecimalFunction("-DECIMAL -12345678901234567890123456789012345678", decimal("12345678901234567890123456789012345678"));
+        assertDecimalFunction("-DECIMAL 123456789012345678.90123456789012345678", decimal("-123456789012345678.90123456789012345678"));
+        assertDecimalFunction("-DECIMAL 000000000000000001.10000000000000000000", decimal("-000000000000000001.10000000000000000000"));
+        assertDecimalFunction("-DECIMAL 000000000000000000.00000000000000000000", decimal("000000000000000000.00000000000000000000"));
+    }
+
+    @Test
     public void testEqual()
             throws Exception
     {
