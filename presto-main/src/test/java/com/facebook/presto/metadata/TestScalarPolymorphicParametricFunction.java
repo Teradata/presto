@@ -17,20 +17,21 @@ import com.facebook.presto.block.BlockEncodingManager;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import org.testng.annotations.Test;
 
 import java.util.List;
 
+import static com.facebook.presto.metadata.Signature.comparableWithVariadicBound;
+import static com.facebook.presto.spi.type.StandardTypes.VARCHAR;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
-import static io.airlift.slice.Slices.EMPTY_SLICE;
 import static java.util.Collections.emptyMap;
 import static org.testng.Assert.assertEquals;
 
 public class TestScalarPolymorphicParametricFunction
 {
-    private static final int INPUT_VARCHAR_LENGTH = 10;
     private static final TypeRegistry TYPE_REGISTRY = new TypeRegistry();
     private static final FunctionRegistry REGISTRY = new FunctionRegistry(TYPE_REGISTRY, new BlockEncodingManager(TYPE_REGISTRY), true);
     private static final Signature SIGNATURE = Signature.builder()
@@ -38,8 +39,10 @@ public class TestScalarPolymorphicParametricFunction
             .returnType("bigint")
             .argumentTypes("varchar(x)")
             .build();
+    private static final int INPUT_VARCHAR_LENGTH = 10;
     private static final TypeSignature INPUT_VARCHAR_TYPE = parseTypeSignature("varchar(" + INPUT_VARCHAR_LENGTH + ")");
     private static final List<TypeSignature> PARAMETER_TYPES = ImmutableList.of(INPUT_VARCHAR_TYPE);
+    private static final Slice INPUT_SLICE = Slices.allocate(INPUT_VARCHAR_LENGTH);
 
     @Test
     public void testSelectsMethodBasedOnArgumentTypes()
@@ -56,7 +59,7 @@ public class TestScalarPolymorphicParametricFunction
 
         assertEquals(functionInfo.getSignature(), SIGNATURE);
         assertEquals(functionInfo.resolveCalculatedTypes(PARAMETER_TYPES).getSignature(), SIGNATURE.resolveCalculatedTypes(PARAMETER_TYPES));
-        assertEquals(functionInfo.getMethodHandle().invoke(EMPTY_SLICE), (long) INPUT_VARCHAR_LENGTH);
+        assertEquals(functionInfo.getMethodHandle().invoke(INPUT_SLICE), (long) INPUT_VARCHAR_LENGTH);
     }
 
     @Test
@@ -73,7 +76,7 @@ public class TestScalarPolymorphicParametricFunction
         FunctionInfo functionInfo = function.specialize(emptyMap(), PARAMETER_TYPES, TYPE_REGISTRY, REGISTRY);
 
         assertEquals(functionInfo.resolveCalculatedTypes(PARAMETER_TYPES).getSignature(), SIGNATURE.resolveCalculatedTypes(PARAMETER_TYPES));
-        assertEquals(functionInfo.getMethodHandle().invoke(EMPTY_SLICE), (long) 42);
+        assertEquals(functionInfo.getMethodHandle().invoke(INPUT_SLICE), (long) 42);
     }
 
     @Test
@@ -93,7 +96,7 @@ public class TestScalarPolymorphicParametricFunction
                 .build();
 
         FunctionInfo functionInfo = function.specialize(emptyMap(), PARAMETER_TYPES, TYPE_REGISTRY, REGISTRY);
-        Slice slice = (Slice) functionInfo.getMethodHandle().invoke(EMPTY_SLICE);
+        Slice slice = (Slice) functionInfo.getMethodHandle().invoke(INPUT_SLICE);
         assertEquals(slice.length(), (long) INPUT_VARCHAR_LENGTH + 10);
     }
 
@@ -109,14 +112,34 @@ public class TestScalarPolymorphicParametricFunction
 
         ParametricFunction function = ParametricFunction.builder(TestScalarPolymorphicParametricFunction.class)
                 .signature(signature)
-                .methods("varcharToVarcharWithExtraParameter")
-                .extraParameters((types, literals) -> ImmutableList.of(literals.get("x").intValue()))
+                .methods("varcharToVarchar")
                 .build();
 
         FunctionInfo functionInfo = function.specialize(emptyMap(), PARAMETER_TYPES, TYPE_REGISTRY, REGISTRY);
-        Slice slice = (Slice) functionInfo.getMethodHandle().invoke(EMPTY_SLICE);
+        Slice slice = (Slice) functionInfo.getMethodHandle().invoke(INPUT_SLICE);
         assertEquals(slice.length(), (long) INPUT_VARCHAR_LENGTH);
         assertEquals(functionInfo.resolveCalculatedTypes(PARAMETER_TYPES).getReturnType(), INPUT_VARCHAR_TYPE);
+    }
+
+    @Test
+    public void testTypeParameters()
+            throws Throwable
+    {
+        Signature signature = Signature.builder()
+                .name("foo")
+                .typeParameters(comparableWithVariadicBound("V", VARCHAR))
+                .returnType("V")
+                .argumentTypes("V")
+                .build();
+
+        ParametricFunction function = ParametricFunction.builder(TestScalarPolymorphicParametricFunction.class)
+                .signature(signature)
+                .methods("varcharToVarchar")
+                .build();
+
+        FunctionInfo functionInfo = function.specialize(ImmutableMap.of("V", TYPE_REGISTRY.getType(INPUT_VARCHAR_TYPE)), PARAMETER_TYPES, TYPE_REGISTRY, REGISTRY);
+        Slice slice = (Slice) functionInfo.getMethodHandle().invoke(INPUT_SLICE);
+        assertEquals(slice.length(), (long) INPUT_VARCHAR_LENGTH);
     }
 
     @Test(expectedExceptions = {IllegalStateException.class},
@@ -151,6 +174,11 @@ public class TestScalarPolymorphicParametricFunction
                 .build();
 
         function.specialize(emptyMap(), PARAMETER_TYPES, TYPE_REGISTRY, REGISTRY);
+    }
+
+    public static Slice varcharToVarchar(Slice varchar)
+    {
+        return varchar;
     }
 
     public static long varcharToBigintWithExtraParameter(Slice varchar, long extraParameter)

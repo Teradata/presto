@@ -129,7 +129,13 @@ class ScalarPolymorphicParametricFunction
                 .build();
 
         List<Type> resolvedParameterTypes = resolveTypes(parameterTypes, typeManager);
-        Type resolvedReturnType = resolveType(calculatedReturnType, typeManager);
+        Type resolvedReturnType;
+        if (types.containsKey(calculatedReturnType.getBase())) {
+            resolvedReturnType = types.get(calculatedReturnType.getBase());
+        }
+        else {
+            resolvedReturnType = resolveType(calculatedReturnType, typeManager);
+        }
 
         Optional<Method> matchingMethod = Optional.empty();
         Optional<ExtraParametersFunction> matchingExtraParametersFunction = Optional.empty();
