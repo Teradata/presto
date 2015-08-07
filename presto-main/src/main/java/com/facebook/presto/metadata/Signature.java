@@ -182,7 +182,7 @@ public final class Signature
             TypeSignature argument = argumentTypes.get(index);
             if (argument.isCalculated()) {
                 TypeSignature actualParameter = parameterTypes.get(index);
-                boundParameters.putAll(TypeUtils.extractCalculationInputs(argument, actualParameter));
+                boundParameters.putAll(TypeUtils.extractLiteralParameters(argument, actualParameter));
             }
         }
 
@@ -404,5 +404,10 @@ public final class Signature
     public static TypeParameter orderableTypeParameter(String name)
     {
         return new TypeParameter(name, false, true, null);
+    }
+
+    public static SignatureBuilder builder()
+    {
+        return new SignatureBuilder();
     }
 }
