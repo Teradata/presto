@@ -16,7 +16,9 @@ package com.facebook.presto.type;
 import com.facebook.presto.metadata.FunctionInfo;
 import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.OperatorType;
+import com.facebook.presto.metadata.ParametricFunction;
 import com.facebook.presto.metadata.ParametricOperator;
+import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.StandardErrorCode;
 import com.facebook.presto.spi.type.DecimalType;
@@ -39,6 +41,7 @@ import static com.facebook.presto.metadata.OperatorType.ADD;
 import static com.facebook.presto.metadata.OperatorType.DIVIDE;
 import static com.facebook.presto.metadata.OperatorType.MODULUS;
 import static com.facebook.presto.metadata.OperatorType.MULTIPLY;
+import static com.facebook.presto.metadata.OperatorType.NEGATION;
 import static com.facebook.presto.metadata.OperatorType.SUBTRACT;
 import static com.facebook.presto.metadata.Signature.comparableWithVariadicBound;
 import static com.facebook.presto.spi.StandardErrorCode.DIVISION_BY_ZERO;
@@ -61,6 +64,7 @@ public final class DecimalOperators
     public static final DecimalMultiplyOperator DECIMAL_MULTIPLY_OPERATOR = new DecimalMultiplyOperator();
     public static final DecimalDivideOperator DECIMAL_DIVIDE_OPERATOR = new DecimalDivideOperator();
     public static final DecimalModulusOperator DECIMAL_MODULUS_OPERATOR = new DecimalModulusOperator();
+    public static final ParametricFunction DECIMAL_NEGATION_OPERATOR = DecimalNegationOperator.FUNCTION;
 
     private DecimalOperators()
     {
@@ -706,6 +710,33 @@ public final class DecimalOperators
             catch (ArithmeticException e) {
                 throw new PrestoException(DIVISION_BY_ZERO, e);
             }
+        }
+    }
+
+    public static class DecimalNegationOperator
+    {
+        public static final Signature SIGNATURE = Signature.builder()
+                .operatorType(NEGATION)
+                .argumentTypes("decimal(x,y)")
+                .returnType("decimal(x,y)")
+                .build();
+
+        public static final ParametricFunction FUNCTION =
+                ParametricFunction.builder(DecimalNegationOperator.class)
+                        .methods("negate")
+                        .signature(SIGNATURE)
+                        .hidden(true)
+                        .build();
+
+        public static long negate(long arg)
+        {
+            return -arg;
+        }
+
+        public static Slice negate(Slice arg)
+        {
+            BigInteger argBigInteger = LongDecimalType.unscaledValueToBigInteger(arg);
+            return LongDecimalType.unscaledValueToSlice(argBigInteger.negate());
         }
     }
 
