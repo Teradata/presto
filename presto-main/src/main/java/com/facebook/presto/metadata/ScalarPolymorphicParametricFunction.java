@@ -107,7 +107,7 @@ class ScalarPolymorphicParametricFunction
     @Override
     public boolean isUnbound()
     {
-        return false;
+        return !signature.getTypeParameters().isEmpty() || signature.isVariableArity() || signature.isReturnTypeOrAnyArgumentTypeCalculated();
     }
 
     @Override

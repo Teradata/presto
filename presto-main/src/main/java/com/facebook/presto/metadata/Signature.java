@@ -174,6 +174,11 @@ public final class Signature
         return new Signature(name, calculatedReturnType, parameterTypes);
     }
 
+    public boolean isReturnTypeOrAnyArgumentTypeCalculated()
+    {
+        return !returnType.isCalculated() && !any(argumentTypes, TypeSignature::isCalculated);
+    }
+
     public Map<String, OptionalLong> bindLiteralParameters(List<TypeSignature> parameterTypes)
     {
         Map<String, OptionalLong> boundParameters = new HashMap<>();
@@ -268,11 +273,6 @@ public final class Signature
         checkState(boundParameters.keySet().equals(parameters.keySet()), "%s matched arguments %s, but type parameters %s are still unbound", this, types, Sets.difference(parameters.keySet(), boundParameters.keySet()));
 
         return boundParameters;
-    }
-
-    private boolean isReturnTypeOrAnyArgumentTypeCalculated()
-    {
-        return !returnType.isCalculated() && !any(argumentTypes, TypeSignature::isCalculated);
     }
 
     private static boolean matchArguments(
