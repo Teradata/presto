@@ -14,6 +14,7 @@
 
 package com.facebook.presto.type;
 
+import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.ShortDecimalType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
@@ -55,6 +56,6 @@ public class DecimalParametricType
                 literals.get(1) instanceof Long, "Expected both literal parameters for DECIMAL to be numbers");
         long precision = (long) literals.get(0);
         long scale = (long) literals.get(1);
-        return ShortDecimalType.createDecimalType((int) precision, (int) scale);
+        return DecimalType.createDecimalType((int) precision, (int) scale);
     }
 }

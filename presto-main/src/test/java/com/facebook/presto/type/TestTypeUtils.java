@@ -19,15 +19,17 @@ import org.testng.annotations.Test;
 import java.util.OptionalLong;
 
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
-import static com.facebook.presto.type.TypeUtils.extractCalculationInputs;
+import static com.facebook.presto.type.TypeUtils.extractLiteralParameters;
 import static org.testng.Assert.assertEquals;
 
 public class TestTypeUtils
 {
     @Test
-    public void testExtractCalculationInputs()
+    public void testExtractLiteralParameters()
     {
-        assertEquals(extractCalculationInputs(parseTypeSignature("varchar(x + y as result)"), parseTypeSignature("varchar(10)")),
+        assertEquals(extractLiteralParameters(parseTypeSignature("varchar(x)"), parseTypeSignature("varchar(10)")),
+                ImmutableMap.of("X", OptionalLong.of(10)));
+        assertEquals(extractLiteralParameters(parseTypeSignature("varchar(x + y as result)"), parseTypeSignature("varchar(10)")),
                 ImmutableMap.of("RESULT", OptionalLong.of(10)));
     }
 }
