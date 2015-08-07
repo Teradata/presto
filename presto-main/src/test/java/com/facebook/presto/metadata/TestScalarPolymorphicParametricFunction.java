@@ -23,10 +23,13 @@ import org.testng.annotations.Test;
 
 import java.util.List;
 
+import static com.facebook.presto.metadata.OperatorType.ADD;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static io.airlift.slice.Slices.EMPTY_SLICE;
 import static java.util.Collections.emptyMap;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 public class TestScalarPolymorphicParametricFunction
 {
@@ -57,6 +60,7 @@ public class TestScalarPolymorphicParametricFunction
         assertEquals(functionInfo.getSignature(), SIGNATURE);
         assertEquals(functionInfo.resolveCalculatedTypes(PARAMETER_TYPES).getSignature(), SIGNATURE.resolveCalculatedTypes(PARAMETER_TYPES));
         assertEquals(functionInfo.getMethodHandle().invoke(EMPTY_SLICE), (long) INPUT_VARCHAR_LENGTH);
+        assertFalse(functionInfo.isHidden());
     }
 
     @Test
@@ -119,6 +123,24 @@ public class TestScalarPolymorphicParametricFunction
         assertEquals(functionInfo.resolveCalculatedTypes(PARAMETER_TYPES).getReturnType(), INPUT_VARCHAR_TYPE);
     }
 
+    @Test
+    public void testSetsHiddenToTrueForOperators()
+    {
+        Signature signature = Signature.builder()
+                .operatorType(ADD)
+                .returnType("bigint")
+                .argumentTypes("varchar(x)")
+                .build();
+
+        ParametricFunction function = ParametricFunction.builder(TestScalarPolymorphicParametricFunction.class)
+                .signature(signature)
+                .methods("varcharToBigint")
+                .build();
+
+        FunctionInfo functionInfo = function.specialize(emptyMap(), PARAMETER_TYPES, TYPE_REGISTRY, REGISTRY);
+        assertTrue(functionInfo.isHidden());
+    }
+
     @Test(expectedExceptions = {IllegalStateException.class},
             expectedExceptionsMessageRegExp = "method foo was not found in class class com.facebook.presto.metadata.TestScalarPolymorphicParametricFunction")
     public void testFailIfNotAllMethodsPresent()
@@ -151,6 +173,11 @@ public class TestScalarPolymorphicParametricFunction
                 .build();
 
         function.specialize(emptyMap(), PARAMETER_TYPES, TYPE_REGISTRY, REGISTRY);
+    }
+
+    public static long varcharToBigint(Slice varchar)
+    {
+        return 42L;
     }
 
     public static long varcharToBigintWithExtraParameter(Slice varchar, long extraParameter)

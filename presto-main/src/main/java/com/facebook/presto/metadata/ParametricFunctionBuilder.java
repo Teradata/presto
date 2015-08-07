@@ -50,6 +50,7 @@ public final class ParametricFunctionBuilder
     public ParametricFunctionBuilder signature(Signature signature)
     {
         this.signature = checkNotNull(signature, "signature is null");
+        this.hidden = isOperator(signature);
         return this;
     }
 
@@ -138,6 +139,17 @@ public final class ParametricFunctionBuilder
         }
 
         return new ScalarPolymorphicParametricFunction(signature, description, hidden, deterministic, nullableResult, nullableArguments, methodsWithExtraParametersFunctions);
+    }
+
+    private static boolean isOperator(Signature signature)
+    {
+        for (OperatorType operator : OperatorType.values()) {
+            if (signature.getName().equals(FunctionRegistry.mangleOperatorName(operator))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     @FunctionalInterface
