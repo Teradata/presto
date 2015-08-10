@@ -14,14 +14,20 @@
 
 package com.facebook.presto.type;
 
+import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.ShortDecimalType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.TypeLiteralCalculation;
+import com.google.common.base.Predicates;
+import com.google.common.collect.Iterables;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Predicates.instanceOf;
+import static com.google.common.collect.Iterables.any;
 
 public class DecimalParametricType
         implements ParametricType
@@ -55,6 +61,6 @@ public class DecimalParametricType
                 literals.get(1) instanceof Long, "Expected both literal parameters for DECIMAL to be numbers");
         long precision = (long) literals.get(0);
         long scale = (long) literals.get(1);
-        return ShortDecimalType.createDecimalType((int) precision, (int) scale);
+        return DecimalType.createDecimalType((int) precision, (int) scale);
     }
 }
