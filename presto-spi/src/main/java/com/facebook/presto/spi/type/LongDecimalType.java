@@ -132,4 +132,9 @@ public final class LongDecimalType
     {
         return DecimalType.toString(unscaledValueToBigInteger(unscaledValue).toString(), precision, scale);
     }
+
+    public static String toString(BigInteger unscaledValue, int precision, int scale)
+    {
+        return DecimalType.toString(unscaledValue.toString(), precision, scale);
+    }
 }
