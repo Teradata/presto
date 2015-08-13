@@ -42,7 +42,7 @@ public class QueryExecutors
         PrestoConnection prestoConnection = createPrestoConnection();
         sessionProperties.entrySet().stream()
                 .forEach(entry -> prestoConnection.setSessionProperty(entry.getKey(), entry.getValue()));
-        return new JdbcQueryExecutor(prestoConnection, testContext());
+        return new JdbcQueryExecutor(prestoConnection, getPrestoConfiguration().getStringMandatory("jdbc_url"), testContext());
     }
 
     public static QueryExecutor onPrestoOnNullCatalog()
