@@ -87,8 +87,8 @@ public class TestTablePartitioningInsertInto
     public Requirement getRequirements(Configuration configuration)
     {
         return compose(
-                new MutableTableRequirement(PARTITIONED_NATION),
-                new MutableTableRequirement(TARGET_NATION));
+                MutableTableRequirement.builder(PARTITIONED_NATION).build(),
+                MutableTableRequirement.builder(TARGET_NATION).build());
     }
 
     @Test(groups = {HIVE_CONNECTOR, SMOKE})
