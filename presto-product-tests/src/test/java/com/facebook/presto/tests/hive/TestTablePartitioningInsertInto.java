@@ -21,9 +21,9 @@ import com.teradata.tempto.Requirement;
 import com.teradata.tempto.RequirementsProvider;
 import com.teradata.tempto.configuration.Configuration;
 import com.teradata.tempto.context.ThreadLocalTestContextHolder;
-import com.teradata.tempto.fulfillment.table.hive.HiveTableDefinition;
 import com.teradata.tempto.fulfillment.table.MutableTableRequirement;
 import com.teradata.tempto.fulfillment.table.MutableTablesState;
+import com.teradata.tempto.fulfillment.table.hive.HiveTableDefinition;
 import com.teradata.tempto.query.QueryResult;
 import org.testng.annotations.Test;
 
@@ -34,7 +34,7 @@ import static com.facebook.presto.tests.TestGroups.SMOKE;
 import static com.teradata.tempto.Requirements.compose;
 import static com.teradata.tempto.fulfillment.table.hive.InlineDataSource.createResourceDataSource;
 import static com.teradata.tempto.query.QueryExecutor.query;
-import static com.teradata.tempto.query.QueryType.SELECT;
+import static com.teradata.tempto.query.QueryType.UPDATE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class TestTablePartitioningInsertInto
@@ -120,7 +120,7 @@ public class TestTablePartitioningInsertInto
         String targetNation = mutableTablesState.get(TARGET_NATION_NAME).getNameInDatabase();
         QueryResult queryResult = query(String.format(query,
                 targetNation,
-                partitionedNation), SELECT);
+                partitionedNation), UPDATE);
 
         long processedLinesCount = getProcessedLinesCount(queryResult);
         assertThat(processedLinesCount).isEqualTo(expectedProcessedLines);
