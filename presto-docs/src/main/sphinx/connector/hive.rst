@@ -192,3 +192,35 @@ So ``'ala  '`` should be equal to ``'ala        '``. This is currently not the c
 
 **Note:** Ultimately Presto presto will implement native ``CHAR(x)`` data type. It will follow ANSI SQL semantics which differs from
  Hive's. This will cause backward incompatibilities of queries using Hive's ``CHAR(x)`` columns.
+
+
+Custom Storage Handlers
+-----------------------
+
+Hive tables can use custom storage handlers to support alternative data formats.
+To query from Hive tables that use custom storage handlers, you will need the
+JARs containing the storage handler classes.  Copy the storage handler JARs to
+the connector plugin directory on all nodes, restart the presto servers, and
+then query the table as you would any other Hive table.  You can copy the
+jar across the cluster using presto-admin's ``plugin add_jar`` command and
+restart servers by using the ``server restart`` command.
+
+For example, if the plugin directory is located at
+``/usr/lib/presto/lib/plugin``, and you want to use the ``hive-hadoop2``
+connector to query from a table that uses a storage handler available
+in ``/tmp/my-classes.jar``:
+
+1. Copy ``my-classes.jar`` into ``/usr/lib/presto/lib/plugin/hive-hadoop2``
+   on all nodes of the cluster.
+   ::
+
+        sudo ./presto-admin plugin add_jar /tmp/my-classes.jar hive-hadoop2
+
+
+2. Restart your presto-servers::
+
+        sudo ./presto-admin server restart
+
+
+Then you can query from the table as you would any other Hive table in Presto.
+
