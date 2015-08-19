@@ -81,7 +81,6 @@ final class ParquetRequirements
 
 public class TestAllDatatypesFromHiveConnector
         extends ProductTest
-//        implements RequirementsProvider
 {
     @Requires(TextRequirements.class)
     @Test(groups = {HIVE_CONNECTOR, SMOKE})
@@ -113,7 +112,7 @@ public class TestAllDatatypesFromHiveConnector
     {
         assertProperAllDatatypesSchema("orc_all_types");
 
-        assertThat(query("SELECT c_tinyint, c_smallint, c_int, c_bigint, c_float, c_double, c_timestamp, c_date, c_string, c_boolean, c_binary " +
+        assertThat(query("SELECT c_tinyint, c_smallint, c_int, c_bigint, c_float, c_double, c_timestamp, c_date, c_string, c_varchar, c_boolean, c_binary " +
                 "FROM orc_all_types")).containsOnly(
                 row(
                         127,
@@ -125,22 +124,9 @@ public class TestAllDatatypesFromHiveConnector
                         parseTimestampInUTC("2015-05-10 12:15:35.123"),
                         Date.valueOf("2015-05-10"),
                         "ala ma kota",
+                        "ala ma kot",
                         true,
                         "kot binarny".getBytes()));
-    }
-
-    @Requires(OrcRequirements.class)
-    @Test(groups = {HIVE_CONNECTOR, QUARANTINE})
-    public void testSelectVarcharColumnForOrc()
-            throws SQLException
-    {
-        assertThat(query("SELECT c_varchar FROM orc_all_types"))
-                .containsOnly(row("ala ma kot"));
-
-        // this test fails. It seems like presto implementation of ORC does not support VARCHAR datatype.
-        // If VARCHAR column is to be returned from query we get error like below:
-        //
-        // Query 20150417_002158_00049_b2hmy failed: Error opening Hive split hdfs://hadoop-master:8020/product-test/inline-tables/xorc_all_types/000000_0 (offset=0, length=1317): Unsupported type: VARCHAR
     }
 
     @Requires(RcfileRequirements.class)
