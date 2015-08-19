@@ -45,7 +45,7 @@ public class HiveTableProperties
                         HiveStorageFormat.class,
                         config.getHiveStorageFormat(),
                         false,
-                        value -> HiveStorageFormat.valueOf(((String) value).toUpperCase(ENGLISH))),
+                        value -> HiveStorageFormat.valueOf(((String) value))),
                 new PropertyMetadata<>(
                         PARTITIONED_BY_PROPERTY,
                         "Partition columns",

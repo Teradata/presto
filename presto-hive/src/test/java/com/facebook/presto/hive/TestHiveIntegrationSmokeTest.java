@@ -44,6 +44,7 @@ import static com.facebook.presto.hive.HiveQueryRunner.createQueryRunner;
 import static com.facebook.presto.hive.HiveQueryRunner.createSampledSession;
 import static com.facebook.presto.hive.HiveTableProperties.PARTITIONED_BY_PROPERTY;
 import static com.facebook.presto.hive.HiveTableProperties.STORAGE_FORMAT_PROPERTY;
+import static com.facebook.presto.hive.HiveTestUtils.SUPPORTED_STORAGE_FORMAT_NAMES;
 import static io.airlift.tpch.TpchTable.ORDERS;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.stream.Collectors.toList;
@@ -132,12 +133,12 @@ public class TestHiveIntegrationSmokeTest
     public void createPartitionedTable()
             throws Exception
     {
-        for (HiveStorageFormat storageFormat : HiveStorageFormat.values()) {
+        for (String storageFormat : SUPPORTED_STORAGE_FORMAT_NAMES) {
             createPartitionedTable(storageFormat);
         }
     }
 
-    public void createPartitionedTable(HiveStorageFormat storageFormat)
+    public void createPartitionedTable(String storageFormat)
             throws Exception
     {
         @Language("SQL") String createTable = "" +
@@ -159,7 +160,7 @@ public class TestHiveIntegrationSmokeTest
         assertQuery(createTable, "SELECT 1");
 
         TableMetadata tableMetadata = getTableMetadata("test_partitioned_table");
-        assertEquals(tableMetadata.getMetadata().getProperties().get(STORAGE_FORMAT_PROPERTY), storageFormat);
+        assertEquals(tableMetadata.getMetadata().getProperties().get(STORAGE_FORMAT_PROPERTY), HiveStorageFormat.valueOf(storageFormat));
 
         List<String> partitionedBy = ImmutableList.of("_partition_varchar", "_partition_bigint");
         assertEquals(tableMetadata.getMetadata().getProperties().get(PARTITIONED_BY_PROPERTY), partitionedBy);
@@ -179,12 +180,12 @@ public class TestHiveIntegrationSmokeTest
     public void createTableAs()
             throws Exception
     {
-        for (HiveStorageFormat storageFormat : HiveStorageFormat.values()) {
+        for (String storageFormat : SUPPORTED_STORAGE_FORMAT_NAMES) {
             createTableAs(storageFormat);
         }
     }
 
-    public void createTableAs(HiveStorageFormat storageFormat)
+    public void createTableAs(String storageFormat)
             throws Exception
     {
         @Language("SQL") String select = "SELECT" +
@@ -198,7 +199,7 @@ public class TestHiveIntegrationSmokeTest
         assertQuery(createTableAs, "SELECT 1");
 
         TableMetadata tableMetadata = getTableMetadata("test_format_table");
-        assertEquals(tableMetadata.getMetadata().getProperties().get(STORAGE_FORMAT_PROPERTY), storageFormat);
+        assertEquals(tableMetadata.getMetadata().getProperties().get(STORAGE_FORMAT_PROPERTY), HiveStorageFormat.valueOf(storageFormat));
 
         assertQuery("SELECT * from test_format_table", select);
 
@@ -211,12 +212,12 @@ public class TestHiveIntegrationSmokeTest
     public void createPartitionedTableAs()
             throws Exception
     {
-        for (HiveStorageFormat storageFormat : HiveStorageFormat.values()) {
+        for (String storageFormat : SUPPORTED_STORAGE_FORMAT_NAMES) {
             createPartitionedTableAs(storageFormat);
         }
     }
 
-    public void createPartitionedTableAs(HiveStorageFormat storageFormat)
+    public void createPartitionedTableAs(String storageFormat)
             throws Exception
     {
         @Language("SQL") String createTable = "" +
@@ -232,7 +233,7 @@ public class TestHiveIntegrationSmokeTest
         assertQuery(createTable, "SELECT count(*) from orders");
 
         TableMetadata tableMetadata = getTableMetadata("test_create_partitioned_table_as");
-        assertEquals(tableMetadata.getMetadata().getProperties().get(STORAGE_FORMAT_PROPERTY), storageFormat);
+        assertEquals(tableMetadata.getMetadata().getProperties().get(STORAGE_FORMAT_PROPERTY), HiveStorageFormat.valueOf(storageFormat));
 
         List<String> partitionedBy = ImmutableList.of("ship_priority", "order_status");
         assertEquals(tableMetadata.getMetadata().getProperties().get(PARTITIONED_BY_PROPERTY), partitionedBy);
@@ -255,12 +256,12 @@ public class TestHiveIntegrationSmokeTest
     public void insertTable()
             throws Exception
     {
-        for (HiveStorageFormat storageFormat : HiveStorageFormat.values()) {
+        for (String storageFormat : SUPPORTED_STORAGE_FORMAT_NAMES) {
             insertTable(storageFormat);
         }
     }
 
-    public void insertTable(HiveStorageFormat storageFormat)
+    public void insertTable(String storageFormat)
             throws Exception
     {
         @Language("SQL") String createTable = "" +
@@ -276,7 +277,7 @@ public class TestHiveIntegrationSmokeTest
         assertQuery(createTable, "SELECT 1");
 
         TableMetadata tableMetadata = getTableMetadata("test_insert_format_table");
-        assertEquals(tableMetadata.getMetadata().getProperties().get(STORAGE_FORMAT_PROPERTY), storageFormat);
+        assertEquals(tableMetadata.getMetadata().getProperties().get(STORAGE_FORMAT_PROPERTY), HiveStorageFormat.valueOf(storageFormat));
 
         @Language("SQL") String select = "SELECT" +
                 " 'foo' _varchar" +
@@ -297,12 +298,12 @@ public class TestHiveIntegrationSmokeTest
     public void insertPartitionedTable()
             throws Exception
     {
-        for (HiveStorageFormat storageFormat : HiveStorageFormat.values()) {
+        for (String storageFormat : SUPPORTED_STORAGE_FORMAT_NAMES) {
             insertPartitionedTable(storageFormat);
         }
     }
 
-    public void insertPartitionedTable(HiveStorageFormat storageFormat)
+    public void insertPartitionedTable(String storageFormat)
             throws Exception
     {
         @Language("SQL") String createTable = "" +
@@ -320,7 +321,7 @@ public class TestHiveIntegrationSmokeTest
         assertQuery(createTable, "SELECT 1");
 
         TableMetadata tableMetadata = getTableMetadata("test_insert_partitioned_table");
-        assertEquals(tableMetadata.getMetadata().getProperties().get(STORAGE_FORMAT_PROPERTY), storageFormat);
+        assertEquals(tableMetadata.getMetadata().getProperties().get(STORAGE_FORMAT_PROPERTY), HiveStorageFormat.valueOf(storageFormat));
         assertEquals(tableMetadata.getMetadata().getProperties().get(PARTITIONED_BY_PROPERTY), ImmutableList.of("ship_priority", "order_status"));
 
         // Hive will reorder the partition keys, so we must insert into the table assuming the partition keys have been moved to the end
