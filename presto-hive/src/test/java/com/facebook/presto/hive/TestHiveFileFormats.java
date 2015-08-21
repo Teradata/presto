@@ -373,7 +373,7 @@ public class TestHiveFileFormats
     {
         List<TestColumn> testColumns = filterOutPrimitiveTypes(
                 TEST_COLUMNS,
-                ImmutableList.of(PrimitiveCategory.DATE, PrimitiveCategory.VARCHAR, PrimitiveCategory.CHAR));
+                ImmutableList.of(PrimitiveCategory.DATE, PrimitiveCategory.VARCHAR, PrimitiveCategory.CHAR, PrimitiveCategory.DECIMAL));
 
         HiveOutputFormat<?, ?> outputFormat = new com.facebook.hive.orc.OrcOutputFormat();
         InputFormat<?, ?> inputFormat = new com.facebook.hive.orc.OrcInputFormat();
@@ -397,7 +397,7 @@ public class TestHiveFileFormats
     {
         List<TestColumn> testColumns = filterOutPrimitiveTypes(
                 TEST_COLUMNS,
-                ImmutableList.of(PrimitiveCategory.DATE, PrimitiveCategory.VARCHAR, PrimitiveCategory.CHAR));
+                ImmutableList.of(PrimitiveCategory.DATE, PrimitiveCategory.VARCHAR, PrimitiveCategory.CHAR, PrimitiveCategory.DECIMAL));
 
         HiveOutputFormat<?, ?> outputFormat = new com.facebook.hive.orc.OrcOutputFormat();
         InputFormat<?, ?> inputFormat = new com.facebook.hive.orc.OrcInputFormat();
