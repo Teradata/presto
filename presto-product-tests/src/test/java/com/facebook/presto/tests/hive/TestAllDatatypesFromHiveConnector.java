@@ -101,6 +101,7 @@ public class TestAllDatatypesFromHiveConnector
                         Date.valueOf("2015-05-10"),
                         "ala ma kota",
                         "ala ma kot",
+                        "ala ma    ",
                         true,
                         "kot binarny".getBytes()));
     }
@@ -112,7 +113,7 @@ public class TestAllDatatypesFromHiveConnector
     {
         assertProperAllDatatypesSchema("orc_all_types");
 
-        assertThat(query("SELECT c_tinyint, c_smallint, c_int, c_bigint, c_float, c_double, c_timestamp, c_date, c_string, c_varchar, c_boolean, c_binary " +
+        assertThat(query("SELECT c_tinyint, c_smallint, c_int, c_bigint, c_float, c_double, c_timestamp, c_date, c_string, c_varchar, c_char, c_boolean, c_binary " +
                 "FROM orc_all_types")).containsOnly(
                 row(
                         127,
@@ -125,6 +126,7 @@ public class TestAllDatatypesFromHiveConnector
                         Date.valueOf("2015-05-10"),
                         "ala ma kota",
                         "ala ma kot",
+                        "ala ma    ",
                         true,
                         "kot binarny".getBytes()));
     }
@@ -149,6 +151,7 @@ public class TestAllDatatypesFromHiveConnector
                         Date.valueOf("2015-05-10"),
                         "ala ma kota",
                         "ala ma kot",
+                        "ala ma    ",
                         true,
                         "kot binarny".getBytes()));
     }
@@ -166,6 +169,7 @@ public class TestAllDatatypesFromHiveConnector
                 row("c_date", "date"),
                 row("c_string", "varchar"),
                 row("c_varchar", "varchar"),
+                row("c_char", "varchar"),
                 row("c_boolean", "boolean"),
                 row("c_binary", "varbinary")
         );
@@ -191,10 +195,11 @@ public class TestAllDatatypesFromHiveConnector
                 row("c_double", "double"),
                 row("c_string", "varchar"),
                 row("c_varchar", "varchar"),
+                row("c_char", "varchar"),
                 row("c_boolean", "boolean")
         );
 
-        assertThat(query("SELECT c_tinyint, c_smallint, c_int, c_bigint, c_float, c_double, c_string, c_varchar, c_boolean " +
+        assertThat(query("SELECT c_tinyint, c_smallint, c_int, c_bigint, c_float, c_double, c_string, c_varchar, c_char, c_boolean " +
                 "FROM textfile_all_types")).containsOnly(
                 row(
                         127,
@@ -205,6 +210,7 @@ public class TestAllDatatypesFromHiveConnector
                         234.567,
                         "ala ma kota",
                         "ala ma kot",
+                        "ala ma    ",
                         true));
     }
     // presto limitations referenced above:
