@@ -30,6 +30,7 @@ import org.testng.annotations.Test;
 import java.sql.SQLException;
 
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
+import static com.facebook.presto.tests.TestGroups.QUARANTINE;
 import static com.facebook.presto.tests.TestGroups.SMOKE;
 import static com.teradata.tempto.Requirements.compose;
 import static com.teradata.tempto.fulfillment.table.hive.InlineDataSource.createResourceDataSource;
@@ -91,7 +92,7 @@ public class TestTablePartitioningInsertInto
                 MutableTableRequirement.builder(TARGET_NATION).build());
     }
 
-    @Test(groups = {HIVE_CONNECTOR, SMOKE})
+    @Test(groups = {HIVE_CONNECTOR, SMOKE, QUARANTINE})
     public void selectFromPartitionedNation()
             throws Exception
     {
