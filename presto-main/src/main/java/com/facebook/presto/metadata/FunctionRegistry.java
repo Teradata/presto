@@ -246,7 +246,7 @@ public class FunctionRegistry
                     public FunctionInfo load(SpecializedFunctionKey key)
                             throws Exception
                     {
-                        return key.getFunction().specialize(key.getBoundTypeParameters(), key.getArity(), typeManager, FunctionRegistry.this);
+                        return key.getFunction().specialize(key.getBoundTypeParameters(), key.getParameterTypes(), typeManager, FunctionRegistry.this);
                     }
                 });
 
@@ -491,7 +491,7 @@ public class FunctionRegistry
                     if (boundTypeParameters != null) {
                         checkArgument(match == null, "Ambiguous call to %s with parameters %s", name, parameterTypes);
                         try {
-                            match = specializedFunctionCache.getUnchecked(new SpecializedFunctionKey(function, boundTypeParameters, resolvedTypes.size()));
+                            match = specializedFunctionCache.getUnchecked(new SpecializedFunctionKey(function, boundTypeParameters, parameterTypes));
                         }
                         catch (UncheckedExecutionException e) {
                             throw Throwables.propagate(e.getCause());
@@ -517,7 +517,7 @@ public class FunctionRegistry
             Map<String, Type> boundTypeParameters = operator.getSignature().bindTypeParameters(returnType, argumentTypes, false, typeManager);
             if (boundTypeParameters != null) {
                 try {
-                    return specializedFunctionCache.getUnchecked(new SpecializedFunctionKey(operator, boundTypeParameters, signature.getArgumentTypes().size()));
+                    return specializedFunctionCache.getUnchecked(new SpecializedFunctionKey(operator, boundTypeParameters, signature.getArgumentTypes()));
                 }
                 catch (UncheckedExecutionException e) {
                     throw Throwables.propagate(e.getCause());
