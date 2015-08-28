@@ -213,7 +213,7 @@ public final class Signature
 
     public Signature resolveCalculatedTypes(List<TypeSignature> parameterTypes)
     {
-        if (isReturnTypeOrAnyArgumentTypeCalculated()) {
+        if (!isReturnTypeOrAnyArgumentTypeCalculated()) {
             return this;
         }
 
@@ -226,6 +226,11 @@ public final class Signature
                 argumentTypes.stream().map(parameter -> TypeUtils.resolveCalculatedType(parameter, inputs, false)).collect(toImmutableList()));
     }
 
+    public boolean isReturnTypeOrAnyArgumentTypeCalculated()
+    {
+        return returnType.isCalculated() || any(argumentTypes, TypeSignature::isCalculated);
+    }
+
     public Map<String, OptionalLong> bindLiteralParameters(List<TypeSignature> parameterTypes)
     {
         Map<String, OptionalLong> boundParameters = new HashMap<>();
@@ -234,7 +239,7 @@ public final class Signature
             TypeSignature argument = argumentTypes.get(index);
             if (argument.isCalculated()) {
                 TypeSignature actualParameter = parameterTypes.get(index);
-                boundParameters.putAll(TypeUtils.extractCalculationInputs(argument, actualParameter));
+                boundParameters.putAll(TypeUtils.extractLiteralParameters(argument, actualParameter));
             }
         }
         return boundParameters;
@@ -319,11 +324,6 @@ public final class Signature
         checkState(boundParameters.keySet().equals(parameters.keySet()), "%s matched arguments %s, but type parameters %s are still unbound", this, types, Sets.difference(parameters.keySet(), boundParameters.keySet()));
 
         return boundParameters;
-    }
-
-    private boolean isReturnTypeOrAnyArgumentTypeCalculated()
-    {
-        return !returnType.isCalculated() && !any(argumentTypes, TypeSignature::isCalculated);
     }
 
     private static boolean matchArguments(
@@ -533,5 +533,10 @@ public final class Signature
     public static TypeParameterRequirement orderableTypeParameter(String name)
     {
         return new TypeParameterRequirement(name, false, true, null);
+    }
+
+    public static SignatureBuilder builder()
+    {
+        return new SignatureBuilder();
     }
 }
