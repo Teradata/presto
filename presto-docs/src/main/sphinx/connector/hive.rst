@@ -66,6 +66,22 @@ Only specify additional configuration files if absolutely necessary.
 We also recommend reducing the configuration files to have the minimum
 set of required properties, as additional properties may cause problems.
 
+HDFS Permissions
+^^^^^^^^^^^^^^^^
+Before running any ``CREATE TABLE`` or ``CREATE TABLE ... AS`` statements
+for Hive tables in Presto, you need to check that the operating system user
+running the Presto server has access to the Hive warehouse directory on HDFS. The Hive warehouse
+directory is specified by the configuration variable ``hive.metastore.warehouse.dir``
+in ``hive-site.xml``, and the default value is ``/user/hive/warehouse``. If that
+is not the case, either add the following to ``jvm.config`` on all of the nodes:
+``-DHADOOP_USER_NAME=USER``, where ``USER`` is an operating system user that has proper
+permissions for the Hive warehouse directory, or start the Presto server as a user with
+similar permissions. The ``hive`` user generally works as ``USER``, since Hive is often
+started with the ``hive`` user. If you run into HDFS permissions problems on
+``CREATE TABLE ... AS``, remove ``/tmp/presto-*`` on HDFS, fix the user as described
+above, then restart all of the Presto servers.
+
+
 Configuration Properties
 ------------------------
 
