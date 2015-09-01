@@ -14,16 +14,13 @@
 
 package com.facebook.presto.tests.hive;
 
-import com.facebook.presto.jdbc.PrestoResultSet;
-import com.facebook.presto.tests.queryinfo.QueryInfoClient;
 import com.google.inject.Inject;
-import com.teradata.tempto.ProductTest;
 import com.teradata.tempto.Requirement;
 import com.teradata.tempto.RequirementsProvider;
 import com.teradata.tempto.configuration.Configuration;
+import com.teradata.tempto.fulfillment.table.MutableTablesState;
 import com.teradata.tempto.fulfillment.table.hive.HiveDataSource;
 import com.teradata.tempto.fulfillment.table.hive.HiveTableDefinition;
-import com.teradata.tempto.fulfillment.table.MutableTablesState;
 import com.teradata.tempto.query.QueryResult;
 import org.testng.annotations.Test;
 
@@ -31,18 +28,17 @@ import java.sql.SQLException;
 import java.util.Optional;
 
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
-import static com.facebook.presto.tests.TestGroups.QUARANTINE;
 import static com.teradata.tempto.Requirements.allOf;
 import static com.teradata.tempto.assertions.QueryAssert.Row.row;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
-import static com.teradata.tempto.fulfillment.table.hive.InlineDataSource.createResourceDataSource;
 import static com.teradata.tempto.fulfillment.table.MutableTableRequirement.State.LOADED;
 import static com.teradata.tempto.fulfillment.table.TableRequirements.mutableTable;
+import static com.teradata.tempto.fulfillment.table.hive.InlineDataSource.createResourceDataSource;
 import static com.teradata.tempto.query.QueryExecutor.query;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class TestTablePartitioningSelect
-        extends ProductTest
+        extends HivePartitioningTest
         implements RequirementsProvider
 {
     private static final HiveTableDefinition SINGLE_INT_COLUMN_PARTITIONEND_TEXTFILE = singleIntColumnPartitionedTableDefinition("TEXTFILE", Optional.of("DELIMITED FIELDS TERMINATED BY '|'"));
@@ -53,8 +49,6 @@ public class TestTablePartitioningSelect
 
     @Inject
     private MutableTablesState tablesState;
-    @Inject
-    private QueryInfoClient queryInfoClient;
 
     private static HiveTableDefinition singleIntColumnPartitionedTableDefinition(String fileFormat, Optional<String> serde)
     {
@@ -93,7 +87,7 @@ public class TestTablePartitioningSelect
         );
     }
 
-    @Test(groups = {HIVE_CONNECTOR, QUARANTINE})
+    @Test(groups = HIVE_CONNECTOR)
     public void testSelectPartitionedHiveTableDifferentFormats()
             throws SQLException
     {
@@ -102,35 +96,28 @@ public class TestTablePartitioningSelect
         String selectFromAllPartitionsSql = "SELECT * FROM " + tableNameInDatabase;
         QueryResult allPartitionsQueryResult = query(selectFromAllPartitionsSql);
         assertThat(allPartitionsQueryResult).containsOnly(row(42, 1), row(42, 2));
-        assertProcessedLinesCountEquals(allPartitionsQueryResult, 2);
+        assertProcessedLinesCountEquals(selectFromAllPartitionsSql, allPartitionsQueryResult, 2);
 
         String selectFromOnePartitionsSql = "SELECT * FROM " + tableNameInDatabase + " WHERE part_col = 2";
         QueryResult onePartitionQueryResult = query(selectFromOnePartitionsSql);
         assertThat(onePartitionQueryResult).containsOnly(row(42, 2));
-        assertProcessedLinesCountEquals(onePartitionQueryResult, 1);
+        assertProcessedLinesCountEquals(selectFromOnePartitionsSql, onePartitionQueryResult, 1);
     }
 
     private static final long GET_PROCESSED_LINES_COUNT_RETRY_SLEEP = 500;
 
-    private void assertProcessedLinesCountEquals(QueryResult allPartitionsQueryResult, int expected)
+    private void assertProcessedLinesCountEquals(String sqlStatement, QueryResult allPartitionsQueryResult, int expected)
             throws SQLException
     {
-        long processedLinesCountAllPartitions = getProcessedLinesCount(allPartitionsQueryResult);
+        long processedLinesCountAllPartitions = getProcessedLinesCount(sqlStatement, allPartitionsQueryResult);
         if (processedLinesCountAllPartitions != expected) {
             try {
                 Thread.sleep(GET_PROCESSED_LINES_COUNT_RETRY_SLEEP);
             }
             catch (InterruptedException e) {
             }
-            processedLinesCountAllPartitions = getProcessedLinesCount(allPartitionsQueryResult);
+            processedLinesCountAllPartitions = getProcessedLinesCount(sqlStatement, allPartitionsQueryResult);
         }
         assertThat(processedLinesCountAllPartitions).isEqualTo(expected);
-    }
-
-    private long getProcessedLinesCount(QueryResult queryResult)
-            throws SQLException
-    {
-        PrestoResultSet prestoResultSet = queryResult.getJdbcResultSet().get().unwrap(PrestoResultSet.class);
-        return queryInfoClient.getQueryStats(prestoResultSet.getQueryId()).get().getRawInputPositions();
     }
 }

@@ -13,24 +13,17 @@
  */
 package com.facebook.presto.tests.hive;
 
-import com.facebook.presto.jdbc.PrestoResultSet;
-import com.facebook.presto.tests.queryinfo.QueryInfoClient;
 import com.google.inject.Inject;
-import com.teradata.tempto.ProductTest;
 import com.teradata.tempto.Requirement;
 import com.teradata.tempto.RequirementsProvider;
 import com.teradata.tempto.configuration.Configuration;
-import com.teradata.tempto.context.ThreadLocalTestContextHolder;
 import com.teradata.tempto.fulfillment.table.MutableTableRequirement;
 import com.teradata.tempto.fulfillment.table.MutableTablesState;
 import com.teradata.tempto.fulfillment.table.hive.HiveTableDefinition;
 import com.teradata.tempto.query.QueryResult;
 import org.testng.annotations.Test;
 
-import java.sql.SQLException;
-
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
-import static com.facebook.presto.tests.TestGroups.QUARANTINE;
 import static com.facebook.presto.tests.TestGroups.SMOKE;
 import static com.teradata.tempto.Requirements.compose;
 import static com.teradata.tempto.fulfillment.table.hive.InlineDataSource.createResourceDataSource;
@@ -39,7 +32,7 @@ import static com.teradata.tempto.query.QueryType.UPDATE;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class TestTablePartitioningInsertInto
-        extends ProductTest
+        extends HivePartitioningTest
         implements RequirementsProvider
 {
     @Inject
@@ -92,7 +85,7 @@ public class TestTablePartitioningInsertInto
                 MutableTableRequirement.builder(TARGET_NATION).build());
     }
 
-    @Test(groups = {HIVE_CONNECTOR, SMOKE, QUARANTINE})
+    @Test(groups = {HIVE_CONNECTOR, SMOKE})
     public void selectFromPartitionedNation()
             throws Exception
     {
@@ -119,19 +112,10 @@ public class TestTablePartitioningInsertInto
     {
         String partitionedNation = mutableTablesState.get(PARTITIONED_NATION_NAME).getNameInDatabase();
         String targetNation = mutableTablesState.get(TARGET_NATION_NAME).getNameInDatabase();
-        QueryResult queryResult = query(String.format(query,
-                targetNation,
-                partitionedNation), UPDATE);
+        String sqlStatement = String.format(query, targetNation, partitionedNation);
+        QueryResult queryResult = query(sqlStatement, UPDATE);
 
-        long processedLinesCount = getProcessedLinesCount(queryResult);
+        long processedLinesCount = getProcessedLinesCount(sqlStatement, queryResult);
         assertThat(processedLinesCount).isEqualTo(expectedProcessedLines);
-    }
-
-    private long getProcessedLinesCount(QueryResult queryResult)
-            throws SQLException
-    {
-        PrestoResultSet prestoResultSet = queryResult.getJdbcResultSet().get().unwrap(PrestoResultSet.class);
-        QueryInfoClient queryInfoClient = ThreadLocalTestContextHolder.testContext().getDependency(QueryInfoClient.class);
-        return queryInfoClient.getQueryStats(prestoResultSet.getQueryId()).get().getRawInputPositions();
     }
 }
