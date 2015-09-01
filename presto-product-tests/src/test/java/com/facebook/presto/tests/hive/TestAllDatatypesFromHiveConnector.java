@@ -193,20 +193,22 @@ public class TestAllDatatypesFromHiveConnector
                 row("c_bigint", "bigint"),
                 row("c_float", "double"),
                 row("c_double", "double"),
+                row("c_timestamp", "timestamp"),
                 row("c_string", "varchar"),
                 row("c_varchar", "varchar"),
                 row("c_char", "varchar"),
                 row("c_boolean", "boolean")
         );
 
-        assertThat(query("SELECT c_tinyint, c_smallint, c_int, c_bigint, c_float, c_double, c_string, c_varchar, c_char, c_boolean " +
-                "FROM textfile_all_types")).containsOnly(
+        assertThat(query("SELECT c_tinyint, c_smallint, c_int, c_bigint, c_float, c_double, c_timestamp, c_string, c_varchar, c_char, c_boolean " +
+                "FROM parquet_all_types")).containsOnly(
                 row(
                         127,
                         32767,
                         2147483647,
                         9223372036854775807L,
                         123.34500122070312, // (double) 123.345f - see limitation #1
+                        parseTimestampInUTC("2015-05-10 12:15:35.123"),
                         234.567,
                         "ala ma kota",
                         "ala ma kot",

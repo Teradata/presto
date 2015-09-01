@@ -88,6 +88,7 @@ public final class AllSimpleTypesTableDefinitions
                         "   c_bigint             BIGINT," +
                         "   c_float              FLOAT," +
                         "   c_double             DOUBLE," +
+                        "   c_timestamp          TIMESTAMP," +
                         "   c_string             STRING," +
                         "   c_varchar            VARCHAR(10)," +
                         "   c_char               CHAR(10)," +
