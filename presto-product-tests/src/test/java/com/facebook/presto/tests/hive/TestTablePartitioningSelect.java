@@ -14,6 +14,7 @@
 
 package com.facebook.presto.tests.hive;
 
+import com.facebook.presto.tests.querystats.QueryStatsClient;
 import com.google.inject.Inject;
 import com.teradata.tempto.Requirement;
 import com.teradata.tempto.RequirementsProvider;
@@ -49,6 +50,9 @@ public class TestTablePartitioningSelect
 
     @Inject
     private MutableTablesState tablesState;
+
+    @Inject
+    private QueryStatsClient queryStatsClient;
 
     private static HiveTableDefinition singleIntColumnPartitionedTableDefinition(String fileFormat, Optional<String> serde)
     {

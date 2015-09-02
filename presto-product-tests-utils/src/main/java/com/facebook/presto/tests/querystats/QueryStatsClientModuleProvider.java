@@ -12,7 +12,7 @@
  * limitations under the License.
  */
 
-package com.facebook.presto.tests.queryinfo;
+package com.facebook.presto.tests.querystats;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.inject.Exposed;
@@ -24,14 +24,16 @@ import com.google.inject.Singleton;
 import com.teradata.tempto.configuration.Configuration;
 import com.teradata.tempto.initialization.AutoModuleProvider;
 import com.teradata.tempto.initialization.SuiteModuleProvider;
+import io.airlift.http.client.HttpClient;
+import io.airlift.http.client.jetty.JettyHttpClient;
 import io.airlift.json.ObjectMapperProvider;
-import org.apache.http.client.HttpClient;
-import org.apache.http.impl.client.HttpClients;
 
 import javax.inject.Named;
 
+import java.net.URI;
+
 @AutoModuleProvider
-public class QueryInfoClientModuleProvider
+public class QueryStatsClientModuleProvider
         implements SuiteModuleProvider
 {
     @Override
@@ -43,16 +45,16 @@ public class QueryInfoClientModuleProvider
             protected void configure()
             {
                 bind(ObjectMapper.class).toProvider(ObjectMapperProvider.class);
-                bind(HttpClient.class).toInstance(HttpClients.createDefault());
+                bind(HttpClient.class).toInstance(new JettyHttpClient());
             }
 
             @Inject
             @Provides
             @Exposed
             @Singleton
-            QueryInfoClient getQueryInfoClient(HttpClient httpClient, ObjectMapper objectMapper, @Named("presto_rest.base_uri") String prestoRestInterfaceBaseUri)
+            QueryStatsClient getQueryStatsClient(HttpClient httpClient, ObjectMapper objectMapper, @Named("presto_rest.base_uri") String prestoRestInterfaceBaseUri)
             {
-                return new HttpQueryInfoClient(httpClient, objectMapper, prestoRestInterfaceBaseUri);
+                return new HttpQueryStatsClient(httpClient, objectMapper, URI.create(prestoRestInterfaceBaseUri));
             }
         };
     }

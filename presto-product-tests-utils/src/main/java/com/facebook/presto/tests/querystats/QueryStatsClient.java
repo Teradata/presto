@@ -12,25 +12,17 @@
  * limitations under the License.
  */
 
-package com.facebook.presto.tests.queryinfo;
+package com.facebook.presto.tests.querystats;
 
 import com.facebook.presto.execution.QueryStats;
-import com.facebook.presto.server.BasicQueryInfo;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
  * Simple client for accessing Presto's /query REST interface. Implemented for testing purposes.
  */
-public interface QueryInfoClient
+public interface QueryStatsClient
 {
-    /**
-     * Obtains information about all queries exposed by the Presto /query REST interface as
-     * BasicQueryInfo objects.
-     */
-    List<BasicQueryInfo> getBasicInfoForAllQueries();
-
     /**
      * Obtains QueryStats for query with given id. If query does not exist or
      * does not contain queryStats information Optional.empty() is returned.

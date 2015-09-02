@@ -14,7 +14,7 @@
 package com.facebook.presto.tests.hive;
 
 import com.facebook.presto.jdbc.PrestoResultSet;
-import com.facebook.presto.tests.queryinfo.QueryInfoClient;
+import com.facebook.presto.tests.querystats.QueryStatsClient;
 import com.teradata.tempto.ProductTest;
 import com.teradata.tempto.context.ThreadLocalTestContextHolder;
 import com.teradata.tempto.query.QueryResult;
@@ -30,7 +30,7 @@ public abstract class HivePartitioningTest
     protected long getProcessedLinesCount(String sqlStatement, QueryResult queryResult)
             throws SQLException
     {
-        QueryInfoClient queryInfoClient = ThreadLocalTestContextHolder.testContext().getDependency(QueryInfoClient.class);
+        QueryStatsClient queryStatsClient = ThreadLocalTestContextHolder.testContext().getDependency(QueryStatsClient.class);
         String queryId;
         if (queryResult.getJdbcResultSet().isPresent() && queryResult.getJdbcResultSet().get().isWrapperFor(PrestoResultSet.class)) {
             // if PrestoResult is available, just unwrap it from ResultSet and extract query id
@@ -40,6 +40,6 @@ public abstract class HivePartitioningTest
             // if there is no ResultSet (UPDATE statements), try to find it in system.runtime.queries table
             queryId = (String) query(format("select query_id from system.runtime.queries where query = '%s'", sqlStatement)).row(0).get(0);
         }
-        return queryInfoClient.getQueryStats(queryId).get().getRawInputPositions();
+        return queryStatsClient.getQueryStats(queryId).get().getRawInputPositions();
     }
 }
