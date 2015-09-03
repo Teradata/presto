@@ -7,3 +7,5 @@
  array_sort      | array<E>           | array<E>    | scalar        | true
  array_intersect | array<E>, array<E> | array<E>    | scalar        | true
  array_distinct  | array<E>           | array<E>    | scalar        | true
+ array_remove    | array<E>, E        | array<E>    | scalar        | true
+
