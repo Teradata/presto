@@ -87,3 +87,8 @@
  yow                             | timestamp                                                                      | bigint                   | scalar        | true
  yow                             | timestamp with time zone                                                       | bigint                   | scalar        | true
  yow                             | date                                                                           | bigint                   | scalar        | true
+ to_iso8601                      | timestamp                                                                      | varchar                  | scalar        | true
+ to_iso8601                      | timestamp with time zone                                                       | varchar                  | scalar        | true
+ to_iso8601                      | date                                                                           | varchar                  | scalar        | true
+ from_iso8601_timestamp          | varchar                                                                        | timestamp with time zone | scalar        | true
+ from_iso8601_date               | varchar                                                                        | date                     | scalar        | true
