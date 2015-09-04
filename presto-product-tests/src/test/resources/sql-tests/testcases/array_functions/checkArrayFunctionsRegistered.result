@@ -9,3 +9,4 @@
  array_distinct  | array<E>           | array<E>    | scalar        | true
  array_join    | array<T>, varchar          | varchar     | scalar        | true
  array_join    | array<T>, varchar, varchar | varchar     | scalar        | true
+
