@@ -708,7 +708,7 @@
             <dependency>
                 <groupId>com.teradata.tempto</groupId>
                 <artifactId>tempto-core</artifactId>
-                <version>1.0.35</version>
+                <version>1.0.36</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
