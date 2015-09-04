@@ -76,39 +76,4 @@
             <scope>test</scope>
         </dependency>
     </dependencies>
-
-    <build>
-        <plugins>
-            <!-- exclude conflicting dependencies -->
-            <plugin>
-                <groupId>com.ning.maven.plugins</groupId>
-                <artifactId>maven-duplicate-finder-plugin</artifactId>
-                <version>1.0.9</version>
-                <configuration>
-                    <exceptions combine.children="append">
-                        <exception>
-                            <conflictingDependencies>
-                                <dependency>
-                                    <groupId>net.minidev</groupId>
-                                    <artifactId>asm</artifactId>
-                                </dependency>
-                                <dependency>
-                                    <groupId>asm</groupId>
-                                    <artifactId>asm</artifactId>
-                                </dependency>
-                                <dependency>
-                                    <groupId>org.ow2.asm</groupId>
-                                    <artifactId>asm-all</artifactId>
-                                </dependency>
-                            </conflictingDependencies>
-                            <packages>
-                                <package>org.objectweb.asm</package>
-                            </packages>
-                        </exception>
-                    </exceptions>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
-
 </project>
