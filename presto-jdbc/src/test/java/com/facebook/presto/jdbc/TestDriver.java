@@ -744,6 +744,23 @@ public class TestDriver
     }
 
     @Test
+    public void testExecuteWithQuotedIdentifier()
+            throws Exception
+    {
+        try (Connection connection = createConnection()) {
+            try (Statement statement = connection.createStatement()) {
+                assertTrue(statement.execute("SELECT 123 \"SELECT\""));
+                ResultSet rs = statement.getResultSet();
+                assertTrue(rs.next());
+                assertEquals(rs.getLong(1), 123);
+                assertFalse(rs.wasNull());
+                assertEquals(rs.getLong("SELECT"), 123);
+                assertFalse(rs.wasNull());
+            }
+        }
+    }
+
+    @Test
     public void testExecuteWithInsert()
             throws Exception
     {
