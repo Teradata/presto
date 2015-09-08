@@ -10,3 +10,5 @@
  array_remove    | array<E>, E                | array<E>    | scalar        | true
  array_join      | array<T>, varchar          | varchar     | scalar        | true
  array_join      | array<T>, varchar, varchar | varchar     | scalar        | true
+ array_agg       | T                          | array<T>    | aggregate     | true
+ array_position  | array<E>, E                | bigint      | scalar        | true
