@@ -33,7 +33,7 @@ import static io.airlift.http.client.Request.Builder.prepareGet;
 import static io.airlift.http.client.ResponseHandlerUtils.propagate;
 
 /**
- * Implementation of {@link QueryStatsClient} based on Apache http client.
+ * Implementation of {@link QueryStatsClient} using Presto's /v1/query HTTP API.
  */
 public class HttpQueryStatsClient
         implements QueryStatsClient
