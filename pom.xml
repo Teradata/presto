@@ -58,7 +58,7 @@
         <air.test.thread-count>4</air.test.thread-count>
         <air.test.jvmsize>1792m</air.test.jvmsize>
 
-        <air.javadoc.lint>--missing</air.javadoc.lint>
+        <air.javadoc.lint>-missing</air.javadoc.lint>
     </properties>
 
     <modules>
@@ -304,13 +304,6 @@
                     </exclusion>
                 </exclusions>
             </dependency>
-
-            <dependency>
-                <groupId>org.codehaus.jackson</groupId>
-                <artifactId>jackson-mapper-asl</artifactId>
-                <version>1.9.13</version>
-            </dependency>
-
             <dependency>
                 <groupId>com.facebook.hive</groupId>
                 <artifactId>hive-dwrf-shims</artifactId>
