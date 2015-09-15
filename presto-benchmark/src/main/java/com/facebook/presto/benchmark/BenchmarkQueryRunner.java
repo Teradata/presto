@@ -39,11 +39,17 @@ public final class BenchmarkQueryRunner
     {
         return createLocalQueryRunner(false);
     }
+
     public static LocalQueryRunner createLocalQueryRunner(boolean hashingEnabled)
+    {
+        return createLocalQueryRunner(hashingEnabled, TINY_SCHEMA_NAME);
+    }
+
+    public static LocalQueryRunner createLocalQueryRunner(boolean hashingEnabled, String schema)
     {
         SessionBuilder sessionBuilder = testSessionBuilder()
                 .setCatalog("tpch")
-                .setSchema(TINY_SCHEMA_NAME);
+                .setSchema(schema);
 
         if (hashingEnabled) {
             sessionBuilder.setSystemProperties(ImmutableMap.of("optimizer.optimize_hash_generation", "true"));
