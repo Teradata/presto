@@ -26,6 +26,12 @@ import java.util.List;
 import java.util.Map;
 
 import static com.facebook.presto.SystemSessionProperties.OPTIMIZE_HASH_GENERATION;
+import static com.facebook.presto.benchmark.NumericBenchmarks.numericBenchmarkAdd;
+import static com.facebook.presto.benchmark.NumericBenchmarks.numericBenchmarkDivide;
+import static com.facebook.presto.benchmark.NumericBenchmarks.numericBenchmarkMultiply;
+import static com.facebook.presto.benchmark.NumericBenchmarks.numericBenchmarkSingleColumnCount;
+import static com.facebook.presto.benchmark.NumericBenchmarks.numericBenchmarkSubtract;
+import static com.facebook.presto.benchmark.NumericBenchmarks.numericBenchmarkTwoColumnsCount;
 import static java.util.Objects.requireNonNull;
 
 public class BenchmarkSuite
@@ -98,6 +104,18 @@ public class BenchmarkSuite
         );
     }
 
+    public static List<AbstractBenchmark> createNumericBenchmarks(LocalQueryRunner localQueryRunner)
+    {
+        return ImmutableList.<AbstractBenchmark>of(
+                numericBenchmarkAdd(localQueryRunner),
+                numericBenchmarkSubtract(localQueryRunner),
+                numericBenchmarkMultiply(localQueryRunner),
+                numericBenchmarkDivide(localQueryRunner),
+                numericBenchmarkSingleColumnCount(localQueryRunner),
+                numericBenchmarkTwoColumnsCount(localQueryRunner)
+        );
+    }
+
     private final LocalQueryRunner localQueryRunner;
     private final String outputDirectory;
 
@@ -118,8 +136,18 @@ public class BenchmarkSuite
     public void runAllBenchmarks()
             throws IOException
     {
-        List<AbstractBenchmark> benchmarks = createBenchmarks(localQueryRunner);
+        runBenchmarks(createBenchmarks(localQueryRunner));
+    }
 
+    public void runNumericBenchmarks()
+            throws IOException
+    {
+        runBenchmarks(createNumericBenchmarks(localQueryRunner));
+    }
+
+    public void runBenchmarks(List<AbstractBenchmark> benchmarks)
+            throws IOException
+    {
         LOGGER.info("=== Pre-running all benchmarks for JVM warmup ===");
         for (AbstractBenchmark benchmark : benchmarks) {
             benchmark.runBenchmark();
