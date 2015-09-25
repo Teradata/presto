@@ -55,4 +55,5 @@ Hadoop Services Startup
 After the VM boots, some Hadoop services may still not be started. Starting them
 takes a couple of minutes depending on the host machine. You can monitor the startup progress
 of these services through the Ambari UI, which is accessible on port 8081 at `<http://[guest-ip-address]:8081/>`_.
-The credentials are admin/admin.
+In order to access Ambari from the host machine, you will need to change the network adaptor for the VM from NAT to the
+Bridged Adaptor. The credentials are admin/admin.
