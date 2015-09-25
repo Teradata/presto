@@ -17,9 +17,9 @@ from docutils import nodes, utils
 # noinspection PyUnresolvedReferences
 from sphinx.errors import SphinxError
 
-TD_LINK_SERVER = 'http://teradata-download.s3.amazonaws.com/aster/presto/presto/101t/presto-0.101-1.0.x86_64.rpm'
-TD_LINK_CLI = 'http://teradata-download.s3.amazonaws.com/aster/presto/cli/101t/presto-cli-0.101-executable.jar'
-TD_LINK_JDBC = 'http://teradata-download.s3.amazonaws.com/aster/presto/jdbc/101t/presto-jdbc-0.101.jar'
+TD_LINK_SERVER = 'http://teradata-download.s3.amazonaws.com/aster/presto/presto/127t/presto-0.127-1.0.x86_64.rpm'
+TD_LINK_CLI = 'http://teradata-download.s3.amazonaws.com/aster/presto/cli/127t/presto-cli-0.127-executable.jar'
+TD_LINK_JDBC = 'http://teradata-download.s3.amazonaws.com/aster/presto/jdbc/127t/presto-jdbc-0.127.jar'
 
 GROUP_ID = 'com.facebook.presto'
 ARTIFACTS = {
