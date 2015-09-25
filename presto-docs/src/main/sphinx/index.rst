@@ -7,11 +7,11 @@ Presto Documentation
     :numbered: 2
 
     overview
-    admin
     sandbox-vms
     configuration
-    connector
     querying
+    admin
+    connector
     sql
     functions
     language
