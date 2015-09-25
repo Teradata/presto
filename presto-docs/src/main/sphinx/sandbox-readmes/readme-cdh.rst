@@ -54,6 +54,4 @@ Hadoop Services Startup
 =======================
 
 After the VM boots, some Hadoop services may still not be started. Starting them
-takes a couple of minutes depending on the host machine. You can monitor the startup
-progress via the Cloudera Manager UI accessible on port 7180, at `<http://[guest-ip-address]:7180/>`_.
-The credentials are admin/admin.
+takes a couple of minutes depending on the host machine.
