@@ -31,9 +31,9 @@ import java.util.Optional;
 import java.util.TimeZone;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.util.Locale.ENGLISH;
+import static java.util.Objects.requireNonNull;
 
 public class BenchmarkDriverOptions
 {
@@ -43,11 +43,11 @@ public class BenchmarkDriverOptions
     @Option(name = "--user", title = "user", description = "Username")
     public String user = System.getProperty("user.name");
 
-    @Option(name = "--catalog", title = "catalog", description = "Default catalog (default: default)")
-    public String catalog = "default";
+    @Option(name = "--catalog", title = "catalog", description = "Default catalog")
+    public String catalog;
 
-    @Option(name = "--schema", title = "schema", description = "Default schema (default: default)")
-    public String schema = "default";
+    @Option(name = "--schema", title = "schema", description = "Default schema")
+    public String schema;
 
     @Option(name = "--suite", title = "suite", description = "Suite to execute")
     public List<String> suites = new ArrayList<>();
@@ -152,9 +152,9 @@ public class BenchmarkDriverOptions
 
         public ClientSessionProperty(Optional<String> catalog, String name, String value)
         {
-            this.catalog = checkNotNull(catalog, "catalog is null");
-            this.name = checkNotNull(name, "name is null");
-            this.value = checkNotNull(value, "value is null");
+            this.catalog = requireNonNull(catalog, "catalog is null");
+            this.name = requireNonNull(name, "name is null");
+            this.value = requireNonNull(value, "value is null");
 
             verifyProperty(catalog, name, value);
         }

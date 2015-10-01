@@ -13,15 +13,17 @@
  */
 package com.facebook.presto.orc.reader;
 
-import com.facebook.presto.orc.LongVector;
 import com.facebook.presto.orc.OrcCorruptionException;
 import com.facebook.presto.orc.StreamDescriptor;
-import com.facebook.presto.orc.Vector;
 import com.facebook.presto.orc.metadata.ColumnEncoding;
 import com.facebook.presto.orc.stream.BooleanStream;
 import com.facebook.presto.orc.stream.LongStream;
 import com.facebook.presto.orc.stream.StreamSource;
 import com.facebook.presto.orc.stream.StreamSources;
+import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.block.BlockBuilderStatus;
+import com.facebook.presto.spi.type.Type;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -34,10 +36,9 @@ import static com.facebook.presto.orc.metadata.Stream.StreamKind.DATA;
 import static com.facebook.presto.orc.metadata.Stream.StreamKind.DICTIONARY_DATA;
 import static com.facebook.presto.orc.metadata.Stream.StreamKind.IN_DICTIONARY;
 import static com.facebook.presto.orc.metadata.Stream.StreamKind.PRESENT;
-import static com.facebook.presto.orc.reader.OrcReaderUtils.castOrcVector;
 import static com.facebook.presto.orc.stream.MissingStreamSource.missingStreamSource;
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 public class LongDictionaryStreamReader
         implements StreamReader
@@ -51,6 +52,7 @@ public class LongDictionaryStreamReader
     private StreamSource<BooleanStream> presentStreamSource = missingStreamSource(BooleanStream.class);
     @Nullable
     private BooleanStream presentStream;
+    private boolean[] nullVector = new boolean[0];
 
     @Nonnull
     private StreamSource<LongStream> dictionaryDataStreamSource = missingStreamSource(LongStream.class);
@@ -62,19 +64,20 @@ public class LongDictionaryStreamReader
     private StreamSource<BooleanStream> inDictionaryStreamSource = missingStreamSource(BooleanStream.class);
     @Nullable
     private BooleanStream inDictionaryStream;
-    private final boolean[] inDictionary = new boolean[Vector.MAX_VECTOR_LENGTH];
+    private boolean[] inDictionary = new boolean[0];
 
     @Nonnull
     private StreamSource<LongStream> dataStreamSource;
     @Nullable
     private LongStream dataStream;
+    private long[] dataVector = new long[0];
 
     private boolean dictionaryOpen;
     private boolean rowGroupOpen;
 
     public LongDictionaryStreamReader(StreamDescriptor streamDescriptor)
     {
-        this.streamDescriptor = checkNotNull(streamDescriptor, "stream is null");
+        this.streamDescriptor = requireNonNull(streamDescriptor, "stream is null");
     }
 
     @Override
@@ -85,7 +88,7 @@ public class LongDictionaryStreamReader
     }
 
     @Override
-    public void readBatch(Object vector)
+    public Block readBlock(Type type)
             throws IOException
     {
         if (!rowGroupOpen) {
@@ -111,42 +114,56 @@ public class LongDictionaryStreamReader
             }
         }
 
-        LongVector longVector = castOrcVector(vector, LongVector.class);
-
+        if (nullVector.length < nextBatchSize) {
+            nullVector = new boolean[nextBatchSize];
+        }
+        if (dataVector.length < nextBatchSize) {
+            dataVector = new long[nextBatchSize];
+        }
         if (presentStream == null) {
             if (dataStream == null) {
                 throw new OrcCorruptionException("Value is not null but data stream is not present");
             }
-            Arrays.fill(longVector.isNull, false);
-            dataStream.nextLongVector(nextBatchSize, longVector.vector);
+            Arrays.fill(nullVector, false);
+            dataStream.nextLongVector(nextBatchSize, dataVector);
         }
         else {
-            int nullValues = presentStream.getUnsetBits(nextBatchSize, longVector.isNull);
+            int nullValues = presentStream.getUnsetBits(nextBatchSize, nullVector);
             if (nullValues != nextBatchSize) {
                 if (dataStream == null) {
                     throw new OrcCorruptionException("Value is not null but data stream is not present");
                 }
-                dataStream.nextLongVector(nextBatchSize, longVector.vector, longVector.isNull);
+                dataStream.nextLongVector(nextBatchSize, dataVector, nullVector);
             }
         }
 
+        if (inDictionary.length < nextBatchSize) {
+            inDictionary = new boolean[nextBatchSize];
+        }
         if (inDictionaryStream == null) {
             Arrays.fill(inDictionary, true);
         }
         else {
-            inDictionaryStream.getSetBits(nextBatchSize, inDictionary, longVector.isNull);
+            inDictionaryStream.getSetBits(nextBatchSize, inDictionary, nullVector);
         }
 
+        BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), nextBatchSize);
         for (int i = 0; i < nextBatchSize; i++) {
-            if (!longVector.isNull[i]) {
-                if (inDictionary[i]) {
-                    longVector.vector[i] = dictionary[((int) longVector.vector[i])];
-                }
+            if (nullVector[i]) {
+                builder.appendNull();
+            }
+            else if (inDictionary[i]) {
+                type.writeLong(builder, dictionary[((int) dataVector[i])]);
+            }
+            else {
+                type.writeLong(builder, dataVector[i]);
             }
         }
 
         readOffset = 0;
         nextBatchSize = 0;
+
+        return builder.build();
     }
 
     private void openRowGroup()

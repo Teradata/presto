@@ -15,6 +15,8 @@ package com.facebook.presto.orc.stream;
 
 import com.facebook.presto.orc.OrcCorruptionException;
 import com.facebook.presto.orc.checkpoint.ByteStreamCheckpoint;
+import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.type.Type;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -96,7 +98,7 @@ public class ByteStream
     }
 
     @Override
-    public void skip(int items)
+    public void skip(long items)
             throws IOException
     {
         while (items > 0) {
@@ -118,20 +120,23 @@ public class ByteStream
         return buffer[offset++];
     }
 
-    public void nextVector(long items, long[] vector)
+    public void nextVector(Type type, long items, BlockBuilder builder)
             throws IOException
     {
         for (int i = 0; i < items; i++) {
-            vector[i] = next();
+            type.writeLong(builder, next());
         }
     }
 
-    public void nextVector(long items, long[] vector, boolean[] isNull)
+    public void nextVector(Type type, long items, BlockBuilder builder, boolean[] isNull)
             throws IOException
     {
         for (int i = 0; i < items; i++) {
-            if (!isNull[i]) {
-                vector[i] = next();
+            if (isNull[i]) {
+                builder.appendNull();
+            }
+            else {
+                type.writeLong(builder, next());
             }
         }
     }

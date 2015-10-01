@@ -28,7 +28,6 @@ import io.airlift.json.JsonCodec;
 
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
-import javax.ws.rs.HeaderParam;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -41,20 +40,14 @@ import java.net.URI;
 import java.util.Iterator;
 import java.util.List;
 
-import static com.facebook.presto.client.PrestoHeaders.PRESTO_CATALOG;
-import static com.facebook.presto.client.PrestoHeaders.PRESTO_LANGUAGE;
-import static com.facebook.presto.client.PrestoHeaders.PRESTO_SCHEMA;
-import static com.facebook.presto.client.PrestoHeaders.PRESTO_SOURCE;
-import static com.facebook.presto.client.PrestoHeaders.PRESTO_TIME_ZONE;
-import static com.facebook.presto.client.PrestoHeaders.PRESTO_USER;
 import static com.facebook.presto.server.ResourceUtil.assertRequest;
 import static com.facebook.presto.server.ResourceUtil.createSessionForRequest;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Iterators.concat;
 import static com.google.common.collect.Iterators.transform;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static javax.ws.rs.core.Response.status;
 
@@ -75,24 +68,16 @@ public class ExecuteResource
             @ForExecute HttpClient httpClient,
             JsonCodec<QueryResults> queryResultsCodec)
     {
-        this.serverInfo = checkNotNull(serverInfo, "serverInfo is null");
-        this.accessControl = checkNotNull(accessControl, "accessControl is null");
-        this.sessionPropertyManager = checkNotNull(sessionPropertyManager, "sessionPropertyManager is null");
-        this.httpClient = checkNotNull(httpClient, "httpClient is null");
-        this.queryResultsCodec = checkNotNull(queryResultsCodec, "queryResultsCodec is null");
+        this.serverInfo = requireNonNull(serverInfo, "serverInfo is null");
+        this.accessControl = requireNonNull(accessControl, "accessControl is null");
+        this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
+        this.httpClient = requireNonNull(httpClient, "httpClient is null");
+        this.queryResultsCodec = requireNonNull(queryResultsCodec, "queryResultsCodec is null");
     }
 
     @POST
     @Produces(MediaType.APPLICATION_JSON)
-    public Response createQuery(
-            String query,
-            @HeaderParam(PRESTO_USER) String user,
-            @HeaderParam(PRESTO_SOURCE) String source,
-            @HeaderParam(PRESTO_CATALOG) String catalog,
-            @HeaderParam(PRESTO_SCHEMA) String schema,
-            @HeaderParam(PRESTO_TIME_ZONE) String timeZoneId,
-            @HeaderParam(PRESTO_LANGUAGE) String language,
-            @Context HttpServletRequest servletRequest)
+    public Response createQuery(String query, @Context HttpServletRequest servletRequest)
     {
         assertRequest(!isNullOrEmpty(query), "SQL query is empty");
 
@@ -144,7 +129,7 @@ public class ExecuteResource
 
         private ResultsPageIterator(StatementClient client)
         {
-            this.client = checkNotNull(client, "client is null");
+            this.client = requireNonNull(client, "client is null");
         }
 
         @Override
@@ -183,8 +168,8 @@ public class ExecuteResource
 
         public SimpleQueryResults(List<Column> columns, Iterator<List<Object>> data)
         {
-            this.columns = checkNotNull(columns, "columns is null");
-            this.data = checkNotNull(data, "data is null");
+            this.columns = requireNonNull(columns, "columns is null");
+            this.data = requireNonNull(data, "data is null");
         }
 
         @JsonProperty

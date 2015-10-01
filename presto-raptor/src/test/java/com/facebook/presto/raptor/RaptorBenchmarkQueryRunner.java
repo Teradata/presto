@@ -34,8 +34,8 @@ import java.io.IOException;
 import java.util.Map;
 
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static java.util.Objects.requireNonNull;
 
 public final class RaptorBenchmarkQueryRunner
 {
@@ -48,7 +48,7 @@ public final class RaptorBenchmarkQueryRunner
     public static void main(String[] args)
             throws IOException
     {
-        String outputDirectory = checkNotNull(System.getProperty("outputDirectory"), "Must specify -DoutputDirectory=...");
+        String outputDirectory = requireNonNull(System.getProperty("outputDirectory"), "Must specify -DoutputDirectory=...");
         try (LocalQueryRunner localQueryRunner = createLocalQueryRunner()) {
             new BenchmarkSuite(localQueryRunner, outputDirectory).runAllBenchmarks();
         }
@@ -57,8 +57,8 @@ public final class RaptorBenchmarkQueryRunner
     public static LocalQueryRunner createLocalQueryRunner()
     {
         Session session = testSessionBuilder()
-                .setCatalog("default")
-                .setSchema("default")
+                .setCatalog("raptor")
+                .setSchema("benchmark")
                 .build();
         LocalQueryRunner localQueryRunner = new LocalQueryRunner(session);
 
@@ -68,13 +68,13 @@ public final class RaptorBenchmarkQueryRunner
 
         // add raptor
         ConnectorFactory raptorConnectorFactory = createRaptorConnectorFactory(TPCH_CACHE_DIR, nodeManager);
-        localQueryRunner.createCatalog("default", raptorConnectorFactory, ImmutableMap.<String, String>of());
+        localQueryRunner.createCatalog("raptor", raptorConnectorFactory, ImmutableMap.<String, String>of());
 
         Metadata metadata = localQueryRunner.getMetadata();
-        if (!metadata.getTableHandle(session, new QualifiedTableName("default", "default", "orders")).isPresent()) {
+        if (!metadata.getTableHandle(session, new QualifiedTableName("raptor", "benchmark", "orders")).isPresent()) {
             localQueryRunner.execute("CREATE TABLE orders AS SELECT * FROM tpch.sf1.orders");
         }
-        if (!metadata.getTableHandle(session, new QualifiedTableName("default", "default", "lineitem")).isPresent()) {
+        if (!metadata.getTableHandle(session, new QualifiedTableName("raptor", "benchmark", "lineitem")).isPresent()) {
             localQueryRunner.execute("CREATE TABLE lineitem AS SELECT * FROM tpch.sf1.lineitem");
         }
         return localQueryRunner;

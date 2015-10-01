@@ -16,8 +16,7 @@ package com.facebook.presto.raptor;
 import com.facebook.presto.raptor.backup.BackupService;
 import com.facebook.presto.raptor.metadata.ShardManager;
 import com.facebook.presto.raptor.metadata.ShardNodes;
-import com.facebook.presto.raptor.util.CloseableIterator;
-import com.facebook.presto.raptor.util.SynchronizedCloseableIterator;
+import com.facebook.presto.raptor.util.SynchronizedResultIterator;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ConnectorPartition;
 import com.facebook.presto.spi.ConnectorPartitionResult;
@@ -32,8 +31,10 @@ import com.facebook.presto.spi.NodeManager;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.TupleDomain;
 import com.google.common.collect.ImmutableList;
+import org.skife.jdbi.v2.ResultIterator;
 
 import javax.annotation.PreDestroy;
+import javax.annotation.concurrent.GuardedBy;
 import javax.inject.Inject;
 
 import java.util.Collection;
@@ -50,11 +51,12 @@ import static com.facebook.presto.raptor.RaptorErrorCode.RAPTOR_NO_HOST_FOR_SHAR
 import static com.facebook.presto.raptor.util.Types.checkType;
 import static com.facebook.presto.spi.StandardErrorCode.NO_NODES_AVAILABLE;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Maps.uniqueIndex;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.CompletableFuture.supplyAsync;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 
@@ -70,14 +72,14 @@ public class RaptorSplitManager
     @Inject
     public RaptorSplitManager(RaptorConnectorId connectorId, NodeManager nodeManager, ShardManager shardManager, BackupService backupService)
     {
-        this(connectorId, nodeManager, shardManager, checkNotNull(backupService, "backupService is null").isBackupAvailable());
+        this(connectorId, nodeManager, shardManager, requireNonNull(backupService, "backupService is null").isBackupAvailable());
     }
 
     public RaptorSplitManager(RaptorConnectorId connectorId, NodeManager nodeManager, ShardManager shardManager, boolean backupAvailable)
     {
-        this.connectorId = checkNotNull(connectorId, "connectorId is null").toString();
-        this.nodeManager = checkNotNull(nodeManager, "nodeManager is null");
-        this.shardManager = checkNotNull(shardManager, "shardManager is null");
+        this.connectorId = requireNonNull(connectorId, "connectorId is null").toString();
+        this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
+        this.shardManager = requireNonNull(shardManager, "shardManager is null");
         this.backupAvailable = backupAvailable;
         this.executor = newCachedThreadPool(daemonThreadsNamed("raptor-split-" + connectorId + "-%s"));
     }
@@ -138,15 +140,16 @@ public class RaptorSplitManager
         private final Map<String, Node> nodesById = uniqueIndex(nodeManager.getActiveNodes(), Node::getNodeIdentifier);
         private final long tableId;
         private final TupleDomain<RaptorColumnHandle> effectivePredicate;
-        private final CloseableIterator<ShardNodes> iterator;
+        private final ResultIterator<ShardNodes> iterator;
 
+        @GuardedBy("this")
         private CompletableFuture<List<ConnectorSplit>> future;
 
         public RaptorSplitSource(long tableId, TupleDomain<RaptorColumnHandle> effectivePredicate)
         {
             this.tableId = tableId;
-            this.effectivePredicate = checkNotNull(effectivePredicate, "effectivePredicate is null");
-            this.iterator = new SynchronizedCloseableIterator<>(shardManager.getShardNodes(tableId, effectivePredicate));
+            this.effectivePredicate = requireNonNull(effectivePredicate, "effectivePredicate is null");
+            this.iterator = new SynchronizedResultIterator<>(shardManager.getShardNodes(tableId, effectivePredicate));
         }
 
         @Override
@@ -156,14 +159,15 @@ public class RaptorSplitManager
         }
 
         @Override
-        public CompletableFuture<List<ConnectorSplit>> getNextBatch(int maxSize)
+        public synchronized CompletableFuture<List<ConnectorSplit>> getNextBatch(int maxSize)
         {
+            checkState((future == null) || future.isDone(), "previous batch not completed");
             future = supplyAsync(batchSupplier(maxSize), executor);
             return future;
         }
 
         @Override
-        public void close()
+        public synchronized void close()
         {
             if (future != null) {
                 future.cancel(true);

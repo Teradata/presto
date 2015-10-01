@@ -18,6 +18,8 @@ import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorTableMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.analyzer.SemanticException;
+import com.facebook.presto.sql.tree.Node;
 import com.facebook.presto.sql.tree.QualifiedName;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -26,9 +28,12 @@ import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Optional;
 
+import static com.facebook.presto.sql.analyzer.SemanticErrorCode.CATALOG_NOT_SPECIFIED;
+import static com.facebook.presto.sql.analyzer.SemanticErrorCode.SCHEMA_NOT_SPECIFIED;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
+import static java.util.Objects.requireNonNull;
 
 public final class MetadataUtil
 {
@@ -90,7 +95,9 @@ public final class MetadataUtil
 
     public static String checkLowerCase(String value, String name)
     {
-        checkNotNull(value, "%s is null", name);
+        if (value == null) {
+            throw new NullPointerException(format("%s is null", name));
+        }
         checkArgument(value.equals(value.toLowerCase(ENGLISH)), "%s is not lowercase", name);
         return value;
     }
@@ -105,18 +112,29 @@ public final class MetadataUtil
         return null;
     }
 
-    public static QualifiedTableName createQualifiedTableName(Session session, QualifiedName name)
+    public static QualifiedTableName createQualifiedTableName(Session session, Node node, QualifiedName name)
     {
-        checkNotNull(session, "session is null");
-        checkNotNull(name, "name is null");
+        requireNonNull(session, "session is null");
+        requireNonNull(name, "name is null");
         checkArgument(name.getParts().size() <= 3, "Too many dots in table name: %s", name);
 
         List<String> parts = Lists.reverse(name.getParts());
         String tableName = parts.get(0);
-        String schemaName = (parts.size() > 1) ? parts.get(1) : session.getSchema();
-        String catalogName = (parts.size() > 2) ? parts.get(2) : session.getCatalog();
+        String schemaName = (parts.size() > 1) ? parts.get(1) : session.getSchema().orElseThrow(() ->
+                new SemanticException(CATALOG_NOT_SPECIFIED, node, "Catalog must be specified when session catalog is not set"));
+        String catalogName = (parts.size() > 2) ? parts.get(2) : session.getCatalog().orElseThrow(() ->
+                new SemanticException(SCHEMA_NOT_SPECIFIED, node, "Schema must be specified when session schema is not set"));
 
         return new QualifiedTableName(catalogName, schemaName, tableName);
+    }
+
+    public static boolean tableExists(Metadata metadata, Session session, String table)
+    {
+        if (!session.getCatalog().isPresent() || !session.getSchema().isPresent()) {
+            return false;
+        }
+        QualifiedTableName name = new QualifiedTableName(session.getCatalog().get(), session.getSchema().get(), table);
+        return metadata.getTableHandle(session, name).isPresent();
     }
 
     public static class SchemaMetadataBuilder

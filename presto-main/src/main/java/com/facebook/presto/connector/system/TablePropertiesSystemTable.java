@@ -31,9 +31,10 @@ import java.util.Map.Entry;
 import java.util.TreeMap;
 
 import static com.facebook.presto.metadata.MetadataUtil.TableMetadataBuilder.tableMetadataBuilder;
+import static com.facebook.presto.spi.SystemTable.Distribution.SINGLE_COORDINATOR;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.MoreObjects.firstNonNull;
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 public class TablePropertiesSystemTable
         implements SystemTable
@@ -52,13 +53,13 @@ public class TablePropertiesSystemTable
     @Inject
     public TablePropertiesSystemTable(Metadata metadata)
     {
-        this.metadata = checkNotNull(metadata);
+        this.metadata = requireNonNull(metadata);
     }
 
     @Override
-    public boolean isDistributed()
+    public Distribution getDistribution()
     {
-        return false;
+        return SINGLE_COORDINATOR;
     }
 
     @Override

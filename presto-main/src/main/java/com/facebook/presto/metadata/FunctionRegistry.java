@@ -30,6 +30,7 @@ import com.facebook.presto.operator.aggregation.CountAggregation;
 import com.facebook.presto.operator.aggregation.CountIfAggregation;
 import com.facebook.presto.operator.aggregation.CovarianceAggregation;
 import com.facebook.presto.operator.aggregation.DoubleSumAggregation;
+import com.facebook.presto.operator.aggregation.GeometricMeanAggregations;
 import com.facebook.presto.operator.aggregation.LongSumAggregation;
 import com.facebook.presto.operator.aggregation.MergeHyperLogLogAggregation;
 import com.facebook.presto.operator.aggregation.NumericHistogramAggregation;
@@ -196,9 +197,9 @@ import static com.facebook.presto.type.UnknownType.UNKNOWN;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
 public class FunctionRegistry
@@ -216,8 +217,8 @@ public class FunctionRegistry
 
     public FunctionRegistry(TypeManager typeManager, BlockEncodingSerde blockEncodingSerde, boolean experimentalSyntaxEnabled)
     {
-        this.typeManager = checkNotNull(typeManager, "typeManager is null");
-        this.blockEncodingSerde = checkNotNull(blockEncodingSerde, "blockEncodingSerde is null");
+        this.typeManager = requireNonNull(typeManager, "typeManager is null");
+        this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
 
         specializedFunctionCache = CacheBuilder.newBuilder()
                 .maximumSize(1000)
@@ -257,6 +258,7 @@ public class FunctionRegistry
                 .aggregate(DoubleSumAggregation.class)
                 .aggregate(LongSumAggregation.class)
                 .aggregate(AverageAggregations.class)
+                .aggregate(GeometricMeanAggregations.class)
                 .aggregate(ApproximateCountDistinctAggregations.class)
                 .aggregate(MergeHyperLogLogAggregation.class)
                 .aggregate(ApproximateSetAggregation.class)
@@ -407,12 +409,12 @@ public class FunctionRegistry
 
             // lookup the type
             Type type = typeManager.getType(parseTypeSignature(typeName));
-            checkNotNull(type, "Type %s not registered", typeName);
+            requireNonNull(type, format("Type %s not registered", typeName));
 
             // verify we have one parameter of the proper type
             checkArgument(parameterTypes.size() == 1, "Expected one argument to literal function, but got %s", parameterTypes);
             Type parameterType = typeManager.getType(parameterTypes.get(0));
-            checkNotNull(parameterType, "Type %s not found", parameterTypes.get(0));
+            requireNonNull(parameterType, format("Type %s not found", parameterTypes.get(0)));
 
             MethodHandle methodHandle = null;
             if (parameterType.getJavaType() == type.getJavaType()) {
@@ -625,6 +627,14 @@ public class FunctionRegistry
 
         if ((firstType.equals(BIGINT) || firstType.equals(DOUBLE)) && (secondType.equals(BIGINT) || secondType.equals(DOUBLE))) {
             return Optional.<Type>of(DOUBLE);
+        }
+
+        if ((firstType.equals(DATE) || firstType.equals(TIMESTAMP)) && (secondType.equals(DATE) || secondType.equals(TIMESTAMP))) {
+            return Optional.<Type>of(TIMESTAMP);
+        }
+
+        if ((firstType.equals(DATE) || firstType.equals(TIMESTAMP_WITH_TIME_ZONE)) && (secondType.equals(DATE) || secondType.equals(TIMESTAMP_WITH_TIME_ZONE))) {
+            return Optional.<Type>of(TIMESTAMP_WITH_TIME_ZONE);
         }
 
         if ((firstType.equals(TIME) || firstType.equals(TIME_WITH_TIME_ZONE)) && (secondType.equals(TIME) || secondType.equals(TIME_WITH_TIME_ZONE))) {

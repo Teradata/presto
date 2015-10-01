@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.kafka;
 
-import com.facebook.presto.kafka.decoder.dummy.DummyKafkaRowDecoder;
+import com.facebook.presto.decoder.dummy.DummyRowDecoder;
 import com.facebook.presto.spi.SchemaTableName;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -32,9 +32,9 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static java.nio.file.Files.readAllBytes;
 import static java.util.Arrays.asList;
+import static java.util.Objects.requireNonNull;
 
 public class KafkaTableDescriptionSupplier
         implements Supplier<Map<SchemaTableName, KafkaTopicDescription>>
@@ -50,9 +50,9 @@ public class KafkaTableDescriptionSupplier
     KafkaTableDescriptionSupplier(KafkaConnectorConfig kafkaConnectorConfig,
             JsonCodec<KafkaTopicDescription> topicDescriptionCodec)
     {
-        this.topicDescriptionCodec = checkNotNull(topicDescriptionCodec, "topicDescriptionCodec is null");
+        this.topicDescriptionCodec = requireNonNull(topicDescriptionCodec, "topicDescriptionCodec is null");
 
-        checkNotNull(kafkaConnectorConfig, "kafkaConfig is null");
+        requireNonNull(kafkaConnectorConfig, "kafkaConfig is null");
         this.tableDescriptionDir = kafkaConnectorConfig.getTableDescriptionDir();
         this.defaultSchema = kafkaConnectorConfig.getDefaultSchema();
         this.tableNames = ImmutableSet.copyOf(kafkaConnectorConfig.getTableNames());
@@ -100,8 +100,8 @@ public class KafkaTableDescriptionSupplier
                     builder.put(tableName, new KafkaTopicDescription(tableName.getTableName(),
                             tableName.getSchemaName(),
                             definedTable,
-                            new KafkaTopicFieldGroup(DummyKafkaRowDecoder.NAME, ImmutableList.<KafkaTopicFieldDescription>of()),
-                            new KafkaTopicFieldGroup(DummyKafkaRowDecoder.NAME, ImmutableList.<KafkaTopicFieldDescription>of())));
+                            new KafkaTopicFieldGroup(DummyRowDecoder.NAME, ImmutableList.<KafkaTopicFieldDescription>of()),
+                            new KafkaTopicFieldGroup(DummyRowDecoder.NAME, ImmutableList.<KafkaTopicFieldDescription>of())));
                 }
             }
 

@@ -23,6 +23,7 @@ import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.spi.Page;
 import com.google.common.collect.ImmutableList;
 import com.google.common.reflect.TypeToken;
+import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 import io.airlift.units.Duration;
@@ -49,6 +50,7 @@ import javax.ws.rs.core.UriInfo;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 
 import static com.facebook.presto.PrestoMediaTypes.PRESTO_PAGES;
@@ -57,10 +59,10 @@ import static com.facebook.presto.client.PrestoHeaders.PRESTO_CURRENT_STATE;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_MAX_WAIT;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_PAGE_NEXT_TOKEN;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_PAGE_TOKEN;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
 import static io.airlift.concurrent.MoreFutures.addTimeout;
 import static io.airlift.http.server.AsyncResponseHandler.bindAsyncResponse;
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -75,16 +77,19 @@ public class TaskResource
 
     private final TaskManager taskManager;
     private final SessionPropertyManager sessionPropertyManager;
-    private final ScheduledExecutorService executor;
+    private final Executor responseExecutor;
+    private final ScheduledExecutorService timeoutExecutor;
 
     @Inject
     public TaskResource(TaskManager taskManager,
             SessionPropertyManager sessionPropertyManager,
-            @ForAsyncHttpResponse ScheduledExecutorService executor)
+            @ForAsyncHttp BoundedExecutor responseExecutor,
+            @ForAsyncHttp ScheduledExecutorService timeoutExecutor)
     {
-        this.taskManager = checkNotNull(taskManager, "taskManager is null");
-        this.sessionPropertyManager = checkNotNull(sessionPropertyManager, "sessionPropertyManager is null");
-        this.executor = checkNotNull(executor, "executor is null");
+        this.taskManager = requireNonNull(taskManager, "taskManager is null");
+        this.sessionPropertyManager = requireNonNull(sessionPropertyManager, "sessionPropertyManager is null");
+        this.responseExecutor = requireNonNull(responseExecutor, "responseExecutor is null");
+        this.timeoutExecutor = requireNonNull(timeoutExecutor, "timeoutExecutor is null");
     }
 
     @GET
@@ -104,7 +109,7 @@ public class TaskResource
     @Produces(MediaType.APPLICATION_JSON)
     public Response createOrUpdateTask(@PathParam("taskId") TaskId taskId, TaskUpdateRequest taskUpdateRequest, @Context UriInfo uriInfo)
     {
-        checkNotNull(taskUpdateRequest, "taskUpdateRequest is null");
+        requireNonNull(taskUpdateRequest, "taskUpdateRequest is null");
 
         Session session = taskUpdateRequest.getSession().toSession(sessionPropertyManager);
         TaskInfo taskInfo = taskManager.updateTask(session,
@@ -129,7 +134,7 @@ public class TaskResource
             @Context UriInfo uriInfo,
             @Suspended AsyncResponse asyncResponse)
     {
-        checkNotNull(taskId, "taskId is null");
+        requireNonNull(taskId, "taskId is null");
 
         if (currentState == null || maxWait == null) {
             TaskInfo taskInfo = taskManager.getTaskInfo(taskId);
@@ -144,7 +149,7 @@ public class TaskResource
                 taskManager.getTaskInfo(taskId, currentState),
                 () -> taskManager.getTaskInfo(taskId),
                 maxWait,
-                executor);
+                timeoutExecutor);
 
         if (shouldSummarize(uriInfo)) {
             futureTaskInfo = futureTaskInfo.thenApply(TaskInfo::summarize);
@@ -152,7 +157,7 @@ public class TaskResource
 
         // For hard timeout, add an additional 5 seconds to max wait for thread scheduling contention and GC
         Duration timeout = new Duration(maxWait.toMillis() + 5000, MILLISECONDS);
-        bindAsyncResponse(asyncResponse, futureTaskInfo, executor)
+        bindAsyncResponse(asyncResponse, futureTaskInfo, responseExecutor)
                 .withTimeout(timeout);
     }
 
@@ -163,7 +168,7 @@ public class TaskResource
             @QueryParam("abort") @DefaultValue("true") boolean abort,
             @Context UriInfo uriInfo)
     {
-        checkNotNull(taskId, "taskId is null");
+        requireNonNull(taskId, "taskId is null");
 
         TaskInfo taskInfo;
         if (abort) {
@@ -188,15 +193,15 @@ public class TaskResource
             @Suspended AsyncResponse asyncResponse)
             throws InterruptedException
     {
-        checkNotNull(taskId, "taskId is null");
-        checkNotNull(outputId, "outputId is null");
+        requireNonNull(taskId, "taskId is null");
+        requireNonNull(outputId, "outputId is null");
 
         CompletableFuture<BufferResult> bufferResultFuture = taskManager.getTaskResults(taskId, outputId, token, DEFAULT_MAX_SIZE);
         bufferResultFuture = addTimeout(
                 bufferResultFuture,
                 () -> BufferResult.emptyResults(token, false),
                 DEFAULT_MAX_WAIT_TIME,
-                executor);
+                timeoutExecutor);
 
         CompletableFuture<Response> responseFuture = bufferResultFuture.thenApply(result -> {
             List<Page> pages = result.getPages();
@@ -221,7 +226,7 @@ public class TaskResource
 
         // For hard timeout, add an additional 5 seconds to max wait for thread scheduling contention and GC
         Duration timeout = new Duration(DEFAULT_MAX_WAIT_TIME.toMillis() + 5000, MILLISECONDS);
-        bindAsyncResponse(asyncResponse, responseFuture, executor)
+        bindAsyncResponse(asyncResponse, responseFuture, responseExecutor)
                 .withTimeout(timeout,
                         Response.status(Status.NO_CONTENT)
                                 .header(PRESTO_PAGE_TOKEN, token)
@@ -235,8 +240,8 @@ public class TaskResource
     @Produces(MediaType.APPLICATION_JSON)
     public Response abortResults(@PathParam("taskId") TaskId taskId, @PathParam("outputId") TaskId outputId, @Context UriInfo uriInfo)
     {
-        checkNotNull(taskId, "taskId is null");
-        checkNotNull(outputId, "outputId is null");
+        requireNonNull(taskId, "taskId is null");
+        requireNonNull(outputId, "outputId is null");
 
         TaskInfo taskInfo = taskManager.abortTaskResults(taskId, outputId);
         if (shouldSummarize(uriInfo)) {

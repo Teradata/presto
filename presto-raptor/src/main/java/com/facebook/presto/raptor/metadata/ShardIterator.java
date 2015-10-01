@@ -14,12 +14,12 @@
 package com.facebook.presto.raptor.metadata;
 
 import com.facebook.presto.raptor.RaptorColumnHandle;
-import com.facebook.presto.raptor.util.CloseableIterator;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.TupleDomain;
 import com.google.common.collect.AbstractIterator;
 import io.airlift.log.Logger;
 import org.skife.jdbi.v2.IDBI;
+import org.skife.jdbi.v2.ResultIterator;
 import org.skife.jdbi.v2.exceptions.DBIException;
 
 import java.sql.Connection;
@@ -27,7 +27,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Wrapper;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +36,7 @@ import java.util.function.Function;
 
 import static com.facebook.presto.raptor.RaptorErrorCode.RAPTOR_ERROR;
 import static com.facebook.presto.raptor.metadata.DatabaseShardManager.shardIndexTable;
+import static com.facebook.presto.raptor.metadata.JdbcUtil.enableStreamingResults;
 import static com.facebook.presto.raptor.util.ArrayUtil.intArrayFromBytes;
 import static com.facebook.presto.raptor.util.UuidUtil.uuidFromBytes;
 import static java.lang.String.format;
@@ -44,7 +44,7 @@ import static java.util.stream.Collectors.toSet;
 
 final class ShardIterator
         extends AbstractIterator<ShardNodes>
-        implements CloseableIterator<ShardNodes>
+        implements ResultIterator<ShardNodes>
 {
     private static final Logger log = Logger.get(ShardIterator.class);
     private final Map<Integer, String> nodeMap = new HashMap<>();
@@ -96,9 +96,9 @@ final class ShardIterator
     public void close()
     {
         // use try-with-resources to close everything properly
-        try (ResultSet resultSet = this.resultSet;
+        try (Connection connection = this.connection;
                 Statement statement = this.statement;
-                Connection connection = this.connection) {
+                ResultSet resultSet = this.resultSet) {
             // do nothing
         }
         catch (SQLException ignored) {
@@ -157,18 +157,8 @@ final class ShardIterator
     private static void enableStreamingResults(Statement statement)
             throws SQLException
     {
-        if (isWrapperFor(statement, com.mysql.jdbc.Statement.class)) {
+        if (statement.isWrapperFor(com.mysql.jdbc.Statement.class)) {
             statement.unwrap(com.mysql.jdbc.Statement.class).enableStreamingResults();
-        }
-    }
-
-    private static boolean isWrapperFor(Wrapper wrapper, Class<?> clazz)
-    {
-        try {
-            return wrapper.isWrapperFor(clazz);
-        }
-        catch (SQLException ignored) {
-            return false;
         }
     }
 }

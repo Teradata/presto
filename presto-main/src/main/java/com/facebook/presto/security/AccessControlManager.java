@@ -53,7 +53,7 @@ public class AccessControlManager
     @Override
     public void checkCanSetUser(Principal principal, String userName)
     {
-        requireNonNull(userName, "tableName is null");
+        requireNonNull(userName, "userName is null");
 
         for (SystemAccessControl accessControl : systemAccessControllers) {
             accessControl.checkCanSetUser(principal, userName);
@@ -94,6 +94,30 @@ public class AccessControlManager
         ConnectorAccessControl accessControl = catalogAccessControl.get(tableName.getCatalogName());
         if (accessControl != null) {
             accessControl.checkCanRenameTable(identity, tableName.asSchemaTableName(), newTableName.asSchemaTableName());
+        }
+    }
+
+    @Override
+    public void checkCanAddColumns(Identity identity, QualifiedTableName tableName)
+    {
+        requireNonNull(identity, "identity is null");
+        requireNonNull(tableName, "tableName is null");
+
+        ConnectorAccessControl accessControl = catalogAccessControl.get(tableName.getCatalogName());
+        if (accessControl != null) {
+            accessControl.checkCanAddColumn(identity, tableName.asSchemaTableName());
+        }
+    }
+
+    @Override
+    public void checkCanRenameColumn(Identity identity, QualifiedTableName tableName)
+    {
+        requireNonNull(identity, "identity is null");
+        requireNonNull(tableName, "tableName is null");
+
+        ConnectorAccessControl accessControl = catalogAccessControl.get(tableName.getCatalogName());
+        if (accessControl != null) {
+            accessControl.checkCanRenameColumn(identity, tableName.asSchemaTableName());
         }
     }
 
@@ -166,6 +190,30 @@ public class AccessControlManager
         ConnectorAccessControl accessControl = catalogAccessControl.get(viewName.getCatalogName());
         if (accessControl != null) {
             accessControl.checkCanSelectFromView(identity, viewName.asSchemaTableName());
+        }
+    }
+
+    @Override
+    public void checkCanCreateViewWithSelectFromTable(Identity identity, QualifiedTableName tableName)
+    {
+        requireNonNull(identity, "identity is null");
+        requireNonNull(tableName, "tableName is null");
+
+        ConnectorAccessControl accessControl = catalogAccessControl.get(tableName.getCatalogName());
+        if (accessControl != null) {
+            accessControl.checkCanCreateViewWithSelectFromTable(identity, tableName.asSchemaTableName());
+        }
+    }
+
+    @Override
+    public void checkCanCreateViewWithSelectFromView(Identity identity, QualifiedTableName viewName)
+    {
+        requireNonNull(identity, "identity is null");
+        requireNonNull(viewName, "viewName is null");
+
+        ConnectorAccessControl accessControl = catalogAccessControl.get(viewName.getCatalogName());
+        if (accessControl != null) {
+            accessControl.checkCanCreateViewWithSelectFromView(identity, viewName.asSchemaTableName());
         }
     }
 

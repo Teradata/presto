@@ -20,6 +20,7 @@ import com.facebook.presto.hive.orc.DwrfRecordCursorProvider;
 import com.facebook.presto.hive.orc.OrcHiveRecordCursor;
 import com.facebook.presto.hive.orc.OrcPageSource;
 import com.facebook.presto.hive.orc.OrcRecordCursorProvider;
+import com.facebook.presto.hive.parquet.ParquetHiveRecordCursor;
 import com.facebook.presto.hive.rcfile.RcFilePageSource;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
@@ -36,6 +37,7 @@ import com.facebook.presto.spi.ConnectorTableLayout;
 import com.facebook.presto.spi.ConnectorTableLayoutHandle;
 import com.facebook.presto.spi.ConnectorTableLayoutResult;
 import com.facebook.presto.spi.ConnectorTableMetadata;
+import com.facebook.presto.spi.ConnectorViewDefinition;
 import com.facebook.presto.spi.Constraint;
 import com.facebook.presto.spi.Domain;
 import com.facebook.presto.spi.PrestoException;
@@ -350,6 +352,8 @@ public abstract class AbstractTestHiveClient
                 hdfsEnvironment,
                 new HivePartitionManager(connectorId, hiveClientConfig),
                 timeZone,
+                true,
+                true,
                 true,
                 true,
                 true,
@@ -1296,9 +1300,9 @@ public abstract class AbstractTestHiveClient
 
         metadata.createView(SESSION, viewName, viewData, replace);
 
-        Map<SchemaTableName, String> views = metadata.getViews(SESSION, viewName.toSchemaTablePrefix());
+        Map<SchemaTableName, ConnectorViewDefinition> views = metadata.getViews(SESSION, viewName.toSchemaTablePrefix());
         assertEquals(views.size(), 1);
-        assertEquals(views.get(viewName), viewData);
+        assertEquals(views.get(viewName).getViewData(), viewData);
 
         assertTrue(metadata.listViews(SESSION, viewName.getSchemaName()).contains(viewName));
     }

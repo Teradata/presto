@@ -13,10 +13,11 @@
  */
 package com.facebook.presto.orc.stream;
 
-import com.facebook.presto.orc.Vector;
 import com.facebook.presto.orc.checkpoint.LongStreamCheckpoint;
 import com.facebook.presto.orc.checkpoint.LongStreamDwrfCheckpoint;
 import com.facebook.presto.orc.metadata.OrcType.OrcTypeKind;
+import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.type.Type;
 import com.google.common.primitives.Ints;
 
 import java.io.IOException;
@@ -55,11 +56,11 @@ public class LongStreamDwrf
     }
 
     @Override
-    public void skip(int items)
+    public void skip(long items)
             throws IOException
     {
         // there is no fast way to skip values
-        for (int i = 0; i < items; i++) {
+        for (long i = 0; i < items; i++) {
             next();
         }
     }
@@ -87,7 +88,6 @@ public class LongStreamDwrf
             throws IOException
     {
         checkPositionIndex(items, vector.length);
-        checkPositionIndex(items, Vector.MAX_VECTOR_LENGTH);
 
         for (int i = 0; i < items; i++) {
             vector[i] = Ints.checkedCast(next());
@@ -123,6 +123,29 @@ public class LongStreamDwrf
         for (int i = 0; i < items; i++) {
             if (!isNull[i]) {
                 vector[i] = next();
+            }
+        }
+    }
+
+    @Override
+    public void nextLongVector(Type type, int items, BlockBuilder builder)
+            throws IOException
+    {
+        for (int i = 0; i < items; i++) {
+            type.writeLong(builder, next());
+        }
+    }
+
+    @Override
+    public void nextLongVector(Type type, int items, BlockBuilder builder, boolean[] isNull)
+            throws IOException
+    {
+        for (int i = 0; i < items; i++) {
+            if (isNull[i]) {
+                builder.appendNull();
+            }
+            else {
+                type.writeLong(builder, next());
             }
         }
     }

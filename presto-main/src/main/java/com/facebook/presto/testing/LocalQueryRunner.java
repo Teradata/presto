@@ -37,6 +37,7 @@ import com.facebook.presto.metadata.HandleResolver;
 import com.facebook.presto.metadata.InMemoryNodeManager;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.MetadataManager;
+import com.facebook.presto.metadata.MetadataUtil;
 import com.facebook.presto.metadata.QualifiedTableName;
 import com.facebook.presto.metadata.QualifiedTablePrefix;
 import com.facebook.presto.metadata.SessionPropertyManager;
@@ -128,11 +129,11 @@ import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.sql.testing.TreeAssertions.assertFormattedSql;
 import static com.facebook.presto.testing.TestingTaskContext.createTaskContext;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.json.JsonCodec.jsonCodec;
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 
 public class LocalQueryRunner
@@ -162,7 +163,7 @@ public class LocalQueryRunner
 
     public LocalQueryRunner(Session defaultSession)
     {
-        checkNotNull(defaultSession, "defaultSession is null");
+        requireNonNull(defaultSession, "defaultSession is null");
         this.executor = newCachedThreadPool(daemonThreadsNamed("local-query-runner-%s"));
 
         this.sqlParser = new SqlParser();
@@ -316,7 +317,7 @@ public class LocalQueryRunner
         @Override
         public OperatorFactory createOutputOperator(int operatorId, List<Type> sourceTypes)
         {
-            checkNotNull(sourceTypes, "sourceType is null");
+            requireNonNull(sourceTypes, "sourceType is null");
 
             return new OperatorFactory()
             {
@@ -364,8 +365,7 @@ public class LocalQueryRunner
     {
         lock.readLock().lock();
         try {
-            QualifiedTableName name = new QualifiedTableName(session.getCatalog(), session.getSchema(), table);
-            return getMetadata().getTableHandle(session, name).isPresent();
+            return MetadataUtil.tableExists(getMetadata(), session, table);
         }
         finally {
             lock.readLock().unlock();
@@ -529,8 +529,11 @@ public class LocalQueryRunner
             String tableName,
             String... columnNames)
     {
+        checkArgument(session.getCatalog().isPresent(), "catalog not set");
+        checkArgument(session.getSchema().isPresent(), "schema not set");
+
         // look up the table
-        QualifiedTableName qualifiedTableName = new QualifiedTableName(session.getCatalog(), session.getSchema(), tableName);
+        QualifiedTableName qualifiedTableName = new QualifiedTableName(session.getCatalog().get(), session.getSchema().get(), tableName);
         TableHandle tableHandle = metadata.getTableHandle(session, qualifiedTableName).orElse(null);
         checkArgument(tableHandle != null, "Table %s does not exist", qualifiedTableName);
 

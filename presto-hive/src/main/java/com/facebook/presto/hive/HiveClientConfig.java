@@ -57,8 +57,10 @@ public class HiveClientConfig
     private int domainCompactionThreshold = 100;
     private boolean forceLocalScheduling;
     private boolean recursiveDirWalkerEnabled;
+    private boolean allowAddColumn;
     private boolean allowDropTable;
     private boolean allowRenameTable;
+    private boolean allowRenameColumn;
 
     private boolean allowCorruptWritesForTesting;
 
@@ -95,6 +97,9 @@ public class HiveClientConfig
     private List<String> resourceConfigFiles;
 
     private boolean optimizedReaderEnabled = true;
+    private boolean parquetOptimizedReaderEnabled;
+
+    private boolean parquetPredicatePushdownEnabled;
 
     private boolean assumeCanonicalPartitionKeys;
 
@@ -237,6 +242,19 @@ public class HiveClientConfig
         return this;
     }
 
+    public boolean getAllowRenameColumn()
+    {
+        return this.allowRenameColumn;
+    }
+
+    @Config("hive.allow-rename-column")
+    @ConfigDescription("Allow hive connector to rename column")
+    public HiveClientConfig setAllowRenameColumn(boolean allowRenameColumn)
+    {
+        this.allowRenameColumn = allowRenameColumn;
+        return this;
+    }
+
     @Deprecated
     public boolean getAllowCorruptWritesForTesting()
     {
@@ -249,6 +267,19 @@ public class HiveClientConfig
     public HiveClientConfig setAllowCorruptWritesForTesting(boolean allowCorruptWritesForTesting)
     {
         this.allowCorruptWritesForTesting = allowCorruptWritesForTesting;
+        return this;
+    }
+
+    public boolean getAllowAddColumn()
+    {
+        return this.allowAddColumn;
+    }
+
+    @Config("hive.allow-add-column")
+    @ConfigDescription("Allow Hive connector to add column")
+    public HiveClientConfig setAllowAddColumn(boolean allowAddColumn)
+    {
+        this.allowAddColumn = allowAddColumn;
         return this;
     }
 
@@ -649,6 +680,34 @@ public class HiveClientConfig
     public HiveClientConfig setOptimizedReaderEnabled(boolean optimizedReaderEnabled)
     {
         this.optimizedReaderEnabled = optimizedReaderEnabled;
+        return this;
+    }
+
+    @Deprecated
+    public boolean isParquetPredicatePushdownEnabled()
+    {
+        return parquetPredicatePushdownEnabled;
+    }
+
+    @Deprecated
+    @Config("hive.parquet-predicate-pushdown.enabled")
+    public HiveClientConfig setParquetPredicatePushdownEnabled(boolean parquetPredicatePushdownEnabled)
+    {
+        this.parquetPredicatePushdownEnabled = parquetPredicatePushdownEnabled;
+        return this;
+    }
+
+    @Deprecated
+    public boolean isParquetOptimizedReaderEnabled()
+    {
+        return parquetOptimizedReaderEnabled;
+    }
+
+    @Deprecated
+    @Config("hive.parquet-optimized-reader.enabled")
+    public HiveClientConfig setParquetOptimizedReaderEnabled(boolean parquetOptimizedReaderEnabled)
+    {
+        this.parquetOptimizedReaderEnabled = parquetOptimizedReaderEnabled;
         return this;
     }
 

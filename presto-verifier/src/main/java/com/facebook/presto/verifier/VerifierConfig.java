@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 public class VerifierConfig
 {
@@ -69,6 +69,7 @@ public class VerifierConfig
     private String additionalJdbcDriverPath;
     private String testJdbcDriverName;
     private String controlJdbcDriverName;
+    private int doublePrecision = 3;
 
     @NotNull
     public String getSkipCorrectnessRegex()
@@ -317,7 +318,7 @@ public class VerifierConfig
     @Config("event-client")
     public VerifierConfig setEventClients(String eventClients)
     {
-        checkNotNull(eventClients, "eventClients is null");
+        requireNonNull(eventClients, "eventClients is null");
         ImmutableSet.Builder<String> builder = ImmutableSet.builder();
         for (String value : Splitter.on(',').trimResults().omitEmptyStrings().split(eventClients)) {
             builder.add(value);
@@ -571,6 +572,19 @@ public class VerifierConfig
     public VerifierConfig setControlJdbcDriverName(String controlJdbcDriverName)
     {
         this.controlJdbcDriverName = controlJdbcDriverName;
+        return this;
+    }
+
+    public int getDoublePrecision()
+    {
+        return doublePrecision;
+    }
+
+    @ConfigDescription("The expected precision when comparing test and control results")
+    @Config("expected-double-precision")
+    public VerifierConfig setDoublePrecision(int doublePrecision)
+    {
+        this.doublePrecision = doublePrecision;
         return this;
     }
 }

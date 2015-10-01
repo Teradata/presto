@@ -225,6 +225,22 @@ public abstract class AbstractTestDistributedQueries
     }
 
     @Test
+    public void testAddColumn()
+            throws Exception
+    {
+        assertQueryTrue("CREATE TABLE test_add_column AS SELECT 123 x");
+
+        assertQueryTrue("ALTER TABLE test_add_column ADD COLUMN (a bigint, b double)");
+        MaterializedResult materializedRows = computeActual("SELECT x, a, b FROM test_add_column");
+        assertEquals(getOnlyElement(materializedRows.getMaterializedRows()).getField(0), 123L);
+        assertEquals(getOnlyElement(materializedRows.getMaterializedRows()).getField(1), null);
+        assertEquals(getOnlyElement(materializedRows.getMaterializedRows()).getField(2), null);
+
+        assertQueryTrue("DROP TABLE test_add_column");
+        assertFalse(queryRunner.tableExists(getSession(), "test_add_column"));
+    }
+
+    @Test
     public void testInsert()
             throws Exception
     {
@@ -366,7 +382,7 @@ public abstract class AbstractTestDistributedQueries
 
         assertQuery("WITH orders AS (SELECT * FROM orders LIMIT 0) SELECT * FROM test_view", query);
 
-        String name = format("%s.%s.test_view", getSession().getCatalog(), getSession().getSchema());
+        String name = format("%s.%s.test_view", getSession().getCatalog().get(), getSession().getSchema().get());
         assertQuery("SELECT * FROM " + name, query);
 
         assertQueryTrue("DROP VIEW test_view");
@@ -382,7 +398,7 @@ public abstract class AbstractTestDistributedQueries
         // test INFORMATION_SCHEMA.TABLES
         MaterializedResult actual = computeActual(format(
                 "SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = '%s'",
-                getSession().getSchema()));
+                getSession().getSchema().get()));
 
         MaterializedResult expected = resultBuilder(getSession(), actual.getTypes())
                 .row("customer", "BASE TABLE")
@@ -412,7 +428,7 @@ public abstract class AbstractTestDistributedQueries
         // test INFORMATION_SCHEMA.VIEWS
         actual = computeActual(format(
                 "SELECT table_name, view_definition FROM information_schema.views WHERE table_schema = '%s'",
-                getSession().getSchema()));
+                getSession().getSchema().get()));
 
         expected = resultBuilder(getSession(), actual.getTypes())
                 .row("meta_test_view", formatSql(new SqlParser().createStatement(query)))

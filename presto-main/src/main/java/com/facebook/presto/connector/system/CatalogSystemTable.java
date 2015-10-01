@@ -28,8 +28,9 @@ import javax.inject.Inject;
 import java.util.Map;
 
 import static com.facebook.presto.metadata.MetadataUtil.TableMetadataBuilder.tableMetadataBuilder;
+import static com.facebook.presto.spi.SystemTable.Distribution.SINGLE_COORDINATOR;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 public class CatalogSystemTable
         implements SystemTable
@@ -45,13 +46,13 @@ public class CatalogSystemTable
     @Inject
     public CatalogSystemTable(Metadata metadata)
     {
-        this.metadata = checkNotNull(metadata);
+        this.metadata = requireNonNull(metadata);
     }
 
     @Override
-    public boolean isDistributed()
+    public Distribution getDistribution()
     {
-        return false;
+        return SINGLE_COORDINATOR;
     }
 
     @Override

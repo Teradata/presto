@@ -25,6 +25,7 @@ import com.facebook.presto.testing.MaterializedRow;
 import com.facebook.presto.testing.QueryRunner;
 import com.facebook.presto.type.TypeRegistry;
 import com.facebook.presto.util.DateTimeZoneIndex;
+import com.google.common.base.Joiner;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -73,6 +74,7 @@ import static com.google.common.collect.Iterables.transform;
 import static io.airlift.tpch.TpchTable.ORDERS;
 import static io.airlift.tpch.TpchTable.tableNameGetter;
 import static java.lang.String.format;
+import static java.util.stream.IntStream.range;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
@@ -1166,6 +1168,12 @@ public abstract class AbstractTestQueries
             throws Exception
     {
         assertQuery("SELECT COUNT(*) FROM lineitem JOIN orders ON lineitem.orderkey = orders.orderkey");
+        assertQuery("" +
+                "SELECT COUNT(*) FROM " +
+                "(SELECT orderkey FROM lineitem WHERE orderkey < 1000) a " +
+                "JOIN " +
+                "(SELECT orderkey FROM orders WHERE orderkey < 2000) b " +
+                "ON NOT (a.orderkey <= b.orderkey)");
     }
 
     @Test
@@ -3126,8 +3134,12 @@ public abstract class AbstractTestQueries
             throws Exception
     {
         assertQuery("SELECT orderkey FROM orders WHERE orderkey IN (1, 2, 3)");
-        assertQuery("SELECT orderkey FROM orders WHERE orderkey IN (1.5, 2.3)");
+        assertQuery("SELECT orderkey FROM orders WHERE orderkey IN (1.5, 2.3)", "SELECT orderkey FROM orders LIMIT 0"); // H2 incorrectly matches rows
+        assertQuery("SELECT orderkey FROM orders WHERE orderkey IN (1, 2.0, 3)");
         assertQuery("SELECT orderkey FROM orders WHERE totalprice IN (1, 2, 3)");
+
+        String list =  Joiner.on(',').join(range(0, 20_000).boxed().iterator());
+        assertQuery("SELECT orderkey FROM orders WHERE orderkey IN (" + list + ")");
     }
 
     @Test
@@ -3334,7 +3346,7 @@ public abstract class AbstractTestQueries
     {
         MaterializedResult result = computeActual("SHOW CATALOGS");
         Set<String> catalogNames = ImmutableSet.copyOf(transform(result.getMaterializedRows(), onlyColumnGetter()));
-        assertTrue(catalogNames.contains(getSession().getCatalog()));
+        assertTrue(catalogNames.contains(getSession().getCatalog().get()));
     }
 
     @Test
@@ -3343,16 +3355,16 @@ public abstract class AbstractTestQueries
     {
         MaterializedResult result = computeActual("SHOW SCHEMAS");
         ImmutableSet<String> schemaNames = ImmutableSet.copyOf(transform(result.getMaterializedRows(), onlyColumnGetter()));
-        assertTrue(schemaNames.containsAll(ImmutableSet.of(getSession().getSchema(), INFORMATION_SCHEMA)));
+        assertTrue(schemaNames.containsAll(ImmutableSet.of(getSession().getSchema().get(), INFORMATION_SCHEMA)));
     }
 
     @Test
     public void testShowSchemasFrom()
             throws Exception
     {
-        MaterializedResult result = computeActual(format("SHOW SCHEMAS FROM %s", getSession().getCatalog()));
+        MaterializedResult result = computeActual(format("SHOW SCHEMAS FROM %s", getSession().getCatalog().get()));
         ImmutableSet<String> schemaNames = ImmutableSet.copyOf(transform(result.getMaterializedRows(), onlyColumnGetter()));
-        assertTrue(schemaNames.containsAll(ImmutableSet.of(getSession().getSchema(), INFORMATION_SCHEMA)));
+        assertTrue(schemaNames.containsAll(ImmutableSet.of(getSession().getSchema().get(), INFORMATION_SCHEMA)));
     }
 
     @Test
@@ -3372,11 +3384,14 @@ public abstract class AbstractTestQueries
     {
         Set<String> expectedTables = ImmutableSet.copyOf(transform(TpchTable.getTables(), tableNameGetter()));
 
-        MaterializedResult result = computeActual("SHOW TABLES FROM " + getSession().getSchema());
+        String catalog = getSession().getCatalog().get();
+        String schema = getSession().getSchema().get();
+
+        MaterializedResult result = computeActual("SHOW TABLES FROM " + schema);
         Set<String> tableNames = ImmutableSet.copyOf(transform(result.getMaterializedRows(), onlyColumnGetter()));
         assertTrue(tableNames.containsAll(expectedTables));
 
-        result = computeActual("SHOW TABLES FROM " + getSession().getCatalog() + "." + getSession().getSchema());
+        result = computeActual("SHOW TABLES FROM " + catalog + "." + schema);
         tableNames = ImmutableSet.copyOf(transform(result.getMaterializedRows(), onlyColumnGetter()));
         assertTrue(tableNames.containsAll(expectedTables));
 
@@ -3707,7 +3722,8 @@ public abstract class AbstractTestQueries
     {
         assertQuery("VALUES 1 UNION ALL VALUES 1.0, 2", "SELECT * FROM (VALUES 1) UNION ALL SELECT * FROM (VALUES 1.0, 2)");
         assertQuery("(VALUES 1) UNION ALL (VALUES 1.0, 2)", "SELECT * FROM (VALUES 1) UNION ALL SELECT * FROM (VALUES 1.0, 2)");
-        assertQuery("SELECT 0, 0 UNION ALL SELECT 1.0, 0");
+        assertQuery("SELECT 0, 0 UNION ALL SELECT 1.0, 0"); // This test case generates a RelationPlan whose .outputSymbols is different .root.outputSymbols
+        assertQuery("SELECT 0, 0, 0, 0 UNION ALL SELECT 0.0, 0.0, 0, 0"); // This test case generates a RelationPlan where multiple positions share the same symbol
         assertQuery("SELECT * FROM (VALUES 1) UNION ALL SELECT * FROM (VALUES 1.0, 2)");
 
         assertQuery("SELECT * FROM (VALUES 1) UNION SELECT * FROM (VALUES 1.0, 2)", "VALUES 1.0, 2.0"); // H2 produces incorrect result for the original query: 1.0 1.0 2.0

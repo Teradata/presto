@@ -32,12 +32,14 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static io.airlift.slice.SizeOf.SIZE_OF_BYTE;
 import static java.lang.Math.min;
+import static java.util.Objects.requireNonNull;
 
 public class OrcReader
 {
+    public static final int MAX_BATCH_SIZE = 1024;
+
     private static final Logger log = Logger.get(OrcReader.class);
 
     private static final Slice MAGIC = Slices.utf8Slice("ORC");
@@ -56,8 +58,8 @@ public class OrcReader
     public OrcReader(OrcDataSource orcDataSource, MetadataReader metadataReader)
             throws IOException
     {
-        this.orcDataSource = checkNotNull(orcDataSource, "orcDataSource is null");
-        this.metadataReader = checkNotNull(metadataReader, "metadataReader is null");
+        this.orcDataSource = requireNonNull(orcDataSource, "orcDataSource is null");
+        this.metadataReader = requireNonNull(metadataReader, "metadataReader is null");
 
         //
         // Read the file tail:
@@ -169,8 +171,8 @@ public class OrcReader
             throws IOException
     {
         return new OrcRecordReader(
-                checkNotNull(includedColumns, "includedColumns is null"),
-                checkNotNull(predicate, "predicate is null"),
+                requireNonNull(includedColumns, "includedColumns is null"),
+                requireNonNull(predicate, "predicate is null"),
                 footer.getNumberOfRows(),
                 footer.getStripes(),
                 footer.getFileStats(),
@@ -182,7 +184,7 @@ public class OrcReader
                 compressionKind,
                 bufferSize,
                 footer.getRowsInRowGroup(),
-                checkNotNull(hiveStorageTimeZone, "hiveStorageTimeZone is null"),
+                requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null"),
                 metadataReader);
     }
 

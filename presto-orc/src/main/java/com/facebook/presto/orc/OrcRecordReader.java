@@ -24,6 +24,7 @@ import com.facebook.presto.orc.metadata.StripeStatistics;
 import com.facebook.presto.orc.reader.StreamReader;
 import com.facebook.presto.orc.reader.StreamReaders;
 import com.facebook.presto.orc.stream.StreamSources;
+import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -41,8 +42,8 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.Comparator.comparingLong;
+import static java.util.Objects.requireNonNull;
 
 public class OrcRecordReader
 {
@@ -87,14 +88,14 @@ public class OrcRecordReader
             MetadataReader metadataReader)
             throws IOException
     {
-        checkNotNull(includedColumns, "includedColumns is null");
-        checkNotNull(predicate, "predicate is null");
-        checkNotNull(fileStripes, "fileStripes is null");
-        checkNotNull(stripeStats, "stripeStats is null");
-        checkNotNull(orcDataSource, "orcDataSource is null");
-        checkNotNull(types, "types is null");
-        checkNotNull(compressionKind, "compressionKind is null");
-        checkNotNull(hiveStorageTimeZone, "hiveStorageTimeZone is null");
+        requireNonNull(includedColumns, "includedColumns is null");
+        requireNonNull(predicate, "predicate is null");
+        requireNonNull(fileStripes, "fileStripes is null");
+        requireNonNull(stripeStats, "stripeStats is null");
+        requireNonNull(orcDataSource, "orcDataSource is null");
+        requireNonNull(types, "types is null");
+        requireNonNull(compressionKind, "compressionKind is null");
+        requireNonNull(hiveStorageTimeZone, "hiveStorageTimeZone is null");
 
         // reduce the included columns to the set that is also present
         ImmutableSet.Builder<Integer> presentColumns = ImmutableSet.builder();
@@ -262,7 +263,7 @@ public class OrcRecordReader
             }
         }
 
-        currentBatchSize = Ints.checkedCast(Math.min(Vector.MAX_VECTOR_LENGTH, currentGroupRowCount - nextRowInGroup));
+        currentBatchSize = Ints.checkedCast(Math.min(OrcReader.MAX_BATCH_SIZE, currentGroupRowCount - nextRowInGroup));
 
         for (StreamReader column : streamReaders) {
             if (column != null) {
@@ -273,16 +274,10 @@ public class OrcRecordReader
         return currentBatchSize;
     }
 
-    public void readVector(int columnIndex, Object vector)
+    public Block readBlock(Type type, int columnIndex)
             throws IOException
     {
-        streamReaders[columnIndex].readBatch(vector);
-    }
-
-    public void readVector(Type type, int columnIndex, Object vector)
-            throws IOException
-    {
-        streamReaders[columnIndex].readBatch(type, vector);
+        return streamReaders[columnIndex].readBlock(type);
     }
 
     public StreamReader getStreamReader(int index)
@@ -365,7 +360,7 @@ public class OrcRecordReader
         for (int columnId = 0; columnId < rowType.getFieldCount(); columnId++) {
             if (includedColumns.containsKey(columnId)) {
                 StreamDescriptor streamDescriptor = streamDescriptors.get(columnId);
-                streamReaders[columnId] = StreamReaders.createStreamReader(streamDescriptor, includedColumns.get(columnId), hiveStorageTimeZone);
+                streamReaders[columnId] = StreamReaders.createStreamReader(streamDescriptor, hiveStorageTimeZone);
             }
         }
         return streamReaders;
@@ -397,9 +392,9 @@ public class OrcRecordReader
 
     private static Map<Integer, ColumnStatistics> getStatisticsByColumnOrdinal(OrcType rootStructType, List<ColumnStatistics> fileStats)
     {
-        checkNotNull(rootStructType, "rootStructType is null");
+        requireNonNull(rootStructType, "rootStructType is null");
         checkArgument(rootStructType.getOrcTypeKind() == OrcTypeKind.STRUCT);
-        checkNotNull(fileStats, "fileStats is null");
+        requireNonNull(fileStats, "fileStats is null");
 
         ImmutableMap.Builder<Integer, ColumnStatistics> statistics = ImmutableMap.builder();
         for (int ordinal = 0; ordinal < rootStructType.getFieldCount(); ordinal++) {
@@ -418,8 +413,8 @@ public class OrcRecordReader
 
         public StripeInfo(StripeInformation stripe, Optional<StripeStatistics> stats)
         {
-            this.stripe = checkNotNull(stripe, "stripe is null");
-            this.stats = checkNotNull(stats, "metadata is null");
+            this.stripe = requireNonNull(stripe, "stripe is null");
+            this.stats = requireNonNull(stats, "metadata is null");
         }
 
         public StripeInformation getStripe()

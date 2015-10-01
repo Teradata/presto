@@ -19,7 +19,7 @@ import java.io.IOException;
 
 import static com.facebook.presto.orc.stream.OrcStreamUtils.readFully;
 import static com.facebook.presto.orc.stream.OrcStreamUtils.skipFully;
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 public class ByteArrayStream
         implements ValueStream<ByteArrayStreamCheckpoint>
@@ -28,7 +28,7 @@ public class ByteArrayStream
 
     public ByteArrayStream(OrcInputStream inputStream)
     {
-        this.inputStream = checkNotNull(inputStream, "inputStream is null");
+        this.inputStream = requireNonNull(inputStream, "inputStream is null");
     }
 
     public byte[] next(int length)
@@ -59,7 +59,7 @@ public class ByteArrayStream
     }
 
     @Override
-    public void skip(int skipSize)
+    public void skip(long skipSize)
             throws IOException
     {
         skipFully(inputStream, skipSize);

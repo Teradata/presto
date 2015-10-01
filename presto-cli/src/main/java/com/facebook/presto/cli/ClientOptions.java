@@ -33,9 +33,9 @@ import java.util.Optional;
 import java.util.TimeZone;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static java.nio.charset.StandardCharsets.US_ASCII;
 import static java.util.Locale.ENGLISH;
+import static java.util.Objects.requireNonNull;
 
 public class ClientOptions
 {
@@ -73,10 +73,10 @@ public class ClientOptions
     public String source = "presto-cli";
 
     @Option(name = "--catalog", title = "catalog", description = "Default catalog")
-    public String catalog = "default";
+    public String catalog;
 
     @Option(name = "--schema", title = "schema", description = "Default schema")
-    public String schema = "default";
+    public String schema;
 
     @Option(name = {"-f", "--file"}, title = "file", description = "Execute statements from file and exit")
     public String file;
@@ -209,9 +209,9 @@ public class ClientOptions
 
         public ClientSessionProperty(Optional<String> catalog, String name, String value)
         {
-            this.catalog = checkNotNull(catalog, "catalog is null");
-            this.name = checkNotNull(name, "name is null");
-            this.value = checkNotNull(value, "value is null");
+            this.catalog = requireNonNull(catalog, "catalog is null");
+            this.name = requireNonNull(name, "name is null");
+            this.value = requireNonNull(value, "value is null");
 
             verifyProperty(catalog, name, value);
         }

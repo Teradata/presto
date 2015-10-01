@@ -15,13 +15,15 @@ package com.facebook.presto.operator.aggregation;
 
 import com.facebook.presto.metadata.MetadataManager;
 import com.facebook.presto.metadata.Signature;
-import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
+import com.google.common.collect.ImmutableList;
 import org.testng.annotations.Test;
 
+import java.util.Arrays;
 import java.util.Set;
 
+import static com.facebook.presto.block.BlockAssertions.createArrayBigintBlock;
 import static com.facebook.presto.block.BlockAssertions.createBooleansBlock;
 import static com.facebook.presto.block.BlockAssertions.createDoublesBlock;
 import static com.facebook.presto.block.BlockAssertions.createLongsBlock;
@@ -53,8 +55,7 @@ public class TestArbitraryAggregation
                 booleanAgg,
                 1.0,
                 null,
-                createPage(
-                        new Boolean[] {null}));
+                createBooleansBlock((Boolean) null));
     }
 
     @Test
@@ -66,8 +67,7 @@ public class TestArbitraryAggregation
                 booleanAgg,
                 1.0,
                 true,
-                createPage(
-                        new Boolean[] {true, true}));
+                createBooleansBlock(true, true));
     }
 
     @Test
@@ -79,8 +79,7 @@ public class TestArbitraryAggregation
                 longAgg,
                 1.0,
                 null,
-                createPage(
-                        new Long[] {null, null}));
+                createLongsBlock(null, null));
     }
 
     @Test
@@ -92,8 +91,7 @@ public class TestArbitraryAggregation
                 longAgg,
                 1.0,
                 1L,
-                createPage(
-                        new Long[] {1L , null}));
+                createLongsBlock(1L , null));
     }
 
     @Test
@@ -105,8 +103,7 @@ public class TestArbitraryAggregation
                 doubleAgg,
                 1.0,
                 null,
-                createPage(
-                        new Double[] {null, null}));
+                createDoublesBlock(null, null));
     }
 
     @Test
@@ -118,8 +115,7 @@ public class TestArbitraryAggregation
                 doubleAgg,
                 1.0,
                 2.0,
-                createPage(
-                        new Double[] {null, 2.0}));
+                createDoublesBlock(null, 2.0));
     }
 
     @Test
@@ -131,8 +127,7 @@ public class TestArbitraryAggregation
                 stringAgg,
                 1.0,
                 null,
-                createPage(
-                        new String[] {null, null}));
+                createStringsBlock(null, null));
     }
 
     @Test
@@ -144,27 +139,30 @@ public class TestArbitraryAggregation
                 stringAgg,
                 1.0,
                 "a",
-                createPage(
-                        new String[] {"a", "a"}));
+                createStringsBlock("a", "a"));
     }
 
-    private static Page createPage(Boolean[] values)
+    @Test
+    public void testNullArray()
+            throws Exception
     {
-        return new Page(createBooleansBlock(values));
+        InternalAggregationFunction arrayAgg = metadata.getExactFunction(new Signature("arbitrary", "array<bigint>", "array<bigint>")).getAggregationFunction();
+        assertAggregation(
+                arrayAgg,
+                1.0,
+                null,
+                createArrayBigintBlock(Arrays.asList(null, null, null, null)));
     }
 
-    private static Page createPage(Long[] values)
+    @Test
+    public void testValidArray()
+            throws Exception
     {
-        return new Page(createLongsBlock(values));
-    }
-
-    private static Page createPage(Double[] values)
-    {
-        return new Page(createDoublesBlock(values));
-    }
-
-    private static Page createPage(String[] values)
-    {
-        return new Page(createStringsBlock(values));
+        InternalAggregationFunction arrayAgg = metadata.getExactFunction(new Signature("arbitrary", "array<bigint>", "array<bigint>")).getAggregationFunction();
+        assertAggregation(
+                arrayAgg,
+                1.0,
+                ImmutableList.of(23L, 45L),
+                createArrayBigintBlock(ImmutableList.of(ImmutableList.of(23L, 45L), ImmutableList.of(23L, 45L), ImmutableList.of(23L, 45L), ImmutableList.of(23L, 45L))));
     }
 }

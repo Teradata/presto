@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.orc.reader;
 
-import com.facebook.presto.orc.LongVector;
 import com.facebook.presto.orc.OrcCorruptionException;
 import com.facebook.presto.orc.StreamDescriptor;
 import com.facebook.presto.orc.metadata.ColumnEncoding;
@@ -21,20 +20,22 @@ import com.facebook.presto.orc.stream.BooleanStream;
 import com.facebook.presto.orc.stream.ByteStream;
 import com.facebook.presto.orc.stream.StreamSource;
 import com.facebook.presto.orc.stream.StreamSources;
+import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.block.BlockBuilderStatus;
+import com.facebook.presto.spi.type.Type;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import java.io.IOException;
-import java.util.Arrays;
 import java.util.List;
 
 import static com.facebook.presto.orc.metadata.Stream.StreamKind.DATA;
 import static com.facebook.presto.orc.metadata.Stream.StreamKind.PRESENT;
-import static com.facebook.presto.orc.reader.OrcReaderUtils.castOrcVector;
 import static com.facebook.presto.orc.stream.MissingStreamSource.missingStreamSource;
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 public class ByteStreamReader
         implements StreamReader
@@ -48,6 +49,7 @@ public class ByteStreamReader
     private StreamSource<BooleanStream> presentStreamSource = missingStreamSource(BooleanStream.class);
     @Nullable
     private BooleanStream presentStream;
+    private boolean[] nullVector = new boolean[0];
 
     @Nonnull
     private StreamSource<ByteStream> dataStreamSource = missingStreamSource(ByteStream.class);
@@ -58,7 +60,7 @@ public class ByteStreamReader
 
     public ByteStreamReader(StreamDescriptor streamDescriptor)
     {
-        this.streamDescriptor = checkNotNull(streamDescriptor, "stream is null");
+        this.streamDescriptor = requireNonNull(streamDescriptor, "stream is null");
     }
 
     @Override
@@ -69,7 +71,7 @@ public class ByteStreamReader
     }
 
     @Override
-    public void readBatch(Object vector)
+    public Block readBlock(Type type)
             throws IOException
     {
         if (!rowGroupOpen) {
@@ -90,26 +92,35 @@ public class ByteStreamReader
             }
         }
 
-        LongVector byteVector = castOrcVector(vector, LongVector.class);
+        BlockBuilder builder = type.createBlockBuilder(new BlockBuilderStatus(), nextBatchSize);
         if (presentStream == null) {
             if (dataStream == null) {
                 throw new OrcCorruptionException("Value is not null but data stream is not present");
             }
-            Arrays.fill(byteVector.isNull, false);
-            dataStream.nextVector(nextBatchSize, byteVector.vector);
+            dataStream.nextVector(type, nextBatchSize, builder);
         }
         else {
-            int nullValues = presentStream.getUnsetBits(nextBatchSize, byteVector.isNull);
+            if (nullVector.length < nextBatchSize) {
+                nullVector = new boolean[nextBatchSize];
+            }
+            int nullValues = presentStream.getUnsetBits(nextBatchSize, nullVector);
             if (nullValues != nextBatchSize) {
                 if (dataStream == null) {
                     throw new OrcCorruptionException("Value is not null but data stream is not present");
                 }
-                dataStream.nextVector(nextBatchSize, byteVector.vector, byteVector.isNull);
+                dataStream.nextVector(type, nextBatchSize, builder, nullVector);
+            }
+            else {
+                for (int i = 0; i < nextBatchSize; i++) {
+                    builder.appendNull();
+                }
             }
         }
 
         readOffset = 0;
         nextBatchSize = 0;
+
+        return builder.build();
     }
 
     private void openRowGroup()

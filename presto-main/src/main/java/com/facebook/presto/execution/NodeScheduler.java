@@ -17,6 +17,7 @@ import com.facebook.presto.metadata.Split;
 import com.facebook.presto.spi.HostAddress;
 import com.facebook.presto.spi.Node;
 import com.facebook.presto.spi.NodeManager;
+import com.facebook.presto.spi.PrestoException;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.HashMultimap;
@@ -25,6 +26,7 @@ import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
 import com.google.common.net.InetAddresses;
+import io.airlift.log.Logger;
 import org.weakref.jmx.Managed;
 
 import javax.inject.Inject;
@@ -43,14 +45,15 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.facebook.presto.spi.StandardErrorCode.NO_NODES_AVAILABLE;
-import static com.facebook.presto.util.Failures.checkCondition;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
+import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 public class NodeScheduler
 {
-    private final String coordinatorNodeId;
+    private static final Logger log = Logger.get(NodeScheduler.class);
+
     private final NodeManager nodeManager;
     private final AtomicLong scheduleLocal = new AtomicLong();
     private final AtomicLong scheduleRack = new AtomicLong();
@@ -67,14 +70,13 @@ public class NodeScheduler
     public NodeScheduler(NodeManager nodeManager, NodeSchedulerConfig config, NodeTaskMap nodeTaskMap)
     {
         this.nodeManager = nodeManager;
-        this.coordinatorNodeId = nodeManager.getCurrentNode().getNodeIdentifier();
         this.minCandidates = config.getMinCandidates();
         this.locationAwareScheduling = config.isLocationAwareSchedulingEnabled();
         this.includeCoordinator = config.isIncludeCoordinator();
         this.doubleScheduling = config.isMultipleTasksPerNodeEnabled();
         this.maxSplitsPerNode = config.getMaxSplitsPerNode();
         this.maxSplitsPerNodePerTaskWhenFull = config.getMaxPendingSplitsPerNodePerTask();
-        this.nodeTaskMap = checkNotNull(nodeTaskMap, "nodeTaskMap is null");
+        this.nodeTaskMap = requireNonNull(nodeTaskMap, "nodeTaskMap is null");
         checkArgument(maxSplitsPerNode > maxSplitsPerNodePerTaskWhenFull, "maxSplitsPerNode must be > maxSplitsPerNodePerTaskWhenFull");
     }
 
@@ -135,7 +137,11 @@ public class NodeScheduler
                 }
             }
 
-            return new NodeMap(byHostAndPort.build(), byHost.build(), byRack.build());
+            Set<String> coordinatorNodeIds = nodeManager.getCoordinators().stream()
+                    .map(Node::getNodeIdentifier)
+                    .collect(toImmutableSet());
+
+            return new NodeMap(byHostAndPort.build(), byHost.build(), byRack.build(), coordinatorNodeIds);
         }, 5, TimeUnit.SECONDS);
 
         return new NodeSelector(nodeMap);
@@ -226,13 +232,17 @@ public class NodeScheduler
                 randomCandidates.reset();
 
                 List<Node> candidateNodes;
+                NodeMap nodeMap = this.nodeMap.get().get();
                 if (locationAwareScheduling || !split.isRemotelyAccessible()) {
-                    candidateNodes = selectCandidateNodes(nodeMap.get().get(), split, randomCandidates);
+                    candidateNodes = selectCandidateNodes(nodeMap, split, randomCandidates);
                 }
                 else {
                     candidateNodes = selectNodes(minCandidates, randomCandidates);
                 }
-                checkCondition(!candidateNodes.isEmpty(), NO_NODES_AVAILABLE, "No nodes available to run query");
+                if (candidateNodes.isEmpty()) {
+                    log.debug("No nodes available to schedule %s. Available nodes %s", split, nodeMap.getNodesByHost().keys());
+                    throw new PrestoException(NO_NODES_AVAILABLE, "No nodes available to run query");
+                }
 
                 // compute and cache number of splits currently assigned to each node
                 // NOTE: This does not use the Stream API for performance reasons.
@@ -274,8 +284,9 @@ public class NodeScheduler
 
         private ResettableRandomizedIterator<Node> randomizedNodes()
         {
-            ImmutableList<Node> nodes = nodeMap.get().get().getNodesByHostAndPort().values().stream()
-                    .filter(node -> includeCoordinator || !coordinatorNodeId.equals(node.getNodeIdentifier()))
+            NodeMap nodeMap = this.nodeMap.get().get();
+            ImmutableList<Node> nodes = nodeMap.getNodesByHostAndPort().values().stream()
+                    .filter(node -> includeCoordinator || !nodeMap.getCoordinatorNodeIds().contains(node.getNodeIdentifier()))
                     .collect(toImmutableList());
             return new ResettableRandomizedIterator<>(nodes);
         }
@@ -283,12 +294,12 @@ public class NodeScheduler
         private List<Node> selectCandidateNodes(NodeMap nodeMap, Split split, ResettableRandomizedIterator<Node> randomizedIterator)
         {
             Set<Node> chosen = new LinkedHashSet<>(minCandidates);
-            String coordinatorIdentifier = nodeManager.getCurrentNode().getNodeIdentifier();
+            Set<String> coordinatorIds = nodeMap.getCoordinatorNodeIds();
 
             // first look for nodes that match the hint
             for (HostAddress hint : split.getAddresses()) {
                 nodeMap.getNodesByHostAndPort().get(hint).stream()
-                        .filter(node -> includeCoordinator || !coordinatorIdentifier.equals(node.getNodeIdentifier()))
+                        .filter(node -> includeCoordinator || !coordinatorIds.contains(node.getNodeIdentifier()))
                         .filter(chosen::add)
                         .forEach(node -> scheduleLocal.incrementAndGet());
 
@@ -305,7 +316,7 @@ public class NodeScheduler
                 // by all nodes in that host
                 if (!hint.hasPort() || split.isRemotelyAccessible()) {
                     nodeMap.getNodesByHost().get(address).stream()
-                            .filter(node -> includeCoordinator || !coordinatorIdentifier.equals(node.getNodeIdentifier()))
+                            .filter(node -> includeCoordinator || !coordinatorIds.contains(node.getNodeIdentifier()))
                             .filter(chosen::add)
                             .forEach(node -> scheduleLocal.incrementAndGet());
                 }
@@ -323,7 +334,7 @@ public class NodeScheduler
                         continue;
                     }
                     for (Node node : nodeMap.getNodesByRack().get(Rack.of(address))) {
-                        if (includeCoordinator || !coordinatorIdentifier.equals(node.getNodeIdentifier())) {
+                        if (includeCoordinator || !coordinatorIds.contains(node.getNodeIdentifier())) {
                             if (chosen.add(node)) {
                                 scheduleRack.incrementAndGet();
                             }
@@ -384,12 +395,17 @@ public class NodeScheduler
         private final SetMultimap<HostAddress, Node> nodesByHostAndPort;
         private final SetMultimap<InetAddress, Node> nodesByHost;
         private final SetMultimap<Rack, Node> nodesByRack;
+        private final Set<String> coordinatorNodeIds;
 
-        public NodeMap(SetMultimap<HostAddress, Node> nodesByHostAndPort, SetMultimap<InetAddress, Node> nodesByHost, SetMultimap<Rack, Node> nodesByRack)
+        public NodeMap(SetMultimap<HostAddress, Node> nodesByHostAndPort,
+                SetMultimap<InetAddress, Node> nodesByHost,
+                SetMultimap<Rack, Node> nodesByRack,
+                Set<String> coordinatorNodeIds)
         {
             this.nodesByHostAndPort = nodesByHostAndPort;
             this.nodesByHost = nodesByHost;
             this.nodesByRack = nodesByRack;
+            this.coordinatorNodeIds = coordinatorNodeIds;
         }
 
         private SetMultimap<HostAddress, Node> getNodesByHostAndPort()
@@ -405,6 +421,11 @@ public class NodeScheduler
         public SetMultimap<Rack, Node> getNodesByRack()
         {
             return nodesByRack;
+        }
+
+        public Set<String> getCoordinatorNodeIds()
+        {
+            return coordinatorNodeIds;
         }
     }
 

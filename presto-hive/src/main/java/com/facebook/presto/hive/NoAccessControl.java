@@ -19,6 +19,7 @@ import com.facebook.presto.spi.security.Identity;
 
 import javax.inject.Inject;
 
+import static com.facebook.presto.spi.security.AccessDeniedException.denyAddColumn;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyDropTable;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyRenameTable;
 import static java.util.Objects.requireNonNull;
@@ -28,6 +29,7 @@ public class NoAccessControl
 {
     private final boolean allowDropTable;
     private final boolean allowRenameTable;
+    private final boolean allowAddColumn;
 
     @Inject
     public NoAccessControl(HiveClientConfig hiveClientConfig)
@@ -35,6 +37,7 @@ public class NoAccessControl
         requireNonNull(hiveClientConfig, "hiveClientConfig is null");
         allowDropTable = hiveClientConfig.getAllowDropTable();
         allowRenameTable = hiveClientConfig.getAllowRenameTable();
+        allowAddColumn = hiveClientConfig.getAllowAddColumn();
     }
 
     @Override
@@ -56,6 +59,19 @@ public class NoAccessControl
         if (!allowRenameTable) {
             denyRenameTable(tableName.toString(), newTableName.toString());
         }
+    }
+
+    @Override
+    public void checkCanAddColumn(Identity identity, SchemaTableName tableName)
+    {
+        if (!allowAddColumn) {
+            denyAddColumn(tableName.toString());
+        }
+    }
+
+    @Override
+    public void checkCanRenameColumn(Identity identity, SchemaTableName tableName)
+    {
     }
 
     @Override
@@ -85,6 +101,16 @@ public class NoAccessControl
 
     @Override
     public void checkCanSelectFromView(Identity identity, SchemaTableName viewName)
+    {
+    }
+
+    @Override
+    public void checkCanCreateViewWithSelectFromTable(Identity identity, SchemaTableName tableName)
+    {
+    }
+
+    @Override
+    public void checkCanCreateViewWithSelectFromView(Identity identity, SchemaTableName viewName)
     {
     }
 

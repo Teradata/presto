@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.sql.parser;
 
+import com.facebook.presto.sql.tree.AddColumn;
 import com.facebook.presto.sql.tree.AllColumns;
 import com.facebook.presto.sql.tree.Approximate;
 import com.facebook.presto.sql.tree.ArithmeticBinaryExpression;
@@ -791,6 +792,13 @@ public class TestSqlParser
     }
 
     @Test
+    public void testAddColumn()
+            throws Exception
+    {
+        assertStatement("ALTER TABLE foo.t ADD COLUMN c bigint", new AddColumn(QualifiedName.of("foo", "t"), new TableElement("c", "bigint")));
+    }
+
+    @Test
     public void testCreateView()
             throws Exception
     {
@@ -917,6 +925,16 @@ public class TestSqlParser
                                 new Table(QualifiedName.of("t")),
                                 new Unnest(ImmutableList.of(new QualifiedNameReference(QualifiedName.of("a"))), true),
                                 Optional.empty())));
+    }
+
+    @Test
+    public void testNonReserved()
+            throws Exception
+    {
+        assertStatement("SELECT zone FROM t",
+                simpleQuery(
+                        selectList(new QualifiedNameReference(QualifiedName.of("zone"))),
+                        table(QualifiedName.of("t"))));
     }
 
     private static void assertCast(String type)

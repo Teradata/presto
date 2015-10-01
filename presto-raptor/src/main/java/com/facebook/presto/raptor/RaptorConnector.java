@@ -19,6 +19,7 @@ import com.facebook.presto.spi.ConnectorMetadata;
 import com.facebook.presto.spi.ConnectorPageSinkProvider;
 import com.facebook.presto.spi.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.ConnectorSplitManager;
+import com.facebook.presto.spi.SystemTable;
 import com.facebook.presto.spi.session.PropertyMetadata;
 import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.log.Logger;
@@ -26,8 +27,9 @@ import io.airlift.log.Logger;
 import javax.inject.Inject;
 
 import java.util.List;
+import java.util.Set;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 public class RaptorConnector
         implements Connector
@@ -42,6 +44,7 @@ public class RaptorConnector
     private final RaptorHandleResolver handleResolver;
     private final List<PropertyMetadata<?>> sessionProperties;
     private final List<PropertyMetadata<?>> tableProperties;
+    private final Set<SystemTable> systemTables;
 
     @Inject
     public RaptorConnector(
@@ -52,16 +55,18 @@ public class RaptorConnector
             RaptorPageSinkProvider pageSinkProvider,
             RaptorHandleResolver handleResolver,
             RaptorSessionProperties sessionProperties,
-            RaptorTableProperties tableProperties)
+            RaptorTableProperties tableProperties,
+            Set<SystemTable> systemTables)
     {
-        this.lifeCycleManager = checkNotNull(lifeCycleManager, "lifeCycleManager is null");
-        this.metadata = checkNotNull(metadata, "metadata is null");
-        this.splitManager = checkNotNull(splitManager, "splitManager is null");
-        this.pageSourceProvider = checkNotNull(pageSourceProvider, "pageSourceProvider is null");
-        this.pageSinkProvider = checkNotNull(pageSinkProvider, "pageSinkProvider is null");
-        this.handleResolver = checkNotNull(handleResolver, "handleResolver is null");
-        this.sessionProperties = checkNotNull(sessionProperties, "sessionProperties is null").getSessionProperties();
-        this.tableProperties = checkNotNull(tableProperties, "tableProperties is null").getTableProperties();
+        this.lifeCycleManager = requireNonNull(lifeCycleManager, "lifeCycleManager is null");
+        this.metadata = requireNonNull(metadata, "metadata is null");
+        this.splitManager = requireNonNull(splitManager, "splitManager is null");
+        this.pageSourceProvider = requireNonNull(pageSourceProvider, "pageSourceProvider is null");
+        this.pageSinkProvider = requireNonNull(pageSinkProvider, "pageSinkProvider is null");
+        this.handleResolver = requireNonNull(handleResolver, "handleResolver is null");
+        this.sessionProperties = requireNonNull(sessionProperties, "sessionProperties is null").getSessionProperties();
+        this.tableProperties = requireNonNull(tableProperties, "tableProperties is null").getTableProperties();
+        this.systemTables = requireNonNull(systemTables, "systemTables is null");
     }
 
     @Override
@@ -104,6 +109,12 @@ public class RaptorConnector
     public List<PropertyMetadata<?>> getTableProperties()
     {
         return tableProperties;
+    }
+
+    @Override
+    public Set<SystemTable> getSystemTables()
+    {
+        return systemTables;
     }
 
     @Override

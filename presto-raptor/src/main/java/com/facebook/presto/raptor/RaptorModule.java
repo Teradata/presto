@@ -19,19 +19,23 @@ import com.facebook.presto.raptor.metadata.ShardDelta;
 import com.facebook.presto.raptor.metadata.ShardInfo;
 import com.facebook.presto.raptor.metadata.ShardManager;
 import com.facebook.presto.raptor.metadata.TableColumn;
+import com.facebook.presto.spi.SystemTable;
 import com.facebook.presto.spi.type.TypeManager;
 import com.google.inject.Binder;
 import com.google.inject.Module;
 import com.google.inject.Provides;
 import com.google.inject.Scopes;
+import com.google.inject.TypeLiteral;
 import org.skife.jdbi.v2.DBI;
 import org.skife.jdbi.v2.IDBI;
 import org.skife.jdbi.v2.tweak.ConnectionFactory;
 
 import javax.inject.Singleton;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import java.util.Set;
+
 import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
+import static java.util.Objects.requireNonNull;
 
 public class RaptorModule
         implements Module
@@ -40,7 +44,7 @@ public class RaptorModule
 
     public RaptorModule(String connectorId)
     {
-        this.connectorId = checkNotNull(connectorId, "connectorId is null");
+        this.connectorId = requireNonNull(connectorId, "connectorId is null");
     }
 
     @Override
@@ -55,7 +59,7 @@ public class RaptorModule
         binder.bind(RaptorHandleResolver.class).in(Scopes.SINGLETON);
         binder.bind(RaptorSessionProperties.class).in(Scopes.SINGLETON);
         binder.bind(RaptorTableProperties.class).in(Scopes.SINGLETON);
-
+        binder.bind(new TypeLiteral<Set<SystemTable>>() {}).toProvider(RaptorSystemTablesFactory.class).in(Scopes.SINGLETON);
         binder.bind(ShardManager.class).to(DatabaseShardManager.class).in(Scopes.SINGLETON);
 
         jsonCodecBinder(binder).bindJsonCodec(ShardInfo.class);

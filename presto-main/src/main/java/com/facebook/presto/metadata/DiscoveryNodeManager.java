@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.metadata;
 
+import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.connector.system.SystemConnector;
 import com.facebook.presto.failureDetector.FailureDetector;
 import com.facebook.presto.spi.Node;
@@ -36,10 +37,10 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Arrays.asList;
 import static java.util.Locale.ENGLISH;
+import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
 public final class DiscoveryNodeManager
@@ -70,10 +71,10 @@ public final class DiscoveryNodeManager
     @Inject
     public DiscoveryNodeManager(@ServiceType("presto") ServiceSelector serviceSelector, NodeInfo nodeInfo, FailureDetector failureDetector, NodeVersion expectedNodeVersion)
     {
-        this.serviceSelector = checkNotNull(serviceSelector, "serviceSelector is null");
-        this.nodeInfo = checkNotNull(nodeInfo, "nodeInfo is null");
-        this.failureDetector = checkNotNull(failureDetector, "failureDetector is null");
-        this.expectedNodeVersion = checkNotNull(expectedNodeVersion, "expectedNodeVersion is null");
+        this.serviceSelector = requireNonNull(serviceSelector, "serviceSelector is null");
+        this.nodeInfo = requireNonNull(nodeInfo, "nodeInfo is null");
+        this.failureDetector = requireNonNull(failureDetector, "failureDetector is null");
+        this.expectedNodeVersion = requireNonNull(expectedNodeVersion, "expectedNodeVersion is null");
         this.currentNode = refreshNodesInternal();
     }
 

@@ -15,6 +15,7 @@ package com.facebook.presto.sql.parser;
 
 import com.facebook.presto.sql.parser.SqlBaseParser.TablePropertiesContext;
 import com.facebook.presto.sql.parser.SqlBaseParser.TablePropertyContext;
+import com.facebook.presto.sql.tree.AddColumn;
 import com.facebook.presto.sql.tree.AliasedRelation;
 import com.facebook.presto.sql.tree.AllColumns;
 import com.facebook.presto.sql.tree.Approximate;
@@ -209,6 +210,12 @@ class AstBuilder
     }
 
     @Override
+    public Node visitAddColumn(SqlBaseParser.AddColumnContext context)
+    {
+        return new AddColumn(getQualifiedName(context.qualifiedName()), (TableElement) visit(context.tableElement()));
+    }
+
+    @Override
     public Node visitCreateView(SqlBaseParser.CreateViewContext context)
     {
         return new CreateView(
@@ -379,8 +386,6 @@ class AstBuilder
                 return new ExplainFormat(ExplainFormat.Type.GRAPHVIZ);
             case SqlBaseLexer.TEXT:
                 return new ExplainFormat(ExplainFormat.Type.TEXT);
-            case SqlBaseLexer.JSON:
-                return new ExplainFormat(ExplainFormat.Type.JSON);
         }
 
         throw new IllegalArgumentException("Unsupported EXPLAIN format: " + context.value.getText());

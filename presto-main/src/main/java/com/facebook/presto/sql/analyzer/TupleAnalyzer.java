@@ -14,7 +14,6 @@
 package com.facebook.presto.sql.analyzer;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.metadata.FunctionInfo;
 import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.Metadata;
@@ -23,9 +22,12 @@ import com.facebook.presto.metadata.QualifiedTableName;
 import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.metadata.TableMetadata;
 import com.facebook.presto.metadata.ViewDefinition;
+import com.facebook.presto.security.AccessControl;
+import com.facebook.presto.security.ViewAccessControl;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeSignature;
@@ -129,8 +131,9 @@ import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
 import static com.facebook.presto.util.Types.checkType;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.Iterables.getLast;
+import static java.util.Objects.requireNonNull;
 
 public class TupleAnalyzer
         extends DefaultTraversalVisitor<TupleDescriptor, AnalysisContext>
@@ -144,10 +147,10 @@ public class TupleAnalyzer
 
     public TupleAnalyzer(Analysis analysis, Session session, Metadata metadata, SqlParser sqlParser, AccessControl accessControl, boolean experimentalSyntaxEnabled)
     {
-        checkNotNull(analysis, "analysis is null");
-        checkNotNull(session, "session is null");
-        checkNotNull(metadata, "metadata is null");
-        checkNotNull(accessControl, "accessControl is null");
+        requireNonNull(analysis, "analysis is null");
+        requireNonNull(session, "session is null");
+        requireNonNull(metadata, "metadata is null");
+        requireNonNull(accessControl, "accessControl is null");
 
         this.analysis = analysis;
         this.session = session;
@@ -207,7 +210,7 @@ public class TupleAnalyzer
             }
         }
 
-        QualifiedTableName name = MetadataUtil.createQualifiedTableName(session, table.getName());
+        QualifiedTableName name = MetadataUtil.createQualifiedTableName(session, table, table.getName());
 
         Optional<ViewDefinition> optionalView = metadata.getView(session, name);
         if (optionalView.isPresent()) {
@@ -218,7 +221,7 @@ public class TupleAnalyzer
             analysis.registerNamedQuery(table, query);
 
             accessControl.checkCanSelectFromView(session.getIdentity(), name);
-            TupleDescriptor descriptor = analyzeView(query, name, view.getCatalog(), view.getSchema(), table);
+            TupleDescriptor descriptor = analyzeView(query, name, view.getCatalog(), view.getSchema(), view.getOwner(), table);
 
             if (isViewStale(view.getColumns(), descriptor.getVisibleFields())) {
                 throw new SemanticException(VIEW_IS_STALE, table, "View '%s' is stale; it must be re-created", name);
@@ -524,6 +527,7 @@ public class TupleAnalyzer
             analysis.addCoercions(analyzer.getExpressionCoercions());
 
             for (Expression conjunct : ExpressionUtils.extractConjuncts((Expression) optimizedExpression)) {
+                conjunct = ExpressionUtils.normalize(conjunct);
                 if (!(conjunct instanceof ComparisonExpression)) {
                     throw new SemanticException(NOT_SUPPORTED, node, "Non-equi joins not supported: %s", conjunct);
                 }
@@ -897,7 +901,8 @@ public class TupleAnalyzer
 
                 Optional<String> alias = column.getAlias();
                 if (!alias.isPresent() && column.getExpression() instanceof QualifiedNameReference) {
-                    alias = Optional.of(((QualifiedNameReference) column.getExpression()).getName().getSuffix());
+                    QualifiedName name = ((QualifiedNameReference) column.getExpression()).getName();
+                    alias = Optional.of(getLast(name.getOriginalParts()));
                 }
 
                 outputFields.add(Field.newUnqualified(alias, analysis.getType(column.getExpression()))); // TODO don't use analysis as a side-channel. Use outputExpressions to look up the type
@@ -1078,15 +1083,26 @@ public class TupleAnalyzer
         }
     }
 
-    private TupleDescriptor analyzeView(Query query, QualifiedTableName name, String catalog, String schema, Table node)
+    private TupleDescriptor analyzeView(Query query, QualifiedTableName name, Optional<String> catalog, Optional<String> schema, Optional<String> owner, Table node)
     {
         try {
-            // todo use view owner access context
+            // run view as view owner if set; otherwise, run as session user
+            Identity identity;
+            AccessControl viewAccessControl;
+            if (owner.isPresent()) {
+                identity = new Identity(owner.get(), Optional.empty());
+                viewAccessControl = new ViewAccessControl(accessControl);
+            }
+            else {
+                identity = session.getIdentity();
+                viewAccessControl = accessControl;
+            }
+
             Session viewSession = Session.builder(metadata.getSessionPropertyManager())
-                    .setIdentity(session.getIdentity())
+                    .setIdentity(identity)
                     .setSource(session.getSource().orElse(null))
-                    .setCatalog(catalog)
-                    .setSchema(schema)
+                    .setCatalog(catalog.orElse(null))
+                    .setSchema(schema.orElse(null))
                     .setTimeZoneKey(session.getTimeZoneKey())
                     .setLocale(session.getLocale())
                     .setRemoteUserAddress(session.getRemoteUserAddress().orElse(null))
@@ -1094,7 +1110,7 @@ public class TupleAnalyzer
                     .setStartTime(session.getStartTime())
                     .build();
 
-            StatementAnalyzer analyzer = new StatementAnalyzer(analysis, metadata, sqlParser, accessControl, viewSession, experimentalSyntaxEnabled, Optional.empty());
+            StatementAnalyzer analyzer = new StatementAnalyzer(analysis, metadata, sqlParser, viewAccessControl, viewSession, experimentalSyntaxEnabled, Optional.empty());
             return analyzer.process(query, new AnalysisContext());
         }
         catch (RuntimeException e) {

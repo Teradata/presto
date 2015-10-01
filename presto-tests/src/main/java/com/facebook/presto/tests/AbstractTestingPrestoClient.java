@@ -18,6 +18,7 @@ import com.facebook.presto.client.Column;
 import com.facebook.presto.client.QueryError;
 import com.facebook.presto.client.QueryResults;
 import com.facebook.presto.client.StatementClient;
+import com.facebook.presto.metadata.MetadataUtil;
 import com.facebook.presto.metadata.QualifiedTableName;
 import com.facebook.presto.metadata.QualifiedTablePrefix;
 import com.facebook.presto.server.testing.TestingPrestoServer;
@@ -36,9 +37,9 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.collect.Iterables.transform;
 import static io.airlift.json.JsonCodec.jsonCodec;
+import static java.util.Objects.requireNonNull;
 
 public abstract class AbstractTestingPrestoClient<T>
         implements Closeable
@@ -53,8 +54,8 @@ public abstract class AbstractTestingPrestoClient<T>
     protected AbstractTestingPrestoClient(TestingPrestoServer prestoServer,
             Session defaultSession)
     {
-        this.prestoServer = checkNotNull(prestoServer, "prestoServer is null");
-        this.defaultSession = checkNotNull(defaultSession, "defaultSession is null");
+        this.prestoServer = requireNonNull(prestoServer, "prestoServer is null");
+        this.defaultSession = requireNonNull(defaultSession, "defaultSession is null");
 
         this.httpClient = new JettyHttpClient(
                 new HttpClientConfig()
@@ -111,8 +112,7 @@ public abstract class AbstractTestingPrestoClient<T>
 
     public boolean tableExists(Session session, String table)
     {
-        QualifiedTableName name = new QualifiedTableName(session.getCatalog(), session.getSchema(), table);
-        return prestoServer.getMetadata().getTableHandle(session, name).isPresent();
+        return MetadataUtil.tableExists(prestoServer.getMetadata(), session, table);
     }
 
     public Session getDefaultSession()

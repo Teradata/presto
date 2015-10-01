@@ -14,13 +14,13 @@
 package com.facebook.presto.event.query;
 
 import com.facebook.presto.client.FailureInfo;
+import com.facebook.presto.client.NodeVersion;
 import com.facebook.presto.execution.QueryInfo;
 import com.facebook.presto.execution.QueryStats;
 import com.facebook.presto.execution.StageInfo;
 import com.facebook.presto.execution.TaskId;
 import com.facebook.presto.execution.TaskInfo;
 import com.facebook.presto.execution.TaskState;
-import com.facebook.presto.metadata.NodeVersion;
 import com.facebook.presto.operator.DriverStats;
 import com.facebook.presto.operator.TaskStats;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -39,7 +39,7 @@ import javax.inject.Inject;
 import java.util.List;
 import java.util.Map;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 public class QueryMonitor
@@ -54,10 +54,10 @@ public class QueryMonitor
     @Inject
     public QueryMonitor(ObjectMapper objectMapper, EventClient eventClient, NodeInfo nodeInfo, NodeVersion nodeVersion)
     {
-        this.objectMapper = checkNotNull(objectMapper, "objectMapper is null");
-        this.eventClient = checkNotNull(eventClient, "eventClient is null");
-        this.environment = checkNotNull(nodeInfo, "nodeInfo is null").getEnvironment();
-        this.serverVersion = checkNotNull(nodeVersion, "nodeVersion is null").toString();
+        this.objectMapper = requireNonNull(objectMapper, "objectMapper is null");
+        this.eventClient = requireNonNull(eventClient, "eventClient is null");
+        this.environment = requireNonNull(nodeInfo, "nodeInfo is null").getEnvironment();
+        this.serverVersion = requireNonNull(nodeVersion, "nodeVersion is null").toString();
     }
 
     public void createdEvent(QueryInfo queryInfo)
@@ -69,8 +69,8 @@ public class QueryMonitor
                         queryInfo.getSession().getSource().orElse(null),
                         serverVersion,
                         environment,
-                        queryInfo.getSession().getCatalog(),
-                        queryInfo.getSession().getSchema(),
+                        queryInfo.getSession().getCatalog().orElse(null),
+                        queryInfo.getSession().getSchema().orElse(null),
                         queryInfo.getSession().getRemoteUserAddress().orElse(null),
                         queryInfo.getSession().getUserAgent().orElse(null),
                         queryInfo.getSelf(),
@@ -114,8 +114,8 @@ public class QueryMonitor
                             queryInfo.getSession().getSource().orElse(null),
                             serverVersion,
                             environment,
-                            queryInfo.getSession().getCatalog(),
-                            queryInfo.getSession().getSchema(),
+                            queryInfo.getSession().getCatalog().orElse(null),
+                            queryInfo.getSession().getSchema().orElse(null),
                             queryInfo.getSession().getRemoteUserAddress().orElse(null),
                             queryInfo.getSession().getUserAgent().orElse(null),
                             queryInfo.getState(),

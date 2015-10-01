@@ -118,6 +118,7 @@ public class TestStatementBuilder
 
         printStatement("select * from foo tablesample system (10+1)");
         printStatement("select * from foo tablesample system (10) join bar tablesample bernoulli (30) on a.id = b.id");
+        printStatement("select * from foo tablesample system (10) join bar tablesample bernoulli (30) on not(a.id > b.id)");
 
         printStatement("select * from foo tablesample bernoulli (10) stratify on (id)");
         printStatement("select * from foo tablesample system (50) stratify on (id, name)");
@@ -163,6 +164,8 @@ public class TestStatementBuilder
         printStatement("alter table a.b.c rename to d.e.f");
 
         printStatement("alter table a.b.c rename column x to y");
+
+        printStatement("alter table a.b.c add column x bigint");
 
         printStatement("create table test (a boolean, b bigint, c double, d varchar, e timestamp)");
         printStatement("create table if not exists baz (a timestamp, b varchar)");

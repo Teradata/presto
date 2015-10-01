@@ -13,8 +13,9 @@
  */
 package com.facebook.presto.orc.stream;
 
-import com.facebook.presto.orc.Vector;
 import com.facebook.presto.orc.checkpoint.DoubleStreamCheckpoint;
+import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.type.Type;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 
@@ -22,14 +23,13 @@ import java.io.IOException;
 
 import static com.facebook.presto.orc.stream.OrcStreamUtils.readFully;
 import static com.facebook.presto.orc.stream.OrcStreamUtils.skipFully;
-import static com.google.common.base.Preconditions.checkPositionIndex;
 import static io.airlift.slice.SizeOf.SIZE_OF_DOUBLE;
 
 public class DoubleStream
         implements ValueStream<DoubleStreamCheckpoint>
 {
     private final OrcInputStream input;
-    private final byte[] buffer = new byte[Vector.MAX_VECTOR_LENGTH * SIZE_OF_DOUBLE];
+    private final byte[] buffer = new byte[SIZE_OF_DOUBLE];
     private final Slice slice = Slices.wrappedBuffer(buffer);
 
     public DoubleStream(OrcInputStream input)
@@ -51,7 +51,7 @@ public class DoubleStream
     }
 
     @Override
-    public void skip(int items)
+    public void skip(long items)
             throws IOException
     {
         long length = items * SIZE_OF_DOUBLE;
@@ -65,39 +65,23 @@ public class DoubleStream
         return slice.getDouble(0);
     }
 
-    public void nextVector(int items, double[] vector)
+    public void nextVector(Type type, int items, BlockBuilder builder)
             throws IOException
     {
-        checkPositionIndex(items, vector.length);
-        checkPositionIndex(items, Vector.MAX_VECTOR_LENGTH);
-
-        // buffer that number of values
-        readFully(input, buffer, 0, items * SIZE_OF_DOUBLE);
-
-        // copy values directly into vector
-        Slices.wrappedDoubleArray(vector).setBytes(0, slice, 0, items * SIZE_OF_DOUBLE);
+        for (int i = 0; i < items; i++) {
+            type.writeDouble(builder, next());
+        }
     }
 
-    public void nextVector(long items, double[] vector, boolean[] isNull)
+    public void nextVector(Type type, long items, BlockBuilder builder, boolean[] isNull)
             throws IOException
     {
-        // count the number of non nulls
-        int notNullCount = 0;
         for (int i = 0; i < items; i++) {
-            if (!isNull[i]) {
-                notNullCount++;
+            if (isNull[i]) {
+                builder.appendNull();
             }
-        }
-
-        // buffer that umber of values
-        readFully(input, buffer, 0, notNullCount * SIZE_OF_DOUBLE);
-
-        // load them into the buffer
-        int elementIndex = 0;
-        for (int i = 0; i < items; i++) {
-            if (!isNull[i]) {
-                vector[i] = slice.getDouble(elementIndex);
-                elementIndex += SIZE_OF_DOUBLE;
+            else {
+                type.writeDouble(builder, next());
             }
         }
     }

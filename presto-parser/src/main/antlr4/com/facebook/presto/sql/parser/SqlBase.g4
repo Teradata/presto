@@ -40,6 +40,8 @@ statement
     | ALTER TABLE from=qualifiedName RENAME TO to=qualifiedName        #renameTable
     | ALTER TABLE tableName=qualifiedName
         RENAME COLUMN from=identifier TO to=identifier                 #renameColumn
+    | ALTER TABLE tableName=qualifiedName
+        ADD COLUMN column=tableElement                                 #addColumn
     | CREATE (OR REPLACE)? VIEW qualifiedName AS query                 #createView
     | DROP VIEW (IF EXISTS)? qualifiedName                             #dropView
     | EXPLAIN ('(' explainOption (',' explainOption)* ')')? statement  #explain
@@ -308,7 +310,7 @@ frameBound
 
 
 explainOption
-    : FORMAT value=(TEXT | GRAPHVIZ | JSON)  #explainFormat
+    : FORMAT value=(TEXT | GRAPHVIZ)         #explainFormat
     | TYPE value=(LOGICAL | DISTRIBUTED)     #explainType
     ;
 
@@ -335,11 +337,12 @@ number
 
 nonReserved
     : SHOW | TABLES | COLUMNS | COLUMN | PARTITIONS | FUNCTIONS | SCHEMAS | CATALOGS | SESSION
+    | ADD
     | OVER | PARTITION | RANGE | ROWS | PRECEDING | FOLLOWING | CURRENT | ROW | MAP
-    | DATE | TIME | TIMESTAMP | INTERVAL
+    | DATE | TIME | TIMESTAMP | INTERVAL | ZONE
     | YEAR | MONTH | DAY | HOUR | MINUTE | SECOND
     | EXPLAIN | FORMAT | TYPE | TEXT | GRAPHVIZ | LOGICAL | DISTRIBUTED
-    | TABLESAMPLE | SYSTEM | BERNOULLI | POISSONIZED | USE | JSON | TO
+    | TABLESAMPLE | SYSTEM | BERNOULLI | POISSONIZED | USE | TO
     | RESCALED | APPROXIMATE | AT | CONFIDENCE
     | SET | RESET
     | VIEW | REPLACE
@@ -354,6 +357,7 @@ normalForm
 
 SELECT: 'SELECT';
 FROM: 'FROM';
+ADD: 'ADD';
 AS: 'AS';
 ALL: 'ALL';
 SOME: 'SOME';
@@ -446,7 +450,6 @@ FORMAT: 'FORMAT';
 TYPE: 'TYPE';
 TEXT: 'TEXT';
 GRAPHVIZ: 'GRAPHVIZ';
-JSON: 'JSON';
 LOGICAL: 'LOGICAL';
 DISTRIBUTED: 'DISTRIBUTED';
 CAST: 'CAST';

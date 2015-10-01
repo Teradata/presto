@@ -94,7 +94,6 @@ import static com.facebook.presto.util.Failures.WORKER_RESTARTED_ERROR;
 import static com.facebook.presto.util.Failures.toFailure;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.base.MoreObjects.toStringHelper;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.http.client.FullJsonResponseHandler.createFullJsonResponseHandler;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
@@ -104,6 +103,7 @@ import static io.airlift.http.client.Request.Builder.prepareGet;
 import static io.airlift.http.client.Request.Builder.preparePost;
 import static io.airlift.http.client.StatusResponseHandler.createStatusResponseHandler;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -141,6 +141,7 @@ public class HttpRemoteTask
 
     private final HttpClient httpClient;
     private final Executor executor;
+    private final ScheduledExecutorService errorScheduledExecutor;
     private final JsonCodec<TaskInfo> taskInfoCodec;
     private final JsonCodec<TaskUpdateRequest> taskUpdateRequestCodec;
 
@@ -164,16 +165,16 @@ public class HttpRemoteTask
             JsonCodec<TaskInfo> taskInfoCodec,
             JsonCodec<TaskUpdateRequest> taskUpdateRequestCodec)
     {
-        checkNotNull(session, "session is null");
-        checkNotNull(taskId, "taskId is null");
-        checkNotNull(nodeId, "nodeId is null");
-        checkNotNull(location, "location is null");
-        checkNotNull(planFragment, "planFragment1 is null");
-        checkNotNull(outputBuffers, "outputBuffers is null");
-        checkNotNull(httpClient, "httpClient is null");
-        checkNotNull(executor, "executor is null");
-        checkNotNull(taskInfoCodec, "taskInfoCodec is null");
-        checkNotNull(taskUpdateRequestCodec, "taskUpdateRequestCodec is null");
+        requireNonNull(session, "session is null");
+        requireNonNull(taskId, "taskId is null");
+        requireNonNull(nodeId, "nodeId is null");
+        requireNonNull(location, "location is null");
+        requireNonNull(planFragment, "planFragment1 is null");
+        requireNonNull(outputBuffers, "outputBuffers is null");
+        requireNonNull(httpClient, "httpClient is null");
+        requireNonNull(executor, "executor is null");
+        requireNonNull(taskInfoCodec, "taskInfoCodec is null");
+        requireNonNull(taskUpdateRequestCodec, "taskUpdateRequestCodec is null");
 
         try (SetThreadName ignored = new SetThreadName("HttpRemoteTask-%s", taskId)) {
             this.taskId = taskId;
@@ -183,12 +184,13 @@ public class HttpRemoteTask
             this.outputBuffers.set(outputBuffers);
             this.httpClient = httpClient;
             this.executor = executor;
+            this.errorScheduledExecutor = errorScheduledExecutor;
             this.taskInfoCodec = taskInfoCodec;
             this.taskUpdateRequestCodec = taskUpdateRequestCodec;
-            this.updateErrorTracker = new RequestErrorTracker(taskId, location, minErrorDuration, errorScheduledExecutor);
-            this.getErrorTracker = new RequestErrorTracker(taskId, location, minErrorDuration, errorScheduledExecutor);
+            this.updateErrorTracker = new RequestErrorTracker(taskId, location, minErrorDuration, errorScheduledExecutor, "updating task");
+            this.getErrorTracker = new RequestErrorTracker(taskId, location, minErrorDuration, errorScheduledExecutor, "getting info for task");
 
-            for (Entry<PlanNodeId, Split> entry : checkNotNull(initialSplits, "initialSplits is null").entries()) {
+            for (Entry<PlanNodeId, Split> entry : requireNonNull(initialSplits, "initialSplits is null").entries()) {
                 ScheduledSplit scheduledSplit = new ScheduledSplit(nextSplitId.getAndIncrement(), entry.getValue());
                 pendingSplits.put(entry.getKey(), scheduledSplit);
             }
@@ -253,8 +255,8 @@ public class HttpRemoteTask
     public synchronized void addSplits(PlanNodeId sourceId, Iterable<Split> splits)
     {
         try (SetThreadName ignored = new SetThreadName("HttpRemoteTask-%s", taskId)) {
-            checkNotNull(sourceId, "sourceId is null");
-            checkNotNull(splits, "splits is null");
+            requireNonNull(sourceId, "sourceId is null");
+            requireNonNull(splits, "splits is null");
             checkState(!noMoreSplits.contains(sourceId), "noMoreSplits has already been set for %s", sourceId);
 
             // only add pending split if not done
@@ -419,6 +421,8 @@ public class HttpRemoteTask
                 .setBodyGenerator(jsonBodyGenerator(taskUpdateRequestCodec, updateRequest))
                 .build();
 
+        updateErrorTracker.startRequest();
+
         ListenableFuture<JsonResponse<TaskInfo>> future = httpClient.executeAsync(request, createFullJsonResponseHandler(taskInfoCodec));
         currentRequest = future;
         currentRequestStartNanos = System.nanoTime();
@@ -465,11 +469,10 @@ public class HttpRemoteTask
             }
 
             // send cancel to task and ignore response
-            long start = System.nanoTime();
             Request request = prepareDelete()
                     .setUri(uriBuilderFrom(uri).addParameter("abort", "false").addParameter("summarize").build())
                     .build();
-            scheduleAsyncCleanupRequest(start, request, "cancel");
+            scheduleAsyncCleanupRequest(new Backoff(MAX_CLEANUP_RETRY_TIME), request, "cancel");
         }
     }
 
@@ -504,15 +507,14 @@ public class HttpRemoteTask
                     ImmutableList.<ExecutionFailureInfo>of()));
 
             // send abort to task and ignore response
-            long start = System.nanoTime();
             Request request = prepareDelete()
                     .setUri(uriBuilderFrom(uri).addParameter("summarize").build())
                     .build();
-            scheduleAsyncCleanupRequest(start, request, "abort");
+            scheduleAsyncCleanupRequest(new Backoff(MAX_CLEANUP_RETRY_TIME), request, "abort");
         }
     }
 
-    private void scheduleAsyncCleanupRequest(long start, Request request, String action)
+    private void scheduleAsyncCleanupRequest(Backoff cleanupBackoff, Request request, String action)
     {
         Futures.addCallback(httpClient.executeAsync(request, createStatusResponseHandler()), new FutureCallback<StatusResponse>()
         {
@@ -530,13 +532,19 @@ public class HttpRemoteTask
                     return;
                 }
 
+                // record failure
+                if (cleanupBackoff.failure()) {
+                    logError(t, "Unable to %s task at %s", action, request.getUri());
+                    return;
+                }
+
                 // reschedule
-                // todo this need a retry rate limit
-                if (Duration.nanosSince(start).compareTo(MAX_CLEANUP_RETRY_TIME) < 0) {
-                    Futures.addCallback(httpClient.executeAsync(request, createStatusResponseHandler()), this, executor);
+                long delayNanos = cleanupBackoff.getBackoffDelayNanos();
+                if (delayNanos == 0) {
+                    scheduleAsyncCleanupRequest(cleanupBackoff, request, action);
                 }
                 else {
-                    logError(t, "Unable to %s task at %s", action, request.getUri());
+                    errorScheduledExecutor.schedule(() -> scheduleAsyncCleanupRequest(cleanupBackoff, request, action), delayNanos, NANOSECONDS);
                 }
             }
         }, executor);
@@ -578,7 +586,7 @@ public class HttpRemoteTask
 
         private UpdateResponseHandler(List<TaskSource> sources)
         {
-            this.sources = ImmutableList.copyOf(checkNotNull(sources, "sources is null"));
+            this.sources = ImmutableList.copyOf(requireNonNull(sources, "sources is null"));
         }
 
         @Override
@@ -695,12 +703,21 @@ public class HttpRemoteTask
                 return;
             }
 
+            // if throttled due to error, asynchronously wait for timeout and try again
+            ListenableFuture<?> errorRateLimit = getErrorTracker.acquireRequestPermit();
+            if (!errorRateLimit.isDone()) {
+                errorRateLimit.addListener(this::scheduleNextRequest, executor);
+                return;
+            }
+
             Request request = prepareGet()
                     .setUri(uriBuilderFrom(taskInfo.getSelf()).addParameter("summarize").build())
                     .setHeader(HttpHeaders.CONTENT_TYPE, MediaType.JSON_UTF_8.toString())
                     .setHeader(PrestoHeaders.PRESTO_CURRENT_STATE, taskInfo.getState().toString())
                     .setHeader(PrestoHeaders.PRESTO_MAX_WAIT, refreshMaxWait.toString())
                     .build();
+
+            getErrorTracker.startRequest();
 
             future = httpClient.executeAsync(request, createFullJsonResponseHandler(taskInfoCodec));
             Futures.addCallback(future, new SimpleHttpResponseHandler<>(this, request.getUri()), executor);
@@ -830,16 +847,18 @@ public class HttpRemoteTask
         private final TaskId taskId;
         private final URI taskUri;
         private final ScheduledExecutorService scheduledExecutor;
+        private final String jobDescription;
         private final Backoff backoff;
 
         private final Queue<Throwable> errorsSinceLastSuccess = new ConcurrentLinkedQueue<>();
 
-        public RequestErrorTracker(TaskId taskId, URI taskUri, Duration minErrorDuration, ScheduledExecutorService scheduledExecutor)
+        public RequestErrorTracker(TaskId taskId, URI taskUri, Duration minErrorDuration, ScheduledExecutorService scheduledExecutor, String jobDescription)
         {
             this.taskId = taskId;
             this.taskUri = taskUri;
             this.scheduledExecutor = scheduledExecutor;
             this.backoff = new Backoff(minErrorDuration);
+            this.jobDescription = jobDescription;
         }
 
         public ListenableFuture<?> acquireRequestPermit()
@@ -853,6 +872,15 @@ public class HttpRemoteTask
             ListenableFutureTask<Object> futureTask = ListenableFutureTask.create(() -> null);
             scheduledExecutor.schedule(futureTask, delayNanos, NANOSECONDS);
             return futureTask;
+        }
+
+        public void startRequest()
+        {
+            // before scheduling a new request clear the error timer
+            // we consider a request to be "new" if there are no current failures
+            if (backoff.getFailureCount() == 0) {
+                requestSucceeded();
+            }
         }
 
         public void requestSucceeded()
@@ -876,10 +904,10 @@ public class HttpRemoteTask
             // log failure message
             if (isExpectedError(reason)) {
                 // don't print a stack for a known errors
-                log.warn("Error updating task %s: %s: %s", taskId, reason.getMessage(), taskUri);
+                log.warn("Error " + jobDescription + " %s: %s: %s", taskId, reason.getMessage(), taskUri);
             }
             else {
-                log.warn(reason, "Error updating task %s: %s", taskId, taskUri);
+                log.warn(reason, "Error " + jobDescription + " %s: %s", taskId, taskUri);
             }
 
             // remember the first 10 errors

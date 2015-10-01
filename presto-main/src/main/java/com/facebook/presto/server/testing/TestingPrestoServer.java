@@ -68,15 +68,13 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.facebook.presto.server.testing.FileUtils.deleteRecursively;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Strings.nullToEmpty;
 import static io.airlift.discovery.client.ServiceAnnouncement.serviceAnnouncement;
+import static java.util.Objects.requireNonNull;
 
 public class TestingPrestoServer
         implements Closeable
 {
-    public static final String TEST_CATALOG = "default"; // TODO: change this to test_catalog
-
     private final Path baseDataDir;
     private final LifeCycleManager lifeCycleManager;
     private final PluginManager pluginManager;
@@ -89,7 +87,7 @@ public class TestingPrestoServer
     private final InternalNodeManager nodeManager;
     private final ServiceSelectorManager serviceSelectorManager;
     private final Announcer announcer;
-    private QueryManager queryManager;
+    private final QueryManager queryManager;
 
     public TestingPrestoServer()
             throws Exception
@@ -146,7 +144,7 @@ public class TestingPrestoServer
                 });
 
         if (discoveryUri != null) {
-            checkNotNull(environment, "environment required when discoveryUri is present");
+            requireNonNull(environment, "environment required when discoveryUri is present");
             serverProperties.put("discovery.uri", discoveryUri.toString());
             modules.add(new DiscoveryModule());
         }

@@ -15,10 +15,10 @@ package com.facebook.presto.connector.informationSchema;
 
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
+import com.facebook.presto.spi.ConnectorMetadata;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.ConnectorTableHandle;
 import com.facebook.presto.spi.ConnectorTableMetadata;
-import com.facebook.presto.spi.ReadOnlyConnectorMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
 import com.google.common.collect.ImmutableList;
@@ -33,17 +33,16 @@ import static com.facebook.presto.metadata.MetadataUtil.SchemaMetadataBuilder.sc
 import static com.facebook.presto.metadata.MetadataUtil.TableMetadataBuilder.tableMetadataBuilder;
 import static com.facebook.presto.metadata.MetadataUtil.findColumnMetadata;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
-import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.util.Types.checkType;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Predicates.compose;
 import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.collect.Iterables.filter;
+import static java.util.Objects.requireNonNull;
 
 public class InformationSchemaMetadata
-        extends ReadOnlyConnectorMetadata
+        implements ConnectorMetadata
 {
     public static final String INFORMATION_SCHEMA = "information_schema";
 
@@ -51,7 +50,6 @@ public class InformationSchemaMetadata
     public static final SchemaTableName TABLE_TABLES = new SchemaTableName(INFORMATION_SCHEMA, "tables");
     public static final SchemaTableName TABLE_VIEWS = new SchemaTableName(INFORMATION_SCHEMA, "views");
     public static final SchemaTableName TABLE_SCHEMATA = new SchemaTableName(INFORMATION_SCHEMA, "schemata");
-    public static final SchemaTableName TABLE_INTERNAL_FUNCTIONS = new SchemaTableName(INFORMATION_SCHEMA, "__internal_functions__");
     public static final SchemaTableName TABLE_INTERNAL_PARTITIONS = new SchemaTableName(INFORMATION_SCHEMA, "__internal_partitions__");
 
     public static final Map<SchemaTableName, ConnectorTableMetadata> TABLES = schemaMetadataBuilder()
@@ -82,14 +80,6 @@ public class InformationSchemaMetadata
             .table(tableMetadataBuilder(TABLE_SCHEMATA)
                     .column("catalog_name", VARCHAR)
                     .column("schema_name", VARCHAR)
-                    .build())
-            .table(tableMetadataBuilder(TABLE_INTERNAL_FUNCTIONS)
-                    .column("function_name", VARCHAR)
-                    .column("argument_types", VARCHAR)
-                    .column("return_type", VARCHAR)
-                    .column("function_type", VARCHAR)
-                    .column("deterministic", BOOLEAN)
-                    .column("description", VARCHAR)
                     .build())
             .table(tableMetadataBuilder(TABLE_INTERNAL_PARTITIONS)
                     .column("table_catalog", VARCHAR)
@@ -150,12 +140,6 @@ public class InformationSchemaMetadata
     }
 
     @Override
-    public ColumnHandle getSampleWeightColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
-    {
-        return null;
-    }
-
-    @Override
     public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
     {
         InformationSchemaTableHandle informationSchemaTableHandle = checkTableHandle(tableHandle);
@@ -181,7 +165,7 @@ public class InformationSchemaMetadata
     @Override
     public Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session, SchemaTablePrefix prefix)
     {
-        checkNotNull(prefix, "prefix is null");
+        requireNonNull(prefix, "prefix is null");
         ImmutableMap.Builder<SchemaTableName, List<ColumnMetadata>> builder = ImmutableMap.builder();
         for (Entry<SchemaTableName, ConnectorTableMetadata> entry : TABLES.entrySet()) {
             if (prefix.matches(entry.getKey())) {
