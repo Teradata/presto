@@ -14,9 +14,9 @@
 
 package com.facebook.presto.tests.hive;
 
+import com.teradata.tempto.fulfillment.table.TableDefinitionsRepository;
 import com.teradata.tempto.fulfillment.table.hive.HiveDataSource;
 import com.teradata.tempto.fulfillment.table.hive.HiveTableDefinition;
-import com.teradata.tempto.fulfillment.table.TableDefinitionsRepository;
 
 import java.util.Optional;
 
