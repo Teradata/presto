@@ -326,7 +326,6 @@ public final class Signature
 
     private static boolean matchAndBind(Map<String, Type> boundParameters, Map<String, TypeParameter> typeParameters, TypeSignature parameter, Type type, boolean allowCoercion, TypeManager typeManager)
     {
-
         // TODO: the code flow here needs reworking. The 'if (allowCoercion()) {...
         // does not make much sense if parameter, we are matching to, is calculated type.
         // Similar binding logic as is done for type parameters should be performed here

@@ -59,16 +59,35 @@ public final class DecimalOperators
         Signature signature = Signature.builder()
                 .type(SCALAR)
                 .operatorType(ADD)
-                .argumentTypes("decimal(a_precision, a_scale)", "decimal(b_precision, b_scale)")
-                .returnType("decimal(min(38, 1 + max(a_scale, b_scale) + max(a_precision - a_scale, b_precision - b_scale)), max(a_scale, b_scale))")
+                .argumentTypes("decimal(p, s)", "decimal(p, s)")
+                .returnType("decimal(min(38, p + 1), s)")
                 .build();
         return ParametricFunction.builder(DecimalOperators.class)
                 .signature(signature)
-                .methods("addShortShortShort")
-                .extraParameters(DecimalOperators::shortRescaleExtraParameters)
-                .methods("addShortShortLong", "addLongLongLong", "addShortLongLong", "addLongShortLong")
-                .extraParameters(DecimalOperators::longRescaleExtraParameters)
+                .methods("addShortShortShort", "addLongLongLong", "addShortShortLong")
                 .build();
+    }
+
+    public static long addShortShortShort(long a, long b)
+    {
+        return a + b;
+    }
+
+    public static Slice addShortShortLong(long a, long b)
+    {
+        BigInteger aBigInteger = BigInteger.valueOf(a);
+        BigInteger bBigInteger = BigInteger.valueOf(b);
+        BigInteger result = aBigInteger.add(bBigInteger);
+        return LongDecimalType.unscaledValueToSlice(result);
+    }
+
+    public static Slice addLongLongLong(Slice a, Slice b)
+    {
+        BigInteger aBigInteger = LongDecimalType.unscaledValueToBigInteger(a);
+        BigInteger bBigInteger = LongDecimalType.unscaledValueToBigInteger(b);
+        BigInteger result = aBigInteger.add(bBigInteger);
+        checkOverflow(result);
+        return LongDecimalType.unscaledValueToSlice(result);
     }
 
     private static List<Object> shortRescaleExtraParameters(SpecializeContext context)
@@ -88,48 +107,6 @@ public final class DecimalOperators
     private static int rescaleFactor(long fromScale, long toScale)
     {
         return max(0, (int) toScale - (int) fromScale);
-    }
-
-    public static long addShortShortShort(long a, long b, long aRescale, long bRescale)
-    {
-        return a * aRescale + b * bRescale;
-    }
-
-    public static Slice addShortShortLong(long a, long b, BigInteger aRescale, BigInteger bRescale)
-    {
-        BigInteger aBigInteger = BigInteger.valueOf(a);
-        BigInteger bBigInteger = BigInteger.valueOf(b);
-        return internalAddLongLongLong(aBigInteger, bBigInteger, aRescale, bRescale);
-    }
-
-    public static Slice addLongLongLong(Slice a, Slice b, BigInteger aRescale, BigInteger bRescale)
-    {
-        BigInteger aBigInteger = LongDecimalType.unscaledValueToBigInteger(a);
-        BigInteger bBigInteger = LongDecimalType.unscaledValueToBigInteger(b);
-        return internalAddLongLongLong(aBigInteger, bBigInteger, aRescale, bRescale);
-    }
-
-    public static Slice addShortLongLong(long a, Slice b, BigInteger aRescale, BigInteger bRescale)
-    {
-        BigInteger aBigInteger = BigInteger.valueOf(a);
-        BigInteger bBigInteger = LongDecimalType.unscaledValueToBigInteger(b);
-        return internalAddLongLongLong(aBigInteger, bBigInteger, aRescale, bRescale);
-    }
-
-    public static Slice addLongShortLong(Slice a, long b, BigInteger aRescale, BigInteger bRescale)
-    {
-        BigInteger aBigInteger = LongDecimalType.unscaledValueToBigInteger(a);
-        BigInteger bBigInteger = BigInteger.valueOf(b);
-        return internalAddLongLongLong(aBigInteger, bBigInteger, aRescale, bRescale);
-    }
-
-    private static Slice internalAddLongLongLong(BigInteger aBigInteger, BigInteger bBigInteger, BigInteger aRescale, BigInteger bRescale)
-    {
-        BigInteger aRescaled = aBigInteger.multiply(aRescale);
-        BigInteger bRescaled = bBigInteger.multiply(bRescale);
-        BigInteger result = aRescaled.add(bRescaled);
-        checkOverflow(result);
-        return LongDecimalType.unscaledValueToSlice(result);
     }
 
     private static ParametricFunction decimalSubtractOperator()
