@@ -141,6 +141,24 @@ public class TestSignature
     }
 
     @Test
+    public void testBindUnknownToConcreteArray()
+    {
+        TypeSignature booleanSignature = BooleanType.BOOLEAN.getTypeSignature();
+        // given function(array(boolean)):boolean
+        // does it bind to argument UNKNOWN
+        // with coercion
+        assertFunctionBind(
+                ImmutableList.of(),
+                booleanSignature,
+                ImmutableList.of(new TypeSignature(StandardTypes.ARRAY, ImmutableList.of(TypeSignatureParameter.of(booleanSignature)))),
+                ImmutableSet.of(),
+                Optional.empty(),
+                ImmutableList.of(UNKNOWN),
+                true,
+                ImmutableMap.of());
+    }
+
+    @Test
     public void testBindUnknownToArray()
     {
         TypeSignature templateType = new TypeSignature("T", ImmutableList.of());
