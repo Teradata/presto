@@ -56,7 +56,6 @@ import static com.facebook.presto.metadata.FunctionType.WINDOW;
 import static com.facebook.presto.metadata.Signature.typeParameter;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
-import static com.facebook.presto.type.TypeUtils.resolveTypes;
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -153,7 +152,7 @@ public class FunctionListBuilder
         return this;
     }
 
-    public FunctionListBuilder functions(ParametricFunction ... parametricFunctions)
+    public FunctionListBuilder functions(ParametricFunction... parametricFunctions)
     {
         for (ParametricFunction parametricFunction : parametricFunctions) {
             function(parametricFunction);
