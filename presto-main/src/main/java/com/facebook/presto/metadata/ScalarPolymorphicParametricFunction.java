@@ -14,6 +14,7 @@
 package com.facebook.presto.metadata;
 
 import com.facebook.presto.metadata.ParametricFunctionBuilder.MethodsGroup;
+import com.facebook.presto.metadata.ParametricFunctionBuilder.NamedMethodHandle;
 import com.facebook.presto.metadata.ParametricFunctionBuilder.SpecializeContext;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
@@ -93,10 +94,10 @@ class ScalarPolymorphicParametricFunction
         Type resolvedReturnType = resolveReturnType(types, typeManager, calculatedReturnType);
         SpecializeContext context = new SpecializeContext(types, filterPresentLiterals(literalParameters), resolvedParameterTypes, resolvedReturnType, typeManager, functionRegistry);
 
-        Optional<ParametricFunctionBuilder.NamedMethodHandle> matchingMethod = Optional.empty();
+        Optional<NamedMethodHandle> matchingMethod = Optional.empty();
         Optional<MethodsGroup> matchingMethodsGroup = Optional.empty();
         for (MethodsGroup candidateMethodsGroup : methodsGroups) {
-            for (ParametricFunctionBuilder.NamedMethodHandle candidateMethod : candidateMethodsGroup.getMethods()) {
+            for (NamedMethodHandle candidateMethod : candidateMethodsGroup.getMethods()) {
                 if (matchesParameterAndReturnTypes(candidateMethod, resolvedParameterTypes, resolvedReturnType) &&
                         predicateIsTrue(candidateMethodsGroup, context)) {
                     if (matchingMethod.isPresent()) {
@@ -133,7 +134,7 @@ class ScalarPolymorphicParametricFunction
         return resolvedReturnType;
     }
 
-    private boolean matchesParameterAndReturnTypes(ParametricFunctionBuilder.NamedMethodHandle method, List<Type> resolvedTypes, Type returnType)
+    private boolean matchesParameterAndReturnTypes(NamedMethodHandle method, List<Type> resolvedTypes, Type returnType)
     {
         MethodType methodHandleType = method.getMethodHandle().type();
         checkState(methodHandleType.parameterCount() >= resolvedTypes.size(),
@@ -170,7 +171,7 @@ class ScalarPolymorphicParametricFunction
                 .collect(toMap(entry -> entry.getKey().toLowerCase(US), entry -> entry.getValue().getAsLong()));
     }
 
-    private MethodHandle applyExtraParameters(ParametricFunctionBuilder.NamedMethodHandle matchingMethod, List<Object> extraParameters)
+    private MethodHandle applyExtraParameters(NamedMethodHandle matchingMethod, List<Object> extraParameters)
     {
         int expectedNumberOfArguments = signature.getArgumentTypes().size() + extraParameters.size();
         int matchingMethodParameterCount = matchingMethod.getMethodHandle().type().parameterCount();
