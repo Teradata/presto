@@ -16,6 +16,7 @@ package com.facebook.presto.type;
 import com.facebook.presto.metadata.ParametricFunction;
 import com.facebook.presto.metadata.ParametricFunctionBuilder.SpecializeContext;
 import com.facebook.presto.metadata.Signature;
+import com.facebook.presto.operator.scalar.ScalarOperator;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.LongDecimalType;
@@ -43,7 +44,6 @@ import static java.math.BigInteger.ZERO;
 
 public final class DecimalOperators
 {
-    public static final ParametricFunction DECIMAL_ADD_OPERATOR = decimalAddOperator();
     public static final ParametricFunction DECIMAL_SUBTRACT_OPERATOR = decimalSubtractOperator();
     public static final ParametricFunction DECIMAL_MULTIPLY_OPERATOR = decimalMultiplyOperator();
     public static final ParametricFunction DECIMAL_DIVIDE_OPERATOR = decimalDivideOperator();
@@ -54,26 +54,16 @@ public final class DecimalOperators
     {
     }
 
-    private static ParametricFunction decimalAddOperator()
-    {
-        Signature signature = Signature.builder()
-                .type(SCALAR)
-                .operatorType(ADD)
-                .argumentTypes("decimal(p, s)", "decimal(p, s)")
-                .returnType("decimal(min(38, p + 1), s)")
-                .build();
-        return ParametricFunction.builder(DecimalOperators.class)
-                .signature(signature)
-                .methods("addShortShortShort", "addLongLongLong", "addShortShortLong")
-                .build();
-    }
-
-    public static long addShortShortShort(long a, long b)
+    @ScalarOperator(ADD)
+    @SqlType("decimal(min(38, p + 1), s)")
+    public static long addShortShortShort(@SqlType("decimal(p,s)") long a, @SqlType("decimal(p,s)") long b)
     {
         return a + b;
     }
 
-    public static Slice addShortShortLong(long a, long b)
+    @ScalarOperator(ADD)
+    @SqlType("decimal(min(38, p + 1), s)")
+    public static Slice addShortShortLong(@SqlType("decimal(p,s)") long a, @SqlType("decimal(p,s)") long b)
     {
         BigInteger aBigInteger = BigInteger.valueOf(a);
         BigInteger bBigInteger = BigInteger.valueOf(b);
@@ -81,7 +71,9 @@ public final class DecimalOperators
         return LongDecimalType.unscaledValueToSlice(result);
     }
 
-    public static Slice addLongLongLong(Slice a, Slice b)
+    @ScalarOperator(ADD)
+    @SqlType("decimal(min(38, p + 1), s)")
+    public static Slice addLongLongLong(@SqlType("decimal(p,s)") Slice a, @SqlType("decimal(p,s)") Slice b)
     {
         BigInteger aBigInteger = LongDecimalType.unscaledValueToBigInteger(a);
         BigInteger bBigInteger = LongDecimalType.unscaledValueToBigInteger(b);
