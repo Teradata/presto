@@ -142,7 +142,7 @@ public class FunctionListBuilder
     {
         FunctionListBuilder localFunctionListBuilder = new FunctionListBuilder(typeManager);
         localFunctionListBuilder.processScalarsInClass(clazz);
-        this.functions.addAll(localFunctionListBuilder.functions);
+        functions.addAll(localFunctionListBuilder.functions);
         return this;
     }
 
