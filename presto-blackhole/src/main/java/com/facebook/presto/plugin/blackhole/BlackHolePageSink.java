@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 
 import java.util.Collection;
+import java.util.concurrent.CompletableFuture;
 
 import static java.lang.Thread.sleep;
 
@@ -36,8 +37,9 @@ class BlackHolePageSink
     }
 
     @Override
-    public void appendPage(Page page, Block sampleWeightBlock)
+    public CompletableFuture<?> appendPage(Page page, Block sampleWeightBlock)
     {
+        // TODO: return uncompleted future and finish it after pageProcessingDelayInMillis
         if (pageProcessingDelayInMillis > 0) {
             try {
                 sleep(pageProcessingDelayInMillis);
@@ -47,6 +49,7 @@ class BlackHolePageSink
                 throw Throwables.propagate(e);
             }
         }
+        return NOT_BLOCKED;
     }
 
     @Override
