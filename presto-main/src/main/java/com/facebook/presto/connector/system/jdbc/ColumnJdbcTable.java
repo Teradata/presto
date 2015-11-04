@@ -132,7 +132,7 @@ public class ColumnJdbcTable
                     column.getType().getDisplayName(),
                     0L,
                     0L,
-                    (long) decimalDigits(column.getType()),
+                    decimalDigits(column.getType()),
                     10L,
                     DatabaseMetaData.columnNullableUnknown,
                     column.getComment(),
@@ -190,10 +190,10 @@ public class ColumnJdbcTable
         return Types.JAVA_OBJECT;
     }
 
-    private static Integer decimalDigits(Type type)
+    private static Long decimalDigits(Type type)
     {
         if (type.equals(BIGINT)) {
-            return 19;
+            return 19L;
         }
         return null;
     }
