@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.planner;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.metadata.TableHandle;
@@ -285,11 +286,12 @@ class QueryPlanner
         ImmutableMap.Builder<Symbol, Expression> projections = ImmutableMap.builder();
 
         for (Expression expression : expressions) {
+            Type type = analysis.getType(expression);
             Type coercion = analysis.getCoercion(expression);
-            Symbol symbol = symbolAllocator.newSymbol(expression, firstNonNull(coercion, analysis.getType(expression)));
+            Symbol symbol = symbolAllocator.newSymbol(expression, firstNonNull(coercion, type));
             Expression rewritten = subPlan.rewrite(expression);
             if (coercion != null) {
-                rewritten = new Cast(rewritten, coercion.getTypeSignature().toString());
+                rewritten = new Cast(rewritten, coercion.getTypeSignature().toString(), false, FunctionRegistry.isTypeOnlyCoercion(type, coercion));
             }
             projections.put(symbol, rewritten);
             translations.put(expression, symbol);

@@ -77,6 +77,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.facebook.presto.metadata.FunctionRegistry.isTypeOnlyCoercion;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.sql.ExpressionUtils.flipComparison;
@@ -494,8 +495,8 @@ class RelationPlanner
             Symbol inputSymbol = oldSymbols.get(i);
             Type inputType = symbolAllocator.getTypes().get(inputSymbol);
             Type outputType = coerceToTypes[i];
-            if (outputType != inputType) {
-                Cast cast = new Cast(new QualifiedNameReference(inputSymbol.toQualifiedName()), outputType.getTypeSignature().toString());
+            if (outputType != inputType && !isTypeOnlyCoercion(inputType, outputType)) {
+                Expression cast = new Cast(new QualifiedNameReference(inputSymbol.toQualifiedName()), outputType.getTypeSignature().toString());
                 Symbol outputSymbol = symbolAllocator.newSymbol(cast, outputType);
                 assignments.put(outputSymbol, cast);
                 newSymbols.add(outputSymbol);
