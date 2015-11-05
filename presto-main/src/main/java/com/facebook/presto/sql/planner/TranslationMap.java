@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.facebook.presto.metadata.FunctionRegistry.isTypeOnlyCoercion;
 import static com.facebook.presto.sql.QueryUtil.mangleFieldReference;
 
 /**
@@ -177,9 +178,10 @@ class TranslationMap
                 Expression rewrittenExpression = treeRewriter.defaultRewrite(node, context);
 
                 // cast expression if coercion is registered
+                Type type = analysis.getType(node);
                 Type coercion = analysis.getCoercion(node);
                 if (coercion != null) {
-                    rewrittenExpression = new Cast(rewrittenExpression, coercion.getTypeSignature().toString());
+                    rewrittenExpression = new Cast(rewrittenExpression, coercion.getTypeSignature().toString(), false, isTypeOnlyCoercion(type, coercion));
                 }
 
                 return rewrittenExpression;
@@ -204,9 +206,10 @@ class TranslationMap
                 }
 
                 // cast expression if coercion is registered
+                Type type = analysis.getType(node);
                 Type coercion = analysis.getCoercion(node);
                 if (coercion != null) {
-                    rewrittenExpression = new Cast(rewrittenExpression, coercion.getTypeSignature().toString());
+                    rewrittenExpression = new Cast(rewrittenExpression, coercion.getTypeSignature().toString(), false, isTypeOnlyCoercion(type, coercion));
                 }
 
                 return rewrittenExpression;

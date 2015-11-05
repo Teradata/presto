@@ -24,6 +24,7 @@ public final class Cast
     private final Expression expression;
     private final String type;
     private final boolean safe;
+    private final boolean typeOnly;
 
     public Cast(Expression expression, String type)
     {
@@ -32,12 +33,18 @@ public final class Cast
 
     public Cast(Expression expression, String type, boolean safe)
     {
+        this(expression, type, safe, false);
+    }
+
+    public Cast(Expression expression, String type, boolean safe, boolean typeOnly)
+    {
         requireNonNull(expression, "expression is null");
         requireNonNull(type, "type is null");
 
         this.expression = expression;
         this.type = type.toUpperCase(ENGLISH);
         this.safe = safe;
+        this.typeOnly = typeOnly;
     }
 
     public Expression getExpression()
@@ -53,6 +60,11 @@ public final class Cast
     public boolean isSafe()
     {
         return safe;
+    }
+
+    public boolean isTypeOnly()
+    {
+        return typeOnly;
     }
 
     @Override
@@ -73,12 +85,13 @@ public final class Cast
         Cast o = (Cast) obj;
         return Objects.equals(this.expression, o.expression) &&
                 Objects.equals(this.type, o.type) &&
-                Objects.equals(this.safe, o.safe);
+                Objects.equals(this.safe, o.safe) &&
+                Objects.equals(this.typeOnly, o.typeOnly);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(expression, type, safe);
+        return Objects.hash(expression, type, safe, typeOnly);
     }
 }

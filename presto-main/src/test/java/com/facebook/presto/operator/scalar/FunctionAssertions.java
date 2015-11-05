@@ -83,6 +83,7 @@ import static com.facebook.presto.block.BlockAssertions.createDoublesBlock;
 import static com.facebook.presto.block.BlockAssertions.createLongsBlock;
 import static com.facebook.presto.block.BlockAssertions.createStringsBlock;
 import static com.facebook.presto.block.BlockAssertions.createTimestampsWithTimezoneBlock;
+import static com.facebook.presto.metadata.FunctionRegistry.isTypeOnlyCoercion;
 import static com.facebook.presto.metadata.FunctionType.SCALAR;
 import static com.facebook.presto.operator.scalar.FunctionAssertions.TestSplit.createNormalSplit;
 import static com.facebook.presto.operator.scalar.FunctionAssertions.TestSplit.createRecordSetSplit;
@@ -410,9 +411,10 @@ public final class FunctionAssertions
                 Expression rewrittenExpression = treeRewriter.defaultRewrite(node, context);
 
                 // cast expression if coercion is registered
+                Type type = analysis.getType(node);
                 Type coercion = analysis.getCoercion(node);
                 if (coercion != null) {
-                    rewrittenExpression = new Cast(rewrittenExpression, coercion.getTypeSignature().toString());
+                    rewrittenExpression = new Cast(rewrittenExpression, coercion.getTypeSignature().toString(), false, isTypeOnlyCoercion(type, coercion));
                 }
 
                 return rewrittenExpression;

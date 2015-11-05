@@ -91,7 +91,6 @@ import java.util.function.Function;
 
 import static com.facebook.presto.metadata.FunctionRegistry.canCoerce;
 import static com.facebook.presto.metadata.FunctionRegistry.getCommonSuperType;
-import static com.facebook.presto.metadata.FunctionRegistry.isTypeOnlyCoercion;
 import static com.facebook.presto.metadata.OperatorType.SUBSCRIPT;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
@@ -933,7 +932,7 @@ public class ExpressionAnalyzer
             // verify all expressions can be coerced to the superType
             for (Expression expression : expressions) {
                 Type type = process(expression, context);
-                if (!type.equals(superType) && !isTypeOnlyCoercion(type, superType)) {
+                if (!type.equals(superType)) {
                     if (!canCoerce(type, superType)) {
                         throw new SemanticException(TYPE_MISMATCH, expression, message, superType);
                     }
