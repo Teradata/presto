@@ -128,7 +128,7 @@ public final class ParametricFunctionBuilder
                 .map(Reflection::methodHandle)
                 .map(methodHandle -> new NamedMethodHandle(methodName, methodHandle))
                 .collect(toList());
-        checkState(!matchingMethods.isEmpty(), "method %s was not found in %s", methodName, clazz);
+        checkState(!matchingMethods.isEmpty(), "method %s was not found in %s", methodName, clazz.get());
         matchingMethods.forEach(currentMethodGroup.get()::addMethod);
         return this;
     }
