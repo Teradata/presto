@@ -621,6 +621,12 @@ public class TestDriver
             try (ResultSet rs = connection.getMetaData().getColumns(null, null, "tables", "table_name")) {
                 assertColumnMetadata(rs);
                 assertTrue(rs.next());
+                assertEquals(rs.getString("TABLE_CAT"), "blackhole");
+                assertEquals(rs.getString("TABLE_SCHEM"), "information_schema");
+                assertEquals(rs.getString("TABLE_NAME"), "tables");
+                assertEquals(rs.getString("COLUMN_NAME"), "table_name");
+                assertEquals(rs.getInt("DATA_TYPE"), Types.LONGNVARCHAR);
+                assertTrue(rs.next());
                 assertEquals(rs.getString("TABLE_CAT"), "system");
                 assertEquals(rs.getString("TABLE_SCHEM"), "information_schema");
                 assertEquals(rs.getString("TABLE_NAME"), "tables");
@@ -646,7 +652,7 @@ public class TestDriver
         try (Connection connection = createConnection()) {
             try (ResultSet rs = connection.getMetaData().getColumns(null, "information_schema", "tables", "table_name")) {
                 assertColumnMetadata(rs);
-                assertEquals(readRows(rs).size(), 2);
+                assertEquals(readRows(rs).size(), 3);
             }
         }
 
