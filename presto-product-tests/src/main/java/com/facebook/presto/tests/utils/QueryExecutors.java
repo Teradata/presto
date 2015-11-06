@@ -14,12 +14,9 @@
 package com.facebook.presto.tests.utils;
 
 import com.facebook.presto.jdbc.PrestoConnection;
-import com.teradata.tempto.configuration.Configuration;
-import com.teradata.tempto.query.JdbcQueryExecutor;
 import com.teradata.tempto.query.QueryExecutor;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Map;
 
@@ -27,8 +24,6 @@ import static com.teradata.tempto.context.ThreadLocalTestContextHolder.testConte
 
 public class QueryExecutors
 {
-    private static final String PRESTO_CONFIGURATION_KEY = "databases.presto";
-
     private QueryExecutors() {}
 
     public static QueryExecutor onPresto()
@@ -36,45 +31,19 @@ public class QueryExecutors
         return testContext().getDependency(QueryExecutor.class, "presto");
     }
 
-    public static QueryExecutor onPrestoWith(Map<String, String> sessionProperties)
+    public static void onPrestoWith(Map<String, String> sessionProperties, ConnectionConsumer connectionConsumer)
             throws SQLException
     {
-        PrestoConnection prestoConnection = createPrestoConnection();
-        sessionProperties.entrySet().stream()
-                .forEach(entry -> prestoConnection.setSessionProperty(entry.getKey(), entry.getValue()));
-        return new JdbcQueryExecutor(prestoConnection, getPrestoConfiguration().getStringMandatory("jdbc_url"));
+        try (PrestoConnection connection = (PrestoConnection) onPresto().getConnection()) {
+            sessionProperties.entrySet().stream()
+                    .forEach(entry -> connection.setSessionProperty(entry.getKey(), entry.getValue()));
+            connectionConsumer.accept(connection);
+        }
     }
 
-    public static QueryExecutor onPrestoOnNullCatalog()
+    public interface ConnectionConsumer
     {
-        return testContext().getDependency(QueryExecutor.class, "presto_null");
-    }
-
-    public static QueryExecutor onHive()
-    {
-        return testContext().getDependency(QueryExecutor.class, "hive");
-    }
-
-    public static PrestoConnection createPrestoConnection()
-            throws SQLException
-    {
-        Configuration config = getPrestoConfiguration();
-        Connection connection = DriverManager.getConnection(
-                config.getStringMandatory("jdbc_url"),
-                config.getStringMandatory("jdbc_user"),
-                config.getStringMandatory("jdbc_password")
-        );
-
-        return connection.unwrap(PrestoConnection.class);
-    }
-
-    private static Configuration getPrestoConfiguration()
-    {
-        return getConfiguration().getSubconfiguration(PRESTO_CONFIGURATION_KEY);
-    }
-
-    private static Configuration getConfiguration()
-    {
-        return testContext().getDependency(Configuration.class);
+        void accept(Connection connection)
+                throws SQLException;
     }
 }

@@ -16,6 +16,7 @@ package com.facebook.presto.tests.utils;
 import java.io.Closeable;
 import java.io.IOException;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Map;
 
 import static com.facebook.presto.tests.utils.QueryExecutors.onPresto;
@@ -74,7 +75,11 @@ public final class PrestoDDLUtils
                 throws SQLException
         {
             String createTableSQL = format(tableDDL, tableName);
-            onPrestoWith(sessionProperties).executeQuery(createTableSQL);
+            onPrestoWith(sessionProperties, connection -> {
+                try (Statement statement = connection.createStatement()) {
+                    statement.executeUpdate(createTableSQL);
+                }
+            });
         }
 
         private void executeDropTable()
