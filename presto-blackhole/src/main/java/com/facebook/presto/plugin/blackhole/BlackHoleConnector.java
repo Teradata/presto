@@ -22,10 +22,12 @@ import com.facebook.presto.spi.ConnectorPageSourceProvider;
 import com.facebook.presto.spi.ConnectorSplitManager;
 import com.facebook.presto.spi.session.PropertyMetadata;
 import com.google.common.collect.ImmutableList;
+import io.airlift.units.Duration;
 
 import java.util.List;
 
 import static com.facebook.presto.spi.session.PropertyMetadata.integerSessionProperty;
+import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 
 public class BlackHoleConnector
         implements Connector
@@ -34,6 +36,7 @@ public class BlackHoleConnector
     public static final String PAGES_PER_SPLIT_PROPERTY = "pages_per_split";
     public static final String ROWS_PER_PAGE_PROPERTY = "rows_per_page";
     public static final String FIELD_LENGTH_PROPERTY = "field_length";
+    public static final String PAGE_PROCESSING_DELAY = "page_processing_delay";
 
     private final BlackHoleMetadata metadata;
     private final BlackHoleHandleResolver connectorHandleResolver;
@@ -107,6 +110,14 @@ public class BlackHoleConnector
                         FIELD_LENGTH_PROPERTY,
                         "Overwrite default length (16) of variable length columns, such as VARCHAR or VARBINARY",
                         16,
-                        false));
+                        false),
+                new PropertyMetadata<>(
+                        PAGE_PROCESSING_DELAY,
+                        "Sleep duration before processing the page",
+                        VARCHAR,
+                        Duration.class,
+                        Duration.valueOf("0s"),
+                        false,
+                        value -> Duration.valueOf((String) value)));
     }
 }

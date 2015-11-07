@@ -32,6 +32,7 @@ import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.TupleDomain;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
+import io.airlift.units.Duration;
 
 import java.util.Collection;
 import java.util.List;
@@ -42,14 +43,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static com.facebook.presto.plugin.blackhole.BlackHoleConnector.FIELD_LENGTH_PROPERTY;
 import static com.facebook.presto.plugin.blackhole.BlackHoleConnector.PAGES_PER_SPLIT_PROPERTY;
+import static com.facebook.presto.plugin.blackhole.BlackHoleConnector.PAGE_PROCESSING_DELAY;
 import static com.facebook.presto.plugin.blackhole.BlackHoleConnector.ROWS_PER_PAGE_PROPERTY;
 import static com.facebook.presto.plugin.blackhole.BlackHoleConnector.SPLIT_COUNT_PROPERTY;
-import static com.facebook.presto.plugin.blackhole.BlackHoleInsertTableHandle.BLACK_HOLE_INSERT_TABLE_HANDLE;
 import static com.facebook.presto.plugin.blackhole.Types.checkType;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
-import static com.google.common.base.Preconditions.checkArgument;
 import static java.text.MessageFormat.format;
-import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
@@ -131,8 +130,8 @@ public class BlackHoleMetadata
                 oldTableHandle.getSplitCount(),
                 oldTableHandle.getPagesPerSplit(),
                 oldTableHandle.getRowsPerPage(),
-                oldTableHandle.getFieldsLength()
-        );
+                oldTableHandle.getFieldsLength(),
+                oldTableHandle.getPageProcessingDelay());
         tables.remove(oldTableHandle.getTableName());
         tables.put(newTableName.getTableName(), newTableHandle);
     }
@@ -168,12 +167,15 @@ public class BlackHoleMetadata
                     SPLIT_COUNT_PROPERTY, PAGES_PER_SPLIT_PROPERTY, ROWS_PER_PAGE_PROPERTY));
         }
 
+        Duration pageProcessingDelay = (Duration) tableMetadata.getProperties().get(PAGE_PROCESSING_DELAY);
+
         return new BlackHoleOutputTableHandle(new BlackHoleTableHandle(
                 tableMetadata,
                 splitCount,
                 pagesPerSplit,
                 rowsPerPage,
-                fieldsLength));
+                fieldsLength,
+                pageProcessingDelay), pageProcessingDelay);
     }
 
     @Override
@@ -187,7 +189,8 @@ public class BlackHoleMetadata
     @Override
     public ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        return BLACK_HOLE_INSERT_TABLE_HANDLE;
+        BlackHoleTableHandle blackHoleTableHandle = checkType(tableHandle, BlackHoleTableHandle.class, "tableHandle");
+        return new BlackHoleInsertTableHandle(blackHoleTableHandle.getPageProcessingDelay());
     }
 
     @Override
@@ -202,15 +205,13 @@ public class BlackHoleMetadata
             Constraint<ColumnHandle> constraint,
             Optional<Set<ColumnHandle>> desiredColumns)
     {
-        requireNonNull(handle, "handle is null");
-        checkArgument(handle instanceof BlackHoleTableHandle);
-        BlackHoleTableHandle blackHoleHandle = (BlackHoleTableHandle) handle;
-
+        BlackHoleTableHandle blackHoleTableHandle = checkType(handle, BlackHoleTableHandle.class, "handle");
         BlackHoleTableLayoutHandle layoutHandle = new BlackHoleTableLayoutHandle(
-                blackHoleHandle.getSplitCount(),
-                blackHoleHandle.getPagesPerSplit(),
-                blackHoleHandle.getRowsPerPage(),
-                blackHoleHandle.getFieldsLength());
+                blackHoleTableHandle.getSplitCount(),
+                blackHoleTableHandle.getPagesPerSplit(),
+                blackHoleTableHandle.getRowsPerPage(),
+                blackHoleTableHandle.getFieldsLength(),
+                blackHoleTableHandle.getPageProcessingDelay());
         return ImmutableList.of(new ConnectorTableLayoutResult(getTableLayout(session, layoutHandle), TupleDomain.all()));
     }
 

@@ -19,12 +19,8 @@ import com.facebook.presto.spi.ConnectorOutputTableHandle;
 import com.facebook.presto.spi.ConnectorPageSink;
 import com.facebook.presto.spi.ConnectorPageSinkProvider;
 import com.facebook.presto.spi.ConnectorSession;
-import com.facebook.presto.spi.Page;
-import com.facebook.presto.spi.block.Block;
-import com.google.common.collect.ImmutableList;
-import io.airlift.slice.Slice;
 
-import java.util.Collection;
+import static com.facebook.presto.plugin.blackhole.Types.checkType;
 
 public class BlackHolePageSinkProvider
         implements ConnectorPageSinkProvider
@@ -32,32 +28,14 @@ public class BlackHolePageSinkProvider
     @Override
     public ConnectorPageSink createPageSink(ConnectorSession session, ConnectorOutputTableHandle outputTableHandle)
     {
-        return new NoOpConnectorPageSink();
+        BlackHoleOutputTableHandle blackHoleOutputTableHandle = checkType(outputTableHandle, BlackHoleOutputTableHandle.class, "outputTableHandle");
+        return new BlackHolePageSink(blackHoleOutputTableHandle.getPageProcessingDelay().toMillis());
     }
 
     @Override
     public ConnectorPageSink createPageSink(ConnectorSession session, ConnectorInsertTableHandle insertTableHandle)
     {
-        return new NoOpConnectorPageSink();
-    }
-
-    private static class NoOpConnectorPageSink
-            implements ConnectorPageSink
-    {
-        @Override
-        public void appendPage(Page page, Block sampleWeightBlock)
-        {
-        }
-
-        @Override
-        public Collection<Slice> commit()
-        {
-            return ImmutableList.of();
-        }
-
-        @Override
-        public void rollback()
-        {
-        }
+        BlackHoleInsertTableHandle blackHoleInsertTableHandle = checkType(insertTableHandle, BlackHoleInsertTableHandle.class, "insertTableHandle");
+        return new BlackHolePageSink(blackHoleInsertTableHandle.getPageProcessingDelay().toMillis());
     }
 }
