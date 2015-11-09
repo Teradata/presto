@@ -97,10 +97,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 import static org.apache.hadoop.hive.ql.io.orc.OrcUtil.getFieldValue;
 
-<<<<<<<HEAD
-        =======
-        >>>>>>>Add decimal support in presto-hive for orc-hive,rc-binary,rc-text and parquet
-
 public class OrcHiveRecordCursor
         extends HiveRecordCursor
 {
