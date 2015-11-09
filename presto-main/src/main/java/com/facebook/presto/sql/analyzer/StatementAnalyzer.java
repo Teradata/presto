@@ -26,6 +26,7 @@ import com.facebook.presto.security.ViewAccessControl;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.AllColumns;
 import com.facebook.presto.sql.tree.Cast;
@@ -119,7 +120,6 @@ import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.collect.Iterables.elementsEqual;
-import static com.google.common.collect.Iterables.transform;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
@@ -439,12 +439,18 @@ class StatementAnalyzer
         analysis.setInsertTarget(targetTableHandle.get());
 
         List<ColumnMetadata> columns = metadata.getTableMetadata(session, targetTableHandle.get()).getColumns();
-        Iterable<Type> tableTypes = columns.stream()
+        Iterable<String> tableTypes = columns.stream()
                 .filter(column -> !column.isHidden())
                 .map(ColumnMetadata::getType)
+                .map(Type::getTypeSignature)
+                .map(TypeSignature::getBase)
                 .collect(toImmutableList());
 
-        Iterable<Type> queryTypes = transform(descriptor.getVisibleFields(), Field::getType);
+        Iterable<String> queryTypes = descriptor.getVisibleFields().stream()
+                .map(Field::getType)
+                .map(Type::getTypeSignature)
+                .map(TypeSignature::getBase)
+                .collect(toImmutableList());
 
         if (!elementsEqual(tableTypes, queryTypes)) {
             throw new SemanticException(MISMATCHED_SET_COLUMN_TYPES, insert, "Insert query has mismatched column types: " +
