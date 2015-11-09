@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.analyzer;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.FunctionType;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.ParametricFunction;
@@ -64,11 +65,14 @@ import com.facebook.presto.sql.tree.WithQuery;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
 
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -118,7 +122,6 @@ import static com.facebook.presto.sql.tree.ExplainType.Type.LOGICAL;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
-import static com.google.common.collect.Iterables.elementsEqual;
 import static com.google.common.collect.Iterables.transform;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -446,13 +449,30 @@ class StatementAnalyzer
 
         Iterable<Type> queryTypes = transform(descriptor.getVisibleFields(), Field::getType);
 
-        if (!elementsEqual(tableTypes, queryTypes)) {
+        if (!typesMatchForInsert(tableTypes, queryTypes)) {
             throw new SemanticException(MISMATCHED_SET_COLUMN_TYPES, insert, "Insert query has mismatched column types: " +
                     "Table: (" + Joiner.on(", ").join(tableTypes) + "), " +
                     "Query: (" + Joiner.on(", ").join(queryTypes) + ")");
         }
 
         return new TupleDescriptor(Field.newUnqualified("rows", BIGINT));
+    }
+
+    private boolean typesMatchForInsert(Iterable<Type> tableTypes, Iterable<Type> queryTypes)
+    {
+        if (Iterables.size(tableTypes) != Iterables.size(queryTypes)) {
+            return false;
+        }
+        Iterator<Type> tableTypesIterator = tableTypes.iterator();
+        Iterator<Type> queryTypesIterator = queryTypes.iterator();
+        while (tableTypesIterator.hasNext()) {
+            Type tableType = tableTypesIterator.next();
+            Type queryType = queryTypesIterator.next();
+            if (!Objects.equals(tableType, queryType) && !FunctionRegistry.isTypeOnlyCoercion(queryType, tableType)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override
