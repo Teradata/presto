@@ -116,7 +116,7 @@
         </artifact>
     </artifactSet>
 
-    <artifactSet to="plugin/teradata-functions">
+    <artifactSet to="plugin/td-functions">
         <artifact id="${project.groupId}:presto-teradata-functions:zip:${project.version}">
             <unpack />
         </artifact>
