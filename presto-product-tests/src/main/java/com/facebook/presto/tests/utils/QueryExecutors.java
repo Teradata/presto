@@ -14,6 +14,7 @@
 package com.facebook.presto.tests.utils;
 
 import com.facebook.presto.jdbc.PrestoConnection;
+import com.teradata.tempto.query.JdbcQueryExecutor;
 import com.teradata.tempto.query.QueryExecutor;
 
 import java.sql.Connection;
@@ -34,11 +35,14 @@ public class QueryExecutors
     public static void onPrestoWith(Map<String, String> sessionProperties, ConnectionConsumer connectionConsumer)
             throws SQLException
     {
-        try (PrestoConnection connection = (PrestoConnection) onPresto().getConnection()) {
+        JdbcQueryExecutor queryExecutor = (JdbcQueryExecutor) onPresto();
+        queryExecutor.openConnection();
+        try (PrestoConnection connection = (PrestoConnection) queryExecutor.getConnection()) {
             sessionProperties.entrySet().stream()
                     .forEach(entry -> connection.setSessionProperty(entry.getKey(), entry.getValue()));
             connectionConsumer.accept(connection);
         }
+        queryExecutor.openConnection();
     }
 
     public interface ConnectionConsumer
