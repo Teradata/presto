@@ -2,20 +2,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <repositories>
-        <repository>
-            <!-- Overwrite value inherited from airbase/oss-parent -->
-            <id>sonatype-nexus-snapshots</id>
-            <url>http://phabricator.td.teradata.com:8081/nexus/content/repositories/presto-td-snapshot</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
-
     <parent>
         <groupId>io.airlift</groupId>
         <artifactId>airbase</artifactId>
