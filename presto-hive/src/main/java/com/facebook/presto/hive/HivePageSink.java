@@ -529,7 +529,7 @@ public class HivePageSink
                 int inputIndex = inputColumnNames.indexOf(columnName);
                 Type inputType = inputColumnTypes.get(inputIndex);
 
-                if (!inputType.equals(fileColumnType)) {
+                if (!inputType.getTypeSignature().getBase().equals(fileColumnType.getTypeSignature().getBase())) {
                     // todo this should be moved to a helper
                     throw new PrestoException(HIVE_PARTITION_SCHEMA_MISMATCH, format("" +
                                     "There is a mismatch between the table and partition schemas. " +
