@@ -49,7 +49,14 @@ public class TestRaptorDistributedQueries
         assertQueryTrue("DROP TABLE array_test");
     }
 
-    @Test
+    @Test(enabled = false)
+    @Override
+    public void testCreateTableAsSelect()
+    {
+        // IGNORE
+    }
+
+    @Test(enabled = false)
     public void testMapTable()
             throws Exception
     {
