@@ -26,6 +26,7 @@ import com.facebook.presto.security.AllowAllAccessControl;
 import com.facebook.presto.security.ViewAccessControl;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.SchemaTableName;
+import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.AllColumns;
@@ -468,11 +469,28 @@ class StatementAnalyzer
         while (tableTypesIterator.hasNext()) {
             Type tableType = tableTypesIterator.next();
             Type queryType = queryTypesIterator.next();
-            if (!Objects.equals(tableType, queryType) && !FunctionRegistry.isTypeOnlyCoercion(queryType, tableType)) {
-                return false;
+
+            if (isStructuralType(tableType)) {
+                if (!tableType.getTypeSignature().getBase().equals(queryType.getTypeSignature().getBase())) {
+                    return false;
+                }
+                if (!typesMatchForInsert(tableType.getTypeParameters(), queryType.getTypeParameters())) {
+                    return false;
+                }
+            }
+            else {
+                if (!Objects.equals(tableType, queryType) && !FunctionRegistry.isTypeOnlyCoercion(queryType, tableType)) {
+                    return false;
+                }
             }
         }
         return true;
+    }
+
+    private static boolean isStructuralType(Type type)
+    {
+        String baseName = type.getTypeSignature().getBase();
+        return baseName.equals(StandardTypes.MAP) || baseName.equals(StandardTypes.ARRAY) || baseName.equals(StandardTypes.ROW);
     }
 
     @Override
