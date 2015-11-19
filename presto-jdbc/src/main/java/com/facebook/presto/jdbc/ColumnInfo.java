@@ -88,7 +88,7 @@ class ColumnInfo
     {
         builder.setColumnType(getType(type));
         ImmutableList.Builder<Integer> parameterTypes = ImmutableList.builder();
-        for (TypeSignature parameter : type.getParameters()) {
+        for (TypeSignature parameter : type.getTypeSignaturesAndAssertNoLiterals()) {
             parameterTypes.add(getType(parameter));
         }
         builder.setColumnParameterTypes(parameterTypes.build());

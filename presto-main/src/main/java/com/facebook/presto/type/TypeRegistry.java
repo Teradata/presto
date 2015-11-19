@@ -131,7 +131,7 @@ public final class TypeRegistry
     private Type instantiateParametricType(TypeSignature signature)
     {
         ImmutableList.Builder<Type> parameterTypes = ImmutableList.builder();
-        for (TypeSignature parameter : signature.getParameters()) {
+        for (TypeSignature parameter : signature.getTypeSignaturesAndAssertNoLiterals()) {
             Type parameterType = getType(parameter);
             if (parameterType == null) {
                 return null;

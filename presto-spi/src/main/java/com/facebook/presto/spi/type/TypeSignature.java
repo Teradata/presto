@@ -86,48 +86,6 @@ public class TypeSignature
         }
     }
 
-    private String toString(String leftParamBracket, String rightParamBracket)
-    {
-        StringBuilder typeName = new StringBuilder(base);
-        if (!parameters.isEmpty()) {
-            typeName.append(leftParamBracket);
-            boolean first = true;
-            for (TypeParameterSignature parameter : parameters) {
-                if (!first) {
-                    typeName.append(",");
-                }
-                first = false;
-                typeName.append(parameter.toString());
-            }
-            typeName.append(rightParamBracket);
-        }
-        if (!literalParameters.isEmpty()) {
-            typeName.append("(");
-            boolean first = true;
-            for (Object parameter : literalParameters) {
-                if (!first) {
-                    typeName.append(",");
-                }
-                first = false;
-                if (parameter instanceof String) {
-                    typeName.append("'").append(parameter).append("'");
-                }
-                else {
-                    typeName.append(parameter.toString());
-                }
-            }
-            typeName.append(")");
-        }
-
-        return typeName.toString();
-    }
-
-    @Deprecated
-    private String rowToString()
-    {
-        return toString("<", ">");
-    }
-
     public String getBase()
     {
         return base;
@@ -138,7 +96,7 @@ public class TypeSignature
         return parameters;
     }
 
-    public List<TypeSignature> getParameters()
+    public List<TypeSignature> getTypeSignaturesAndAssertNoLiterals()
     {
         List<TypeSignature> result = new ArrayList<>();
         for (TypeParameterSignature parameter : parameters) {
@@ -307,6 +265,48 @@ public class TypeSignature
         else {
             return Long.parseLong(literal);
         }
+    }
+
+    @Deprecated
+    private String rowToString()
+    {
+        return toString("<", ">");
+    }
+
+    private String toString(String leftParamBracket, String rightParamBracket)
+    {
+        StringBuilder typeName = new StringBuilder(base);
+        if (!parameters.isEmpty()) {
+            typeName.append(leftParamBracket);
+            boolean first = true;
+            for (TypeParameterSignature parameter : parameters) {
+                if (!first) {
+                    typeName.append(",");
+                }
+                first = false;
+                typeName.append(parameter.toString());
+            }
+            typeName.append(rightParamBracket);
+        }
+        if (!literalParameters.isEmpty()) {
+            typeName.append("(");
+            boolean first = true;
+            for (Object parameter : literalParameters) {
+                if (!first) {
+                    typeName.append(",");
+                }
+                first = false;
+                if (parameter instanceof String) {
+                    typeName.append("'").append(parameter).append("'");
+                }
+                else {
+                    typeName.append(parameter.toString());
+                }
+            }
+            typeName.append(")");
+        }
+
+        return typeName.toString();
     }
 
     @Override

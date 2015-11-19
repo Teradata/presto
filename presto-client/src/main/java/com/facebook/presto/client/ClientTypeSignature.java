@@ -41,7 +41,7 @@ public class ClientTypeSignature
     {
         this(
                 typeSignature.getBase(),
-                Lists.transform(typeSignature.getParameters(), ClientTypeSignature::new),
+                Lists.transform(typeSignature.getTypeSignaturesAndAssertNoLiterals(), ClientTypeSignature::new),
                 typeSignature.getLiteralParameters());
     }
 

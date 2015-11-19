@@ -408,10 +408,10 @@ public class FunctionRegistry
 
     private static TypeSignature bindParameters(TypeSignature typeSignature, Map<String, Type> boundParameters)
     {
-        List<TypeSignature> parameters = typeSignature.getParameters().stream().map(signature -> bindParameters(signature, boundParameters)).collect(toImmutableList());
+        List<TypeSignature> parameters = typeSignature.getTypeSignaturesAndAssertNoLiterals().stream().map(signature -> bindParameters(signature, boundParameters)).collect(toImmutableList());
         String base = typeSignature.getBase();
         if (boundParameters.containsKey(base)) {
-            verify(typeSignature.getLiteralParameters().isEmpty() && typeSignature.getParameters().isEmpty(), "Type parameters cannot have parameters");
+            verify(typeSignature.getLiteralParameters().isEmpty() && typeSignature.getTypeSignaturesAndAssertNoLiterals().isEmpty(), "Type parameters cannot have parameters");
             return boundParameters.get(base).getTypeSignature();
         }
         return new TypeSignature(base, parameters, typeSignature.getLiteralParameters());
