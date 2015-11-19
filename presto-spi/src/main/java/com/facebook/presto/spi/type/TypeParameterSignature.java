@@ -61,6 +61,11 @@ public class TypeParameterSignature
         return typeSignature;
     }
 
+    public Optional<Long> getLongLiteral()
+    {
+        return longLiteral;
+    }
+
     @Override
     public boolean equals(Object o)
     {
