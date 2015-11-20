@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -63,15 +64,17 @@ public class TypeSignature
         this.literalParameters = unmodifiableList(new ArrayList<>(literalParameters));
     }
 
-    private static boolean validateName(String name)
+    public TypeSignature bindParameters(Map<String, Type> boundParameters)
     {
-        for (int i = 0; i < name.length(); i++) {
-            char c = name.charAt(i);
-            if (c == '<' || c == '>' || c == ',') {
-                return false;
+        List<TypeSignature> parameters = getTypeSignaturesAndAssertNoLiterals().stream().map(signature -> signature.bindParameters(boundParameters)).collect(Collectors.toList());
+        String base = getBase();
+        if (boundParameters.containsKey(base)) {
+            if (!getLiteralParameters().isEmpty() || !getTypeSignaturesAndAssertNoLiterals().isEmpty()) {
+                throw new IllegalStateException("Type parameters cannot have parameters");
             }
+            return boundParameters.get(base).getTypeSignature();
         }
-        return true;
+        return new TypeSignature(base, parameters, getLiteralParameters());
     }
 
     @Override
@@ -344,5 +347,16 @@ public class TypeSignature
         if (!argument) {
             throw new AssertionError(message);
         }
+    }
+
+    private static boolean validateName(String name)
+    {
+        for (int i = 0; i < name.length(); i++) {
+            char c = name.charAt(i);
+            if (c == '<' || c == '>' || c == ',') {
+                return false;
+            }
+        }
+        return true;
     }
 }

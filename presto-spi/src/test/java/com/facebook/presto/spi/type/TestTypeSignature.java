@@ -14,9 +14,11 @@
 package com.facebook.presto.spi.type;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import org.testng.annotations.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static org.testng.Assert.assertEquals;
@@ -25,7 +27,41 @@ import static org.testng.Assert.fail;
 public class TestTypeSignature
 {
     @Test
-    public void testRow()
+    public void testBindParameters()
+            throws Exception
+    {
+        Map<String, Type> boundParameters = ImmutableMap.of("T1", VarcharType.VARCHAR, "T2", BigintType.BIGINT);
+
+        assertBindSignature("bigint", boundParameters, "bigint");
+        assertBindSignature("T1", boundParameters, "varchar");
+        assertBindSignature("T2", boundParameters, "bigint");
+        assertBindSignature("array(T1)", boundParameters, "array(varchar)");
+        assertBindSignature("array<T1>", boundParameters, "array(varchar)");
+        assertBindSignature("map(T1,T2)", boundParameters, "map(varchar,bigint)");
+        assertBindSignature("map<T1,T2>", boundParameters, "map(varchar,bigint)");
+        assertBindSignature("row<T1,T2>('a','b')", boundParameters, "row<varchar,bigint>('a','b')");
+
+        assertBindSignatureFails("T1(bigint)", boundParameters, "Unbounded parameters can not have parameters");
+    }
+
+    private void assertBindSignatureFails(String typeName, Map<String, Type> boundParameters, String reason)
+    {
+        try {
+            parseTypeSignature(typeName).bindParameters(boundParameters);
+            fail(reason);
+        }
+        catch (RuntimeException e) {
+            // Expected
+        }
+    }
+
+    private void assertBindSignature(String typeName, Map<String, Type> boundParameters, String expectedTypeName)
+    {
+        assertEquals(parseTypeSignature(typeName).bindParameters(boundParameters).toString(), expectedTypeName);
+    }
+
+    @Test
+    public void parseRowSignature()
             throws Exception
     {
         assertRowSignature(
@@ -56,7 +92,7 @@ public class TestTypeSignature
     }
 
     @Test
-    public void test()
+    public void parseSignature()
             throws Exception
     {
         assertSignature("bigint", "bigint", ImmutableList.<String>of());
@@ -88,7 +124,7 @@ public class TestTypeSignature
     }
 
     @Test
-    public void testLiteralParameters()
+    public void parseWithLiteralParameters()
     {
         assertSignature("foo(42)", "foo", ImmutableList.<String>of("42"));
         assertSignature("varchar(10)", "varchar", ImmutableList.<String>of("10"));
