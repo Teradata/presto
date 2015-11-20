@@ -1139,7 +1139,7 @@ public class PrestoResultSet
         }
 
         ColumnInfo columnInfo = columnInfo(columnIndex);
-        String elementTypeName = getOnlyElement(columnInfo.getColumnTypeSignature().getParameters()).toString();
+        String elementTypeName = getOnlyElement(columnInfo.getColumnTypeSignature().getTypeParameters()).toString();
         int elementType = getOnlyElement(columnInfo.getColumnParameterTypes());
         return new PrestoArray(elementTypeName, elementType, (List<?>) value);
     }

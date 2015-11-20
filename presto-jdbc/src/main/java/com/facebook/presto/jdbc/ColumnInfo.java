@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.jdbc;
 
+import com.facebook.presto.spi.type.TypeParameterSignature;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.google.common.collect.ImmutableList;
 
@@ -88,7 +89,7 @@ class ColumnInfo
     {
         builder.setColumnType(getType(type));
         ImmutableList.Builder<Integer> parameterTypes = ImmutableList.builder();
-        for (TypeSignature parameter : type.getParameters()) {
+        for (TypeParameterSignature parameter : type.getTypeParameters()) {
             parameterTypes.add(getType(parameter));
         }
         builder.setColumnParameterTypes(parameterTypes.build());
@@ -155,6 +156,16 @@ class ColumnInfo
             case "interval day to second":
                 builder.setColumnDisplaySize(TIMESTAMP_MAX);
                 break;
+        }
+    }
+
+    private static int getType(TypeParameterSignature typeParameter)
+    {
+        if (typeParameter.getTypeSignature().isPresent()) {
+            return getType(typeParameter.getTypeSignature().get());
+        }
+        else {
+            return Types.JAVA_OBJECT;
         }
     }
 
