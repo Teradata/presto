@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.spi.type;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -86,5 +87,15 @@ public class TypeParameterSignature
     public int hashCode()
     {
         return Objects.hash(typeSignature, longLiteral);
+    }
+
+    public TypeParameterSignature bindParameters(Map<String, Type> boundParameters)
+    {
+        if (typeSignature.isPresent()) {
+            return TypeParameterSignature.of(typeSignature.get().bindParameters(boundParameters));
+        }
+        else {
+            return this;
+        }
     }
 }

@@ -40,6 +40,7 @@ public class TestTypeSignature
         assertBindSignature("map(T1,T2)", boundParameters, "map(varchar,bigint)");
         assertBindSignature("map<T1,T2>", boundParameters, "map(varchar,bigint)");
         assertBindSignature("row<T1,T2>('a','b')", boundParameters, "row<varchar,bigint>('a','b')");
+        assertBindSignature("bla(T1,42,T2)", boundParameters, "bla(varchar,42,bigint)");
 
         assertBindSignatureFails("T1(bigint)", boundParameters, "Unbounded parameters can not have parameters");
     }

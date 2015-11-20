@@ -66,15 +66,21 @@ public class TypeSignature
 
     public TypeSignature bindParameters(Map<String, Type> boundParameters)
     {
-        List<TypeSignature> parameters = getTypeSignaturesAndAssertNoLiterals().stream().map(signature -> signature.bindParameters(boundParameters)).collect(Collectors.toList());
-        String base = getBase();
         if (boundParameters.containsKey(base)) {
-            if (!getLiteralParameters().isEmpty() || !getTypeSignaturesAndAssertNoLiterals().isEmpty()) {
+            if (!getLiteralParameters().isEmpty() || !getTypeParameters().isEmpty()) {
                 throw new IllegalStateException("Type parameters cannot have parameters");
             }
             return boundParameters.get(base).getTypeSignature();
         }
-        return new TypeSignature(base, parameters, getLiteralParameters());
+
+        if (base.equals(StandardTypes.ROW)) {
+            List<TypeSignature> parameters = getTypeSignaturesAndAssertNoLiterals().stream().map(signature -> signature.bindParameters(boundParameters)).collect(Collectors.toList());
+            return new TypeSignature(base, parameters, getLiteralParameters());
+        }
+        else {
+            List<TypeParameterSignature> parameters = getTypeParameters().stream().map(signature -> signature.bindParameters(boundParameters)).collect(Collectors.toList());
+            return new TypeSignature(base, parameters);
+        }
     }
 
     @Override
