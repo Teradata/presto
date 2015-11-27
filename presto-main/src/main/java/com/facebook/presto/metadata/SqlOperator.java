@@ -41,9 +41,9 @@ public abstract class SqlOperator
         return new SimpleSqlOperator(operatorType, argumentTypes, returnType, methodHandle, nullable, nullableArguments);
     }
 
-    protected SqlOperator(OperatorType operatorType, List<TypeParameter> typeParameters, String returnType, List<String> argumentTypes)
+    protected SqlOperator(OperatorType operatorType, List<TypeParameterRequirement> typeParameterRequirements, String returnType, List<String> argumentTypes)
     {
-        super(mangleOperatorName(operatorType), typeParameters, returnType, argumentTypes);
+        super(mangleOperatorName(operatorType), typeParameterRequirements, returnType, argumentTypes);
     }
 
     @Override
