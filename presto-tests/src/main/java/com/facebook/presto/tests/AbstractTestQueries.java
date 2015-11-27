@@ -3489,7 +3489,7 @@ public abstract class AbstractTestQueries
         assertQuery("SELECT orderkey, CASE orderstatus WHEN 'O' THEN 'a' END FROM orders");
     }
 
-    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = "line 1:67: All CASE results must be the same type: varchar")
+    @Test(expectedExceptions = SemanticException.class, expectedExceptionsMessageRegExp = "line 1:67: All CASE results must be the same type: varchar\\(1\\)")
     public void testCaseNoElseInconsistentResultType()
         throws Exception
     {
