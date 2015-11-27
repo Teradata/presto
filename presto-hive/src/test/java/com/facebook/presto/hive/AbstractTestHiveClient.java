@@ -354,7 +354,7 @@ public abstract class AbstractTestHiveClient
         List<HivePartition> partitions = ImmutableList.<HivePartition>builder()
                 .add(new HivePartition(tablePartitionFormat,
                         TupleDomain.<HiveColumnHandle>all(),
-                        "ds=2012-12-29/file_format=textfile/dummy=1",
+                        "ds=2012-12-29/file_format=textfile/dummy=1/dummy_decimal_short=1.1/dummy_decimal_long=1.11111111111111111111BD",
                         ImmutableMap.<ColumnHandle, NullableValue>builder()
                                 .put(dsColumn, NullableValue.of(VARCHAR, utf8Slice("2012-12-29")))
                                 .put(fileFormatColumn, NullableValue.of(VARCHAR, utf8Slice("textfile")))
@@ -365,7 +365,7 @@ public abstract class AbstractTestHiveClient
                         Optional.empty()))
                 .add(new HivePartition(tablePartitionFormat,
                         TupleDomain.<HiveColumnHandle>all(),
-                        "ds=2012-12-29/file_format=sequencefile/dummy=2",
+                        "ds=2012-12-29/file_format=sequencefile/dummy=2/dummy_decimal_short=2.2/dummy_decimal_long=2.22222222222222222222BD",
                         ImmutableMap.<ColumnHandle, NullableValue>builder()
                                 .put(dsColumn, NullableValue.of(VARCHAR, utf8Slice("2012-12-29")))
                                 .put(fileFormatColumn, NullableValue.of(VARCHAR, utf8Slice("sequencefile")))
@@ -376,7 +376,7 @@ public abstract class AbstractTestHiveClient
                         Optional.empty()))
                 .add(new HivePartition(tablePartitionFormat,
                         TupleDomain.<HiveColumnHandle>all(),
-                        "ds=2012-12-29/file_format=rctext/dummy=3",
+                        "ds=2012-12-29/file_format=rctext/dummy=3/dummy_decimal_short=3.3/dummy_decimal_long=3.33333333333333333333BD",
                         ImmutableMap.<ColumnHandle, NullableValue>builder()
                                 .put(dsColumn, NullableValue.of(VARCHAR, utf8Slice("2012-12-29")))
                                 .put(fileFormatColumn, NullableValue.of(VARCHAR, utf8Slice("rctext")))
@@ -387,7 +387,7 @@ public abstract class AbstractTestHiveClient
                         Optional.empty()))
                 .add(new HivePartition(tablePartitionFormat,
                         TupleDomain.<HiveColumnHandle>all(),
-                        "ds=2012-12-29/file_format=rcbinary/dummy=4",
+                        "ds=2012-12-29/file_format=rcbinary/dummy=4/dummy_decimal_short=4.4/dummy_decimal_long=4.44444444444444444444BD",
                         ImmutableMap.<ColumnHandle, NullableValue>builder()
                                 .put(dsColumn, NullableValue.of(VARCHAR, utf8Slice("2012-12-29")))
                                 .put(fileFormatColumn, NullableValue.of(VARCHAR, utf8Slice("rcbinary")))
