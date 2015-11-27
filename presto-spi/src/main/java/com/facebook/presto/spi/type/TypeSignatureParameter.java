@@ -23,27 +23,42 @@ public class TypeSignatureParameter
 {
     private final Optional<TypeSignature> typeSignature;
     private final Optional<Long> longLiteral;
+    private final Optional<NamedTypeSignature> namedTypeSignature;
+
+    private TypeSignatureParameter(
+            Optional<TypeSignature> typeSignature,
+            Optional<Long> longLiteral,
+            Optional<NamedTypeSignature> namedTypeSignature)
+    {
+        int presentCount = (typeSignature.isPresent() ? 1 : 0) +
+                (longLiteral.isPresent() ? 1 : 0) +
+                (namedTypeSignature.isPresent() ? 1 : 0);
+
+        if (presentCount != 1) {
+            throw new IllegalStateException(
+                    format("Parameters are mutual exclusive but [%s, %s, %s] was found",
+                            typeSignature,
+                            longLiteral,
+                            namedTypeSignature));
+        }
+        this.typeSignature = typeSignature;
+        this.longLiteral = longLiteral;
+        this.namedTypeSignature = namedTypeSignature;
+    }
 
     public static TypeSignatureParameter of(TypeSignature typeSignature)
     {
-        return new TypeSignatureParameter(Optional.of(typeSignature), Optional.empty());
+        return new TypeSignatureParameter(Optional.of(typeSignature), Optional.empty(), Optional.empty());
     }
 
     public static TypeSignatureParameter of(long longLiteral)
     {
-        return new TypeSignatureParameter(Optional.empty(), Optional.of(longLiteral));
+        return new TypeSignatureParameter(Optional.empty(), Optional.of(longLiteral), Optional.empty());
     }
 
-    private TypeSignatureParameter(Optional<TypeSignature> typeSignature, Optional<Long> longLiteral)
+    public static TypeSignatureParameter of(NamedTypeSignature namedTypeSignature)
     {
-        if (!(typeSignature.isPresent() ^ longLiteral.isPresent())) {
-            throw new IllegalStateException(
-                    format("typeSignature and longLiteral are mutual exclusive but [%s, %s] was found",
-                            typeSignature.get(),
-                            longLiteral.get()));
-        }
-        this.typeSignature = typeSignature;
-        this.longLiteral = longLiteral;
+        return new TypeSignatureParameter(Optional.empty(), Optional.empty(), Optional.of(namedTypeSignature));
     }
 
     @Override
@@ -52,8 +67,14 @@ public class TypeSignatureParameter
         if (typeSignature.isPresent()) {
             return typeSignature.get().toString();
         }
-        else {
+        else if (longLiteral.isPresent()) {
             return longLiteral.get().toString();
+        }
+        else if (namedTypeSignature.isPresent()) {
+            return namedTypeSignature.get().toString();
+        }
+        else {
+            throw new UnsupportedOperationException("Unsupported TypeSignatureParameter in toString");
         }
     }
 
@@ -65,6 +86,11 @@ public class TypeSignatureParameter
     public Optional<Long> getLongLiteral()
     {
         return longLiteral;
+    }
+
+    public Optional<NamedTypeSignature> getNamedTypeSignature()
+    {
+        return namedTypeSignature;
     }
 
     @Override
@@ -80,19 +106,25 @@ public class TypeSignatureParameter
         TypeSignatureParameter other = (TypeSignatureParameter) o;
 
         return Objects.equals(this.typeSignature, other.typeSignature) &&
-                Objects.equals(this.longLiteral, other.longLiteral);
+                Objects.equals(this.longLiteral, other.longLiteral) &&
+                Objects.equals(this.namedTypeSignature, other.namedTypeSignature);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(typeSignature, longLiteral);
+        return Objects.hash(typeSignature, longLiteral, namedTypeSignature);
     }
 
     public TypeSignatureParameter bindParameters(Map<String, Type> boundParameters)
     {
         if (typeSignature.isPresent()) {
             return TypeSignatureParameter.of(typeSignature.get().bindParameters(boundParameters));
+        }
+        else if (namedTypeSignature.isPresent()) {
+            return TypeSignatureParameter.of(new NamedTypeSignature(
+                    namedTypeSignature.get().getName(),
+                    namedTypeSignature.get().getTypeSignature().bindParameters(boundParameters)));
         }
         else {
             return this;

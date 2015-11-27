@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.client;
 
+import com.facebook.presto.spi.type.NamedTypeSignature;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -23,13 +24,15 @@ import javax.annotation.concurrent.Immutable;
 import java.util.Objects;
 import java.util.Optional;
 
-import static com.google.common.base.Preconditions.checkArgument;
+import static java.lang.String.format;
 
 @Immutable
 public class ClientTypeSignatureParameter
 {
     private final Optional<ClientTypeSignature> typeSignature;
     private final Optional<Long> longLiteral;
+    // TODO: use NamedClientTypeSignature here?
+    private final Optional<NamedTypeSignature> namedTypeSignature;
 
     public ClientTypeSignatureParameter(TypeSignatureParameter typeParameterSignature)
     {
@@ -41,16 +44,30 @@ public class ClientTypeSignatureParameter
             this.typeSignature = Optional.empty();
         }
         longLiteral = typeParameterSignature.getLongLiteral();
+        namedTypeSignature = typeParameterSignature.getNamedTypeSignature();
     }
 
     @JsonCreator
     public ClientTypeSignatureParameter(
             @JsonProperty("typeSignature") Optional<ClientTypeSignature> typeSignature,
-            @JsonProperty("longLiteral") Optional<Long> longLiteral)
+            @JsonProperty("longLiteral") Optional<Long> longLiteral,
+            @JsonProperty("namedTypeSignature") Optional<NamedTypeSignature> namedTypeSignature)
     {
-        checkArgument(typeSignature.isPresent() ^ longLiteral.isPresent(), "Only one of the typeSignature and longLiteral must be set");
+        int presentCount = (typeSignature.isPresent() ? 1 : 0) +
+                (longLiteral.isPresent() ? 1 : 0) +
+                (namedTypeSignature.isPresent() ? 1 : 0);
+
+        if (presentCount != 1) {
+            throw new IllegalStateException(
+                    format("Parameters are mutual exclusive but [%s, %s, %s] was found",
+                            typeSignature,
+                            longLiteral,
+                            namedTypeSignature));
+        }
+
         this.typeSignature = typeSignature;
         this.longLiteral = longLiteral;
+        this.namedTypeSignature = namedTypeSignature;
     }
 
     @JsonProperty
@@ -65,14 +82,26 @@ public class ClientTypeSignatureParameter
         return longLiteral;
     }
 
+    @JsonProperty
+    public Optional<NamedTypeSignature> getNamedTypeSignature()
+    {
+        return namedTypeSignature;
+    }
+
     @Override
     public String toString()
     {
         if (typeSignature.isPresent()) {
             return typeSignature.get().toString();
         }
-        else {
+        else if (longLiteral.isPresent()) {
             return longLiteral.get().toString();
+        }
+        else if (namedTypeSignature.isPresent()) {
+            return namedTypeSignature.get().toString();
+        }
+        else {
+            throw new UnsupportedOperationException("ClientTypeSignatureParameter::toString has failed");
         }
     }
 
@@ -89,12 +118,13 @@ public class ClientTypeSignatureParameter
         ClientTypeSignatureParameter other = (ClientTypeSignatureParameter) o;
 
         return Objects.equals(this.typeSignature, other.typeSignature) &&
-                Objects.equals(this.longLiteral, other.longLiteral);
+                Objects.equals(this.longLiteral, other.longLiteral) &&
+                Objects.equals(this.namedTypeSignature, other.namedTypeSignature);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(typeSignature, longLiteral);
+        return Objects.hash(typeSignature, longLiteral, namedTypeSignature);
     }
 }

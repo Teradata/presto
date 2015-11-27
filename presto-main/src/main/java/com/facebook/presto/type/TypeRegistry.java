@@ -13,8 +13,10 @@
  */
 package com.facebook.presto.type;
 
+import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
+import com.facebook.presto.spi.type.TypeParameter;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
 import com.google.common.collect.ImmutableList;
@@ -23,6 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -55,6 +58,7 @@ import static com.facebook.presto.type.UnknownType.UNKNOWN;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 @ThreadSafe
 public final class TypeRegistry
@@ -123,28 +127,33 @@ public final class TypeRegistry
 
     @Override
     @Deprecated
-    public Type getParameterizedType(String baseTypeName, List<TypeSignature> typeParameters, List<Object> literalParameters)
+    public Type getParameterizedType(String baseTypeName, List<TypeSignature> typeParameters, List<String> literalParameters)
     {
-        return getType(new TypeSignature(baseTypeName, typeParameters, literalParameters));
+        if (baseTypeName.equals(StandardTypes.ROW)) {
+            return getType(new TypeSignature(baseTypeName, typeParameters, literalParameters));
+        }
+        return getParameterizedType(
+                baseTypeName,
+                typeParameters.stream().map(TypeSignatureParameter::of).collect(toList()));
     }
 
     private Type instantiateParametricType(TypeSignature signature)
     {
-        ImmutableList.Builder<Type> parameterTypes = ImmutableList.builder();
-        // TODO: add literals to Types and switch to TypeSignatureParameter
-        for (TypeSignature parameter : signature.getTypeParametersAsTypeSignatures()) {
-            Type parameterType = getType(parameter);
-            if (parameterType == null) {
+        List<TypeParameter> parameters = new ArrayList<>();
+
+        for (TypeSignatureParameter parameter : signature.getParameters()) {
+            TypeParameter typeParameter = TypeParameter.of(parameter, this);
+            if (typeParameter == null) {
                 return null;
             }
-            parameterTypes.add(parameterType);
+            parameters.add(typeParameter);
         }
 
         ParametricType parametricType = parametricTypes.get(signature.getBase().toLowerCase(Locale.ENGLISH));
         if (parametricType == null) {
             return null;
         }
-        Type instantiatedType = parametricType.createType(parameterTypes.build(), signature.getLiteralParameters());
+        Type instantiatedType = parametricType.createType(parameters);
         checkState(instantiatedType.getTypeSignature().equals(signature), "Instantiated parametric type name (%s) does not match expected name (%s)", instantiatedType, signature);
         return instantiatedType;
     }

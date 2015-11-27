@@ -15,8 +15,10 @@ package com.facebook.presto.type;
 
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.TypeParameter;
 
 import java.util.List;
+import java.util.Optional;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
@@ -36,10 +38,12 @@ public final class MapParametricType
     }
 
     @Override
-    public MapType createType(List<Type> types, List<Object> literals)
+    public Type createType(List<TypeParameter> parameters)
     {
-        checkArgument(types.size() == 2, "Expected two types");
-        checkArgument(literals.isEmpty(), "Unexpected literals: %s", literals);
-        return new MapType(types.get(0), types.get(1));
+        checkArgument(parameters.size() == 2, "Expected two parameters, got %s", parameters);
+        Optional<Type> key = parameters.get(0).getType();
+        Optional<Type> value = parameters.get(1).getType();
+        checkArgument(key.isPresent() && value.isPresent(), "Expected key and type to be types, got %s", parameters);
+        return new MapType(key.get(), value.get());
     }
 }

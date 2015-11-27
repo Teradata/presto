@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.client;
 
+import com.facebook.presto.spi.type.NamedTypeSignature;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -29,6 +30,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static com.facebook.presto.spi.type.StandardTypes.ARRAY;
@@ -240,10 +242,12 @@ public class QueryResults
         if (signature.getBase().equals(ROW)) {
             Map<String, Object> fixedValue = new LinkedHashMap<>();
             List<Object> listValue = List.class.cast(value);
-            checkArgument(listValue.size() == signature.getLiteralParameters().size(), "Mismatched data values and row type");
+            checkArgument(listValue.size() == signature.getParameters().size(), "Mismatched data values and row type");
             for (int i = 0; i < listValue.size(); i++) {
-                String key = (String) signature.getLiteralParameters().get(i);
-                fixedValue.put(key, fixValue(signature.getTypeParametersAsTypeSignatures().get(i).toString(), listValue.get(i)));
+                Optional<NamedTypeSignature> namedTypeSignature = signature.getParameters().get(i).getNamedTypeSignature();
+                checkArgument(namedTypeSignature.isPresent(), "Unexpected parameter [%s] for row type", namedTypeSignature);
+                String key = namedTypeSignature.get().getName();
+                fixedValue.put(key, fixValue(namedTypeSignature.get().getTypeSignature().toString(), listValue.get(i)));
             }
             return fixedValue;
         }
