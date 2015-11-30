@@ -5,22 +5,20 @@ Fragment 0 [SINGLE]
             _col1 := count
         - Sort[n_regionkey ASC_NULLS_LAST] => [n_regionkey:bigint, count:bigint]
             - RemoteSource[1] => [n_regionkey:bigint, count:bigint]
-\
+
 Fragment 1 [FIXED]
     Output layout: [n_regionkey, count]
-    - Aggregate(FINAL)[n_regionkey] => [n_regionkey:bigint, $hashvalue:bigint, count:bigint]
-            count := "count"("count_8")
-        - RemoteSource[2] => [n_regionkey:bigint, $hashvalue:bigint, count_8:bigint]
-\
+    - Aggregate(FINAL)[n_regionkey] => [n_regionkey:bigint, count:bigint]
+            count := "count"("count_9")
+        - RemoteSource[2] => [n_regionkey:bigint, count_9:bigint]
+
 Fragment 2 [SOURCE]
-    Output layout: [n_regionkey, $hashvalue, count_8]
+    Output layout: [n_regionkey, count_9]
     Output partitioning: [n_regionkey]
-    - Aggregate(PARTIAL)[n_regionkey] => [n_regionkey:bigint, $hashvalue:bigint, count_8:bigint]
-            count_8 := "count"(*)
-        - Project => [n_regionkey:bigint, $hashvalue:bigint]
-                $hashvalue := "combine_hash"(0, COALESCE("$operator$hash_code"("n_regionkey"), 0))
-            - TableScan[hive:hive:default:nation, originalConstraint = true] => [n_regionkey:bigint]
-                    LAYOUT: hive
-                    n_regionkey := HiveColumnHandle{clientId=hive, name=n_regionkey, hiveType=int, hiveColumnIndex=2, partitionKey=false}
-\
+    - Aggregate(PARTIAL)[n_regionkey] => [n_regionkey:bigint, count_9:bigint]
+            count_9 := "count"(*)
+        - TableScan[hive:hive:default:nation, originalConstraint = true] => [n_regionkey:bigint]
+                LAYOUT: hive
+                n_regionkey := HiveColumnHandle{clientId=hive, name=n_regionkey, hiveType=int, hiveColumnIndex=2, partitionKey=false}
+
 |
