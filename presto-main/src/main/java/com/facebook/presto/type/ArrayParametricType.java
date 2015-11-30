@@ -39,8 +39,8 @@ public final class ArrayParametricType
     @Override
     public Type createType(List<TypeParameter> parameters)
     {
-        checkArgument(parameters.size() == 1, "Expected only one type, got %s", parameters);
-        checkArgument(parameters.get(0).getType().isPresent(), "Expected type as a parameter, got %s", parameters);
+        checkArgument(parameters.size() == 1, "Array type expects exactly one type as a parameter, got %s", parameters);
+        checkArgument(parameters.get(0).getType().isPresent(), "Array expects type as a parameter, got %s", parameters);
         return new ArrayType(parameters.get(0).getType().get());
     }
 }

@@ -459,8 +459,13 @@ public class FunctionRegistry
             Signature signature = bindSignature(function.getSignature(), resolvedTypes, true, typeManager);
             if (signature != null) {
                 // TODO: This should also check for ambiguities
-                return signature;
+                match = signature;
+                break;
             }
+        }
+
+        if (match != null) {
+            return match.resolveCalculatedTypes(parameterTypes);
         }
 
         List<String> expectedParameters = new ArrayList<>();
@@ -705,18 +710,26 @@ public class FunctionRegistry
         return true;
     }
 
+    public static boolean canCoerce(String actualTypeBase, String expectedTypeBase)
+    {
+        // null can be cast to anything
+        if (actualTypeBase.equals(UNKNOWN.getTypeSignature().getBase())) {
+            return true;
+        }
+        return false;
+    }
+
     public static boolean canCoerce(Type actualType, Type expectedType)
     {
+        if (canCoerce(actualType.getTypeSignature().getBase(), expectedType.getTypeSignature().getBase())) {
+            return true;
+        }
         // are types the same
         if (expectedType.equals(actualType)) {
             return true;
         }
         // is this a coercion of the type only (no data change)
         if (isTypeOnlyCoercion(actualType, expectedType)) {
-            return true;
-        }
-        // null can be cast to anything
-        if (actualType.equals(UNKNOWN)) {
             return true;
         }
         // widen bigint to double
@@ -738,6 +751,10 @@ public class FunctionRegistry
         // widen timestamp to timestamp with time zone
         if (actualType.equals(TIMESTAMP) && expectedType.equals(TIMESTAMP_WITH_TIME_ZONE)) {
             return true;
+        }
+
+        if (actualType instanceof VarcharType && expectedType instanceof VarcharType) {
+            return ((VarcharType) actualType).getLength() <= ((VarcharType) expectedType).getLength();
         }
 
         if (actualType instanceof VarcharType && expectedType.equals(REGEXP)) {
@@ -771,7 +788,7 @@ public class FunctionRegistry
             if (expectedType.equals(VARCHAR)) {
                 return true;
             }
-            return ((VarcharType) actualType).getLength().orElse(Integer.MAX_VALUE) < ((VarcharType) expectedType).getLength().orElse(Integer.MAX_VALUE);
+            return ((VarcharType) actualType).getLength() < ((VarcharType) expectedType).getLength();
         }
 
         return false;
@@ -828,10 +845,7 @@ public class FunctionRegistry
         if (firstType instanceof VarcharType && secondType instanceof VarcharType) {
             VarcharType firstVarchar = (VarcharType) firstType;
             VarcharType secondVarchar = (VarcharType) secondType;
-            if (!firstVarchar.getLength().isPresent() || !secondVarchar.getLength().isPresent()) {
-                return Optional.of(VARCHAR);
-            }
-            int length = Math.max(firstVarchar.getLength().getAsInt(), secondVarchar.getLength().getAsInt());
+            int length = Math.max(firstVarchar.getLength(), secondVarchar.getLength());
             return Optional.of(createVarcharType(length));
         }
 

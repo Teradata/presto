@@ -19,6 +19,8 @@ import com.facebook.presto.operator.scalar.ScalarFunction;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.sql.tree.QualifiedName;
+import com.facebook.presto.type.ArrayType;
+import com.facebook.presto.type.MapType;
 import com.facebook.presto.type.SqlType;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.base.Functions;
@@ -30,9 +32,11 @@ import java.util.List;
 import static com.facebook.presto.metadata.FunctionRegistry.getMagicLiteralFunctionSignature;
 import static com.facebook.presto.metadata.FunctionRegistry.mangleOperatorName;
 import static com.facebook.presto.metadata.FunctionRegistry.unmangleOperator;
+import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.HyperLogLogType.HYPER_LOG_LOG;
 import static com.facebook.presto.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
+import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
 import static com.facebook.presto.type.TypeUtils.resolveTypes;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.collect.Lists.transform;
@@ -42,6 +46,14 @@ import static org.testng.Assert.assertTrue;
 
 public class TestFunctionRegistry
 {
+    @Test
+    public void testCanCoerce()
+    {
+        assertFalse(FunctionRegistry.canCoerce(new ArrayType(new ArrayType(BIGINT)), new ArrayType(new MapType(BIGINT, BIGINT))));
+        assertFalse(FunctionRegistry.canCoerce(createVarcharType(5), createVarcharType(3)));
+        assertTrue(FunctionRegistry.canCoerce(createVarcharType(3), createVarcharType(5)));
+    }
+
     @Test
     public void testIdentityCast()
     {

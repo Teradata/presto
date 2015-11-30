@@ -19,34 +19,36 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 
-import java.util.OptionalInt;
-
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 public class VarcharType
         extends AbstractVariableWidthType
 {
-    public static final VarcharType VARCHAR = new VarcharType(OptionalInt.empty());
+    public static final int MAX_LENGTH = Integer.MAX_VALUE;
+    public static final VarcharType VARCHAR = new VarcharType(MAX_LENGTH);
 
     public static VarcharType createVarcharType(int length)
     {
-        return new VarcharType(OptionalInt.of(length));
+        return new VarcharType(length);
     }
 
-    private final OptionalInt length;
+    private final int length;
 
-    private VarcharType(OptionalInt length)
+    private VarcharType(int length)
     {
-        super(new TypeSignature(StandardTypes.VARCHAR, emptyList(), length.isPresent() ? singletonList((long) length.getAsInt()) : emptyList()), Slice.class);
+        super(
+                new TypeSignature(
+                        StandardTypes.VARCHAR,
+                        singletonList(TypeSignatureParameter.of((long) length))),
+                Slice.class);
 
-        if (length.isPresent() && length.getAsInt() < 0) {
+        if (length < 0) {
             throw new IllegalArgumentException("Invalid VARCHAR length " + length);
         }
         this.length = length;
     }
 
-    public OptionalInt getLength()
+    public int getLength()
     {
         return length;
     }

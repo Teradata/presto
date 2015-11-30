@@ -112,6 +112,9 @@ public class TypeParameter
         else if (namedType.isPresent()) {
             return namedType.get().toString();
         }
+        else if (literalCalculation.isPresent()) {
+            return literalCalculation.get().toString();
+        }
         else {
             throw new UnsupportedOperationException("Unkown state of type parameter");
         }
@@ -130,6 +133,11 @@ public class TypeParameter
     public Optional<NamedType> getNamedType()
     {
         return namedType;
+    }
+
+    public Optional<TypeLiteralCalculation> getLiteralCalculation()
+    {
+        return literalCalculation;
     }
 
     @Override

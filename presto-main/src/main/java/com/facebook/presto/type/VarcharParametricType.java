@@ -15,6 +15,7 @@ package com.facebook.presto.type;
 
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.TypeParameter;
 import com.facebook.presto.spi.type.VarcharType;
 
 import java.util.List;
@@ -31,26 +32,24 @@ public class VarcharParametricType
     }
 
     @Override
-    public Type createType(List<Type> types, List<Object> literals)
+    public Type createType(List<TypeParameter> parameters)
     {
-        if (!types.isEmpty()) {
-            throw new IllegalArgumentException("Type parameters not allowed for VARCHAR");
+        if (parameters.isEmpty()) {
+            return VarcharType.createVarcharType(VarcharType.MAX_LENGTH);
         }
-        if (literals.isEmpty()) {
-            return VarcharType.VARCHAR;
-        }
-        if (literals.size() != 1) {
-            throw new IllegalArgumentException("Expected only one parameter for VARCHAR");
+        if (parameters.size() != 1) {
+            throw new IllegalArgumentException("Expected at most one parameter for VARCHAR");
         }
 
-        Object literal = literals.get(0);
-        if (!(literal instanceof Long)) {
+        TypeParameter parameter = parameters.get(0);
+
+        if (!parameter.getLongLiteral().isPresent()) {
             throw new IllegalArgumentException("VARCHAR length must be a number");
         }
 
-        long length = (Long) literal;
+        long length = parameter.getLongLiteral().get();
         if (length < 0 || length > Integer.MAX_VALUE) {
-            throw new IllegalArgumentException("Invalid VARCHAR length " + literal);
+            throw new IllegalArgumentException("Invalid VARCHAR length " + length);
         }
         return VarcharType.createVarcharType((int) length);
     }

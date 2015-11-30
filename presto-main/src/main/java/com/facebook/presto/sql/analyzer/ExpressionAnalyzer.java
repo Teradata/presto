@@ -537,14 +537,26 @@ public class ExpressionAnalyzer
         @Override
         protected Type visitLikePredicate(LikePredicate node, AnalysisContext context)
         {
-            coerceType(context, node.getValue(), VARCHAR, "Left side of LIKE expression");
-            coerceType(context, node.getPattern(), VARCHAR, "Pattern for LIKE expression");
+            Type valueType = getVarcharType(node.getValue(), context);
+            Type patternType = getVarcharType(node.getPattern(), context);
+            coerceType(context, node.getValue(), valueType, "Left side of LIKE expression");
+            coerceType(context, node.getPattern(), patternType, "Pattern for LIKE expression");
             if (node.getEscape() != null) {
-                coerceType(context, node.getEscape(), VARCHAR, "Escape for LIKE expression");
+                Type escapeType = getVarcharType(node.getEscape(), context);
+                coerceType(context, node.getEscape(), escapeType, "Escape for LIKE expression");
             }
 
             expressionTypes.put(node, BOOLEAN);
             return BOOLEAN;
+        }
+
+        private Type getVarcharType(Expression value, AnalysisContext context)
+        {
+            Type type = process(value, context);
+            if (!(type instanceof VarcharType)) {
+                return VARCHAR;
+            }
+            return type;
         }
 
         @Override

@@ -59,12 +59,10 @@ public class VarcharToVarcharCast
 
     private static MethodHandle getMethodHandle(VarcharType fromType, VarcharType toType)
     {
-        if (toType.getLength().isPresent()) {
-            int toLength = toType.getLength().getAsInt();
-            if (toLength < fromType.getLength().orElse(Integer.MAX_VALUE)) {
-                return MethodHandles.insertArguments(TRUNCATE_METHOD_HANDLE, 1, toLength);
-            }
+        if (toType.getLength() < fromType.getLength()) {
+            return MethodHandles.insertArguments(TRUNCATE_METHOD_HANDLE, 1, toType.getLength());
         }
+
         return MethodHandles.identity(Slice.class);
     }
 
