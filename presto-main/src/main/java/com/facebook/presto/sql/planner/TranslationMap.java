@@ -175,9 +175,9 @@ class TranslationMap
                 Expression rewrittenExpression = treeRewriter.defaultRewrite(node, context);
 
                 // cast expression if coercion is registered
-                Type type = analysis.getType(node);
                 Type coercion = analysis.getCoercion(node);
                 if (coercion != null) {
+                    Type type = analysis.getType(node);
                     rewrittenExpression = new Cast(rewrittenExpression, coercion.getTypeSignature().toString(), false, isTypeOnlyCoercion(type, coercion));
                 }
 
