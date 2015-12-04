@@ -31,6 +31,7 @@ class ColumnInfo
     private static final int TIMESTAMP_MAX = "yyyy-MM-dd HH:mm:ss.SSS".length();
     private static final int TIMESTAMP_WITH_TIME_ZONE_MAX = TIMESTAMP_MAX + TIME_ZONE_MAX;
     private static final int DATE_MAX = "yyyy-MM-dd".length();
+    private static final int DECIMAL_MAX = 38;
 
     private final int columnType;
     private final List<Integer> columnParameterTypes;
@@ -155,6 +156,12 @@ class ColumnInfo
             case "interval day to second":
                 builder.setColumnDisplaySize(TIMESTAMP_MAX);
                 break;
+            case "decimal":
+                builder.setSigned(true);
+                builder.setColumnDisplaySize((int) type.getLiteralParameters().get(0) + 1);
+                builder.setPrecision((int) type.getLiteralParameters().get(0));
+                builder.setScale((int) type.getLiteralParameters().get(1));
+                break;
         }
     }
 
@@ -184,6 +191,8 @@ class ColumnInfo
                 return Types.TIMESTAMP;
             case "date":
                 return Types.DATE;
+            case "decimal":
+                return Types.DECIMAL;
             default:
                 return Types.JAVA_OBJECT;
         }
