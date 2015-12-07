@@ -339,17 +339,24 @@ public final class Signature
                 if (canCoerce(type, boundParameters.get(parameter.getBase()))) {
                     return true;
                 }
-                else if (canCoerce(boundParameters.get(parameter.getBase()), type) && typeParameters.get(parameter.getBase()).canBind(type)) {
-                    // Try to coerce current binding to new candidate
-                    boundParameters.put(parameter.getBase(), type);
-                    return true;
-                }
                 else {
-                    // Try to use common super type of current binding and candidate
-                    Optional<Type> commonSuperType = getCommonSuperType(boundParameters.get(parameter.getBase()), type);
-                    if (commonSuperType.isPresent() && typeParameters.get(parameter.getBase()).canBind(commonSuperType.get())) {
-                        boundParameters.put(parameter.getBase(), commonSuperType.get());
+                    Optional<Type> boundType;
+                    boundType = typeParameters.get(parameter.getBase()).canBindAllowingCoercion(type);
+                    if (canCoerce(boundParameters.get(parameter.getBase()), type) && boundType.isPresent()) {
+                        // Try to coerce current binding to new candidate
+                        boundParameters.put(parameter.getBase(), boundType.get());
                         return true;
+                    }
+                    else {
+                        // Try to use common super type of current binding and candidate
+                        Optional<Type> commonSuperType = getCommonSuperType(boundParameters.get(parameter.getBase()), type);
+                        if (commonSuperType.isPresent()) {
+                            boundType = typeParameters.get(parameter.getBase()).canBindAllowingCoercion(commonSuperType.get());
+                            if (boundType.isPresent()) {
+                                boundParameters.put(parameter.getBase(), boundType.get());
+                                return true;
+                            }
+                        }
                     }
                 }
                 return false;
@@ -376,10 +383,11 @@ public final class Signature
         // Bind parameter, if this is a free type parameter
         if (typeParameters.containsKey(parameter.getBase())) {
             TypeParameter typeParameter = typeParameters.get(parameter.getBase());
-            if (!typeParameter.canBind(type)) {
+            Optional<Type> boundType = typeParameter.canBind(type, allowCoercion);
+            if (!boundType.isPresent()) {
                 return false;
             }
-            boundParameters.put(parameter.getBase(), type);
+            boundParameters.put(parameter.getBase(), boundType.get());
             return true;
         }
 

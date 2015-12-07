@@ -13,13 +13,16 @@
  */
 package com.facebook.presto.metadata;
 
+import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.VarcharType;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import javax.annotation.Nullable;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -67,18 +70,47 @@ public final class TypeParameter
         return variadicBound;
     }
 
-    public boolean canBind(Type type)
+    public Optional<Type> canBind(Type type, boolean allowCoercion)
+    {
+        return allowCoercion ? canBindAllowingCoercion(type) : canBindNoCoercion(type);
+    }
+
+    public Optional<Type> canBindNoCoercion(Type type)
     {
         if (comparableRequired && !type.isComparable()) {
-            return false;
+            return Optional.empty();
         }
         if (orderableRequired && !type.isOrderable()) {
-            return false;
+            return Optional.empty();
         }
         if (variadicBound != null && !type.getTypeSignature().getBase().equals(variadicBound)) {
-            return false;
+            return Optional.empty();
         }
-        return true;
+        return Optional.of(type);
+    }
+
+    public Optional<Type> canBindAllowingCoercion(Type type)
+    {
+        Optional<Type> boundType = canBindNoCoercion(type);
+        if (!boundType.isPresent()) {
+            if (variadicBound == null) {
+                return Optional.empty();
+            }
+            // hack zone - should reuse coercion rules from FunctionRegistry
+            // but as we operate on String based variadicBound here and not on
+            // explicit types we cannot use it directly.
+            // Also some mechanism of determining default values for
+            // literal parameters is required if variadic bound is e.g. (DECIMAL(*))
+            if (type.getTypeSignature().getBase().equals("unknown")) {
+                if (variadicBound.equals("decimal")) {
+                    boundType = Optional.of(DecimalType.createDecimalType(1));
+                }
+                else if (variadicBound.equals("varchar")) {
+                    boundType = Optional.of(VarcharType.VARCHAR);
+                }
+            }
+        }
+        return boundType;
     }
 
     @Override
