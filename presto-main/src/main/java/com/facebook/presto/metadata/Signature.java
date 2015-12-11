@@ -225,12 +225,12 @@ public final class Signature
                 inputs.putAll(TypeUtils.extractCalculationInputs(argument, actualParameter));
             }
         }
-        TypeSignature calculatedReturnType = TypeUtils.resolveCalculatedType(returnType, inputs);
+        TypeSignature calculatedReturnType = TypeUtils.resolveCalculatedType(returnType, inputs, true);
         return new Signature(
                 name,
                 kind,
                 calculatedReturnType,
-                argumentTypes.stream().map(parameter -> TypeUtils.resolveCalculatedType(parameter, inputs)).collect(toImmutableList()));
+                argumentTypes.stream().map(parameter -> TypeUtils.resolveCalculatedType(parameter, inputs, false)).collect(toImmutableList()));
     }
 
     @Override

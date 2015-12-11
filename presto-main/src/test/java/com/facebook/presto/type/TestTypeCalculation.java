@@ -24,7 +24,7 @@ import static org.testng.Assert.assertEquals;
 public class TestTypeCalculation
 {
     @Test
-    public void test()
+    public void basicUsage()
     {
         assertEquals(calculateLiteralValue("42", ImmutableMap.of()), OptionalLong.of(42));
         assertEquals(calculateLiteralValue("NULL", ImmutableMap.of()), OptionalLong.empty());
@@ -44,5 +44,23 @@ public class TestTypeCalculation
 
         assertEquals(calculateLiteralValue("x + y", ImmutableMap.of("X", OptionalLong.of(42), "Y", OptionalLong.of(55))), OptionalLong.of(42 + 55));
         assertEquals(calculateLiteralValue("x + y", ImmutableMap.of("X", OptionalLong.of(42), "Y", OptionalLong.empty())), OptionalLong.empty());
+    }
+
+    @Test
+    public void disallowExpressionFlag()
+    {
+        assertEquals(calculateLiteralValue("x", ImmutableMap.of("X", OptionalLong.of(42)), false), OptionalLong.of(42));
+    }
+
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void failDisallowBinaryExpression()
+    {
+        calculateLiteralValue("x + y", ImmutableMap.of("X", OptionalLong.of(42), "Y", OptionalLong.of(55)), false);
+    }
+
+    @Test(expectedExceptions = IllegalArgumentException.class)
+    public void failDisallowUnaryExpression()
+    {
+        calculateLiteralValue("-y", ImmutableMap.of("Y", OptionalLong.of(55)), false);
     }
 }
