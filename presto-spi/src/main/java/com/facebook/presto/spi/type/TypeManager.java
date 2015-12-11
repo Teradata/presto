@@ -29,6 +29,8 @@ public interface TypeManager
 
     /**
      * Gets the type with the specified base type, and the given parameters, or null if not found.
+     *
+     * This method is deprecated and above generalized version should be used.
      */
     @Deprecated
     Type getParameterizedType(String baseTypeName, List<TypeSignature> typeParameters, List<String> literalParameters);
