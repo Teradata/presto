@@ -16,6 +16,7 @@ package com.facebook.presto.spi.type;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static java.lang.String.format;
 
@@ -32,10 +33,11 @@ public class TypeSignatureParameter
             Optional<NamedTypeSignature> namedTypeSignature,
             Optional<TypeLiteralCalculation> literalCalculation)
     {
-        int presentCount = (typeSignature.isPresent() ? 1 : 0) +
-                (longLiteral.isPresent() ? 1 : 0) +
-                (namedTypeSignature.isPresent() ? 1 : 0) +
-                (literalCalculation.isPresent() ? 1 : 0);
+        long presentCount = Stream.of(
+                typeSignature,
+                longLiteral,
+                namedTypeSignature,
+                literalCalculation).filter(Optional::isPresent).count();
 
         if (presentCount != 1) {
             throw new IllegalStateException(

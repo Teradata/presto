@@ -23,6 +23,7 @@ import javax.annotation.concurrent.Immutable;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static java.lang.String.format;
 
@@ -53,9 +54,7 @@ public class ClientTypeSignatureParameter
             @JsonProperty("longLiteral") Optional<Long> longLiteral,
             @JsonProperty("namedTypeSignature") Optional<NamedTypeSignature> namedTypeSignature)
     {
-        int presentCount = (typeSignature.isPresent() ? 1 : 0) +
-                (longLiteral.isPresent() ? 1 : 0) +
-                (namedTypeSignature.isPresent() ? 1 : 0);
+        long presentCount = Stream.of(typeSignature, longLiteral, namedTypeSignature).filter(Optional::isPresent).count();
 
         if (presentCount != 1) {
             throw new IllegalStateException(

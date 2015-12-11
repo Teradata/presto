@@ -260,7 +260,7 @@ public class TypeSignature
 
     private static String parseFieldName(String fieldName)
     {
-        checkArgument(fieldName != null && !fieldName.isEmpty(), "Bad fieldName: '%s'", fieldName);
+        checkArgument(fieldName != null && fieldName.length() >= 2, "Bad fieldName: '%s'", fieldName);
         checkArgument(fieldName.startsWith("'") && fieldName.endsWith("'"), "Bad fieldName: '%s'", fieldName);
         return fieldName.substring(1, fieldName.length() - 1);
     }
