@@ -5,7 +5,8 @@ CREATE EXTERNAL TABLE %NAME%(
   c_varchar varchar(100),
   c_date date,
   c_timestamp timestamp,
-  c_boolean boolean
+  c_boolean boolean,
+  c_decimal decimal(30,10)
 )
 ROW FORMAT DELIMITED FIELDS TERMINATED BY '|'
 STORED AS TEXTFILE
