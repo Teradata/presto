@@ -11,6 +11,20 @@ See the [User Manual](https://prestodb.io/docs/current/) for deployment instruct
 * Maven 3.2.3+ (for building)
 * Python 2.4+ (for running with the launcher script)
 
+## Adding Teradata JDBC driver JARs to you local maven repository
+
+Since Teradata JDBC driver classes are not provided in Maven Central or any public repository, these JARs must be added to your local reposory as they are dependencies needed for build.
+
+First download the 2 followings JARs from [Teradata](https://downloads.teradata.com/download/connectivity/jdbc-driver).
+
+* terajdbc4.jar
+* tdgssconfig.jar
+
+Then add them to you local maven repository:
+
+    mvn install:install-file -Dfile=path/to/terajdbc4.jar -DgroupId=com.teradata.driver -DartifactId=terajdbc -Dversion=4 -Dpackaging=jar
+    mvn install:install-file -Dfile=path/to/tdgssconfig.jar -DgroupId=com.teradata.driver -DartifactId=tdgssconfig -Dversion=4 -Dpackaging=jar
+
 ## Building Presto
 
 Presto is a standard Maven project. Simply run the following command from the project root directory:
