@@ -46,7 +46,6 @@ DECIMAL
             - System wide property: ``parse-decimal-literals-as-double=true``
             - Session wide property: ``parse_decimal_literals_as_double=true``
 
-
 VARCHAR
 -------
 
