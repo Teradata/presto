@@ -252,7 +252,7 @@ public class TypeSignature
             int end,
             Set<String> templateLiteralParameters)
     {
-        String parameterName = signature.substring(begin, end);
+        String parameterName = signature.substring(begin, end).trim();
         if (Character.isDigit(signature.charAt(begin))) {
             parameters.add(TypeSignatureParameter.of(Long.parseLong(parameterName)));
         }
