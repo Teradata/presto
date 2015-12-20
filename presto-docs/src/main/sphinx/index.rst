@@ -7,9 +7,10 @@ Presto Documentation
     :numbered: 2
 
     overview
+    system-requirements
+    installation
     sandbox-vms
     configuration
-    querying
     admin
     connector
     sql

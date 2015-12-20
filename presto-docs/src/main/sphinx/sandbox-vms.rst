@@ -1,6 +1,6 @@
-************************************
-Getting started with the Sandbox VMs
-************************************
+*******************
+Presto VM Sandboxes
+*******************
 
 This chapter describes how to get started with Presto on the CDH and HDP
 sandbox VMs.
@@ -8,5 +8,5 @@ sandbox VMs.
 .. toctree::
     :maxdepth: 1
 
-    sandbox-readmes/readme-cdh
-    sandbox-readmes/readme-hdp
+    sandboxes/presto-sandbox-cdh
+    sandboxes/presto-sandbox-hdp
