@@ -2,7 +2,7 @@
 CLI Kerberos Authentication
 ===========================
 
-The Presto :doc:`/querying/cli` can connect to a :doc:`Presto coordinator
+The Presto :doc:`/installation/cli` can connect to a :doc:`Presto coordinator
 </security/server>` that has Kerberos authentication enabled.
 
 Environment Configuration
