@@ -1,14 +1,14 @@
-=============
-Release Notes
-=============
+==========================================
+Unsupported Features and Known Limitations
+==========================================
 
-Presto 115t is equivalent to Presto release 0.115, with some additional features. Below
+Presto 127t is equivalent to Presto release 0.127, with some additional features. Below
 are documented unsupported features and known limitations.
 
 Unsupported Features
 --------------------
 
-The following features from Presto 0.115 may work but are not officially supported:
+The following features from Presto 0.127 may work but are not officially supported:
 
  * Installing presto via the tar ball
  * Running presto via the launcher script
