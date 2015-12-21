@@ -25,10 +25,6 @@ value for :doc:`/sql/set-session` can now be any constant expression, and the
 :doc:`/sql/show-session` command prints the current effective value and default
 value for all session properties.
 
-This type safety extends to the :doc:`SPI </develop/spi-overview>` where properties
-can be validated and converted to any Java type using
-``SessionPropertyMetadata``. For an example, see ``HiveSessionProperties``.
-
 .. note::
     This is a backwards incompatible change with the previous connector SPI.
     If you have written a connector that uses session properties, you will need
