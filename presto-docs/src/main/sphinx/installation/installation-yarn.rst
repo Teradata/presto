@@ -1,25 +1,16 @@
 ======================================
-Installing Presto on Yarn-based cluster
+ Presto on Yarn-based cluster
 ======================================
 
 Presto-YARN Slider package
 ==========================
 
-Presto can be installed on Yarn-based cluster. Presto integration with
-yarn is provided by using `Apache Slider`_. To install presto on yarn cluster
-first you need to have Presto Slider package. Either you can download a recent
-`package`_ or build one by yourself: 
+Presto can be installed on Yarn-based cluster. Presto integration with yarn is
+provided by using `Apache Slider`_. To install presto on yarn cluster first you
+need to have Presto Slider `package`_. Once you have a package you go to
+`Presto-YARN deployment <#presto-yarn-deployment>`__.
 
-.. parsed-literal::
-
-  $ git clone git@github.com:prestodb/presto-yarn.git
-  $ cd presto-yarn
-  $ mvn install -Dpresto.version=\ |version|\
-
-After that you will find a Slider package under: ``presto-yarn-package/target/presto-yarn-package-*.zip``. 
-Once you have a package you go to `PRESTO-YARN deployment <#presto-yarn-deployment>`__.
-
-  .. _Package: https://not-yet-know-source-of.pkg
+  .. _Package: https:www.teradata.com/presto
   .. _Apache slider: https://slider.incubator.apache.org/
 
 .. 
@@ -28,7 +19,7 @@ Once you have a package you go to `PRESTO-YARN deployment <#presto-yarn-deployme
   - inner links got fixed
   - links section updates
   - added note where example files are stored
-
+    
 Presto-YARN deployment
 ======================
 
@@ -209,7 +200,7 @@ section for further details.
 
 -  ``yarn.component.instances`` (default - ``1`` for COORDINATOR and
    ``3`` for WORKER): The multinode
-   ``presto-yarn-package/src/main/resources/rresources-multinode.json``
+   ``presto-yarn-package/src/main/resources/resources-multinode.json``
    sample file is now configured for a 4 node cluster where there will
    be 1 coordinator and 3 workers with strict placement policy, meaning,
    there will be one component instance running on every node
