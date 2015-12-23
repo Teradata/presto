@@ -2,9 +2,13 @@
 Automated Installation with Ambari
 **********************************
 
-Presto can be installed using Apache Ambari. To install Presto using Ambari you need to have the `Presto Ambari Integration package <https:www.teradata.com/presto>`_.
+Presto can be installed using Apache Ambari. To install Presto using Ambari you
+need to have the `Presto Ambari Integration package
+<https:www.teradata.com/presto>`_. These instructions **do not describe how to
+install Presto integrated with YARN using Ambari**. For instructions how to do that follow
+:doc:`Automated Installation with Ambari 2.1 with YARN integration <installation-yarn>`.
 
-.. contents:: Getting Started
+.. contents:: Presto Ambari Integration
 
 Requirements for Integration
 ----------------------------
@@ -15,7 +19,8 @@ Requirements for Integration
 
 Adding the Presto service
 -------------------------
-This section and all others that follow walk you through the integration steps needed to get Presto working with Ambari. By default, this integration code installs the latest Teradata Presto release (0.127t).
+This section and all others that follow walk you through the integration steps needed to get Presto working with Ambari. By default, this integration code installs the latest Teradata Presto release (0.127t). 
+
 
 To integrate the Presto service with Ambari, follow the steps outlines below:
 

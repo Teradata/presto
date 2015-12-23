@@ -2,6 +2,8 @@
  Presto on Yarn-based cluster
 ======================================
 
+.. contents:: Presto YARN Integration
+
 Presto-YARN Slider package
 ==========================
 
