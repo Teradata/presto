@@ -23,7 +23,7 @@ Install and manage Presto using `Apache Ambari`_.
 
 
 Automated Installation with Ambari 2.1 with YARN integration
-===============================================
+============================================================
 Install and manage Presto integrated with YARN using the `Apache Slider`_ view for `Apache Ambari`_.
 
 :doc:`Installation Instructions <installation/installation-yarn>`
