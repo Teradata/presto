@@ -8,8 +8,9 @@ Presto Documentation
 
     overview
     system-requirements
-    installation
     sandbox-vms
+    server-installation
+    installation
     configuration
     admin
     connector
