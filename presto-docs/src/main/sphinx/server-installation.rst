@@ -4,8 +4,17 @@
 
 There are several ways to install and deploy Presto depending on your requirements and preference.
 
+.. toctree::
+    :hidden:
+  
+    installation/installation-ambari
+    installation/installation-yarn
+    installation/installation-presto-admin
+
+
 Automated Installation with Ambari 2.1
 ======================================
+
 Install and manage Presto using `Apache Ambari`_.
 
 :doc:`Installation Instructions <installation/installation-ambari>`
@@ -24,6 +33,7 @@ Install and manage Presto using `Apache Ambari`_.
 
 Automated Installation with Ambari 2.1 with YARN integration
 ============================================================
+
 Install and manage Presto integrated with YARN using the `Apache Slider`_ view for `Apache Ambari`_.
 
 :doc:`Installation Instructions <installation/installation-yarn>`
@@ -42,6 +52,7 @@ Install and manage Presto integrated with YARN using the `Apache Slider`_ view f
 
 Manual Installation via Presto-Admin
 ====================================
+
 Install and manage Presto manually using Presto-Admin.
 
 :doc:`Installation Instructions <installation/installation-presto-admin>`
@@ -57,6 +68,7 @@ Install and manage Presto manually using Presto-Admin.
 
 Manual Installation with YARN integration
 =========================================
+
 Install and manage Presto integrated with YARN manually using `Apache Slider`_.
 
 :doc:`Installation Instructions <installation/installation-yarn>`
