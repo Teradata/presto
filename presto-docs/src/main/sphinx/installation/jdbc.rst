@@ -3,7 +3,7 @@ JDBC Driver
 ===========
 
 Presto can be accessed from Java using the JDBC driver.  The JDBC driver
-requires Java 1.6 or later.
+requires Java 1.8.
 Download :download:`jdbc` and add it to the class path of your Java application.
 The following JDBC URL formats are supported:
 
