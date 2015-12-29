@@ -20,14 +20,39 @@ from sphinx.errors import SphinxError
 TD_LINK_SERVER = 'http://www.teradata.com/presto'
 TD_LINK_CLI = 'http://www.teradata.com/presto'
 TD_LINK_JDBC = 'http://www.teradata.com/presto'
+TD_LINK_DEMO_CDH = 'http://www.teradata.com/presto'
+TD_LINK_DEMO_HDP = 'http://www.teradata.com/presto'
+TD_LINK_PRESTO_DOCS = 'http://www.teradata.com/presto'
+TD_LINK_PRESTO_YARN_PACKAGE = 'http://www.teradata.com/presto'
+TD_LINK_PRESTO_AMBARI_PLUGIN = 'http://www.teradata.com/presto'
+TD_LINK_SLIDER = 'http://archive.apache.org/dist/incubator/slider/0.80.0-incubating/slider-assembly-0.80.0-incubating-all.tar.gz'
+TD_LINK_ODBC_MAC = 'http://www.teradata.com/presto'
+TD_LINK_ODBC_WIN64 = 'http://www.teradata.com/presto'
+TD_LINK_ODBC_WIN32 = 'http://www.teradata.com/presto'
+TD_LINK_ODBC_LINUX64 = 'http://www.teradata.com/presto'
+TD_LINK_ODBC_LINUX32 = 'http://www.teradata.com/presto'
+TD_LINK_ODBC_DOCS = 'http://www.teradata.com/presto'
 
 GROUP_ID = 'com.facebook.presto'
 ARTIFACTS = {
-    'server': ('presto-server', 'rpm', TD_LINK_SERVER),
-    'cli': ('presto-cli', 'jar', TD_LINK_CLI),
-    'jdbc': ('presto-jdbc', 'jar', TD_LINK_JDBC)
-}
+    'server': ('presto-server-rpm-0.127t', 'rpm', TD_LINK_SERVER),
+    'cli': ('presto-cli-0.127t', 'jar', TD_LINK_CLI),
+    'jdbc': ('presto-jdbc-0.127t', 'jar', TD_LINK_JDBC),
+    'demo-cdh': ('presto-demo-cdh-0.127t', 'ova', TD_LINK_DEMO_CDH),
+    'demo-hdp': ('presto-demo-hdp-0.127t', 'ova', TD_LINK_DEMO_HDP),
+    'presto-yarn-package': ('presto-yarn-package-1.0.1-0.127t', 'zip', TD_LINK_PRESTO_YARN_PACKAGE),
+    'presto-ambari-plugin': ('ambari-presto-1.0', 'tar.gz', TD_LINK_PRESTO_DOCS),
+    'presto-admin': ('prestoadmin-1.2', 'tar.bz2', TD_LINK_PRESTO_DOCS),
+    'apache-slider': ('slider-assembly-0.80.0-incubating-all', 'tar.gz', TD_LINK_PRESTO_DOCS),
+    'presto-docs': ('presto-docs-0.127t-download', 'zip', TD_LINK_PRESTO_DOCS),
 
+    'odbc-mac': ('TeradataPrestoODBC-1.0.0.1001', 'dmg', TD_LINK_ODBC_MAC),
+    'odbc-windows-64': ('TeradataPrestoODBC64-1.0.0.1001', 'msi', TD_LINK_ODBC_WIN64),
+    'odbc-windows-32': ('TeradataPrestoODBC32-1.0.0.1001', 'msi', TD_LINK_ODBC_WIN32),
+    'odbc-linux-64': ('TeradataPrestoODBC-64bit-1.0.0.1001', 'rpm', TD_LINK_ODBC_LINUX64,),
+    'odbc-linux-32': ('TeradataPrestoODBC-32bit-1.0.0.1001', 'rpm', TD_LINK_ODBC_LINUX32),
+    'odbc-documentation': ('Teradata ODBC Driver for Presto Install Guide', 'pdf', TD_LINK_ODBC_DOCS)
+}
 
 def setup(app):
     # noinspection PyDefaultArgument,PyUnusedLocal
