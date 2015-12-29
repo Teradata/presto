@@ -12,6 +12,7 @@ Presto Documentation
     sandbox-vms
     server-installation
     client-software
+    Presto Admin <installation/presto-admin/user-guide>
     configuration
     admin
     connector
