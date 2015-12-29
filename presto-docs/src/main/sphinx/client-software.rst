@@ -1,6 +1,6 @@
-===========================
- Presto Client Installation
-===========================
+=======================
+ Presto Client Software
+=======================
 
 The cient software for Presto includes ODBC drivers, a JDBC driver, and a Command Line Interfact (CLI).
 

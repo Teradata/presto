@@ -3,14 +3,48 @@ ODBC Drivers
 ============
 
 Presto can be accessed from using one of the Teradata ODBC drivers. The ODBC
-driver is abailable for Windows, Mac, and Linux. The drivers are available for
-free download from `Teradata`_. See the :doc:`../software-downloads` section for
-more requirements and documentation.
+driver is available for Windows, Mac, and Linux. The drivers are available for
+free download from Teradata.
 
-  .. _Teradata: http:www.teradata.com/presto
+ODBC for Mac
+************
+
+*Requires*
+
+* OS X 10.9 or 10.10
+* iODBC 3.52.7 or later
+
+| Download :download:`odbc-documentation`
+| Download :download:`odbc-mac`
+
+----
+
+ODBC for Windows
+****************
+
+*Requires*
+
+* Microsoft ODBC Driver Manager
+
+| Download :download:`odbc-documentation`
+| Download (64 bit) :download:`odbc-windows-64`
+| Download (32 bit) :download:`odbc-windows-32`
+
+----
+
+ODBC for Linux
+**************
+*Requires*
+
+* RedHat Enterprise Linux 6.x or or CentOS equivalent
+* iODBC 3.52.7 or later, unixODBC 2.3.0 or later
+
+| Download :download:`odbc-documentation`
+| Download (64) :download:`odbc-linux-64`
+| Download (32) :download:`odbc-linux-32`
 
 Tableau Customizations
-======================
+**********************
 **Windows Only**
 
 The Teradata Presto ODBC driver is distributed with a Tableau Datasource Connection (TDC) file. The file is used to better the use of Presto and Tableau by customizing the SQL that Tableau sends to Presto via the driver. The TDC will not correct functionality, it will only inform Tableau of the best way to work with the Teradata Presto ODBC driver.
