@@ -807,7 +807,7 @@ public class ExpressionAnalyzer
             }
 
             Type value = process(node.getExpression(), context);
-            if (!value.equals(UNKNOWN)) {
+            if (!value.equals(UNKNOWN) && !node.isTypeOnly()) {
                 try {
                     functionRegistry.getCoercion(value, type);
                 }
