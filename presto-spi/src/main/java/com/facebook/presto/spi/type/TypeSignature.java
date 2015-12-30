@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static java.lang.String.format;
+import static java.util.Arrays.asList;
 import static java.util.Collections.unmodifiableList;
 import static java.util.stream.Collectors.toList;
 
@@ -34,6 +35,11 @@ public class TypeSignature
     private final String base;
     private final List<TypeSignatureParameter> parameters;
     private final boolean calculated;
+
+    public TypeSignature(String base, TypeSignatureParameter... parameters)
+    {
+        this(base, asList(parameters));
+    }
 
     public TypeSignature(String base, List<TypeSignatureParameter> parameters)
     {
@@ -120,7 +126,8 @@ public class TypeSignature
             // Angel brackets here are checked not for the support of ARRAY<> and MAP<>
             // but to correctly parse ARRAY(row<BIGINT, BIGINT>('a','b'))
             if (c == '(' || c == '<') {
-                if (bracketCount == 0) {
+                // hack for min/max
+                if (bracketCount == 0 && (baseName == null || !baseName.equals("min") && !baseName.equals("max"))) {
                     verify(baseName == null, "Expected baseName to be null");
                     verify(parameterStart == -1, "Expected parameter start to be -1");
                     baseName = signature.substring(0, i);
@@ -245,11 +252,14 @@ public class TypeSignature
             int end,
             Set<String> templateLiteralParameters)
     {
-        String parameterName = signature.substring(begin, end);
+        String parameterName = signature.substring(begin, end).trim();
         if (Character.isDigit(signature.charAt(begin))) {
             parameters.add(TypeSignatureParameter.of(Long.parseLong(parameterName)));
         }
-        else if (templateLiteralParameters.contains(parameterName)) {
+        else if (templateLiteralParameters.contains(parameterName) ||
+                parameterName.matches(".*[/\\+\\-\\*].*") ||
+                parameterName.contains("min") ||
+                parameterName.contains("max")) {
             parameters.add(TypeSignatureParameter.of(new TypeLiteralCalculation(parameterName)));
         }
         else {
