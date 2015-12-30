@@ -38,6 +38,7 @@ DECIMAL
 
     Example literals: ``DECIMAL 10.3``, ``DECIMAL 1234567890``
 
+    Decimal support is currently in BETA stage. :doc:`See list of known limitations </language/decimal_limitations>`.
 
 VARCHAR
 -------

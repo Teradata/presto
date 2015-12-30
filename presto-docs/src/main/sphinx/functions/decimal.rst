@@ -63,3 +63,14 @@ Unary Decimal Operators
 -----------------------
 
     The ``-`` operator performs negation. The type of result is same as type of argument.
+
+Casts
+-----
+
+    Following type casts are currently supported for ``DECIMAL`` values:
+
+    - to and from ``BIGINT``
+    - to and from ``DOUBLE``
+    - to and from ``VARCHAR``
+    - to and from ``BOOLEAN``
+    - to and from ``DECIMAL`` with different precision and scale
