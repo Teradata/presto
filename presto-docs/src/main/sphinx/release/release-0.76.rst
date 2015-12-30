@@ -17,7 +17,7 @@ the connector and a :doc:`tutorial </connector/kafka-tutorial>` to get started.
 MySQL and PostgreSQL Connectors
 -------------------------------
 
-This release adds the :doc:`/connector/mysql` and :doc:`/connector/postgresql`
+This release adds the MySQL and :doc:`/connector/postgresql`
 for querying and creating tables in external relational databases. These can
 be used to join or copy data between different systems like MySQL and Hive,
 or between two different MySQL or PostgreSQL instances, or any combination.

@@ -86,20 +86,8 @@
         </artifact>
     </artifactSet>
 
-    <artifactSet to="plugin/mysql">
-        <artifact id="${project.groupId}:presto-mysql:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
     <artifactSet to="plugin/postgresql">
         <artifact id="${project.groupId}:presto-postgresql:zip:${project.version}">
-            <unpack />
-        </artifact>
-    </artifactSet>
-
-    <artifactSet to="plugin/raptor">
-        <artifact id="${project.groupId}:presto-raptor:zip:${project.version}">
             <unpack />
         </artifact>
     </artifactSet>
