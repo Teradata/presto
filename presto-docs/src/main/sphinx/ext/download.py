@@ -36,6 +36,7 @@ TD_LINK_ODBC_DOCS = 'http://www.teradata.com/presto'
 GROUP_ID = 'com.facebook.presto'
 ARTIFACTS = {
     'server': ('presto-server-rpm-0.127t', 'rpm', TD_LINK_SERVER),
+    'server-old': ('presto-server-rpm4.6-0.127t', 'rpm', TD_LINK_SERVER),
     'cli': ('presto-cli-0.127t', 'jar', TD_LINK_CLI),
     'jdbc': ('presto-jdbc-0.127t', 'jar', TD_LINK_JDBC),
     'demo-cdh': ('presto-demo-cdh-0.127t', 'ova', TD_LINK_DEMO_CDH),
