@@ -35,6 +35,7 @@ Install and manage Presto integrated with YARN using the `Apache Slider`_ view f
 
 *Requires*:
 
+* Ambari 2.1 (on Java 8)
 * Oracle Java JDK 1.8 (64-bit)
 * Red Hat Enterprise Linux 6.x (64-bit) or CentOS equivalent
 * HDP 2.2 (Presto-YARN integration requires Hadoop 2.6 which is on HDP 2.2)
@@ -62,6 +63,8 @@ Install and manage Presto manually using Presto-Admin.
 * CDH 5.x or HDP 2.x
 * Python 2.6 or 2.7
 * Minimum 16GB RAM per node allocated for Presto
+
+For RPM Package Manager < 4.6, you need to download :download:`server-old`
 
 ----
 
