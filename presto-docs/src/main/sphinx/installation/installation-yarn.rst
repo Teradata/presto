@@ -59,6 +59,12 @@ json files with whatever configurations you want to have for Presto. If
 you are ok with the default values in the sample file you can just use
 them as-is.
 
+The "default" values listed for the sections `appConfig.json <#appconfig-json>`__ 
+and `resources.json <#resources-json>`__ are from ``presto-yarn-package/src/main/resources/appConfig.json`` 
+and ``presto-yarn-package/src/main/resources/resources-multinode.json`` 
+files respectively. These default values will also be used for installation 
+using `Ambari <#installation-using-ambari-slider-view>`__ Slider View.
+
 ``Note``: If you are planning to use Ambari for your installation skip
 to this `section <#installation-using-ambari-slider-view>`__. Changing these files manually is
 needed only if you are going to install Presto on YARN manually using
@@ -119,8 +125,8 @@ scripts(bin/slider) as user ``hdfs`` in this case.
 -  ``site.global.presto_server_port`` (default - ``8080``): Presto
    server's http port.
 
--  ``site.global.catalog`` (optional) (default - configures ``hive``,
-   ``tpch`` and ``jmx`` connectors): It should be of the format (note
+-  ``site.global.catalog`` (optional) (default - configures ``tpch`` 
+   connector): It should be of the format (note
    the single quotes around each value) - {'connector1' :
    ['key1=value1', 'key2=value2'..], 'connector2' : ['key1=value1',
    'key2=value2'..]..}. This will create files connector1.properties,
@@ -151,20 +157,20 @@ hostname.
 
 -  ``site.global.additional_node_properties`` and
    ``site.global.additional_config_properties`` (optional) (default -
-   None): Presto launched via Slider will use ``config.properties`` and
-   ``node.properties`` created from templates
-   ``presto-yarn-package/package/templates/config.properties*.j2`` and
-   ``presto-yarn-package/package/target/node.properties.j2``
-   respectively. If you want to add any additional properties to these
-   configuration files, add ``site.global.additional_config_properties``
-   and ``site.global.additional_node_properties`` to your
-   ``appConfig.json``. The value of these has to be a string with each
-   property that has to go to the ``.properties`` file separated by a
-   ``\n``. Eg:
+   None): Presto launched via Slider will use ``config.properties`` and 
+   ``node.properties`` created from templates 
+   ``presto-yarn-package/package/templates/config.properties*.j2`` and 
+   ``presto-yarn-package/package/target/node.properties.j2`` 
+   respectively. If you want to add any additional properties to these 
+   configuration files, add ``site.global.additional_config_properties`` 
+   and ``site.global.additional_node_properties`` to your 
+   ``appConfig.json``. The value of these has to be a string 
+   representation of an array of entries (key=value) that has to go to 
+   the ``.properties`` file. Eg:
 
 ::
 
-        "site.global.additional_config_properties": "task.max-worker-threads=5\ndistributed-joins-enabled=true"
+        "site.global.additional_config_properties": "['task.max-worker-threads=50', 'distributed-joins-enabled=true']"
 
 -  ``site.global.plugin`` (optional) (default - None): This allows you
    to add any additional jars you want to copy to plugin
@@ -177,8 +183,8 @@ hostname.
    Presto available at
    ``presto-yarn-package/src/main/slider/package/plugins/`` prior to
    building the presto-yarn app package and thus the app package built
-   ``presto-yarn-package-<version>.zip`` will have the jars under
-   ``package/plugins`` directory.
+   ``presto-yarn-package-<version>-<presto-version>.zip`` will have the 
+   jars under ``package/plugins`` directory.
 
 ::
 
@@ -360,7 +366,8 @@ The steps for deploying Presto on Yarn via Slider views in Ambari are:
 -  Install Ambari server. You may refer:
    http://docs.hortonworks.com/HDPDocuments/Ambari-2.1.0.0/bk\_Installing\_HDP\_AMB/content/ch\_Installing\_Ambari.html.
 
--  Copy the app package ``presto-yarn-package-<version>.zip`` to
+-  Copy the app package 
+   ``presto-yarn-package-<version>-<presto-version>.zip`` to
    ``/var/lib/ambari-server/resources/apps/`` directory on your Ambari
    server node. Restart ambari-server.
 
@@ -414,10 +421,12 @@ The steps for deploying Presto on Yarn via Slider views in Ambari are:
    slider will fail to start Presto with permission errors.
 
 -  If you want to add any additional Custom properties, use Custom
-   property section. Additional properties supported as of now is
-   ``global.plugin``. See `section <#presto-app-package-configuration>`__ above for
+   property section. Additional properties supported as of now are 
+   ``site.global.plugin``, ``site.global.additional_config_properties`` 
+   and ``site.global.additional_node_properties``. See 
+   `section <#presto-app-package-configuration>`__ above for
    requirements and format of these properties.
-
+   
 -  Click Finish. This will basically do the equivalent of
    ``package  --install`` and ``create`` you do via the bin/slider
    script. Once successfully deployed, you will see the Yarn application
