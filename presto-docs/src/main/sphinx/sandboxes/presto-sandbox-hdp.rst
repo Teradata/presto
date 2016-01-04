@@ -8,7 +8,7 @@ The credentials for the VM are:
     |  user: **presto**
     |  password: **presto**
 
-The image is based on CentOS 6.6 and contains the following components:
+The image is based on CentOS 6.7 and contains the following components:
 
     * Presto is installed in ``/usr/lib/presto``. It is set up with Hive, TPCH and JMX connectors. Logs are located in ``/var/log/presto``.
     * ``presto-admin`` is installed in ``/opt/prestoadmin``. You can run presto-admin by executing: ``/opt/prestoadmin/presto-admin``.
@@ -32,7 +32,7 @@ Please wait a few moments after the image boots for the Presto service to start.
 
 Usage example: ::
 
-    [presto@presto-demo-hdp ~]# java -jar /home/presto/presto-cli.jar --catalog hive
+    [presto@presto-demo-hdp ~]# java -jar /home/presto/presto-cli.jar --catalog hive --schema default
     show tables;
      Table
     --------
