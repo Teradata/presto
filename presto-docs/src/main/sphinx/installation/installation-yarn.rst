@@ -218,6 +218,12 @@ section for further details.
    could be ``number of nodemanagers in your cluster - 1``, with 1 node
    reserved for the coordinator, if you want Presto to be on all YARN
    nodes.
+   If you want to deploy Presto on a single node 
+   (``site.global.singlenode`` set to true), make sure you set 1 for 
+   the COORDINATOR and just not add the WORKER component section 
+   (Refer  ``presto-yarn-package/src/main/resources/resources-singlenode.json``). 
+   You can also just set ``yarn.component.instances`` to 0 for WORKER in this case.
+
 
 -  ``yarn.memory`` (default - ``1500MB``): The heapsize defined as -Xmx
    of ``site.global.jvm_args`` in ``appConfig.json``, is used by the
@@ -400,6 +406,11 @@ The steps for deploying Presto on Yarn via Slider views in Ambari are:
 -  Provide details of the Presto service. By default, the UI will be
    populated with the values you have in the ``*-default.json`` files in
    your ``presto-yarn-package-*.zip``.
+   
+-  The ``Allocate Resources`` section can be configured for the Presto components,
+   COORDINATOR and WORKER, also the ``yarn.memory`` for each.
+   Configuring label is optional. Please refer 
+   `resources.json <#resources-json>`__ section for config details.
 
 -  The app name should be of lower case, eg: presto1, and also set all
    the configuration here as per your cluster requirement. See
@@ -671,16 +682,19 @@ Debugging and Logging
 -  Once the YARN application is launched, you can monitor the status at
    YARN ResourceManager WebUI.
 
--  A successfully launched application will be in ``RUNNING`` state and
-   can also use Slider to check `status <#check-the-status>`__.
+-  A successfully launched application will be in ``RUNNING`` state.
+   The YARN ApplicationMaster UI (eg: ``http://master:8088/cluster/app/application_<id>``) 
+   will show slider-appmaster, COORDINATOR and WORKER components and the 
+   associated containers running based on your configuration. You can also 
+   use Slider cli script to check `status <#check-the-status>`__.
 
 -  If you have used `labels <#using-yarn-label>`__ your COORDINATOR and WORKER
-   components will be running on nodes which were 'labelled'. If you
-   have not used labels, then you can check the status either at the
-   YARN ResourceManager (eg:
-   ``http://master:8088/cluster/app/application_<id>``) or you can use
-   `status <#check-the-status>`__ to get the "live" containers, and thus get the
-   node hosting the Presto components.
+   components will be running on nodes which were 'labelled'. 
+   
+-  If you have not used labels, then you can check the status either at the
+   YARN ResourceManager (eg: ``http://master:8088/cluster/app/application_<id>``) 
+   or you can use `status <#check-the-status>`__ to get the "live" containers, 
+   and thus get the node hosting the Presto components.
 
 -  If Presto is up and running, then a ``pgrep`` of PrestoServer on your
    NodeManager nodes will give you the process details. This should also
@@ -690,8 +704,9 @@ Debugging and Logging
 -  It is recommended that log aggregation of YARN application log files
    be enabled in YARN, using ``yarn.log-aggregation-enable property`` in
    your ``yarn-site.xml``. Then slider logs created during the launch of
-   Presto-YARN will be available locally on your nodemanager nodes under
-   contanier logs directory eg:
+   Presto-YARN will be available locally on your nodemanager nodes (where 
+   slider-appmaster and Presto components-COORDINATOR/WORKER are deployed)
+   under contanier logs directory eg:
    ``/var/log/hadoop-yarn/application_<id>/container_<id>/``. For any
    retries attempted by Slider to launch Presto a new container will be
    launched and hence you will find a new ``container_<id>`` directory.
