@@ -66,17 +66,17 @@ public class HivePageSinkProvider
     public ConnectorPageSink createPageSink(ConnectorSession session, ConnectorOutputTableHandle tableHandle)
     {
         HiveWritableTableHandle handle = checkType(tableHandle, HiveOutputTableHandle.class, "tableHandle");
-        return createPageSink(handle, true);
+        return createPageSink(session, handle, true);
     }
 
     @Override
     public ConnectorPageSink createPageSink(ConnectorSession session, ConnectorInsertTableHandle tableHandle)
     {
         HiveInsertTableHandle handle = checkType(tableHandle, HiveInsertTableHandle.class, "tableHandle");
-        return createPageSink(handle, false);
+        return createPageSink(session, handle, false);
     }
 
-    private ConnectorPageSink createPageSink(HiveWritableTableHandle handle, boolean isCreateTable)
+    private ConnectorPageSink createPageSink(ConnectorSession session, HiveWritableTableHandle handle, boolean isCreateTable)
     {
         return new HivePageSink(
                 handle.getSchemaName(),
@@ -94,6 +94,7 @@ public class HivePageSinkProvider
                 respectTableFormat,
                 maxOpenPartitions,
                 immutablePartitions,
-                partitionUpdateCodec);
+                partitionUpdateCodec,
+                session.getIdentity());
     }
 }
