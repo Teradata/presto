@@ -21,7 +21,6 @@ import com.facebook.presto.spi.PageIndexer;
 import com.facebook.presto.spi.PageIndexerFactory;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
-import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.google.common.base.Joiner;
@@ -121,8 +120,6 @@ public class HivePageSink
     private final boolean immutablePartitions;
     private final boolean respectTableFormat;
 
-    private final Identity user;
-
     private HiveRecordWriter[] writers = new HiveRecordWriter[0];
 
     public HivePageSink(
@@ -141,12 +138,10 @@ public class HivePageSink
             boolean respectTableFormat,
             int maxOpenPartitions,
             boolean immutablePartitions,
-            JsonCodec<PartitionUpdate> partitionUpdateCodec,
-            Identity user)
+            JsonCodec<PartitionUpdate> partitionUpdateCodec)
     {
         this.schemaName = requireNonNull(schemaName, "schemaName is null");
         this.tableName = requireNonNull(tableName, "tableName is null");
-        this.user = requireNonNull(user, "user is null");
 
         requireNonNull(inputColumns, "inputColumns is null");
 
@@ -330,7 +325,7 @@ public class HivePageSink
 
                 if (partitionName.isPresent()) {
                     // verify the target directory for the partition does not already exist
-                    if (HiveWriteUtils.pathExists(hdfsEnvironment, target, user)) {
+                    if (HiveWriteUtils.pathExists(hdfsEnvironment, target)) {
                         throw new PrestoException(HIVE_PATH_ALREADY_EXISTS, format("Target directory for new partition '%s' of table '%s.%s' already exists: %s",
                                 partitionName,
                                 schemaName,

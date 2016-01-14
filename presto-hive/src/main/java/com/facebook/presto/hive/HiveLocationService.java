@@ -15,7 +15,6 @@ package com.facebook.presto.hive;
 
 import com.facebook.presto.hive.metastore.HiveMetastore;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.security.Identity;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -47,18 +46,18 @@ public class HiveLocationService
     }
 
     @Override
-    public LocationHandle forNewTable(String queryId, String schemaName, String tableName, Identity identity)
+    public LocationHandle forNewTable(String queryId, String schemaName, String tableName)
     {
-        Path targetPath = getTableDefaultLocation(metastore, hdfsEnvironment, schemaName, tableName, identity);
+        Path targetPath = getTableDefaultLocation(metastore, hdfsEnvironment, schemaName, tableName);
 
         // verify the target directory for the table
-        if (pathExists(hdfsEnvironment, targetPath, identity)) {
+        if (pathExists(hdfsEnvironment, targetPath)) {
             throw new PrestoException(HIVE_PATH_ALREADY_EXISTS, format("Target directory for table '%s.%s' already exists: %s", schemaName, tableName, targetPath));
         }
 
         Path writePath;
         if (shouldUseTemporaryDirectory(targetPath)) {
-            writePath = createTemporaryPath(hdfsEnvironment, targetPath, identity);
+            writePath = createTemporaryPath(hdfsEnvironment, targetPath);
         }
         else {
             writePath = targetPath;
@@ -68,13 +67,13 @@ public class HiveLocationService
     }
 
     @Override
-    public LocationHandle forExistingTable(String queryId, Table table, Identity identity)
+    public LocationHandle forExistingTable(String queryId, Table table)
     {
         Path targetPath = new Path(table.getSd().getLocation());
 
         Optional<Path> writePath;
         if (shouldUseTemporaryDirectory(targetPath)) {
-            writePath = Optional.of(createTemporaryPath(hdfsEnvironment, targetPath, identity));
+            writePath = Optional.of(createTemporaryPath(hdfsEnvironment, targetPath));
         }
         else {
             writePath = Optional.empty();

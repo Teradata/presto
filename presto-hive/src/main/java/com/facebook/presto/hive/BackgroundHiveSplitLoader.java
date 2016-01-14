@@ -229,7 +229,7 @@ public class BackgroundHiveSplitLoader
                 }
             }
             else {
-                boolean splittable = isSplittable(files.getInputFormat(), hdfsEnvironment.getFileSystem(file.getPath(), session.getUser()), file.getPath());
+                boolean splittable = isSplittable(files.getInputFormat(), hdfsEnvironment.getFileSystem(file.getPath()), file.getPath());
 
                 CompletableFuture<?> future = hiveSplitSource.addToQueue(createHiveSplits(
                         files.getPartitionName(),
@@ -275,7 +275,7 @@ public class BackgroundHiveSplitLoader
                 FileSplit split = ((SymlinkTextInputFormat.SymlinkTextInputSplit) rawSplit).getTargetSplit();
 
                 // get the filesystem for the target path -- it may be a different hdfs instance
-                FileSystem targetFilesystem = hdfsEnvironment.getFileSystem(split.getPath(), session.getUser());
+                FileSystem targetFilesystem = hdfsEnvironment.getFileSystem(split.getPath());
                 FileStatus file = targetFilesystem.getFileStatus(split.getPath());
                 hiveSplitSource.addToQueue(createHiveSplits(
                         partitionName,
@@ -295,7 +295,7 @@ public class BackgroundHiveSplitLoader
             return;
         }
 
-        FileSystem fs = hdfsEnvironment.getFileSystem(path, session.getUser());
+        FileSystem fs = hdfsEnvironment.getFileSystem(path);
         if (bucket.isPresent()) {
             Optional<FileStatus> bucketFile = getBucketFile(bucket.get(), fs, path);
             if (bucketFile.isPresent()) {

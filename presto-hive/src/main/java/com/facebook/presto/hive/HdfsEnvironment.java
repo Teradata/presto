@@ -16,6 +16,7 @@ package com.facebook.presto.hive;
 import com.facebook.presto.hadoop.HadoopFileSystemCache;
 import com.facebook.presto.hadoop.HadoopNative;
 import com.facebook.presto.hadoop.shaded.com.google.common.base.Throwables;
+import com.google.common.base.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -25,7 +26,6 @@ import javax.inject.Inject;
 
 import java.io.IOException;
 import java.security.PrivilegedExceptionAction;
-import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -86,6 +86,6 @@ public class HdfsEnvironment
 
     private Optional<UserGroupInformation> buildUserGroupInformation(String userName)
     {
-        return superUserUgi.map(it -> UserGroupInformation.createProxyUser(userName, it));
+        return superUserUgi.transform(it -> UserGroupInformation.createProxyUser(userName, it));
     }
 }
