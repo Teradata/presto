@@ -115,6 +115,11 @@ public class HiveClientConfig
     private DataSize orcMaxBufferSize = new DataSize(8, MEGABYTE);
     private DataSize orcStreamBufferSize = new DataSize(8, MEGABYTE);
 
+    private boolean hiveMetastoreSaslEnabled;
+    private String hiveMetastorePrincipal;
+    private String hiveMetastorePrestoPrincipal;
+    private String hiveMetastorePrestoKeytab;
+
     public int getMaxInitialSplits()
     {
         return maxInitialSplits;
@@ -860,5 +865,49 @@ public class HiveClientConfig
     {
         this.useParquetColumnNames = useParquetColumnNames;
         return this;
+    }
+
+    public boolean isHiveMetastoreSaslEnabled()
+    {
+        return hiveMetastoreSaslEnabled;
+    }
+
+    @Config("hive.metastore.sasl.enabled")
+    public void setHiveMetastoreSaslEnabled(boolean hiveMetastoreSaslEnabled)
+    {
+        this.hiveMetastoreSaslEnabled = hiveMetastoreSaslEnabled;
+    }
+
+    public String getHiveMetastorePrincipal()
+    {
+        return hiveMetastorePrincipal;
+    }
+
+    @Config("hive.metastore.principal")
+    public void setHiveMetastorePrincipal(String hiveMetastorePrincipal)
+    {
+        this.hiveMetastorePrincipal = hiveMetastorePrincipal;
+    }
+
+    public String getHiveMetastorePrestoPrincipal()
+    {
+        return hiveMetastorePrestoPrincipal;
+    }
+
+    @Config("hive.metastore.presto.principal")
+    public void setHiveMetastorePrestoPrincipal(String hiveMetastorePrestoPrincipal)
+    {
+        this.hiveMetastorePrestoPrincipal = hiveMetastorePrestoPrincipal;
+    }
+
+    public String getHiveMetastorePrestoKeytab()
+    {
+        return hiveMetastorePrestoKeytab;
+    }
+
+    @Config("hive.metastore.presto.keytab")
+    public void setHiveMetastorePrestoKeytab(String hiveMetastorePrestoKeytab)
+    {
+        this.hiveMetastorePrestoKeytab = hiveMetastorePrestoKeytab;
     }
 }
