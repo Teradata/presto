@@ -18,10 +18,14 @@ import com.facebook.presto.hadoop.HadoopNative;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.security.UserGroupInformation;
 
 import javax.inject.Inject;
 
 import java.io.IOException;
+import java.security.PrivilegedExceptionAction;
+import java.util.Optional;
+import java.util.concurrent.Callable;
 
 import static java.util.Objects.requireNonNull;
 
@@ -34,10 +38,12 @@ public class HdfsEnvironment
 
     private final HdfsConfiguration hdfsConfiguration;
     private final boolean verifyChecksum;
+    private final Optional<UserGroupInformation> superUserUgi;
 
     @Inject
-    public HdfsEnvironment(HdfsConfiguration hdfsConfiguration, HiveClientConfig config)
+    public HdfsEnvironment(HdfsConfiguration hdfsConfiguration, HiveClientConfig config, Optional<UserGroupInformation> superUserUgi)
     {
+        this.superUserUgi = superUserUgi;
         this.hdfsConfiguration = requireNonNull(hdfsConfiguration, "hdfsConfiguration is null");
         this.verifyChecksum = requireNonNull(config, "config is null").isVerifyChecksum();
     }
@@ -54,5 +60,24 @@ public class HdfsEnvironment
         fileSystem.setVerifyChecksum(verifyChecksum);
 
         return fileSystem;
+    }
+
+    public <T> T doAs(Callable<T> action, String user)
+            throws Exception
+    {
+        Optional<UserGroupInformation> effectiveUserGroupInformation = buildUserGroupInformation(user);
+
+        if (!effectiveUserGroupInformation.isPresent()) {
+            return action.call();
+        }
+        else {
+            return effectiveUserGroupInformation.get().doAs(
+                    (PrivilegedExceptionAction<T>) () -> action.call());
+        }
+    }
+
+    private Optional<UserGroupInformation> buildUserGroupInformation(String userName)
+    {
+        return superUserUgi.map(it -> UserGroupInformation.createProxyUser(userName, it));
     }
 }
