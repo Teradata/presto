@@ -15,17 +15,13 @@ package com.facebook.presto.hive;
 
 import com.facebook.presto.hadoop.HadoopFileSystemCache;
 import com.facebook.presto.hadoop.HadoopNative;
-import com.facebook.presto.hadoop.shaded.com.google.common.base.Throwables;
-import com.google.common.base.Optional;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.security.UserGroupInformation;
 
 import javax.inject.Inject;
 
 import java.io.IOException;
-import java.security.PrivilegedExceptionAction;
 
 import static java.util.Objects.requireNonNull;
 
@@ -38,19 +34,12 @@ public class HdfsEnvironment
 
     private final HdfsConfiguration hdfsConfiguration;
     private final boolean verifyChecksum;
-    private final Optional<UserGroupInformation> superUserUgi;
 
     @Inject
     public HdfsEnvironment(HdfsConfiguration hdfsConfiguration, HiveClientConfig config)
     {
         this.hdfsConfiguration = requireNonNull(hdfsConfiguration, "hdfsConfiguration is null");
         this.verifyChecksum = requireNonNull(config, "config is null").isVerifyChecksum();
-        try {
-            this.superUserUgi = Optional.of(UserGroupInformation.loginUserFromKeytabAndReturnUGI("presto@HADOOP.TERADATA.COM", "/Users/losipiuk/tmp/kerberos/presto_superuser.keytab"));
-        }
-        catch (IOException e) {
-            throw Throwables.propagate(e);
-        }
     }
 
     public Configuration getConfiguration(Path path)
@@ -65,27 +54,5 @@ public class HdfsEnvironment
         fileSystem.setVerifyChecksum(verifyChecksum);
 
         return fileSystem;
-    }
-
-    public FileSystem getFileSystem(Path path, String userName)
-            throws IOException
-    {
-        Optional<UserGroupInformation> userGroupInformation = buildUserGroupInformation(userName);
-        if (userGroupInformation.isPresent()) {
-            try {
-                return userGroupInformation.get().doAs((PrivilegedExceptionAction<FileSystem>) () -> getFileSystem(path));
-            }
-            catch (InterruptedException e) {
-                throw Throwables.propagate(e);
-            }
-        }
-        else {
-            return getFileSystem(path);
-        }
-    }
-
-    private Optional<UserGroupInformation> buildUserGroupInformation(String userName)
-    {
-        return superUserUgi.transform(it -> UserGroupInformation.createProxyUser(userName, it));
     }
 }
