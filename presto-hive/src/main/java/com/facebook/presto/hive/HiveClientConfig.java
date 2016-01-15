@@ -120,6 +120,10 @@ public class HiveClientConfig
     private String hiveMetastorePrestoPrincipal;
     private String hiveMetastorePrestoKeytab;
 
+    private boolean hdfsSaslEnabled;
+    private String hdfsPrestoPrincipal;
+    private String hdfsPrestoKeytab;
+
     public int getMaxInitialSplits()
     {
         return maxInitialSplits;
@@ -855,7 +859,7 @@ public class HiveClientConfig
     }
 
     public boolean isUseParquetColumnNames()
-   {
+    {
         return useParquetColumnNames;
     }
 
@@ -909,5 +913,38 @@ public class HiveClientConfig
     public void setHiveMetastorePrestoKeytab(String hiveMetastorePrestoKeytab)
     {
         this.hiveMetastorePrestoKeytab = hiveMetastorePrestoKeytab;
+    }
+
+    public boolean isHdfsSaslEnabled()
+    {
+        return hdfsSaslEnabled;
+    }
+
+    @Config("hive.hdfs.sasl.enabled")
+    public void setHdfsSaslEnabled(boolean hdfsSaslEnabled)
+    {
+        this.hdfsSaslEnabled = hdfsSaslEnabled;
+    }
+
+    public String getHdfsPrestoPrincipal()
+    {
+        return hdfsPrestoPrincipal;
+    }
+
+    @Config("hive.hdfs.presto.principal")
+    public void setHdfsPrestoPrincipal(String hdfsPrestoPrincipal)
+    {
+        this.hdfsPrestoPrincipal = hdfsPrestoPrincipal;
+    }
+
+    public String getHdfsPrestoKeytab()
+    {
+        return hdfsPrestoKeytab;
+    }
+
+    @Config("hive.hdfs.presto.keytab")
+    public void setHdfsPrestoKeytab(String hdfsPrestoKeytab)
+    {
+        this.hdfsPrestoKeytab = hdfsPrestoKeytab;
     }
 }

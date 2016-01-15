@@ -13,8 +13,8 @@
  */
 package com.facebook.presto.hive.metastore;
 
-import com.facebook.presto.hive.HadoopKerberosAuthentication;
 import com.facebook.presto.hive.HiveClientConfig;
+import com.facebook.presto.hive.auth.HadoopKerberosAuthentication;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.inject.Binder;

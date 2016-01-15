@@ -13,6 +13,8 @@
  */
 package com.facebook.presto.hive;
 
+import com.facebook.presto.hive.auth.HdfsAuthenticatingConnectorModule;
+import com.facebook.presto.hive.auth.SimpleConnectorModule;
 import com.facebook.presto.hive.metastore.HiveMetastore;
 import com.facebook.presto.hive.metastore.HiveMetastoreAuthenticationKerberos;
 import com.facebook.presto.hive.metastore.HiveMetastoreAuthenticationSimple;
@@ -116,6 +118,14 @@ public class HiveConnectorFactory
                             HiveClientConfig.class,
                             HiveClientConfig::isHiveMetastoreSaslEnabled,
                             new HiveMetastoreAuthenticationKerberos.Module()),
+                    installModuleIf(
+                            HiveClientConfig.class,
+                            HiveClientConfig::isHdfsSaslEnabled,
+                            new HdfsAuthenticatingConnectorModule()),
+                    installModuleIf(
+                            HiveClientConfig.class,
+                            hiveClientConfig -> !hiveClientConfig.isHdfsSaslEnabled(),
+                            new SimpleConnectorModule()),
                     binder -> {
                         MBeanServer platformMBeanServer = ManagementFactory.getPlatformMBeanServer();
                         binder.bind(MBeanServer.class).toInstance(new RebindSafeMBeanServer(platformMBeanServer));
