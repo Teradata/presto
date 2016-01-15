@@ -14,7 +14,6 @@
 
 package com.facebook.presto.hive;
 
-import com.facebook.presto.hadoop.shaded.com.google.common.base.Throwables;
 import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorInsertTableHandle;
@@ -40,407 +39,215 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
 
+import static java.util.Objects.requireNonNull;
+
 public class HiveAuthenticatingMetadata
         implements ConnectorMetadata
 {
-    private final HdfsEnvironment hdfsEnvironment;
+    private final HadoopKerberosAuthentication authentication;
     private final ConnectorMetadata targetMetadata;
 
     @Inject
-    public HiveAuthenticatingMetadata(HdfsEnvironment hdfsEnvironment, ConnectorMetadata targetMetadata)
+    public HiveAuthenticatingMetadata(HadoopKerberosAuthentication authentication,
+            ConnectorMetadata targetMetadata)
     {
-        this.hdfsEnvironment = hdfsEnvironment;
-        this.targetMetadata = targetMetadata;
+        this.authentication = requireNonNull(authentication, "authentication is null");
+        this.targetMetadata = requireNonNull(targetMetadata, "targetMetadata is null");
     }
 
     @Override
     public List<String> listSchemaNames(ConnectorSession session)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.listSchemaNames(session), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.listSchemaNames(session));
     }
 
     @Override
     public ConnectorTableHandle getTableHandle(ConnectorSession session, SchemaTableName tableName)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.getTableHandle(session, tableName), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.getTableHandle(session, tableName));
     }
 
     @Override
-    public List<ConnectorTableLayoutResult> getTableLayouts(ConnectorSession session, ConnectorTableHandle table, Constraint<ColumnHandle> constraint, Optional<Set<ColumnHandle>> desiredColumns)
+    public List<ConnectorTableLayoutResult> getTableLayouts(ConnectorSession session,
+            ConnectorTableHandle table,
+            Constraint<ColumnHandle> constraint,
+            Optional<Set<ColumnHandle>> desiredColumns)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.getTableLayouts(session, table, constraint, desiredColumns), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(),
+                () -> targetMetadata.getTableLayouts(session, table, constraint, desiredColumns));
     }
 
     @Override
     public ConnectorTableLayout getTableLayout(ConnectorSession session, ConnectorTableLayoutHandle handle)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.getTableLayout(session, handle), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.getTableLayout(session, handle));
     }
 
     @Override
     public ConnectorTableMetadata getTableMetadata(ConnectorSession session, ConnectorTableHandle table)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.getTableMetadata(session, table), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.getTableMetadata(session, table));
     }
 
     @Override
     public List<SchemaTableName> listTables(ConnectorSession session, String schemaNameOrNull)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.listTables(session, schemaNameOrNull), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.listTables(session, schemaNameOrNull));
     }
 
     @Override
     public ColumnHandle getSampleWeightColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.getSampleWeightColumnHandle(session, tableHandle), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.getSampleWeightColumnHandle(session, tableHandle));
     }
 
     @Override
     public boolean canCreateSampledTables(ConnectorSession session)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.canCreateSampledTables(session), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.canCreateSampledTables(session));
     }
 
     @Override
     public Map<String, ColumnHandle> getColumnHandles(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.getColumnHandles(session, tableHandle), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.getColumnHandles(session, tableHandle));
     }
 
     @Override
     public ColumnMetadata getColumnMetadata(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle columnHandle)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.getColumnMetadata(session, tableHandle, columnHandle), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.getColumnMetadata(session, tableHandle, columnHandle));
     }
 
     @Override
     public Map<SchemaTableName, List<ColumnMetadata>> listTableColumns(ConnectorSession session, SchemaTablePrefix prefix)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.listTableColumns(session, prefix), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.listTableColumns(session, prefix));
     }
 
     @Override
     public void createTable(ConnectorSession session, ConnectorTableMetadata tableMetadata)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.createTable(session, tableMetadata);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.createTable(session, tableMetadata));
     }
 
     @Override
     public void dropTable(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.dropTable(session, tableHandle);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.dropTable(session, tableHandle));
     }
 
     @Override
     public void renameTable(ConnectorSession session, ConnectorTableHandle tableHandle, SchemaTableName newTableName)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.renameTable(session, tableHandle, newTableName);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.renameTable(session, tableHandle, newTableName));
     }
 
     @Override
     public void addColumn(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnMetadata column)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.addColumn(session, tableHandle, column);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.addColumn(session, tableHandle, column));
     }
 
     @Override
     public void renameColumn(ConnectorSession session, ConnectorTableHandle tableHandle, ColumnHandle source, String target)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.renameColumn(session, tableHandle, source, target);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.renameColumn(session, tableHandle, source, target));
     }
 
     @Override
     public ConnectorOutputTableHandle beginCreateTable(ConnectorSession session, ConnectorTableMetadata tableMetadata)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.beginCreateTable(session, tableMetadata), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.beginCreateTable(session, tableMetadata));
     }
 
     @Override
     public void commitCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle, Collection<Slice> fragments)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.commitCreateTable(session, tableHandle, fragments);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.commitCreateTable(session, tableHandle, fragments));
     }
 
     @Override
     public void rollbackCreateTable(ConnectorSession session, ConnectorOutputTableHandle tableHandle)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.rollbackCreateTable(session, tableHandle);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.rollbackCreateTable(session, tableHandle));
     }
 
     @Override
     public ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.beginInsert(session, tableHandle), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.beginInsert(session, tableHandle));
     }
 
     @Override
     public void commitInsert(ConnectorSession session, ConnectorInsertTableHandle insertHandle, Collection<Slice> fragments)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.commitInsert(session, insertHandle, fragments);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.commitInsert(session, insertHandle, fragments));
     }
 
     @Override
     public void rollbackInsert(ConnectorSession session, ConnectorInsertTableHandle insertHandle)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.rollbackInsert(session, insertHandle);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.rollbackInsert(session, insertHandle));
     }
 
     @Override
     public ColumnHandle getUpdateRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.getUpdateRowIdColumnHandle(session, tableHandle), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.getUpdateRowIdColumnHandle(session, tableHandle));
     }
 
     @Override
     public ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.beginDelete(session, tableHandle), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.beginDelete(session, tableHandle));
     }
 
     @Override
     public void commitDelete(ConnectorSession session, ConnectorTableHandle tableHandle, Collection<Slice> fragments)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.commitDelete(session, tableHandle, fragments);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.commitDelete(session, tableHandle, fragments));
     }
 
     @Override
     public void rollbackDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.rollbackDelete(session, tableHandle);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.rollbackDelete(session, tableHandle));
     }
 
     @Override
     public void createView(ConnectorSession session, SchemaTableName viewName, String viewData, boolean replace)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.createView(session, viewName, viewData, replace);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.createView(session, viewName, viewData, replace));
     }
 
     @Override
     public void dropView(ConnectorSession session, SchemaTableName viewName)
     {
-        try {
-            hdfsEnvironment.doAs(() -> {
-                targetMetadata.dropView(session, viewName);
-                return null;
-            }, session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        authentication.doAs(session.getUser(), () -> targetMetadata.dropView(session, viewName));
     }
 
     @Override
     public List<SchemaTableName> listViews(ConnectorSession session, String schemaNameOrNull)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.listViews(session, schemaNameOrNull), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.listViews(session, schemaNameOrNull));
     }
 
     @Override
     public Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, SchemaTablePrefix prefix)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.getViews(session, prefix), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.getViews(session, prefix));
     }
 
     @Override
     public boolean supportsMetadataDelete(ConnectorSession session, ConnectorTableHandle tableHandle, ConnectorTableLayoutHandle tableLayoutHandle)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.supportsMetadataDelete(session, tableHandle, tableLayoutHandle), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.supportsMetadataDelete(session, tableHandle, tableLayoutHandle));
     }
 
     @Override
     public OptionalLong metadataDelete(ConnectorSession session, ConnectorTableHandle tableHandle, ConnectorTableLayoutHandle tableLayoutHandle)
     {
-        try {
-            return hdfsEnvironment.doAs(() -> targetMetadata.metadataDelete(session, tableHandle, tableLayoutHandle), session.getUser());
-        }
-        catch (Exception e) {
-            throw Throwables.propagate(e);
-        }
+        return authentication.doAs(session.getUser(), () -> targetMetadata.metadataDelete(session, tableHandle, tableLayoutHandle));
     }
 }
