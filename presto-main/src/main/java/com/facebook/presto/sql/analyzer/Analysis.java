@@ -235,7 +235,7 @@ public class Analysis
         this.scalarSubqueries.putAll(node, expressionAnalysis.getScalarSubqueries());
     }
 
-    public Set<InPredicate> getInPredicates(Node node)
+    public Set<InPredicate> getSubqueryInPredicates(Node node)
     {
         return inPredicates.get(node);
     }
