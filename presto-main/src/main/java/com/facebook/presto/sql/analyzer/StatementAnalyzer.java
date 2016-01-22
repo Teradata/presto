@@ -1312,7 +1312,7 @@ class StatementAnalyzer
             Expression predicate = node.getHaving().get();
 
             ExpressionAnalysis expressionAnalysis = analyzeExpression(predicate, tupleDescriptor, context);
-            analysis.recordSubqueries(node, expressionAnalysis);
+            analysis.recordSubqueries(predicate, expressionAnalysis);
 
             Type predicateType = expressionAnalysis.getType(predicate);
             if (!predicateType.equals(BOOLEAN) && !predicateType.equals(UNKNOWN)) {

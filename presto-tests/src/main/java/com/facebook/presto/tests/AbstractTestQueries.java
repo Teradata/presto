@@ -4401,6 +4401,11 @@ public abstract class AbstractTestQueries
     public void testSemiJoin()
             throws Exception
     {
+        assertQuery("SELECT linenumber, min(orderkey) " +
+                "FROM lineitem " +
+                "GROUP BY linenumber " +
+                "HAVING min(orderkey) IN (SELECT orderkey FROM orders WHERE orderkey > 1)");
+
         // Throw in a bunch of IN subquery predicates
         assertQuery("" +
                 "SELECT *, o2.custkey\n" +
@@ -4584,6 +4589,12 @@ public abstract class AbstractTestQueries
                 multipleRowsErrorMsg);
         assertQueryFails("SELECT (VALUES (1), (2)) IN (1,2)",
                 multipleRowsErrorMsg);
+
+        // subquery in having
+        assertQuery("SELECT linenumber, min(orderkey) " +
+                "FROM lineitem " +
+                "GROUP BY linenumber " +
+                "HAVING min(orderkey) < (SELECT avg(orderkey) FROM orders WHERE orderkey < 7)");
     }
 
     @Test

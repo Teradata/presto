@@ -48,6 +48,7 @@ import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FrameBound;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.InPredicate;
+import com.facebook.presto.sql.tree.Node;
 import com.facebook.presto.sql.tree.QualifiedNameReference;
 import com.facebook.presto.sql.tree.Query;
 import com.facebook.presto.sql.tree.QuerySpecification;
@@ -107,8 +108,8 @@ class QueryPlanner
     protected PlanBuilder visitQuery(Query query, Void context)
     {
         PlanBuilder builder = planQueryBody(query);
-        builder = appendSemiJoins(builder, analysis.getInPredicates(query));
-        builder = appendScalarSubqueryJoins(builder, analysis.getScalarSubqueries(query));
+
+        builder = handleSubqueries(builder, query);
 
         List<FieldOrExpression> orderBy = analysis.getOrderByExpressions(query);
         List<FieldOrExpression> outputs = analysis.getOutputExpressions(query);
@@ -126,12 +127,11 @@ class QueryPlanner
     {
         PlanBuilder builder = planFrom(node);
 
-        builder = appendSemiJoins(builder, analysis.getInPredicates(node));
-        builder = appendScalarSubqueryJoins(builder, analysis.getScalarSubqueries(node));
+        builder = handleSubqueries(builder, node);
 
         builder = filter(builder, analysis.getWhere(node));
         builder = aggregate(builder, node);
-        builder = filter(builder, analysis.getHaving(node));
+        builder = having(builder, analysis.getHaving(node));
 
         builder = window(builder, node);
 
@@ -457,6 +457,19 @@ class QueryPlanner
         return subPlan;
     }
 
+    private PlanBuilder having(PlanBuilder subPlan, Expression predicate)
+    {
+        if (predicate == null) {
+            return subPlan;
+        }
+        predicate = subPlan.rewrite(predicate);
+        subPlan = handleSubqueries(subPlan, predicate);
+
+        return new PlanBuilder(subPlan.getTranslations(),
+                new FilterNode(idAllocator.getNextId(), subPlan.getRoot(), predicate),
+                subPlan.getSampleWeight());
+    }
+
     private PlanBuilder window(PlanBuilder subPlan, QuerySpecification node)
     {
         Set<FunctionCall> windowFunctions = ImmutableSet.copyOf(analysis.getWindowFunctions(node));
@@ -601,6 +614,13 @@ class QueryPlanner
         }
 
         return new PlanBuilder(translations, new ProjectNode(idAllocator.getNextId(), subPlan.getRoot(), projections.build()), subPlan.getSampleWeight());
+    }
+
+    private PlanBuilder handleSubqueries(PlanBuilder builder, Node node)
+    {
+        builder = appendSemiJoins(builder, analysis.getInPredicates(node));
+        builder = appendScalarSubqueryJoins(builder, analysis.getScalarSubqueries(node));
+        return builder;
     }
 
     private PlanBuilder appendSemiJoins(PlanBuilder subPlan, Set<InPredicate> inPredicates)
