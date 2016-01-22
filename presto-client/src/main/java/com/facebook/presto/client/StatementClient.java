@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.client;
 
+import com.facebook.presto.spi.PrestoException;
 import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
@@ -29,6 +30,7 @@ import io.airlift.units.Duration;
 import javax.annotation.concurrent.ThreadSafe;
 
 import java.io.Closeable;
+import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.util.List;
 import java.util.Map;
@@ -40,10 +42,13 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_ADDED_PREPARE;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_CLEAR_SESSION;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_CLEAR_TRANSACTION_ID;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_DEALLOCATED_PREPARE;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_SET_SESSION;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_STARTED_TRANSACTION_ID;
+import static com.facebook.presto.spi.StandardErrorCode.UNSUPPORTED_ENCODING;
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.net.HttpHeaders.USER_AGENT;
@@ -59,6 +64,7 @@ import static io.airlift.http.client.StaticBodyGenerator.createStaticBodyGenerat
 import static io.airlift.http.client.StatusResponseHandler.StatusResponse;
 import static io.airlift.http.client.StatusResponseHandler.createStatusResponseHandler;
 import static java.lang.String.format;
+import static java.net.URLEncoder.encode;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -80,6 +86,8 @@ public class StatementClient
     private final AtomicReference<QueryResults> currentResults = new AtomicReference<>();
     private final Map<String, String> setSessionProperties = new ConcurrentHashMap<>();
     private final Set<String> resetSessionProperties = Sets.newConcurrentHashSet();
+    private final Map<String, String> addedPreparedStatements = new ConcurrentHashMap<>();
+    private final Set<String> deallocatedPreparedStatements = Sets.newConcurrentHashSet();
     private final AtomicReference<String> startedtransactionId = new AtomicReference<>();
     private final AtomicBoolean clearTransactionId = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
@@ -137,6 +145,21 @@ public class StatementClient
         Map<String, String> property = session.getProperties();
         for (Entry<String, String> entry : property.entrySet()) {
             builder.addHeader(PrestoHeaders.PRESTO_SESSION, entry.getKey() + "=" + entry.getValue());
+        }
+
+        Map<String, String> statements = session.getPreparedStatements();
+        for (Entry<String, String> entry : statements.entrySet()) {
+            String encodedKey;
+            String encodedValue;
+            try {
+                encodedKey = encode(entry.getKey(), "UTF-8");
+                encodedValue = encode(entry.getValue(), "UTF-8");
+            }
+            catch (UnsupportedEncodingException e) {
+                throw new PrestoException(UNSUPPORTED_ENCODING, "Cannot encode statement: UTF-8 encoding unsupported");
+            }
+
+            builder.addHeader(PrestoHeaders.PRESTO_PREPARED_STATEMENT, encodedKey + "=" + encodedValue);
         }
 
         builder.setHeader(PrestoHeaders.PRESTO_TRANSACTION_ID, session.getTransactionId() == null ? "NONE" : session.getTransactionId());
@@ -199,6 +222,16 @@ public class StatementClient
     public Set<String> getResetSessionProperties()
     {
         return ImmutableSet.copyOf(resetSessionProperties);
+    }
+
+    public Map<String, String> getAddedPreparedStatements()
+    {
+        return ImmutableMap.copyOf(addedPreparedStatements);
+    }
+
+    public Set<String> getDeallocatedPreparedStatements()
+    {
+        return ImmutableSet.copyOf(deallocatedPreparedStatements);
     }
 
     public String getStartedtransactionId()
@@ -286,6 +319,17 @@ public class StatementClient
         }
         for (String clearSession : response.getHeaders().get(PRESTO_CLEAR_SESSION)) {
             resetSessionProperties.add(clearSession);
+        }
+
+        for (String entry : response.getHeaders().get(PRESTO_ADDED_PREPARE)) {
+            List<String> keyValue = SESSION_HEADER_SPLITTER.splitToList(entry);
+            if (keyValue.size() != 2) {
+                continue;
+            }
+            this.addedPreparedStatements.put(keyValue.get(0), keyValue.get(1));
+        }
+        for (String entry : response.getHeaders().get(PRESTO_DEALLOCATED_PREPARE)) {
+            this.deallocatedPreparedStatements.add(entry);
         }
 
         String startedTransactionId = response.getHeader(PRESTO_STARTED_TRANSACTION_ID);
