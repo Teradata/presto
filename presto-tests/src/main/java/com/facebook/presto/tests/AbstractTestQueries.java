@@ -4401,6 +4401,9 @@ public abstract class AbstractTestQueries
     public void testSemiJoin()
             throws Exception
     {
+        // constant literal versus a subquery
+        assertQuery("SELECT 10 in (SELECT orderkey FROM orders)");
+
         // Throw in a bunch of IN subquery predicates
         assertQuery("" +
                 "SELECT *, o2.custkey\n" +
@@ -4558,6 +4561,7 @@ public abstract class AbstractTestQueries
                 "(SELECT min(orderkey) FROM orders)" +
                 "<" +
                 "(SELECT max(orderkey) FROM orders)");
+        assertQuery("SELECT (SELECT 1), (SELECT 2), (SELECT 3)");
 
         // distinct
         assertQuery("SELECT DISTINCT orderkey FROM lineitem " +

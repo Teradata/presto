@@ -27,12 +27,12 @@ import com.facebook.presto.sql.analyzer.FieldOrExpression;
 import com.facebook.presto.sql.analyzer.RelationType;
 import com.facebook.presto.sql.analyzer.SemanticException;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
+import com.facebook.presto.sql.planner.plan.ApplyNode;
 import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.facebook.presto.sql.planner.plan.SampleNode;
-import com.facebook.presto.sql.planner.plan.SemiJoinNode;
 import com.facebook.presto.sql.planner.plan.TableScanNode;
 import com.facebook.presto.sql.planner.plan.UnionNode;
 import com.facebook.presto.sql.planner.plan.UnnestNode;
@@ -78,7 +78,6 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
-import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.sql.ExpressionUtils.flipComparison;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.sql.planner.ExpressionInterpreter.evaluateConstantExpression;
@@ -266,8 +265,8 @@ class RelationPlanner
 
             // Add semi joins if necessary
             if (joinInPredicates != null) {
-                leftPlanBuilder = appendSemiJoins(leftPlanBuilder, joinInPredicates.getLeftInPredicates());
-                rightPlanBuilder = appendSemiJoins(rightPlanBuilder, joinInPredicates.getRightInPredicates());
+                leftPlanBuilder = appendInPredicateApplies(leftPlanBuilder, joinInPredicates.getLeftInPredicates());
+                rightPlanBuilder = appendInPredicateApplies(rightPlanBuilder, joinInPredicates.getRightInPredicates());
             }
 
             // Add projections for join criteria
@@ -634,41 +633,34 @@ class RelationPlanner
         return new PlanBuilder(translations, new ProjectNode(idAllocator.getNextId(), subPlan.getRoot(), projections.build()), subPlan.getSampleWeight());
     }
 
-    private PlanBuilder appendSemiJoins(PlanBuilder subPlan, Set<InPredicate> inPredicates)
+    private PlanBuilder appendInPredicateApplies(PlanBuilder subPlan, Set<InPredicate> inPredicates)
     {
         for (InPredicate inPredicate : inPredicates) {
-            subPlan = appendSemiJoin(subPlan, inPredicate);
+            subPlan = appendInPredicateApply(subPlan, inPredicate);
         }
         return subPlan;
     }
 
-    private PlanBuilder appendSemiJoin(PlanBuilder subPlan, InPredicate inPredicate)
+    private PlanBuilder appendInPredicateApply(PlanBuilder subPlan, InPredicate inPredicate)
     {
         TranslationMap translations = new TranslationMap(subPlan.getRelationPlan(), analysis);
         translations.copyMappingsFrom(subPlan.getTranslations());
 
         subPlan = appendProjections(subPlan, ImmutableList.of(inPredicate.getValue()));
-        Symbol sourceJoinSymbol = subPlan.translate(inPredicate.getValue());
 
         checkState(inPredicate.getValueList() instanceof SubqueryExpression);
         SubqueryExpression subqueryExpression = (SubqueryExpression) inPredicate.getValueList();
         RelationPlanner relationPlanner = new RelationPlanner(analysis, symbolAllocator, idAllocator, metadata, session);
-        RelationPlan valueListRelation = relationPlanner.process(subqueryExpression.getQuery(), null);
-        Symbol filteringSourceJoinSymbol = Iterables.getOnlyElement(valueListRelation.getRoot().getOutputSymbols());
+        PlanNode valueListRelation = relationPlanner.process(subqueryExpression.getQuery(), null).getRoot();
+        Symbol valueListRelationOutputSymbol = Iterables.getOnlyElement(valueListRelation.getOutputSymbols());
 
-        Symbol semiJoinOutputSymbol = symbolAllocator.newSymbol("semijoinresult", BOOLEAN);
-
-        translations.put(inPredicate, semiJoinOutputSymbol);
+        translations.put(inPredicate.getValueList(), valueListRelationOutputSymbol);
 
         return new PlanBuilder(translations,
-                new SemiJoinNode(idAllocator.getNextId(),
+                new ApplyNode(idAllocator.getNextId(),
                         subPlan.getRoot(),
-                        valueListRelation.getRoot(),
-                        sourceJoinSymbol,
-                        filteringSourceJoinSymbol,
-                        semiJoinOutputSymbol,
-                        Optional.empty(),
-                        Optional.empty()),
+                        valueListRelation,
+                        ImmutableMap.of()),
                 subPlan.getSampleWeight());
     }
 
