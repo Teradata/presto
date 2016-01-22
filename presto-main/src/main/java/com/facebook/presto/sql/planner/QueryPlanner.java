@@ -107,7 +107,7 @@ class QueryPlanner
     protected PlanBuilder visitQuery(Query query, Void context)
     {
         PlanBuilder builder = planQueryBody(query);
-        builder = appendSemiJoins(builder, analysis.getInPredicates(query));
+        builder = appendSemiJoins(builder, analysis.getSubqueryInPredicates(query));
         builder = appendScalarSubqueryJoins(builder, analysis.getScalarSubqueries(query));
 
         List<FieldOrExpression> orderBy = analysis.getOrderByExpressions(query);
@@ -126,7 +126,7 @@ class QueryPlanner
     {
         PlanBuilder builder = planFrom(node);
 
-        builder = appendSemiJoins(builder, analysis.getInPredicates(node));
+        builder = appendSemiJoins(builder, analysis.getSubqueryInPredicates(node));
         builder = appendScalarSubqueryJoins(builder, analysis.getScalarSubqueries(node));
 
         builder = filter(builder, analysis.getWhere(node));
@@ -217,7 +217,7 @@ class QueryPlanner
         PlanBuilder builder = new PlanBuilder(translations, relationPlan.getRoot(), relationPlan.getSampleWeight());
 
         // add semi-joins and filters
-        Set<InPredicate> inPredicates = analysis.getInPredicates(node);
+        Set<InPredicate> inPredicates = analysis.getSubqueryInPredicates(node);
         builder = appendSemiJoins(builder, inPredicates);
 
         if (node.getWhere().isPresent()) {
