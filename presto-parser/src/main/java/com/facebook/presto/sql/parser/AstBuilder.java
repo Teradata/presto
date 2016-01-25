@@ -36,6 +36,7 @@ import com.facebook.presto.sql.tree.CreateTableAsSelect;
 import com.facebook.presto.sql.tree.CreateView;
 import com.facebook.presto.sql.tree.Cube;
 import com.facebook.presto.sql.tree.CurrentTime;
+import com.facebook.presto.sql.tree.Deallocate;
 import com.facebook.presto.sql.tree.Delete;
 import com.facebook.presto.sql.tree.DereferenceExpression;
 import com.facebook.presto.sql.tree.DoubleLiteral;
@@ -317,6 +318,13 @@ class AstBuilder
         String name = context.identifier().getText();
         Query query = (Query) visitQuery(context.query());
         return new Prepare(getLocation(context), name, query);
+    }
+
+    @Override
+    public Node visitDeallocate(SqlBaseParser.DeallocateContext context)
+    {
+        String name = context.identifier().getText();
+        return new Deallocate(getLocation(context), name);
     }
 
     // ********************** query expressions ********************
