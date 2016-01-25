@@ -13,9 +13,11 @@
  */
 package com.facebook.presto.tests;
 
+import com.facebook.presto.Session;
 import com.facebook.presto.metadata.FunctionListBuilder;
 import com.facebook.presto.metadata.SqlFunction;
 import com.facebook.presto.operator.scalar.TestingRowConstructor;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.spi.type.TimeZoneKey;
 import com.facebook.presto.spi.type.Type;
@@ -5468,5 +5470,25 @@ public abstract class AbstractTestQueries
         assertAccessDenied("INSERT INTO orders SELECT * FROM orders", "Cannot insert into table .*.orders.*", privilege("orders", INSERT_TABLE));
         assertAccessDenied("DELETE FROM orders", "Cannot delete from table .*.orders.*", privilege("orders", DELETE_TABLE));
         assertAccessDenied("CREATE TABLE foo AS SELECT * FROM orders", "Cannot create table .*.foo.*", privilege("foo", CREATE_TABLE));
+    }
+
+    @Test
+    public void testExecute()
+    {
+        Session session = getSession().withPreparedStatement("my_query", "select 123, 'abc'");
+        MaterializedResult actual = computeActual(session, "EXECUTE my_query");
+        List<MaterializedRow> rows = actual.getMaterializedRows();
+
+        assertEquals(rows.size(), 1);
+
+        MaterializedRow row = rows.get(0);
+        assertEquals(row.getField(0), 123L);
+        assertEquals(row.getField(1), "abc");
+    }
+
+    @Test(expectedExceptions = PrestoException.class)
+    public void testExecuteNoSuchQuery()
+    {
+        computeActual(getSession(), "EXECUTE my_query");
     }
 }
