@@ -31,6 +31,7 @@ import com.facebook.presto.sql.tree.CreateTableAsSelect;
 import com.facebook.presto.sql.tree.CreateView;
 import com.facebook.presto.sql.tree.Cube;
 import com.facebook.presto.sql.tree.CurrentTime;
+import com.facebook.presto.sql.tree.Deallocate;
 import com.facebook.presto.sql.tree.Delete;
 import com.facebook.presto.sql.tree.DereferenceExpression;
 import com.facebook.presto.sql.tree.DoubleLiteral;
@@ -1271,6 +1272,12 @@ public class TestSqlParser
                                 new Prepare("myquery", simpleQuery(
                                         selectList(new AllColumns()),
                                         table(QualifiedName.of("foo")))));
+    }
+
+    @Test
+    public void testDeallocatePrepare()
+    {
+        assertStatement("DEALLOCATE PREPARE myquery", new Deallocate("myquery"));
     }
 
     private static void assertCast(String type)
