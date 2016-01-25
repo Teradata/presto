@@ -55,3 +55,14 @@ Hadoop Services Startup
 
 After the VM boots, some Hadoop services may still not be started. Starting them
 takes a couple of minutes depending on the host machine.
+
+VM Networking
+=============
+
+By default, the VM is configured to use NAT networking and will have an IP of 10.0.2.15 in VirtualBox.
+For some systems with local firewalls or connected to VPN this may result in being unable to reach the Airpal, presto
+and various hadoop web UI pages.
+
+To resolve this, enable port forwarding via the VirtualBox UI by navigating to your VM -> settings -> Network -> Advanced.
+Click on the 'Port Forwarding' button and configure the ports you would like to forward from your local machine to the VM.
+For example, 127.0.0.1:50070 -> 10.0.2.15:50070 will enable access to the hadoop name node web UI.
