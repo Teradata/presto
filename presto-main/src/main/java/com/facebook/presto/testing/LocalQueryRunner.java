@@ -38,6 +38,7 @@ import com.facebook.presto.execution.ResetSessionTask;
 import com.facebook.presto.execution.RollbackTask;
 import com.facebook.presto.execution.SetSessionTask;
 import com.facebook.presto.execution.StartTransactionTask;
+import com.facebook.presto.execution.StatementCreator;
 import com.facebook.presto.execution.TaskManagerConfig;
 import com.facebook.presto.index.IndexManager;
 import com.facebook.presto.metadata.HandleResolver;
@@ -163,6 +164,7 @@ public class LocalQueryRunner
     private final ScheduledExecutorService transactionCheckExecutor;
 
     private final SqlParser sqlParser;
+    private final StatementCreator statementCreator;
     private final InMemoryNodeManager nodeManager;
     private final TypeRegistry typeRegistry;
     private final MetadataManager metadata;
@@ -196,6 +198,7 @@ public class LocalQueryRunner
         this.transactionCheckExecutor = newSingleThreadScheduledExecutor(daemonThreadsNamed("transaction-idle-check"));
 
         this.sqlParser = new SqlParser();
+        this.statementCreator = new StatementCreator(sqlParser);
         this.nodeManager = new InMemoryNodeManager();
         this.typeRegistry = new TypeRegistry();
         this.indexManager = new IndexManager();
@@ -508,7 +511,7 @@ public class LocalQueryRunner
 
     public List<Driver> createDrivers(Session session, @Language("SQL") String sql, OutputFactory outputFactory, TaskContext taskContext)
     {
-        Statement statement = sqlParser.createStatement(sql);
+        Statement statement = statementCreator.createStatement(sql, session);
 
         assertFormattedSql(sqlParser, statement);
 
