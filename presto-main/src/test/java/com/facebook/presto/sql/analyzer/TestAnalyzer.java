@@ -28,6 +28,7 @@ import com.facebook.presto.spi.ColumnMetadata;
 import com.facebook.presto.spi.ConnectorMetadata;
 import com.facebook.presto.spi.ConnectorSplitManager;
 import com.facebook.presto.spi.ConnectorTableMetadata;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.connector.Connector;
 import com.facebook.presto.spi.type.TypeManager;
@@ -821,6 +822,20 @@ public class TestAnalyzer
     {
         // the view must not be analyzed using the query context
         analyze("WITH t1 AS (SELECT 123 x) SELECT * FROM v1");
+    }
+
+    @Test(expectedExceptions = PrestoException.class)
+    public void testExecuteStatementNotFound()
+            throws Exception
+    {
+        analyze("EXECUTE my_query");
+    }
+
+    public void testExecute()
+            throws Exception
+    {
+        Session session = CLIENT_SESSION.withPreparedStatement("my_query", "select * FROM v1");
+        analyze(session, "EXECUTE my_query");
     }
 
     @Test

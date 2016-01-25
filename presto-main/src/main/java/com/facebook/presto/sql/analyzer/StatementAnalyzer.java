@@ -52,6 +52,7 @@ import com.facebook.presto.sql.tree.DefaultTraversalVisitor;
 import com.facebook.presto.sql.tree.Delete;
 import com.facebook.presto.sql.tree.DereferenceExpression;
 import com.facebook.presto.sql.tree.Except;
+import com.facebook.presto.sql.tree.Execute;
 import com.facebook.presto.sql.tree.Explain;
 import com.facebook.presto.sql.tree.ExplainFormat;
 import com.facebook.presto.sql.tree.ExplainOption;
@@ -131,6 +132,7 @@ import static com.facebook.presto.metadata.FunctionKind.APPROXIMATE_AGGREGATE;
 import static com.facebook.presto.metadata.FunctionKind.WINDOW;
 import static com.facebook.presto.metadata.MetadataUtil.createQualifiedObjectName;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
+import static com.facebook.presto.spi.StandardErrorCode.NOT_FOUND;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.sql.QueryUtil.aliased;
@@ -738,6 +740,19 @@ class StatementAnalyzer
         analysis.setQuery(node);
 
         return descriptor;
+    }
+
+    @Override
+    protected RelationType visitExecute(Execute node, AnalysisContext context)
+    {
+        String name = node.getName();
+        String sqlString = session.getPreparedStatements().get(name);
+        if (sqlString == null) {
+            throw new PrestoException(NOT_FOUND, "Prepared statement not found: " + name);
+        }
+
+        Statement statement = sqlParser.createStatement(sqlString);
+        return process(statement, context);
     }
 
     @Override
