@@ -966,9 +966,9 @@ public class HiveClientConfig
         return this;
     }
 
-    public String getTemporaryDirectory()
+    public String getTemporaryDirectory(String userName)
     {
-        return temporaryDirectory;
+        return temporaryDirectory.replace("%NAME%", userName);
     }
 
     @Config("hive.hdfs.temporary.directory")

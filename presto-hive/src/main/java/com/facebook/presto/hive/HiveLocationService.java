@@ -105,7 +105,7 @@ public class HiveLocationService
         String temporaryPrefix;
         try {
             String currentUser = UserGroupInformation.getCurrentUser().getUserName();
-            temporaryPrefix = hiveClientConfig.getTemporaryDirectory().replace("%USER%", currentUser);
+            temporaryPrefix = hiveClientConfig.getTemporaryDirectory(currentUser);
             temporaryPrefix = temporaryPrefix + "/prestotmp-" + currentUser;
         }
         catch (IOException e) {
