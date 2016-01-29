@@ -17,10 +17,12 @@ package com.facebook.presto.execution;
 import com.facebook.presto.Session;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.sql.parser.SqlParser;
+import com.facebook.presto.sql.tree.AstExpressionRewriter;
 import com.facebook.presto.sql.tree.Execute;
 import com.facebook.presto.sql.tree.Statement;
 import com.google.inject.Inject;
 
+import static com.facebook.presto.execution.ParameterValidator.validateParameters;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_FOUND;
 import static java.util.Objects.requireNonNull;
 
@@ -50,6 +52,13 @@ public class StatementCreator
         }
 
         statement = sqlParser.createStatement(sqlString);
-        return statement;
+
+        // validate that we have the right number of parameters
+        validateParameters(statement, execute.getParameters());
+
+        // replace Parameter expressions with the supplied values.
+        ParameterRewriter parameterRewriter = new ParameterRewriter(execute.getParameters());
+        AstExpressionRewriter expressionRewriter = new AstExpressionRewriter(parameterRewriter);
+        return (Statement) expressionRewriter.process(statement, null);
     }
 }
