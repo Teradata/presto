@@ -71,6 +71,7 @@ import com.facebook.presto.sql.tree.JoinOn;
 import com.facebook.presto.sql.tree.JoinUsing;
 import com.facebook.presto.sql.tree.LambdaExpression;
 import com.facebook.presto.sql.tree.LikePredicate;
+import com.facebook.presto.sql.tree.Literal;
 import com.facebook.presto.sql.tree.LogicalBinaryExpression;
 import com.facebook.presto.sql.tree.LongLiteral;
 import com.facebook.presto.sql.tree.NaturalJoin;
@@ -79,6 +80,7 @@ import com.facebook.presto.sql.tree.NodeLocation;
 import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.NullIfExpression;
 import com.facebook.presto.sql.tree.NullLiteral;
+import com.facebook.presto.sql.tree.Parameter;
 import com.facebook.presto.sql.tree.Prepare;
 import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.QualifiedNameReference;
@@ -137,6 +139,7 @@ import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.ParseTree;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -149,6 +152,8 @@ import static java.util.stream.Collectors.toList;
 class AstBuilder
         extends SqlBaseBaseVisitor<Node>
 {
+    private int parameterId = 0;
+
     @Override
     public Node visitSingleStatement(SqlBaseParser.SingleStatementContext context)
     {
@@ -331,7 +336,11 @@ class AstBuilder
     public Node visitExecute(SqlBaseParser.ExecuteContext context)
     {
         String name = context.identifier().getText();
-        return new Execute(getLocation(context), name);
+        List<Literal> parameterValues = new ArrayList<>(context.literal().size());
+        for (SqlBaseParser.LiteralContext literalContext : context.literal()) {
+            parameterValues.add((Literal) visit(literalContext));
+        }
+        return new Execute(getLocation(context), name, parameterValues);
     }
 
     // ********************** query expressions ********************
@@ -1228,6 +1237,12 @@ class AstBuilder
                         .map((x) -> x.getChild(0).getPayload())
                         .map(Token.class::cast)
                         .map(AstBuilder::getIntervalFieldType));
+    }
+
+    @Override
+    public Node visitParameter(SqlBaseParser.ParameterContext context)
+    {
+        return new Parameter(getLocation(context), parameterId++);
     }
 
     // ***************** arguments *****************
