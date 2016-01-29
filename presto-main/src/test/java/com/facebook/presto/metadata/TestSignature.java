@@ -190,7 +190,7 @@ public class TestSignature
 
         // given f(T1):T2 bind f(varchar(42)):varchar(1)
         assertFunctionBind(
-                ImmutableList.of(new TypeParameterRequirement("T1", true, false, "varchar"), new TypeParameterRequirement("T2", true, false, "varchar")),
+                ImmutableList.of(TypeParameterRequirement.typeConstraint("T1", true, false, "varchar"), TypeParameterRequirement.typeConstraint("T2", true, false, "varchar")),
                 templateType2,
                 ImmutableList.of(templateType1),
                 Optional.of(varchar1),

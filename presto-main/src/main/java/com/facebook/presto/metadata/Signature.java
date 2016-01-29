@@ -413,7 +413,7 @@ public final class Signature
                 if (canCoerce(type, boundParameters.get(parameter.getBase()))) {
                     return true;
                 }
-                else if (canCoerce(boundParameters.get(parameter.getBase()), type) && typeParameters.get(parameter.getBase()).canBind(type)) {
+                else if (canCoerce(boundParameters.get(parameter.getBase()), type) && typeParameters.get(parameter.getBase()).getTypeConstraint().canBind(type)) {
                     // Try to coerce current binding to new candidate
                     boundParameters.put(parameter.getBase(), type);
                     return true;
@@ -421,7 +421,7 @@ public final class Signature
                 else {
                     // Try to use common super type of current binding and candidate
                     Optional<Type> commonSuperType = typeManager.getCommonSuperType(boundParameters.get(parameter.getBase()), type);
-                    if (commonSuperType.isPresent() && typeParameters.get(parameter.getBase()).canBind(commonSuperType.get())) {
+                    if (commonSuperType.isPresent() && typeParameters.get(parameter.getBase()).getTypeConstraint().canBind(commonSuperType.get())) {
                         boundParameters.put(parameter.getBase(), commonSuperType.get());
                         return true;
                     }
@@ -452,7 +452,7 @@ public final class Signature
         // Bind parameter, if this is a free type parameter
         if (typeParameters.containsKey(parameter.getBase())) {
             TypeParameterRequirement typeParameterRequirement = typeParameters.get(parameter.getBase());
-            if (!typeParameterRequirement.canBind(type)) {
+            if (!typeParameterRequirement.getTypeConstraint().canBind(type)) {
                 return false;
             }
             boundParameters.put(parameter.getBase(), type);
@@ -554,27 +554,27 @@ public final class Signature
      */
     public static TypeParameterRequirement withVariadicBound(String name, String variadicBound)
     {
-        return new TypeParameterRequirement(name, false, false, variadicBound);
+        return TypeParameterRequirement.typeConstraint(name, false, false, variadicBound);
     }
 
     public static TypeParameterRequirement comparableWithVariadicBound(String name, String variadicBound)
     {
-        return new TypeParameterRequirement(name, true, false, variadicBound);
+        return TypeParameterRequirement.typeConstraint(name, true, false, variadicBound);
     }
 
     public static TypeParameterRequirement typeParameter(String name)
     {
-        return new TypeParameterRequirement(name, false, false, null);
+        return TypeParameterRequirement.typeConstraint(name, false, false, null);
     }
 
     public static TypeParameterRequirement comparableTypeParameter(String name)
     {
-        return new TypeParameterRequirement(name, true, false, null);
+        return TypeParameterRequirement.typeConstraint(name, true, false, null);
     }
 
     public static TypeParameterRequirement orderableTypeParameter(String name)
     {
-        return new TypeParameterRequirement(name, false, true, null);
+        return TypeParameterRequirement.typeConstraint(name, false, true, null);
     }
 
     public static SignatureBuilder builder()
