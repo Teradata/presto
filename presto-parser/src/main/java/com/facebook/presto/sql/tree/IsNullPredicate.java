@@ -33,7 +33,7 @@ public class IsNullPredicate
         this(Optional.of(location), value);
     }
 
-    private IsNullPredicate(Optional<NodeLocation> location, Expression value)
+    public IsNullPredicate(Optional<NodeLocation> location, Expression value)
     {
         super(location);
         requireNonNull(value, "value is null");

@@ -50,7 +50,7 @@ public class Query
         this(Optional.of(location), with, queryBody, orderBy, limit, approximate);
     }
 
-    private Query(
+    public Query(
             Optional<NodeLocation> location,
             Optional<With> with,
             QueryBody queryBody,

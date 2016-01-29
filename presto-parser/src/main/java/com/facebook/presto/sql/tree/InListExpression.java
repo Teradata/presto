@@ -32,7 +32,7 @@ public class InListExpression
         this(Optional.of(location), values);
     }
 
-    private InListExpression(Optional<NodeLocation> location, List<Expression> values)
+    public InListExpression(Optional<NodeLocation> location, List<Expression> values)
     {
         super(location);
         this.values = values;

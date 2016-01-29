@@ -32,7 +32,7 @@ public class InPredicate
         this(Optional.of(location), value, valueList);
     }
 
-    private InPredicate(Optional<NodeLocation> location, Expression value, Expression valueList)
+    public InPredicate(Optional<NodeLocation> location, Expression value, Expression valueList)
     {
         super(location);
         this.value = value;
