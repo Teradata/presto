@@ -17,7 +17,6 @@ import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.spi.type.TypeSignatureParameter;
-import com.facebook.presto.type.TypeRegistry;
 import com.facebook.presto.type.TypeUtils;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -493,11 +492,21 @@ public final class Signature
         // Bind parameter, if this is a free type parameter
         if (typeVariableConstraints.containsKey(parameter.getBase())) {
             TypeVariableConstraint typeVariableConstraint = typeVariableConstraints.get(parameter.getBase());
-            if (!typeVariableConstraint.canBind(type)) {
-                return false;
+            if (typeVariableConstraint.canBind(type)) {
+                boundParameters.put(parameter.getBase(), type);
+                return true;
             }
-            boundParameters.put(parameter.getBase(), type);
-            return true;
+
+            if (allowCoercion && typeVariableConstraint.getVariadicBound() != null) {
+                TypeSignature variadicBoundSignature = new TypeSignature(typeVariableConstraint.getVariadicBound());
+                if (canCoerce(type.getTypeSignature(), variadicBoundSignature)) {
+                    boundParameters.put(parameter.getBase(),
+                            commonSuperType(type, variadicBoundSignature, typeManager));
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // If parameters don't match, and base type differs
@@ -508,7 +517,7 @@ public final class Signature
                         boundParameters,
                         typeVariableConstraints,
                         parameter,
-                        requireNonNull(typeManager.getType(TypeRegistry.getUnmatchedSignature(parameter))),
+                        commonSuperType(type, parameter, typeManager),
                         true,
                         typeManager);
             }
@@ -588,6 +597,13 @@ public final class Signature
             }
         }
         return true;
+    }
+
+    private static Type commonSuperType(Type parameterType, TypeSignature requiredTypeSignature, TypeManager typeManager)
+    {
+        Optional<TypeSignature> commonSuperType = getCommonSuperTypeSignature(parameterType.getTypeSignature(), requiredTypeSignature);
+        checkState(commonSuperType.isPresent());
+        return requireNonNull(typeManager.getType(commonSuperType.get()), "concrete type is required here");
     }
 
     /*

@@ -14,6 +14,7 @@
 package com.facebook.presto.metadata;
 
 import com.facebook.presto.spi.type.BooleanType;
+import com.facebook.presto.spi.type.DoubleType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
@@ -40,6 +41,7 @@ import static com.facebook.presto.metadata.Signature.comparableTypeParameter;
 import static com.facebook.presto.metadata.Signature.typeVariable;
 import static com.facebook.presto.metadata.Signature.withVariadicBound;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
+import static com.facebook.presto.spi.type.DecimalType.createDecimalType;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.HyperLogLogType.HYPER_LOG_LOG;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
@@ -55,6 +57,9 @@ public class TestSignature
 {
     private final TypeSignature varcharX = new TypeSignature(StandardTypes.VARCHAR, ImmutableList.of(TypeSignatureParameter.of("x")));
     private final TypeSignature varcharY = new TypeSignature(StandardTypes.VARCHAR, ImmutableList.of(TypeSignatureParameter.of("y")));
+
+    private final TypeSignature decimalPS = new TypeSignature(StandardTypes.DECIMAL,
+            ImmutableList.of(TypeSignatureParameter.of("p"), TypeSignatureParameter.of("n")));
 
     @Test
     public void testBindLiteralForDecimal()
@@ -133,6 +138,66 @@ public class TestSignature
                 ImmutableList.of(varcharX),
                 Optional.empty(),
                 ImmutableList.of(UNKNOWN),
+                true,
+                ImmutableMap.of());
+    }
+
+    @Test
+    public void testBindBigintToDecimal()
+            throws Exception
+    {
+        assertFunctionBind(
+                ImmutableList.of(),
+                ImmutableList.of(),
+                BooleanType.BOOLEAN.getTypeSignature(),
+                ImmutableList.of(decimalPS),
+                Optional.empty(),
+                ImmutableList.of(BIGINT),
+                true,
+                ImmutableMap.of());
+    }
+
+    @Test
+    public void testBindDecimalBigintToDecimalDecimal()
+            throws Exception
+    {
+        assertFunctionBind(
+                ImmutableList.of(),
+                ImmutableList.of(),
+                BooleanType.BOOLEAN.getTypeSignature(),
+                ImmutableList.of(decimalPS, decimalPS),
+                Optional.empty(),
+                ImmutableList.of(createDecimalType(5, 2), BIGINT),
+                true,
+                ImmutableMap.of());
+    }
+
+    @Test
+    public void testBindUnknownToDecimal()
+            throws Exception
+    {
+        assertFunctionBind(
+                ImmutableList.of(),
+                ImmutableList.of(),
+                BooleanType.BOOLEAN.getTypeSignature(),
+                ImmutableList.of(decimalPS),
+                Optional.empty(),
+                ImmutableList.of(UNKNOWN),
+                true,
+                ImmutableMap.of());
+    }
+
+    @Test
+    public void testBindDecimalToDouble()
+            throws Exception
+    {
+        assertFunctionBind(
+                ImmutableList.of(),
+                ImmutableList.of(),
+                BooleanType.BOOLEAN.getTypeSignature(),
+                ImmutableList.of(DoubleType.DOUBLE.getTypeSignature()),
+                Optional.empty(),
+                ImmutableList.of(createDecimalType(5, 2)),
                 true,
                 ImmutableMap.of());
     }

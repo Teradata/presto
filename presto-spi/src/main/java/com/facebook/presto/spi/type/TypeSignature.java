@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static com.facebook.presto.spi.type.ParameterKind.LONG;
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
 import static java.util.Collections.unmodifiableList;
@@ -97,6 +98,12 @@ public class TypeSignature
             result.add(parameter.getTypeSignature());
         }
         return result;
+    }
+
+    public boolean isWithLongLiteralParameters()
+    {
+        return !parameters.isEmpty() &&
+                parameters.stream().allMatch(parameter -> parameter.getKind() == LONG);
     }
 
     public boolean isCalculated()
