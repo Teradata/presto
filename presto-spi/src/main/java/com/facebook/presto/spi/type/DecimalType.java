@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
+import static com.facebook.presto.spi.type.StandardTypes.DECIMAL;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.unmodifiableList;
 
@@ -51,6 +52,11 @@ public abstract class DecimalType
     public static DecimalType createDecimalType()
     {
         return createDecimalType(DEFAULT_PRECISION, DEFAULT_SCALE);
+    }
+
+    public static TypeSignature createDecimalTypeSignature(long precision, long scale)
+    {
+        return new TypeSignature(DECIMAL, buildPrecisionScaleList(precision, scale));
     }
 
     protected final int precision;
@@ -120,11 +126,11 @@ public abstract class DecimalType
         return precision <= MAX_SHORT_PRECISION;
     }
 
-    private static List<TypeSignatureParameter> buildPrecisionScaleList(int precision, int scale)
+    private static List<TypeSignatureParameter> buildPrecisionScaleList(long precision, long scale)
     {
         List<TypeSignatureParameter> literalArguments = new ArrayList<>();
-        literalArguments.add(TypeSignatureParameter.of((long) precision));
-        literalArguments.add(TypeSignatureParameter.of((long) scale));
+        literalArguments.add(TypeSignatureParameter.of(precision));
+        literalArguments.add(TypeSignatureParameter.of(scale));
         return unmodifiableList(literalArguments);
     }
 
