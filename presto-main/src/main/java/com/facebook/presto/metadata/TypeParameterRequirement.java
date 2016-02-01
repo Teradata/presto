@@ -44,24 +44,24 @@ public final class TypeParameterRequirement
         this.value = value;
     }
 
-    public static TypeParameterRequirement typeConstraint(String name, boolean comparableRequired, boolean orderableRequired, @Nullable String variadicBound)
+    public static TypeParameterRequirement typeVariableConstraint(String name, boolean comparableRequired, boolean orderableRequired, @Nullable String variadicBound)
     {
-        return new TypeParameterRequirement(name, new TypeConstraint(comparableRequired, orderableRequired, variadicBound));
+        return new TypeParameterRequirement(name, new TypeVariableConstraint(comparableRequired, orderableRequired, variadicBound));
     }
 
-    public static TypeParameterRequirement longConstraint(String name, @Nullable String computation)
+    public static TypeParameterRequirement longVariableConstraint(String name, @Nullable String calculation)
     {
-        return new TypeParameterRequirement(name, new LongConstraint(computation));
+        return new TypeParameterRequirement(name, new LongVariableConstraint(calculation));
     }
 
-    public TypeConstraint getTypeConstraint()
+    public TypeVariableConstraint getTypeConstraint()
     {
-        return (TypeConstraint) value;
+        return (TypeVariableConstraint) value;
     }
 
-    public LongConstraint getLongConstraint()
+    public LongVariableConstraint getLongConstraint()
     {
-        return (LongConstraint) value;
+        return (LongVariableConstraint) value;
     }
 
     @JsonProperty
@@ -85,7 +85,7 @@ public final class TypeParameterRequirement
     @Override
     public String toString()
     {
-        return name + value.toString();
+        return name + "=" + value.toString();
     }
 
     @Override
@@ -109,8 +109,8 @@ public final class TypeParameterRequirement
     }
 
     @JsonSubTypes({
-            @JsonSubTypes.Type(value = TypeConstraint.class, name = "type"),
-            @JsonSubTypes.Type(value = LongConstraint.class, name = "long")
+            @JsonSubTypes.Type(value = TypeVariableConstraint.class, name = "type"),
+            @JsonSubTypes.Type(value = LongVariableConstraint.class, name = "long")
     })
 
     interface BaseConstraint
@@ -118,7 +118,7 @@ public final class TypeParameterRequirement
         ConstraintKind getKind();
     }
 
-    public static class TypeConstraint
+    public static class TypeVariableConstraint
             implements BaseConstraint
     {
         private final boolean comparableRequired;
@@ -126,7 +126,7 @@ public final class TypeParameterRequirement
         private final String variadicBound;
 
         @JsonCreator
-        public TypeConstraint(
+        public TypeVariableConstraint(
                 @JsonProperty("comparableRequired") boolean comparableRequired,
                 @JsonProperty("orderableRequired") boolean orderableRequired,
                 @JsonProperty("variadicBound") @Nullable String variadicBound)
@@ -200,7 +200,7 @@ public final class TypeParameterRequirement
                 return false;
             }
 
-            TypeConstraint other = (TypeConstraint) o;
+            TypeVariableConstraint other = (TypeVariableConstraint) o;
 
             return Objects.equals(this.comparableRequired, other.comparableRequired) &&
                     Objects.equals(this.orderableRequired, other.orderableRequired) &&
@@ -214,13 +214,13 @@ public final class TypeParameterRequirement
         }
     }
 
-    public static class LongConstraint
+    public static class LongVariableConstraint
             implements BaseConstraint
     {
         private final String calculation;
 
         @JsonCreator
-        public LongConstraint(@JsonProperty("calculation") @Nullable String calculation)
+        public LongVariableConstraint(@JsonProperty("calculation") @Nullable String calculation)
         {
             this.calculation = calculation;
         }
@@ -251,7 +251,7 @@ public final class TypeParameterRequirement
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-            LongConstraint that = (LongConstraint) o;
+            LongVariableConstraint that = (LongVariableConstraint) o;
             return Objects.equals(calculation, that.calculation);
         }
 

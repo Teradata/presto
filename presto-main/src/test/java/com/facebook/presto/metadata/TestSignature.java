@@ -77,11 +77,11 @@ public class TestSignature
                 false);
 
         assertEquals(
-                function.bindLiteralParameters(ImmutableList.of(decimal21, decimal10)),
+                function.bindLongVariables(ImmutableList.of(decimal21, decimal10)),
                 ImmutableMap.of("P", OptionalLong.of(2), "S", OptionalLong.of(1)));
 
         assertEquals(
-                function.bindLiteralParameters(ImmutableList.of(decimal10, decimal21)),
+                function.bindLongVariables(ImmutableList.of(decimal10, decimal21)),
                 ImmutableMap.of("P", OptionalLong.of(2), "S", OptionalLong.of(1)));
     }
 
@@ -190,7 +190,7 @@ public class TestSignature
 
         // given f(T1):T2 bind f(varchar(42)):varchar(1)
         assertFunctionBind(
-                ImmutableList.of(TypeParameterRequirement.typeConstraint("T1", true, false, "varchar"), TypeParameterRequirement.typeConstraint("T2", true, false, "varchar")),
+                ImmutableList.of(TypeParameterRequirement.typeVariableConstraint("T1", true, false, "varchar"), TypeParameterRequirement.typeVariableConstraint("T2", true, false, "varchar")),
                 templateType2,
                 ImmutableList.of(templateType1),
                 Optional.of(varchar1),
@@ -256,10 +256,10 @@ public class TestSignature
 
         Map<String, Type> actualBoundParameters;
         if (actualReturnType.isPresent()) {
-            actualBoundParameters = function.bindTypeParameters(actualReturnType.get(), actualArguments, allowCoercion, new TypeRegistry());
+            actualBoundParameters = function.bindTypeVariables(actualReturnType.get(), actualArguments, allowCoercion, new TypeRegistry());
         }
         else {
-            actualBoundParameters = function.bindTypeParameters(actualArguments, allowCoercion, new TypeRegistry());
+            actualBoundParameters = function.bindTypeVariables(actualArguments, allowCoercion, new TypeRegistry());
         }
 
         assertEquals(
@@ -291,10 +291,10 @@ public class TestSignature
     {
         TypeManager typeManager = new TypeRegistry();
         Signature signature = new Signature("foo", SCALAR, ImmutableList.of(typeParameter("T")), "T", ImmutableList.of("T"), false);
-        assertNotNull(signature.bindTypeParameters(ImmutableList.<Type>of(BIGINT), true, typeManager));
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(VARCHAR), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(VARCHAR, BIGINT), true, typeManager));
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)"))), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.<Type>of(BIGINT), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(VARCHAR), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(VARCHAR, BIGINT), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)"))), true, typeManager));
     }
 
     @Test
@@ -303,10 +303,10 @@ public class TestSignature
     {
         TypeManager typeManager = new TypeRegistry();
         Signature signature = new Signature("foo", SCALAR, ImmutableList.<TypeParameterRequirement>of(), "boolean", ImmutableList.of("bigint"), false);
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(BIGINT), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(VARCHAR), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(VARCHAR, BIGINT), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)"))), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(BIGINT), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(VARCHAR), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(VARCHAR, BIGINT), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)"))), true, typeManager));
     }
 
     @Test
@@ -315,17 +315,17 @@ public class TestSignature
     {
         TypeManager typeManager = new TypeRegistry();
         Signature signature = new Signature("get", SCALAR, ImmutableList.of(typeParameter("T")), "T", ImmutableList.of("array(T)"), false);
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)"))), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(BIGINT), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)"))), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(BIGINT), true, typeManager));
 
         signature = new Signature("contains", SCALAR, ImmutableList.of(comparableTypeParameter("T")), "T", ImmutableList.of("array(T)", "T"), false);
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)")), BIGINT), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)")), VARCHAR), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(typeManager.getType(parseTypeSignature("array(HyperLogLog)")), HYPER_LOG_LOG), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)")), BIGINT), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)")), VARCHAR), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(typeManager.getType(parseTypeSignature("array(HyperLogLog)")), HYPER_LOG_LOG), true, typeManager));
 
         signature = new Signature("foo", SCALAR, ImmutableList.of(typeParameter("T")), "T", ImmutableList.of("array(T)", "array(T)"), false);
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)")), typeManager.getType(parseTypeSignature("array(bigint)"))), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)")), typeManager.getType(parseTypeSignature("array(varchar)"))), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)")), typeManager.getType(parseTypeSignature("array(bigint)"))), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(typeManager.getType(parseTypeSignature("array(bigint)")), typeManager.getType(parseTypeSignature("array(varchar)"))), true, typeManager));
     }
 
     @Test
@@ -334,8 +334,8 @@ public class TestSignature
     {
         TypeManager typeManager = new TypeRegistry();
         Signature signature = new Signature("get", SCALAR, ImmutableList.of(typeParameter("K"), typeParameter("V")), "V", ImmutableList.of("map(K,V)", "K"), false);
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(typeManager.getType(parseTypeSignature("map(bigint,varchar)")), BIGINT), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(typeManager.getType(parseTypeSignature("map(bigint,varchar)")), VARCHAR), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(typeManager.getType(parseTypeSignature("map(bigint,varchar)")), BIGINT), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(typeManager.getType(parseTypeSignature("map(bigint,varchar)")), VARCHAR), true, typeManager));
     }
 
     @Test
@@ -346,8 +346,8 @@ public class TestSignature
         Type mapType = typeManager.getType(parseTypeSignature("map(bigint,bigint)"));
         Type arrayType = typeManager.getType(parseTypeSignature("array(bigint)"));
         Signature signature = new Signature("foo", SCALAR, ImmutableList.of(withVariadicBound("T", "map")), "bigint", ImmutableList.of("T"), true);
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(mapType), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(arrayType), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(mapType), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(arrayType), true, typeManager));
     }
 
     @Test
@@ -356,10 +356,10 @@ public class TestSignature
     {
         TypeManager typeManager = new TypeRegistry();
         Signature signature = new Signature("foo", SCALAR, ImmutableList.of(typeParameter("T")), "boolean", ImmutableList.of("T"), true);
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(BIGINT), true, typeManager));
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(VARCHAR), true, typeManager));
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(BIGINT, BIGINT), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(VARCHAR, BIGINT), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(BIGINT), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(VARCHAR), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(BIGINT, BIGINT), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(VARCHAR, BIGINT), true, typeManager));
     }
 
     @Test
@@ -368,10 +368,10 @@ public class TestSignature
     {
         TypeManager typeManager = new TypeRegistry();
         Signature signature = new Signature("foo", SCALAR, ImmutableList.of(typeParameter("T")), "boolean", ImmutableList.of("T", "double"), true);
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(DOUBLE, DOUBLE), true, typeManager));
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(BIGINT, BIGINT), true, typeManager));
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(VARCHAR, BIGINT), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(BIGINT, VARCHAR), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(DOUBLE, DOUBLE), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(BIGINT, BIGINT), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(VARCHAR, BIGINT), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(BIGINT, VARCHAR), true, typeManager));
     }
 
     @Test
@@ -380,14 +380,14 @@ public class TestSignature
     {
         TypeManager typeManager = new TypeRegistry();
         Signature signature = new Signature("foo", SCALAR, ImmutableList.of(typeParameter("T")), "boolean", ImmutableList.of("T", "T"), false);
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(UNKNOWN, UNKNOWN), true, typeManager));
-        assertNotNull(signature.bindTypeParameters(ImmutableList.of(UNKNOWN, BIGINT), true, typeManager));
-        assertNull(signature.bindTypeParameters(ImmutableList.of(BIGINT, VARCHAR), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(UNKNOWN, UNKNOWN), true, typeManager));
+        assertNotNull(signature.bindTypeVariables(ImmutableList.of(UNKNOWN, BIGINT), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(BIGINT, VARCHAR), true, typeManager));
 
         signature = new Signature("foo", SCALAR, ImmutableList.of(comparableTypeParameter("T")), "boolean", ImmutableList.of("T", "T"), false);
-        Map<String, Type> boundParameters = signature.bindTypeParameters(ImmutableList.of(UNKNOWN, BIGINT), true, typeManager);
+        Map<String, Type> boundParameters = signature.bindTypeVariables(ImmutableList.of(UNKNOWN, BIGINT), true, typeManager);
         assertNotNull(boundParameters);
         assertEquals(boundParameters.get("T"), BIGINT);
-        assertNull(signature.bindTypeParameters(ImmutableList.of(BIGINT, VARCHAR), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(BIGINT, VARCHAR), true, typeManager));
     }
 }
