@@ -548,7 +548,7 @@ public class FunctionListBuilder
         List<LongVariableConstraint> longVariableConstraints = asList(method.getAnnotationsByType(LongVariableConstraint.class));
         ImmutableList.Builder<TypeParameterRequirement> typeRequirements = ImmutableList.<TypeParameterRequirement>builder();
         for (LongVariableConstraint longVariableConstraint : longVariableConstraints) {
-            typeRequirements.add(TypeParameterRequirement.longConstraint(longVariableConstraint.variable(), longVariableConstraint.calculation()));
+            typeRequirements.add(TypeParameterRequirement.longVariableConstraint(longVariableConstraint.variable(), longVariableConstraint.calculation()));
         }
         return typeRequirements.build();
     }

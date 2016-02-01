@@ -216,12 +216,12 @@ public final class Signature
         }
 
         Map<String, OptionalLong> inputs = bindLongVariables(parameterTypes);
-        TypeSignature calculatedReturnType = TypeUtils.resolveCalculatedType(returnType, inputs, true);
+        TypeSignature calculatedReturnType = TypeUtils.resolveCalculatedType(returnType, inputs);
         return new Signature(
                 name,
                 kind,
                 calculatedReturnType,
-                argumentTypes.stream().map(parameter -> TypeUtils.resolveCalculatedType(parameter, inputs, false)).collect(toImmutableList()));
+                argumentTypes.stream().map(parameter -> TypeUtils.resolveCalculatedType(parameter, inputs)).collect(toImmutableList()));
     }
 
     public boolean isReturnTypeOrAnyArgumentTypeCalculated()
@@ -547,7 +547,7 @@ public final class Signature
             TypeSignatureParameter typeSignatureParameter = type.getTypeSignature().getParameters().get(i);
             TypeSignatureParameter componentParameter = parameters.get(i);
 
-            if (componentParameter.isLiteralCalculation()) {
+            if (componentParameter.isVariable()) {
                 if (!typeSignatureParameter.isLongLiteral()) {
                     return false;
                 }
@@ -612,8 +612,9 @@ public final class Signature
         return TypeParameterRequirement.typeVariableConstraint(name, false, true, null);
     }
 
-    public static TypeParameterRequirement longVariableCalculation(String variable, String calculation) {
-        return TypeParameterRequirement.longConstraint(variable, calculation);
+    public static TypeParameterRequirement longVariableCalculation(String variable, String calculation)
+    {
+        return TypeParameterRequirement.longVariableConstraint(variable, calculation);
     }
 
     public static SignatureBuilder builder()
