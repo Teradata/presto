@@ -18,12 +18,14 @@ import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import java.lang.invoke.MethodHandle;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.facebook.presto.metadata.FunctionRegistry.mangleOperatorName;
 import static java.util.Objects.requireNonNull;
@@ -33,6 +35,7 @@ public abstract class SqlOperator
 {
     public static SqlOperator create(
             OperatorType operatorType,
+            List<TypeParameterRequirement> typeParameterRequirements,
             List<TypeSignature> argumentTypes,
             TypeSignature returnType,
             MethodHandle methodHandle,
@@ -41,7 +44,8 @@ public abstract class SqlOperator
             List<Boolean> nullableArguments,
             Set<String> literalParameters)
     {
-        return new SimpleSqlOperator(operatorType, argumentTypes, returnType, methodHandle, instanceFactory, nullable, nullableArguments, literalParameters);
+        List<String> arugmentTypesAsString = argumentTypes.stream().map(TypeSignature::toString).collect(Collectors.toList());
+        return new SimpleSqlOperator(operatorType, typeParameterRequirements, arugmentTypesAsString, returnType, methodHandle, instanceFactory, nullable, nullableArguments, literalParameters);
     }
 
     protected SqlOperator(OperatorType operatorType, TypeSignature returnType, List<TypeSignature> argumentTypes, Set<String> literalParameters)
@@ -49,9 +53,14 @@ public abstract class SqlOperator
         super(mangleOperatorName(operatorType), returnType, argumentTypes, literalParameters);
     }
 
+    protected SqlOperator(OperatorType operatorType, List<TypeParameterRequirement> typeParameterRequirements, String returnType, List<String> argumentTypes, Set<String> literalParameters)
+    {
+        super(mangleOperatorName(operatorType), typeParameterRequirements, returnType, argumentTypes, false, literalParameters);
+    }
+
     protected SqlOperator(OperatorType operatorType, List<TypeParameterRequirement> typeParameterRequirements, String returnType, List<String> argumentTypes)
     {
-        super(mangleOperatorName(operatorType), typeParameterRequirements, returnType, argumentTypes);
+        this(operatorType, typeParameterRequirements, returnType, argumentTypes, ImmutableSet.of());
     }
 
     @Override
@@ -83,7 +92,8 @@ public abstract class SqlOperator
 
         public SimpleSqlOperator(
                 OperatorType operatorType,
-                List<TypeSignature> argumentTypes,
+                List<TypeParameterRequirement> typeParameterRequirements,
+                List<String> argumentTypes,
                 TypeSignature returnType,
                 MethodHandle methodHandle,
                 Optional<MethodHandle> instanceFactory,
@@ -91,7 +101,7 @@ public abstract class SqlOperator
                 List<Boolean> nullableArguments,
                 Set<String> literalParameters)
         {
-            super(operatorType, returnType, argumentTypes, literalParameters);
+            super(operatorType, typeParameterRequirements, returnType.toString(), argumentTypes, literalParameters);
             this.methodHandle = requireNonNull(methodHandle, "methodHandle is null");
             this.instanceFactory = requireNonNull(instanceFactory, "instanceFactory is null");
             this.nullable = nullable;

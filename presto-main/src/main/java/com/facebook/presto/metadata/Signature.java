@@ -612,6 +612,10 @@ public final class Signature
         return TypeParameterRequirement.typeVariableConstraint(name, false, true, null);
     }
 
+    public static TypeParameterRequirement longVariableCalculation(String variable, String calculation) {
+        return TypeParameterRequirement.longConstraint(variable, calculation);
+    }
+
     public static SignatureBuilder builder()
     {
         return new SignatureBuilder();

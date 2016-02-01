@@ -29,6 +29,7 @@ import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.type.LiteralParameters;
+import com.facebook.presto.type.LongVariableConstraint;
 import com.facebook.presto.type.SqlType;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -66,6 +67,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static java.lang.String.format;
 import static java.lang.invoke.MethodHandles.lookup;
+import static java.util.Arrays.asList;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
@@ -191,6 +193,7 @@ public class FunctionListBuilder
 
     private FunctionListBuilder operator(
             OperatorType operatorType,
+            List<TypeParameterRequirement> typeRequirements,
             TypeSignature returnType,
             List<TypeSignature> argumentTypes,
             MethodHandle function,
@@ -203,6 +206,7 @@ public class FunctionListBuilder
         addFunction(
                 SqlOperator.create(
                         operatorType,
+                        typeRequirements,
                         argumentTypes,
                         returnType,
                         function,
@@ -337,11 +341,15 @@ public class FunctionListBuilder
             literalParameters = ImmutableSet.copyOf(literalParametersAnnotation.value());
         }
 
+        List<TypeParameterRequirement> typeParameterRequirements = getTypeParameterRequirements(method);
+
         Signature signature = new Signature(
                 name.toLowerCase(ENGLISH),
                 SCALAR,
+                typeParameterRequirements,
                 parseTypeSignature(returnTypeAnnotation.value(), literalParameters),
-                parameterTypeSignatures(method, literalParameters));
+                parameterTypeSignatures(method, literalParameters),
+                false);
 
         verifyMethodSignature(method, signature.getReturnType(), signature.getArgumentTypes(), typeManager);
 
@@ -447,7 +455,7 @@ public class FunctionListBuilder
             }
             Type expectedType = typeManager.getType(expectedTypeName);
             Class<?> actualType = parameterTypes[i];
-            boolean nullable = Arrays.asList(annotations[i]).stream().anyMatch(Nullable.class::isInstance);
+            boolean nullable = asList(annotations[i]).stream().anyMatch(Nullable.class::isInstance);
             // Only allow boxing for functions that need to see nulls
             if (Primitives.isWrapperType(actualType)) {
                 checkArgument(nullable, "Method %s has parameter with type %s that is missing @Nullable", method, actualType);
@@ -494,7 +502,7 @@ public class FunctionListBuilder
             return false;
         }
         checkValidMethod(method);
-        Optional<MethodHandle>  instanceFactory = getInstanceFactory(method);
+        Optional<MethodHandle> instanceFactory = getInstanceFactory(method);
         MethodHandle methodHandle = lookup().unreflect(method);
         OperatorType operatorType = scalarOperator.value();
 
@@ -503,6 +511,8 @@ public class FunctionListBuilder
         if (literalParametersAnnotation != null) {
             literalParameters = ImmutableSet.copyOf(literalParametersAnnotation.value());
         }
+
+        List<TypeParameterRequirement> typeParameterRequirements = getTypeParameterRequirements(method);
 
         List<TypeSignature> argumentTypes = parameterTypeSignatures(method, literalParameters);
         TypeSignature returnTypeSignature;
@@ -522,6 +532,7 @@ public class FunctionListBuilder
 
         operator(
                 operatorType,
+                typeParameterRequirements,
                 returnTypeSignature,
                 argumentTypes,
                 methodHandle,
@@ -530,6 +541,16 @@ public class FunctionListBuilder
                 nullableArguments,
                 literalParameters);
         return true;
+    }
+
+    private List<TypeParameterRequirement> getTypeParameterRequirements(Method method)
+    {
+        List<LongVariableConstraint> longVariableConstraints = asList(method.getAnnotationsByType(LongVariableConstraint.class));
+        ImmutableList.Builder<TypeParameterRequirement> typeRequirements = ImmutableList.<TypeParameterRequirement>builder();
+        for (LongVariableConstraint longVariableConstraint : longVariableConstraints) {
+            typeRequirements.add(TypeParameterRequirement.longConstraint(longVariableConstraint.variable(), longVariableConstraint.calculation()));
+        }
+        return typeRequirements.build();
     }
 
     private static String getDescription(AnnotatedElement annotatedElement)
