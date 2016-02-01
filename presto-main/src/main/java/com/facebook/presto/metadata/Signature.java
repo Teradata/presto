@@ -26,11 +26,13 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -41,6 +43,7 @@ import java.util.stream.Collectors;
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
 import static com.facebook.presto.metadata.FunctionRegistry.mangleOperatorName;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
+import static com.facebook.presto.type.TypeCalculation.calculateLiteralValue;
 import static com.facebook.presto.type.TypeRegistry.canCoerce;
 import static com.facebook.presto.type.TypeRegistry.getCommonSuperTypeSignature;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
@@ -226,7 +229,7 @@ public final class Signature
             return this;
         }
 
-        Map<String, OptionalLong> inputs = bindLiteralParameters(parameterTypes);
+        Map<String, OptionalLong> inputs = bindLongVariables(parameterTypes);
         TypeSignature calculatedReturnType = TypeUtils.resolveCalculatedType(returnType, inputs, true);
         return new Signature(
                 name,
@@ -240,11 +243,22 @@ public final class Signature
         return returnType.isCalculated() || any(argumentTypes, TypeSignature::isCalculated);
     }
 
-    public Map<String, OptionalLong> bindLiteralParameters(List<TypeSignature> parameterTypes)
+    public Map<String, OptionalLong> bindLongVariables(List<TypeSignature> parameterTypes)
+    {
+        Map<String, OptionalLong> boundVariables = bindLongVariablesFromParameterTypes(parameterTypes);
+        Map<String, OptionalLong> calculatedVariables = calculateVariablesValuesForLongConstraints(boundVariables);
+
+        return ImmutableMap.<String, OptionalLong>builder()
+                .putAll(boundVariables)
+                .putAll(calculatedVariables).build();
+    }
+
+    @NotNull
+    private Map<String, OptionalLong> bindLongVariablesFromParameterTypes(List<TypeSignature> parameterTypes)
     {
         parameterTypes = replaceSameArgumentsWithCommonSuperType(parameterTypes);
 
-        Map<String, OptionalLong> boundParameters = new HashMap<>();
+        Map<String, OptionalLong> boundVariables = new HashMap<>();
         for (int index = 0; index < argumentTypes.size(); index++) {
             TypeSignature argument = argumentTypes.get(index);
             if (argument.isCalculated()) {
@@ -254,17 +268,26 @@ public final class Signature
                 for (String literal : matchedLiterals.keySet()) {
                     OptionalLong value = matchedLiterals.get(literal);
                     checkArgument(
-                            boundParameters.getOrDefault(literal, value).equals(value),
+                            boundVariables.getOrDefault(literal, value).equals(value),
                             "Literal [%s] with value [%s] for argument [%s] has been previously matched to different value [%s]",
                             literal,
                             value,
                             argument,
-                            boundParameters.get(literal));
+                            boundVariables.get(literal));
                 }
-                boundParameters.putAll(matchedLiterals);
+                boundVariables.putAll(matchedLiterals);
             }
         }
-        return boundParameters;
+        return boundVariables;
+    }
+
+    private Map<String, OptionalLong> calculateVariablesValuesForLongConstraints(Map<String, OptionalLong> inputs)
+    {
+        return longVariableConstraints.stream()
+                .collect(Collectors.toMap(
+                        c -> c.getName().toUpperCase(Locale.US),
+                        c -> calculateLiteralValue(c.getCalculation(), inputs, true)
+                ));
     }
 
     private List<TypeSignature> replaceSameArgumentsWithCommonSuperType(List<TypeSignature> parameters)
@@ -336,7 +359,7 @@ public final class Signature
     }
 
     @Nullable
-    public Map<String, Type> bindTypeParameters(Type returnType, List<? extends Type> types, boolean allowCoercion, TypeManager typeManager)
+    public Map<String, Type> bindTypeVariables(Type returnType, List<? extends Type> types, boolean allowCoercion, TypeManager typeManager)
     {
         Map<String, Type> boundParameters = new HashMap<>();
         Map<String, TypeVariableConstraint> parameters = getTypeVariableConstraintsAsMap();
@@ -360,12 +383,12 @@ public final class Signature
     public Map<String, Type> bindTypeVariables(List<? extends Type> types, boolean allowCoercion, TypeManager typeManager)
     {
         Map<String, Type> boundParameters = new HashMap<>();
-        Map<String, TypeVariableConstraint> parameters = getTypeVariableConstraintsAsMap();
-        if (!matchArguments(boundParameters, parameters, argumentTypes, types, allowCoercion, variableArity, typeManager)) {
+        Map<String, TypeVariableConstraint> typeVariableConstraints = getTypeVariableConstraintsAsMap();
+        if (!matchArguments(boundParameters, typeVariableConstraints, argumentTypes, types, allowCoercion, variableArity, typeManager)) {
             return null;
         }
 
-        checkState(boundParameters.keySet().equals(parameters.keySet()), "%s matched arguments %s, but type parameters %s are still unbound", this, types, Sets.difference(parameters.keySet(), boundParameters.keySet()));
+        checkState(boundParameters.keySet().equals(typeVariableConstraints.keySet()), "%s matched arguments %s, but type variables %s are still unbound", this, types, Sets.difference(typeVariableConstraints.keySet(), boundParameters.keySet()));
 
         return boundParameters;
     }
@@ -376,7 +399,6 @@ public final class Signature
         for (TypeVariableConstraint parameter : typeVariableConstraints) {
             builder.put(parameter.getName(), parameter);
         }
-
         return builder.build();
     }
 

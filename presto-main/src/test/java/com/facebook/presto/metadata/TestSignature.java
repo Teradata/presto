@@ -78,11 +78,11 @@ public class TestSignature
                 false);
 
         assertEquals(
-                function.bindLiteralParameters(ImmutableList.of(decimal21, decimal10)),
+                function.bindLongVariables(ImmutableList.of(decimal21, decimal10)),
                 ImmutableMap.of("P", OptionalLong.of(2), "S", OptionalLong.of(1)));
 
         assertEquals(
-                function.bindLiteralParameters(ImmutableList.of(decimal10, decimal21)),
+                function.bindLongVariables(ImmutableList.of(decimal10, decimal21)),
                 ImmutableMap.of("P", OptionalLong.of(2), "S", OptionalLong.of(1)));
     }
 
@@ -268,10 +268,10 @@ public class TestSignature
 
         Map<String, Type> actualBoundParameters;
         if (actualReturnType.isPresent()) {
-            actualBoundParameters = function.bindTypeParameters(actualReturnType.get(), actualArguments, allowCoercion, new TypeRegistry());
+            actualBoundParameters = function.bindTypeVariables(actualReturnType.get(), actualArguments, allowCoercion, new TypeRegistry());
         }
         else {
-            actualBoundParameters = function.bindTypeParameters(actualArguments, allowCoercion, new TypeRegistry());
+            actualBoundParameters = function.bindTypeVariables(actualArguments, allowCoercion, new TypeRegistry());
         }
 
         assertEquals(
@@ -400,6 +400,6 @@ public class TestSignature
         Map<String, Type> boundParameters = signature.bindTypeParameters(ImmutableList.of(UNKNOWN, BIGINT), true, typeManager);
         assertNotNull(boundParameters);
         assertEquals(boundParameters.get("T"), BIGINT);
-        assertNull(signature.bindTypeParameters(ImmutableList.of(BIGINT, VARCHAR), true, typeManager));
+        assertNull(signature.bindTypeVariables(ImmutableList.of(BIGINT, VARCHAR), true, typeManager));
     }
 }
