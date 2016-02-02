@@ -10,6 +10,7 @@ Presto Documentation
     installation
     admin
     connector
+    kerberos
     functions
     language
     sql
