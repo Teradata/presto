@@ -10,7 +10,8 @@ authentication:
 * The Hive metastore Thrift service
 * The Hadoop Distributed File System (HDFS)
 
-Access to these services by the Hive connector is configured separately.
+Access to these services by the Hive connector is configured in the properties
+file that contains the general Hive connector configuration.
 
 Hive Metastore Thrift Service
 -----------------------------
