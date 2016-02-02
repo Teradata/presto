@@ -13,13 +13,18 @@ This chapter describes the SQL syntax used in Presto.
     sql/create-table
     sql/create-table-as
     sql/create-view
+    sql/deallocate-prepare
     sql/delete
     sql/describe
+    sql/describe-input
+    sql/describe-output
     sql/drop-table
     sql/drop-view
+    sql/execute
     sql/explain
     sql/explain-analyze
     sql/insert
+    sql/prepare
     sql/reset-session
     sql/rollback
     sql/select
