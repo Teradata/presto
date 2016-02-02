@@ -37,7 +37,7 @@ public class ArrayConstructor
         this(Optional.of(location), values);
     }
 
-    public ArrayConstructor(Optional<NodeLocation> location, List<Expression> values)
+    protected ArrayConstructor(Optional<NodeLocation> location, List<Expression> values)
     {
         super(location);
         requireNonNull(values, "values is null");

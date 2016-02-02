@@ -36,7 +36,7 @@ public final class Row
         this(Optional.of(location), items);
     }
 
-    public Row(Optional<NodeLocation> location, List<Expression> items)
+    protected Row(Optional<NodeLocation> location, List<Expression> items)
     {
         super(location);
         requireNonNull(items, "items is null");

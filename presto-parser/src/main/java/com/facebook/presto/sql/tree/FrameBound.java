@@ -59,7 +59,7 @@ public class FrameBound
         this(Optional.of(location), type, value);
     }
 
-    public FrameBound(Optional<NodeLocation> location, Type type, Expression value)
+    protected FrameBound(Optional<NodeLocation> location, Type type, Expression value)
     {
         super(location);
         this.type = requireNonNull(type, "type is null");
