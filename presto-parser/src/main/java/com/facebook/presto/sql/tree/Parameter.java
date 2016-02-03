@@ -19,7 +19,7 @@ import java.util.Optional;
 public class Parameter
     extends Expression
 {
-    private final int id;
+    private final int position;
 
     public Parameter(int id)
     {
@@ -31,15 +31,15 @@ public class Parameter
         this(Optional.of(location), id);
     }
 
-    private Parameter(Optional<NodeLocation> location, int id)
+    private Parameter(Optional<NodeLocation> location, int position)
     {
         super(location);
-        this.id = id;
+        this.position = position;
     }
 
-    public int getId()
+    public int getPosition()
     {
-        return id;
+        return position;
     }
 
     @Override
@@ -59,12 +59,12 @@ public class Parameter
         }
 
         Parameter that = (Parameter) o;
-        return Objects.equals(id, that.id);
+        return Objects.equals(position, that.position);
     }
 
     @Override
     public int hashCode()
     {
-        return id;
+        return position;
     }
 }

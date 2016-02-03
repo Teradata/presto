@@ -152,7 +152,7 @@ import static java.util.stream.Collectors.toList;
 class AstBuilder
         extends SqlBaseBaseVisitor<Node>
 {
-    private int parameterId = 0;
+    private int parameterPosition = 0;
 
     @Override
     public Node visitSingleStatement(SqlBaseParser.SingleStatementContext context)
@@ -1242,7 +1242,7 @@ class AstBuilder
     @Override
     public Node visitParameter(SqlBaseParser.ParameterContext context)
     {
-        return new Parameter(getLocation(context), parameterId++);
+        return new Parameter(getLocation(context), parameterPosition++);
     }
 
     // ***************** arguments *****************
