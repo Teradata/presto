@@ -16,39 +16,36 @@ package com.facebook.presto.sql.tree;
 import java.util.Objects;
 import java.util.Optional;
 
-import static java.util.Objects.requireNonNull;
-
-public class IsNullPredicate
-        extends Expression
+public class Parameter
+    extends Expression
 {
-    private final Expression value;
+    private final int position;
 
-    public IsNullPredicate(Expression value)
+    public Parameter(int id)
     {
-        this(Optional.empty(), value);
+        this(Optional.empty(), id);
     }
 
-    public IsNullPredicate(NodeLocation location, Expression value)
+    public Parameter(NodeLocation location, int id)
     {
-        this(Optional.of(location), value);
+        this(Optional.of(location), id);
     }
 
-    protected IsNullPredicate(Optional<NodeLocation> location, Expression value)
+    private Parameter(Optional<NodeLocation> location, int position)
     {
         super(location);
-        requireNonNull(value, "value is null");
-        this.value = value;
+        this.position = position;
     }
 
-    public Expression getValue()
+    public int getPosition()
     {
-        return value;
+        return position;
     }
 
     @Override
     public <R, C> R accept(AstVisitor<R, C> visitor, C context)
     {
-        return visitor.visitIsNullPredicate(this, context);
+        return visitor.visitParameter(this, context);
     }
 
     @Override
@@ -61,13 +58,13 @@ public class IsNullPredicate
             return false;
         }
 
-        IsNullPredicate that = (IsNullPredicate) o;
-        return Objects.equals(value, that.value);
+        Parameter that = (Parameter) o;
+        return Objects.equals(position, that.position);
     }
 
     @Override
     public int hashCode()
     {
-        return value.hashCode();
+        return position;
     }
 }
