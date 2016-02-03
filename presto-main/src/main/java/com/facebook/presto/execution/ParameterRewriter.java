@@ -39,9 +39,9 @@ public class ParameterRewriter
     @Override
     public Expression rewriteParameter(Parameter node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
     {
-        if (parameterValues.size() <= node.getId()) {
+        if (parameterValues.size() <= node.getPosition()) {
             throw new PrestoException(INTERNAL_ERROR, "Too few parameters specified for query");
         }
-        return parameterValues.get(node.getId());
+        return parameterValues.get(node.getPosition());
     }
 }
