@@ -15,15 +15,19 @@
 package com.facebook.presto.execution;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.sql.analyzer.SemanticException;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.AstExpressionRewriter;
 import com.facebook.presto.sql.tree.Execute;
+import com.facebook.presto.sql.tree.Literal;
+import com.facebook.presto.sql.tree.Node;
+import com.facebook.presto.sql.tree.ParameterCollector;
 import com.facebook.presto.sql.tree.Statement;
 import com.google.inject.Inject;
 
-import static com.facebook.presto.execution.ParameterValidator.validateParameters;
-import static com.facebook.presto.spi.StandardErrorCode.NOT_FOUND;
+import java.util.List;
+
+import static com.facebook.presto.sql.analyzer.SemanticErrorCode.INCORRECT_NUMBER_OF_PARAMETERS;
 import static java.util.Objects.requireNonNull;
 
 public class StatementCreator
@@ -46,10 +50,7 @@ public class StatementCreator
         // For execute queries, get the statement referenced in the query
         Execute execute = (Execute) statement;
         String name = execute.getName();
-        String sqlString = session.getPreparedStatements().get(name);
-        if (sqlString == null) {
-            throw new PrestoException(NOT_FOUND, "Prepared statement not found: " + name);
-        }
+        String sqlString = session.getPreparedStatement(name);
 
         statement = sqlParser.createStatement(sqlString);
 
@@ -60,5 +61,14 @@ public class StatementCreator
         ParameterRewriter parameterRewriter = new ParameterRewriter(execute.getParameters());
         AstExpressionRewriter expressionRewriter = new AstExpressionRewriter(parameterRewriter);
         return (Statement) expressionRewriter.process(statement, null);
+    }
+
+    public static void validateParameters(Node node, List<Literal> parameterValues)
+    {
+        ParameterCollector collector = new ParameterCollector();
+        collector.process(node, null);
+        if (parameterValues.size() != collector.getParameterCount()) {
+            throw new SemanticException(INCORRECT_NUMBER_OF_PARAMETERS, node, "Incorrect number of parameters: expected " + collector.getParameterCount() + " but found " + parameterValues.size());
+        }
     }
 }
