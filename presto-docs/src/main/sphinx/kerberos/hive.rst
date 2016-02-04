@@ -24,10 +24,11 @@ file using the following properties:
 ================================================== ============================================================ ==========
 Property Name                                      Description                                                  Default
 ================================================== ============================================================ ==========
-``hive.metastore.sasl.enabled``                    When set to ‘true’ the Hive connector will connect to the    ``false``
+``hive.metastore.sasl.enabled``                    When set to ``true`` the Hive connector will connect to the  ``false``
                                                    Hive metastore Thrift service using SASL and authenticate
                                                    with Kerberos. When using the default value of ``false``,
-                                                   no additional configuration is required.
+                                                   no Kerberos authentication is disabled and no other
+                                                   properties need to be configured.
 
 ``hive.metastore.principal``                       The Kerberos principal of the Hive metastore. The Presto     
                                                    coordinator will use this to authenticate the Hive
@@ -51,6 +52,13 @@ Example Configuration
     hive.metastore.presto.principal=hive/_HOST@EXAMPLE.COM
     hive.metastore.presto.keytab=/etc/presto/hive.keytab
     
+When SASL is enabled for the Hive metastore Thrift service, Presto will connect
+as the principal specified by the property ``hive.metastore.presto.principal``.
+Presto will authenticate using the keytab specified by
+``hive.metastore.presto.keytab``, and will verify that the identity of the
+metastore matches ``hive.metastore.principal``.  The special value _HOST is
+replaced at runtime with the fully qualified domain name of the host Presto is
+running on.
 
 Hive HDFS Access
 ----------------
@@ -72,7 +80,7 @@ Property Name                                      Description                  
                                                    ``KERBEROS`` or ``KERBEROS_IMPERSONATION``, the Kerberos
                                                    principal that Presto will use when connecting to HDFS.
                                                    When using ``KERBEROS_IMPERSONATION``, this principal must
-                                                   be able to impersonate the users who connect to presto.
+                                                   be allowed to impersonate the users who connect to Presto.
 
 ``hive.hdfs.presto.keytab``                        The path to the keytab file that contains a key for the
                                                    principal specified by hive.hdfs.presto.principal.
@@ -90,7 +98,7 @@ Property Name                                      Description                  
 
 When using ``SIMPLE`` authentication, Presto accesses HDFS as the user the
 Presto process is running as. This is the default authentication type, and no
-additional configuration is required.
+additional properties need to be set. Kerberos is not used.
 
 .. _kerberos-hive-simple-impersonation:
 
@@ -104,7 +112,7 @@ additional configuration is required.
 When using ``SIMPLE_IMPERSONATION`` authentication, Presto accesses HDFS as the
 user who owns the Presto session. The user Presto is running as must be able to
 impersonate this user, as discussed in the section
-:ref:`configuring-hadoop-impersonation`.
+:ref:`configuring-hadoop-impersonation`. Kerberos is not used.
 
 .. _kerberos-hive-kerberos:
 
@@ -135,7 +143,7 @@ keytab.
 
 When using ``KERBEROS_IMPERSONATION`` authentication, Presto accesses HDFS as
 the principal who owns the Presto session. The principal specified by the
-``hive.hdfs.presto.principal`` property must be able to impoersonate this user,
+``hive.hdfs.presto.principal`` property must be able to impersonate this user,
 as discussed in the section :ref:`configuring-hadoop-impersonation`. Presto
 authenticates ``hive.hdfs.presto.principal`` using the keytab specified by the
 ``hive.hdfs.presto.keytab`` keytab.
@@ -148,7 +156,7 @@ Configuring Impersonation in Hadoop
 In order to use :ref:`kerberos-hive-simple-impersonation` or
 :ref:`kerberos-hive-kerberos-impersonation`, the Hadoop cluster must be
 configured to allow the user or principal that Presto is running as to
-impersonate the users who log in to Presto. This is done in the Hadoop
-configuration file :file:`core-site.xml`. A complete description of the
-configuration options is provided in the `Hadoop documentation
+impersonate the users who log in to Presto. Impersonation in Hadoop is
+configured in the file :file:`core-site.xml`. A complete description of the
+configuration options can be found in the `Hadoop documentation
 <https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-common/Superusers.html#Configurations>`_.
