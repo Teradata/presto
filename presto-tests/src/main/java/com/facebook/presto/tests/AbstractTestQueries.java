@@ -5509,9 +5509,9 @@ public abstract class AbstractTestQueries
         assertEquals(row2.getField(1), "bigint");
     }
 
-    @Test(expectedExceptions = PrestoException.class)
+    @Test
     public void testDescribeInputNoSuchQuery()
     {
-        computeActual(getSession(), "DESCRIBE INPUT my_query");
+        assertQueryFails("DESCRIBE INPUT my_query", "Prepared statement not found: my_query");
     }
 }
