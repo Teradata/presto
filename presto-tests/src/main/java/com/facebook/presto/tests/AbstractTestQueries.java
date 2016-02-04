@@ -5486,10 +5486,10 @@ public abstract class AbstractTestQueries
         assertEquals(row.getField(1), "abc");
     }
 
-    @Test(expectedExceptions = PrestoException.class)
+    @Test
     public void testExecuteNoSuchQuery()
     {
-        computeActual(getSession(), "EXECUTE my_query");
+        assertQueryFails("EXECUTE my_query", "Prepared statement not found: my_query");
     }
 
     @Test
