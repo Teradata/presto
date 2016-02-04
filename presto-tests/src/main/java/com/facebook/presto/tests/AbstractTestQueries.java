@@ -17,7 +17,6 @@ import com.facebook.presto.Session;
 import com.facebook.presto.metadata.FunctionListBuilder;
 import com.facebook.presto.metadata.SqlFunction;
 import com.facebook.presto.operator.scalar.TestingRowConstructor;
-import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.spi.type.TimeZoneKey;
 import com.facebook.presto.spi.type.Type;
@@ -5486,9 +5485,32 @@ public abstract class AbstractTestQueries
         assertEquals(row.getField(1), "abc");
     }
 
-    @Test(expectedExceptions = PrestoException.class)
+    @Test
     public void testExecuteNoSuchQuery()
     {
-        computeActual(getSession(), "EXECUTE my_query");
+        assertQueryFails("EXECUTE my_query", "Prepared statement not found: my_query");
+    }
+
+    @Test
+    public void testDescribeInput()
+    {
+        Session session = getSession().withPreparedStatement("my_query", "select ? from nation where nationkey = ?");
+        MaterializedResult actual = computeActual(session, "DESCRIBE INPUT my_query");
+        List<MaterializedRow> rows = actual.getMaterializedRows();
+
+        assertEquals(rows.size(), 2);
+
+        MaterializedRow row1 = rows.get(0);
+        assertEquals(row1.getField(0), 0L);
+        assertEquals(row1.getField(1), "unknown");
+        MaterializedRow row2 = rows.get(1);
+        assertEquals(row2.getField(0), 1L);
+        assertEquals(row2.getField(1), "bigint");
+    }
+
+    @Test
+    public void testDescribeInputNoSuchQuery()
+    {
+        assertQueryFails("DESCRIBE INPUT my_query", "Prepared statement not found: my_query");
     }
 }
