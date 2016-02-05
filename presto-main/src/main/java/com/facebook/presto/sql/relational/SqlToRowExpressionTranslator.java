@@ -196,7 +196,9 @@ public final class SqlToRowExpressionTranslator
         @Override
         protected RowExpression visitStringLiteral(StringLiteral node, Void context)
         {
-            return constant(node.getSlice(), createVarcharType(node.getValue().length()));
+            String value = node.getValue();
+            int lengthInCodePoints = value.codePointCount(0, value.length());
+            return constant(node.getSlice(), createVarcharType(lengthInCodePoints));
         }
 
         @Override
