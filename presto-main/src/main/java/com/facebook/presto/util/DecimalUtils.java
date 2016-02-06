@@ -18,6 +18,7 @@ import com.facebook.presto.spi.StandardErrorCode;
 import com.facebook.presto.spi.type.LongDecimalType;
 import com.facebook.presto.spi.type.ShortDecimalType;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import static com.facebook.presto.spi.type.LongDecimalType.MAX_DECIMAL_UNSCALED_VALUE;
@@ -43,11 +44,16 @@ public final class DecimalUtils
         return value.compareTo(MAX_DECIMAL_UNSCALED_VALUE) > 0 || value.compareTo(MIN_DECIMAL_UNSCALED_VALUE) < 0;
     }
 
+    public static void checkOverflow(BigDecimal value)
+    {
+        checkOverflow(value.unscaledValue());
+    }
+
     public static void checkOverflow(BigInteger value)
     {
         if (overflows(value)) {
             // todo determine correct ErrorCode.
-            throw new PrestoException(StandardErrorCode.INVALID_FUNCTION_ARGUMENT, "DECIMAL result exceeds 38 digits");
+            throw new PrestoException(StandardErrorCode.INVALID_FUNCTION_ARGUMENT, "DECIMAL result exceeds 38 digits: " + value);
         }
     }
 }
