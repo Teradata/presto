@@ -50,6 +50,7 @@ import java.util.Set;
 
 import static com.facebook.presto.connector.informationSchema.InformationSchemaMetadata.INFORMATION_SCHEMA;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
+import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.TimeType.TIME;
@@ -5515,5 +5516,48 @@ public abstract class AbstractTestQueries
     public void testDescribeInputNoSuchQuery()
     {
         assertQueryFails("DESCRIBE INPUT my_query", "Prepared statement not found: my_query");
+    }
+
+    @Test
+    public void testDescribeOutput()
+    {
+        Session session = getSession().withPreparedStatement("my_query", "select * from nation");
+        MaterializedResult actual = computeActual(session, "DESCRIBE OUTPUT my_query");
+        MaterializedResult expected = resultBuilder(session, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN, BOOLEAN)
+                .row("nationkey", "nation", session.getSchema().get(), session.getCatalog().get(), "bigint", 8, false, false)
+                .row("name", "nation", session.getSchema().get(), session.getCatalog().get(), "varchar", 0, false, false)
+                .row("regionkey", "nation", session.getSchema().get(), session.getCatalog().get(), "bigint", 8, false, false)
+                .row("comment", "nation", session.getSchema().get(), session.getCatalog().get(), "varchar", 0, false, false)
+                .build();
+        assertEqualsIgnoreOrder(actual, expected);
+    }
+
+    @Test
+    public void testDescribeOutputRowCountQuery()
+    {
+        Session session = getSession().withPreparedStatement("my_query", "show tables");
+        MaterializedResult actual = computeActual(session, "DESCRIBE OUTPUT my_query");
+        MaterializedResult expected = resultBuilder(session, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN, BOOLEAN)
+                .row(null, null, null, null, null, null, null, true)
+                .build();
+        assertEqualsIgnoreOrder(actual, expected);
+    }
+
+    @Test
+    public void testDescribeOutputOnAliasedColumnsAndExpressions()
+    {
+        Session session = getSession().withPreparedStatement("my_query", "select count(*) as this_is_aliased, 1 + 2 from nation");
+        MaterializedResult actual = computeActual(session, "DESCRIBE OUTPUT my_query");
+        MaterializedResult expected = resultBuilder(session, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN, BOOLEAN)
+                .row("this_is_aliased", "", "", "", "bigint", 8, true, false)
+                .row("col_1", "", "", "", "bigint", 8, false, false)
+                .build();
+        assertEqualsIgnoreOrder(actual, expected);
+    }
+
+    @Test
+    public void testDescribeOutputNoSuchQuery()
+    {
+        assertQueryFails("DESCRIBE OUTPUT my_query", "Prepared statement not found: my_query");
     }
 }
