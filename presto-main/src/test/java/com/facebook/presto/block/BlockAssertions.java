@@ -18,10 +18,13 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.DictionaryBlock;
 import com.facebook.presto.spi.block.RunLengthEncodedBlock;
+import com.facebook.presto.spi.type.DecimalType;
+import com.facebook.presto.spi.type.LongDecimalType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.type.ArrayType;
 import io.airlift.slice.Slice;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -188,6 +191,54 @@ public final class BlockAssertions
             }
             else {
                 BOOLEAN.writeBoolean(builder, value);
+            }
+        }
+
+        return builder.build();
+    }
+
+    public static Block createShortDecimalsBlock(String... values)
+    {
+        requireNonNull(values, "varargs 'values' is null");
+
+        return createShortDecimalsBlock(Arrays.asList(values));
+    }
+
+    public static Block createShortDecimalsBlock(Iterable<String> values)
+    {
+        DecimalType shortDecimalType = DecimalType.createDecimalType(1);
+        BlockBuilder builder = shortDecimalType.createBlockBuilder(new BlockBuilderStatus(), 100);
+
+        for (String value : values) {
+            if (value == null) {
+                builder.appendNull();
+            }
+            else {
+                shortDecimalType.writeLong(builder, new BigDecimal(value).unscaledValue().longValue());
+            }
+        }
+
+        return builder.build();
+    }
+
+    public static Block createLongDecimalsBlock(String... values)
+    {
+        requireNonNull(values, "varargs 'values' is null");
+
+        return createLongDecimalsBlock(Arrays.asList(values));
+    }
+
+    public static Block createLongDecimalsBlock(Iterable<String> values)
+    {
+        LongDecimalType longDecimalType = (LongDecimalType) DecimalType.createDecimalType(18);
+        BlockBuilder builder = longDecimalType.createBlockBuilder(new BlockBuilderStatus(), 100);
+
+        for (String value : values) {
+            if (value == null) {
+                builder.appendNull();
+            }
+            else {
+                longDecimalType.writeBigDecimal(builder, new BigDecimal(value));
             }
         }
 
