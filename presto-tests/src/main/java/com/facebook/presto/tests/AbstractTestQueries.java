@@ -5476,13 +5476,10 @@ public abstract class AbstractTestQueries
     {
         Session session = getSession().withPreparedStatement("my_query", "select 123, 'abc'");
         MaterializedResult actual = computeActual(session, "EXECUTE my_query");
-        List<MaterializedRow> rows = actual.getMaterializedRows();
-
-        assertEquals(rows.size(), 1);
-
-        MaterializedRow row = rows.get(0);
-        assertEquals(row.getField(0), 123L);
-        assertEquals(row.getField(1), "abc");
+        MaterializedResult expected = resultBuilder(session, BIGINT, VARCHAR)
+                .row(123, "abc")
+                .build();
+        assertEqualsIgnoreOrder(actual, expected);
     }
 
     @Test
