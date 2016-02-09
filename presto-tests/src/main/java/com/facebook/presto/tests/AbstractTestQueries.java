@@ -5496,16 +5496,22 @@ public abstract class AbstractTestQueries
     {
         Session session = getSession().withPreparedStatement("my_query", "select ? from nation where nationkey = ?");
         MaterializedResult actual = computeActual(session, "DESCRIBE INPUT my_query");
-        List<MaterializedRow> rows = actual.getMaterializedRows();
+        MaterializedResult expected = resultBuilder(session, BIGINT, VARCHAR)
+                .row(0, "unknown")
+                .row(1, "bigint")
+                .build();
+        assertEqualsIgnoreOrder(actual, expected);
+    }
 
-        assertEquals(rows.size(), 2);
-
-        MaterializedRow row1 = rows.get(0);
-        assertEquals(row1.getField(0), 0L);
-        assertEquals(row1.getField(1), "unknown");
-        MaterializedRow row2 = rows.get(1);
-        assertEquals(row2.getField(0), 1L);
-        assertEquals(row2.getField(1), "bigint");
+    @Test
+    public void testDescribeInputNoParameters()
+    {
+        Session session = getSession().withPreparedStatement("my_query", "select * from nation");
+        MaterializedResult actual = computeActual(session, "DESCRIBE INPUT my_query");
+        MaterializedResult expected = resultBuilder(session, BIGINT, VARCHAR)
+                .row(null, null)
+                .build();
+        assertEqualsIgnoreOrder(actual, expected);
     }
 
     @Test

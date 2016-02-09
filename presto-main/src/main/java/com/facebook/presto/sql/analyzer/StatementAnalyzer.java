@@ -71,6 +71,7 @@ import com.facebook.presto.sql.tree.LikePredicate;
 import com.facebook.presto.sql.tree.LongLiteral;
 import com.facebook.presto.sql.tree.NaturalJoin;
 import com.facebook.presto.sql.tree.Node;
+import com.facebook.presto.sql.tree.NullLiteral;
 import com.facebook.presto.sql.tree.Parameter;
 import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.QualifiedNameReference;
@@ -350,8 +351,12 @@ class StatementAnalyzer
         // get all parameters in query
         List<Parameter> parameters = getParameters(statement);
 
-        // return the positions and types of all parameters
+        // return the positions and types of all parameters.  If there are no parameters, return a single null row.
         Row[] rows = parameters.stream().map(parameter -> createDescribeInputRow(parameter, queryAnalysis)).toArray(Row[]::new);
+        if (rows.length == 0) {
+            rows = new Row[] {row(new NullLiteral(), new NullLiteral())};
+        }
+
         Query query = simpleQuery(
                 selectList(nameReference("Position"), nameReference("Type")),
                 aliased(
