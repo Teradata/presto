@@ -20,12 +20,12 @@ import com.facebook.presto.operator.Description;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.type.LongDecimalType;
 import com.facebook.presto.spi.type.StandardTypes;
+import com.facebook.presto.type.LiteralParameters;
 import com.facebook.presto.type.SqlType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Doubles;
 import io.airlift.slice.Slice;
 
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -37,17 +37,11 @@ import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RAN
 import static com.facebook.presto.spi.type.LongDecimalType.tenToNth;
 import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToBigInteger;
 import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToSlice;
-import static com.facebook.presto.util.DecimalUtils.checkOverflow;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.Character.MAX_RADIX;
 import static java.lang.Character.MIN_RADIX;
 import static java.lang.String.format;
-import static java.math.BigDecimal.ROUND_UNNECESSARY;
-import static java.math.BigDecimal.ZERO;
-import static java.math.RoundingMode.CEILING;
-import static java.math.RoundingMode.DOWN;
-import static java.math.RoundingMode.FLOOR;
 
 public final class MathFunctions
 {
@@ -72,6 +66,16 @@ public final class MathFunctions
     {
         return Math.abs(num);
     }
+
+    @ScalarFunction("abs")
+    @LiteralParameters({"p", "s"})
+    @SqlType("decimal(p, s)")
+    public static long absDecimal(@SqlType("decimal(p, s)") long num) { return num > 0 ? num : -num; }
+
+    @ScalarFunction("abs")
+    @LiteralParameters({"p", "s"})
+    @SqlType("decimal(p, s)")
+    public static Slice absDecimal(@SqlType("decimal(p, s)") Slice num) { return unscaledValueToSlice(unscaledValueToBigInteger(num).abs()); }
 
     @Description("arc cosine")
     @ScalarFunction
