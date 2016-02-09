@@ -13,25 +13,47 @@
  */
 package com.facebook.presto.operator.scalar;
 
+import com.facebook.presto.metadata.Signature;
+import com.facebook.presto.metadata.SqlScalarFunction;
+import com.facebook.presto.metadata.SqlScalarFunctionBuilder.SpecializeContext;
 import com.facebook.presto.operator.Description;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.type.LongDecimalType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.type.SqlType;
+import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Doubles;
 import io.airlift.slice.Slice;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static com.facebook.presto.metadata.FunctionKind.SCALAR;
+import static com.facebook.presto.metadata.Signature.longVariableCalculation;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
+import static com.facebook.presto.spi.type.LongDecimalType.tenToNth;
+import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToBigInteger;
+import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToSlice;
+import static com.facebook.presto.util.DecimalUtils.checkOverflow;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.Character.MAX_RADIX;
 import static java.lang.Character.MIN_RADIX;
 import static java.lang.String.format;
+import static java.math.BigDecimal.ROUND_UNNECESSARY;
+import static java.math.BigDecimal.ZERO;
+import static java.math.RoundingMode.CEILING;
+import static java.math.RoundingMode.DOWN;
+import static java.math.RoundingMode.FLOOR;
 
 public final class MathFunctions
 {
+    public static final SqlScalarFunction[] DECIMAL_CEILING_FUNCTIONS = {decimalCeilingFunction("ceiling"), decimalCeilingFunction("ceil")};
+    public static final SqlScalarFunction DECIMAL_FLOOR_FUNCTION = decimalFloorFunction();
+
     private MathFunctions() {}
 
     @Description("absolute value")
@@ -107,6 +129,56 @@ public final class MathFunctions
         return Math.ceil(num);
     }
 
+    private static SqlScalarFunction decimalCeilingFunction(String name)
+    {
+        Signature signature = Signature.builder()
+                .kind(SCALAR)
+                .name(name)
+                .literalParameters("num_precision", "num_scale", "return_precision")
+                .longVariableConstraints(longVariableCalculation("return_precision", "num_precision - num_scale + min(num_scale, 1)"))
+                .argumentTypes("decimal(num_precision, num_scale)")
+                .returnType("decimal(return_precision,0)")
+                .build();
+        return SqlScalarFunction.builder(MathFunctions.class)
+                .signature(signature)
+                .methods("ceilingShortDecimal", "ceilingLong2ShortDecimal", "ceilingLongDecimal")
+                .extraParameters(MathFunctions::decimalTenToScaleExtraParameters)
+                .build();
+    }
+
+    private static List<Object> decimalScaleExtraParameters(SpecializeContext context)
+    {
+        return ImmutableList.of(context.getLiteral("scale"));
+    }
+
+    private static List<Object> decimalTenToScaleExtraParameters(SpecializeContext context)
+    {
+        return ImmutableList.of(tenToNth(context.getLiteral("num_scale").intValue()));
+    }
+
+    public static long ceilingShortDecimal(long num, BigInteger divisorBigInteger)
+    {
+        long divisor = divisorBigInteger.longValueExact();
+        long increment = (num % divisor) > 0 ? 1 : 0;
+        return num / divisor + increment;
+    }
+
+    public static long ceilingLong2ShortDecimal(Slice num, BigInteger divisor)
+    {
+        return ceiling(num, divisor).longValueExact();
+    }
+
+    public static Slice ceilingLongDecimal(Slice num, BigInteger divisor)
+    {
+        return LongDecimalType.unscaledValueToSlice(ceiling(num, divisor));
+    }
+
+    private static BigInteger ceiling(Slice num, BigInteger divisor)
+    {
+        BigInteger[] divideAndRemainder = unscaledValueToBigInteger(num).divideAndRemainder(divisor);
+        return divideAndRemainder[0].add(BigInteger.valueOf(divideAndRemainder[0].signum() > 0 ? 1 : 0));
+    }
+
     @Description("cosine")
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
@@ -161,6 +233,46 @@ public final class MathFunctions
     public static double floor(@SqlType(StandardTypes.DOUBLE) double num)
     {
         return Math.floor(num);
+    }
+
+    private static SqlScalarFunction decimalFloorFunction()
+    {
+        Signature signature = Signature.builder()
+                .kind(SCALAR)
+                .name("floor")
+                .literalParameters("num_precision", "num_scale", "return_precision")
+                .longVariableConstraints(longVariableCalculation("return_precision", "num_precision - num_scale + min(num_scale, 1)"))
+                .argumentTypes("decimal(num_precision, num_scale)")
+                .returnType("decimal(return_precision,0)")
+                .build();
+        return SqlScalarFunction.builder(MathFunctions.class)
+                .signature(signature)
+                .methods("floorShortDecimal", "floorLongShortDecimal", "floorLongDecimal")
+                .extraParameters(MathFunctions::decimalTenToScaleExtraParameters)
+                .build();
+    }
+
+    public static long floorShortDecimal(long num, BigInteger divisorBigInteger)
+    {
+        long divisor = divisorBigInteger.longValueExact();
+        long increment = (num % divisor) < 0 ? -1 : 0;
+        return num / divisor + increment;
+    }
+
+    public static Slice floorLongDecimal(Slice num, BigInteger divisor)
+    {
+        return LongDecimalType.unscaledValueToSlice(floor(num, divisor));
+    }
+
+    public static long floorLongShortDecimal(Slice num, BigInteger divisor)
+    {
+        return floor(num, divisor).longValueExact();
+    }
+
+    private static BigInteger floor(Slice num, BigInteger divisor)
+    {
+        BigInteger[] divideAndRemainder = unscaledValueToBigInteger(num).divideAndRemainder(divisor);
+        return divideAndRemainder[0].add(BigInteger.valueOf(divideAndRemainder[0].signum() < 0 ? -1 : 0));
     }
 
     @Description("natural logarithm")
