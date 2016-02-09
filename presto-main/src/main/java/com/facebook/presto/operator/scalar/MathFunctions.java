@@ -13,17 +13,28 @@
  */
 package com.facebook.presto.operator.scalar;
 
+import com.facebook.presto.metadata.Signature;
+import com.facebook.presto.metadata.SqlScalarFunction;
+import com.facebook.presto.metadata.SqlScalarFunctionBuilder.SpecializeContext;
 import com.facebook.presto.operator.Description;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.type.LongDecimalType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.type.SqlType;
+import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Doubles;
 import io.airlift.slice.Slice;
 
+import java.math.BigInteger;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static com.facebook.presto.metadata.FunctionKind.SCALAR;
+import static com.facebook.presto.metadata.Signature.longVariableCalculation;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
+import static com.facebook.presto.spi.type.LongDecimalType.tenToNth;
+import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToBigInteger;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.Character.MAX_RADIX;
@@ -32,6 +43,9 @@ import static java.lang.String.format;
 
 public final class MathFunctions
 {
+    public static final SqlScalarFunction[] DECIMAL_CEILING_FUNCTIONS = {decimalCeilingFunction("ceiling"), decimalCeilingFunction("ceil")};
+    public static final SqlScalarFunction DECIMAL_FLOOR_FUNCTION = decimalFloorFunction();
+
     private MathFunctions() {}
 
     @Description("absolute value")
@@ -107,6 +121,57 @@ public final class MathFunctions
         return Math.ceil(num);
     }
 
+    private static SqlScalarFunction decimalCeilingFunction(String name)
+    {
+        Signature signature = Signature.builder()
+                .kind(SCALAR)
+                .name(name)
+                .literalParameters("num_precision", "num_scale", "return_precision")
+                .longVariableConstraints(longVariableCalculation("return_precision", "num_precision - num_scale + min(num_scale, 1)"))
+                .argumentTypes("decimal(num_precision, num_scale)")
+                .returnType("decimal(return_precision,0)")
+                .build();
+        return SqlScalarFunction.builder(MathFunctions.class)
+                .signature(signature)
+                .methods("ceilingShortShortDecimal")
+                .extraParameters(MathFunctions::decimalTenToScaleAsLongExtraParameters)
+                .methods("ceilingLongShortDecimal", "ceilingLongLongDecimal")
+                .extraParameters(MathFunctions::decimalTenToScaleAsBigDecimalExtraParameters)
+                .build();
+    }
+
+    private static List<Object> decimalTenToScaleAsBigDecimalExtraParameters(SpecializeContext context)
+    {
+        return ImmutableList.of(tenToNth(context.getLiteral("num_scale").intValue()));
+    }
+
+    private static List<Object> decimalTenToScaleAsLongExtraParameters(SpecializeContext context)
+    {
+        return ImmutableList.of(tenToNth(context.getLiteral("num_scale").intValue()).longValueExact());
+    }
+
+    public static long ceilingShortShortDecimal(long num, long divisor)
+    {
+        long increment = (num % divisor) > 0 ? 1 : 0;
+        return num / divisor + increment;
+    }
+
+    public static long ceilingLongShortDecimal(Slice num, BigInteger divisor)
+    {
+        return ceiling(num, divisor).longValueExact();
+    }
+
+    public static Slice ceilingLongLongDecimal(Slice num, BigInteger divisor)
+    {
+        return LongDecimalType.unscaledValueToSlice(ceiling(num, divisor));
+    }
+
+    private static BigInteger ceiling(Slice num, BigInteger divisor)
+    {
+        BigInteger[] divideAndRemainder = unscaledValueToBigInteger(num).divideAndRemainder(divisor);
+        return divideAndRemainder[0].add(BigInteger.valueOf(divideAndRemainder[1].signum() > 0 ? 1 : 0));
+    }
+
     @Description("cosine")
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
@@ -161,6 +226,47 @@ public final class MathFunctions
     public static double floor(@SqlType(StandardTypes.DOUBLE) double num)
     {
         return Math.floor(num);
+    }
+
+    private static SqlScalarFunction decimalFloorFunction()
+    {
+        Signature signature = Signature.builder()
+                .kind(SCALAR)
+                .name("floor")
+                .literalParameters("num_precision", "num_scale", "return_precision")
+                .longVariableConstraints(longVariableCalculation("return_precision", "num_precision - num_scale + min(num_scale, 1)"))
+                .argumentTypes("decimal(num_precision, num_scale)")
+                .returnType("decimal(return_precision,0)")
+                .build();
+        return SqlScalarFunction.builder(MathFunctions.class)
+                .signature(signature)
+                .methods("floorShortShortDecimal")
+                .extraParameters(MathFunctions::decimalTenToScaleAsLongExtraParameters)
+                .methods("floorLongShortDecimal", "floorLongLongDecimal")
+                .extraParameters(MathFunctions::decimalTenToScaleAsBigDecimalExtraParameters)
+                .build();
+    }
+
+    public static long floorShortShortDecimal(long num, long divisor)
+    {
+        long increment = (num % divisor) < 0 ? -1 : 0;
+        return num / divisor + increment;
+    }
+
+    public static Slice floorLongLongDecimal(Slice num, BigInteger divisor)
+    {
+        return LongDecimalType.unscaledValueToSlice(floor(num, divisor));
+    }
+
+    public static long floorLongShortDecimal(Slice num, BigInteger divisor)
+    {
+        return floor(num, divisor).longValueExact();
+    }
+
+    private static BigInteger floor(Slice num, BigInteger divisor)
+    {
+        BigInteger[] divideAndRemainder = unscaledValueToBigInteger(num).divideAndRemainder(divisor);
+        return divideAndRemainder[0].add(BigInteger.valueOf(divideAndRemainder[1].signum() < 0 ? -1 : 0));
     }
 
     @Description("natural logarithm")
