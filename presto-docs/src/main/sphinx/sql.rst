@@ -36,3 +36,4 @@ This chapter describes the SQL syntax used in Presto.
     sql/prepare
     sql/execute
     sql/deallocate-prepare
+    sql/describe-input
