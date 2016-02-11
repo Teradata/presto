@@ -26,7 +26,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Doubles;
 import io.airlift.slice.Slice;
 
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
@@ -40,20 +39,18 @@ import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToBigInt
 import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToSlice;
 import static com.facebook.presto.type.DecimalOperators.modulusScalarFunction;
 import static com.facebook.presto.type.DecimalOperators.modulusSignatureBuilder;
-import static com.facebook.presto.util.DecimalUtils.checkOverflow;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.Character.MAX_RADIX;
 import static java.lang.Character.MIN_RADIX;
 import static java.lang.String.format;
-import static java.math.BigDecimal.ROUND_UNNECESSARY;
-import static java.math.BigDecimal.ZERO;
 
 public final class MathFunctions
 {
     public static final SqlScalarFunction[] DECIMAL_CEILING_FUNCTIONS = {decimalCeilingFunction("ceiling"), decimalCeilingFunction("ceil")};
     public static final SqlScalarFunction DECIMAL_FLOOR_FUNCTION = decimalFloorFunction();
     public static final SqlScalarFunction DECIMAL_MOD_FUNCTION = decimalModFunction();
+    public static final SqlScalarFunction[] DECIMAL_ROUND_FUNCTIONS = {decimalRoundFunction(), decimalRoundNFunction()};
 
     private MathFunctions() {}
 
@@ -155,11 +152,6 @@ public final class MathFunctions
                 .methods("ceilingShortDecimal", "ceilingLong2ShortDecimal", "ceilingLongDecimal")
                 .extraParameters(MathFunctions::decimalTenToScaleExtraParameters)
                 .build();
-    }
-
-    private static List<Object> decimalScaleExtraParameters(SpecializeContext context)
-    {
-        return ImmutableList.of(context.getLiteral("scale"));
     }
 
     private static List<Object> decimalTenToScaleExtraParameters(SpecializeContext context)
@@ -421,6 +413,98 @@ public final class MathFunctions
 
         double factor = Math.pow(10, decimals);
         return Math.floor(num * factor + 0.5) / factor;
+    }
+
+    private static SqlScalarFunction decimalRoundNFunction()
+    {
+        Signature signature = Signature.builder()
+                .kind(SCALAR)
+                .name("round")
+                .literalParameters("num_precision", "num_scale")
+                .argumentTypes("decimal(num_precision, num_scale)", StandardTypes.BIGINT)
+                .returnType("decimal(num_precision, num_scale)")
+                .build();
+        return SqlScalarFunction.builder(MathFunctions.class)
+                .signature(signature)
+                .description("remainder of given quotient")
+                .methods("roundShortDecimal", "roundLongDecimal")
+                .extraParameters(MathFunctions::decimalRoundNExtraParameters)
+                .build();
+    }
+
+    private static SqlScalarFunction decimalRoundFunction()
+    {
+        Signature signature = Signature.builder()
+                .kind(SCALAR)
+                .name("round")
+                .literalParameters("num_precision", "num_scale")
+                .argumentTypes("decimal(num_precision, num_scale)")
+                .returnType("decimal(num_precision, num_scale)")
+                .build();
+        return SqlScalarFunction.builder(MathFunctions.class)
+                .signature(signature)
+                .description("remainder of given quotient")
+                .methods("roundShortDecimal", "roundLongDecimal")
+                .extraParameters(MathFunctions::decimalRoundExtraParameters)
+                .build();
+    }
+
+    private static List<Object> decimalRoundExtraParameters(SpecializeContext specializeContext)
+    {
+        return ImmutableList.of(0, decimalRoundNExtraParameters(specializeContext).get(0), decimalRoundNExtraParameters(specializeContext).get(1));
+    }
+
+    private static List<Object> decimalRoundNExtraParameters(SpecializeContext context)
+    {
+        return ImmutableList.of(context.getLiteral("num_precision"), context.getLiteral("num_scale"));
+    }
+
+    public static long roundShortDecimal(long num, long roundScale, long inputPrecision, long inputScale)
+
+    {
+        if (num == 0 || inputPrecision - inputScale + roundScale <= 0) {
+            return 0;
+        }
+        if (roundScale >= inputScale) {
+            return num;
+        }
+        if (num < 0) {
+            return -roundShortDecimal(-num, roundScale, inputPrecision, inputScale);
+        }
+
+        long rescaleFactor = tenToNth((int) (inputScale - roundScale)).longValueExact();
+        long remainder = num % rescaleFactor;
+        return (num / rescaleFactor + ((firstDigit(remainder) > 4) ? 1 : 0)) * rescaleFactor;
+    }
+
+    private static long firstDigit(long num)
+    {
+        while (num > 9) {
+            num /= 10;
+        }
+        return Math.abs(num);
+    }
+
+    public static Slice roundLongDecimal(Slice num, long roundScale, long inputPrecision, long inputScale)
+    {
+        BigInteger unscaledVal = unscaledValueToBigInteger(num);
+        if (unscaledVal.signum() == 0) {
+            return LongDecimalType.unscaledValueToSlice(0);
+        }
+        if (roundScale >= inputScale) {
+            return num;
+        }
+        BigInteger rescaleFactor = tenToNth((int) (inputScale - roundScale));
+        if (unscaledVal.signum() < 0) {
+            return LongDecimalType.unscaledValueToSlice(roundLongDecimal(unscaledVal.negate(), rescaleFactor).negate());
+        }
+        return LongDecimalType.unscaledValueToSlice(roundLongDecimal(unscaledVal, rescaleFactor));
+    }
+
+    public static BigInteger roundLongDecimal(BigInteger num, BigInteger rescaleFactor)
+    {
+        BigInteger[] divideAndRemainder = num.divideAndRemainder(rescaleFactor);
+        return divideAndRemainder[0].add(BigInteger.valueOf(Integer.valueOf(divideAndRemainder[1].toString().substring(0, 1)) > 4 ? 1 : 0)).multiply(rescaleFactor);
     }
 
     @Description("sine")
