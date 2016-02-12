@@ -30,3 +30,8 @@ Delete all line items for low priority orders::
 Delete all orders::
 
     DELETE FROM orders;
+
+Limitations
+-------------
+Only :doc:`../connector/hive` currently supports DELETE and it works for the queries where one or more partitions are
+deleted entirely.

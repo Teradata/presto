@@ -151,3 +151,8 @@ Hive, this table can be described in Presto::
 This table can then be queried in Presto::
 
     SELECT * FROM hive.web.page_view;
+
+Hive Connector Limitations
+---------------------------
+
+* :doc:`/sql/delete` : Only supports ``DELETE`` where one or more partitions are deleted entirely using condition on partitioning columns.
