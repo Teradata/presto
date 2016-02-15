@@ -14,14 +14,16 @@
 
 package com.facebook.presto.type;
 
+import com.facebook.presto.operator.scalar.AbstractTestFunctions;
 import org.testng.annotations.Test;
 
 import static com.facebook.presto.spi.StandardErrorCode.DIVISION_BY_ZERO;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DecimalType.createDecimalType;
+import static com.facebook.presto.spi.type.SqlDecimal.decimal;
 
 public class TestDecimalOperators
-        extends AbstractTestDecimalFunctions
+        extends AbstractTestFunctions
 {
     @Test
     public void testAdd()

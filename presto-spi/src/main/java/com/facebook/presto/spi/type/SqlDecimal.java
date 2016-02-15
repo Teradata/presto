@@ -34,6 +34,21 @@ public final class SqlDecimal
         this.scale = scale;
     }
 
+    public static SqlDecimal decimal(String decimalString)
+    {
+        int dotPos = decimalString.indexOf('.');
+        String decimalStringNoDot = decimalString.replace(".", "");
+        int precision = decimalStringNoDot.length();
+        if (decimalStringNoDot.startsWith("-")) {
+            precision--;
+        }
+        int scale = 0;
+        if (dotPos != -1) {
+            scale = decimalString.length() - dotPos - 1;
+        }
+        return new SqlDecimal(new BigInteger(decimalStringNoDot), precision, scale);
+    }
+
     @Override
     public boolean equals(Object o)
     {
