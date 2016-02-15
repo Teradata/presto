@@ -270,7 +270,7 @@ public final class DecimalOperators
                 .signature(signature)
                 .methods("divideShortShortShort")
                 .extraParameters(DecimalOperators::shortDivideRescaleExtraParameter)
-                .methods("divideShortShortLong", "divideLongLongLong", "divideShortLongLong", "divideLongShortLong")
+                .methods("divideShortShortLong", "divideLongLongLong", "divideShortLongLong", "divideLongShortLong", "divideShortLongShort", "divideLongShortShort")
                 .extraParameters(DecimalOperators::longDivideRescaleExtraParameter)
                 .build();
     }
@@ -320,6 +320,30 @@ public final class DecimalOperators
         }
     }
 
+    public static long divideShortLongShort(long a, Slice b, BigInteger aRescale)
+    {
+        BigInteger aBigInteger = BigInteger.valueOf(a);
+        BigInteger bBigInteger = LongDecimalType.unscaledValueToBigInteger(b);
+        return internalDivideShortResult(aBigInteger, bBigInteger, aRescale);
+    }
+
+    public static long divideLongShortShort(Slice a, long b, BigInteger aRescale)
+    {
+        BigInteger aBigInteger = LongDecimalType.unscaledValueToBigInteger(a);
+        BigInteger bBigInteger = BigInteger.valueOf(b);
+        return internalDivideShortResult(aBigInteger, bBigInteger, aRescale);
+    }
+
+    private static long internalDivideShortResult(BigInteger aBigInteger, BigInteger bBigInteger, BigInteger aRescale)
+    {
+        try {
+            return internalDivideDecimals(aBigInteger.multiply(aRescale), bBigInteger).longValue();
+        }
+        catch (ArithmeticException e) {
+            throw new PrestoException(DIVISION_BY_ZERO, e);
+        }
+    }
+
     public static Slice divideShortShortLong(long a, long b, BigInteger aRescale)
     {
         BigInteger aBigInteger = BigInteger.valueOf(a).multiply(aRescale);
@@ -356,30 +380,36 @@ public final class DecimalOperators
     private static Slice internalDivideLongLongLong(BigInteger aBigInteger, BigInteger bBigInteger)
     {
         try {
-            BigInteger result = aBigInteger.divide(bBigInteger);
-            BigInteger resultModTen = result.mod(TEN);
-            if (result.signum() > 0) {
-                if (resultModTen.compareTo(BigInteger.valueOf(5)) >= 0) {
-                    result = result.divide(TEN).add(ONE);
-                }
-                else {
-                    result = result.divide(TEN);
-                }
-            }
-            else {
-                if (resultModTen.compareTo(BigInteger.valueOf(5)) < 0 && !resultModTen.equals(ZERO)) {
-                    result = result.divide(TEN).subtract(ONE);
-                }
-                else {
-                    result = result.divide(TEN);
-                }
-            }
-            checkOverflow(result);
+            BigInteger result = internalDivideDecimals(aBigInteger, bBigInteger);
             return LongDecimalType.unscaledValueToSlice(result);
         }
         catch (ArithmeticException e) {
             throw new PrestoException(DIVISION_BY_ZERO, e);
         }
+    }
+
+    private static BigInteger internalDivideDecimals(BigInteger aBigInteger, BigInteger bBigInteger)
+    {
+        BigInteger result = aBigInteger.divide(bBigInteger);
+        BigInteger resultModTen = result.mod(TEN);
+        if (result.signum() > 0) {
+            if (resultModTen.compareTo(BigInteger.valueOf(5)) >= 0) {
+                result = result.divide(TEN).add(ONE);
+            }
+            else {
+                result = result.divide(TEN);
+            }
+        }
+        else {
+            if (resultModTen.compareTo(BigInteger.valueOf(5)) < 0 && !resultModTen.equals(ZERO)) {
+                result = result.divide(TEN).subtract(ONE);
+            }
+            else {
+                result = result.divide(TEN);
+            }
+        }
+        checkOverflow(result);
+        return result;
     }
 
     private static SqlScalarFunction decimalModulusOperator()
