@@ -66,6 +66,8 @@ public class IsDistinctFromCodeGenerator
             // the generated block should be unreachable. However, a boolean need to be pushed to balance the stack
             neitherSideIsNull = new BytecodeBlock()
                     .comment("unreachable code")
+                    .pop(leftType.getJavaType())
+                    .pop(rightType.getJavaType())
                     .push(false);
         }
         else {
