@@ -13,15 +13,18 @@
  */
 package com.facebook.presto.type;
 
+import com.facebook.presto.operator.scalar.AbstractTestFunctions;
 import org.testng.annotations.Test;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.SqlDecimal.decimal;
+import static com.facebook.presto.spi.type.SqlDecimal.maxPrecisionDecimal;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 
 public class TestDecimalCasts
-        extends AbstractTestDecimalFunctions
+        extends AbstractTestFunctions
 {
     @Test
     public void testBooleanToDecimalCasts()

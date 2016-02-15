@@ -21,6 +21,8 @@ import java.math.BigInteger;
 import java.math.MathContext;
 import java.util.Objects;
 
+import static com.facebook.presto.spi.type.DecimalType.MAX_PRECISION;
+
 public final class SqlDecimal
 {
     private final BigInteger unscaledValue;
@@ -32,6 +34,36 @@ public final class SqlDecimal
         this.unscaledValue = unscaledValue;
         this.precision = precision;
         this.scale = scale;
+    }
+
+    public static SqlDecimal of(BigDecimal bigDecimal)
+    {
+        if (bigDecimal == null) {
+            return null;
+        }
+
+        return new SqlDecimal(bigDecimal.unscaledValue(), bigDecimal.precision(), bigDecimal.scale());
+    }
+
+    public static SqlDecimal decimal(String decimalString)
+    {
+        int dotPos = decimalString.indexOf('.');
+        String decimalStringNoDot = decimalString.replace(".", "");
+        int precision = decimalStringNoDot.length();
+        if (decimalStringNoDot.startsWith("-")) {
+            precision--;
+        }
+        int scale = 0;
+        if (dotPos != -1) {
+            scale = decimalString.length() - dotPos - 1;
+        }
+        return new SqlDecimal(new BigInteger(decimalStringNoDot), precision, scale);
+    }
+
+    public static SqlDecimal maxPrecisionDecimal(long value)
+    {
+        final String maxPrecisionFormat = "%0" + (MAX_PRECISION + (value < 0 ? 1 : 0)) + "d";
+        return decimal(String.format(maxPrecisionFormat, value));
     }
 
     @Override
