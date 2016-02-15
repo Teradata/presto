@@ -96,6 +96,7 @@ public class TestJsonOperators
             throws Exception
     {
         assertFunction("cast(cast (null as double) as JSON)", JSON, null);
+        // TODO: implement json cast operator from decimal
         assertFunction("cast(CAST(3.14 as DOUBLE) as JSON)", JSON, "3.14");
         assertFunction("cast(nan() as JSON)", JSON, "\"NaN\"");
         assertFunction("cast(infinity() as JSON)", JSON, "\"Infinity\"");
