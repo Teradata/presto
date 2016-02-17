@@ -91,7 +91,6 @@ public class TestExpressionCompiler
     private static final Long[] smallLongs = {9L, 10L, 11L, -9L, -10L, -11L, null};
     private static final Long[] extremeLongs = {10151082135029368L, /*Long.MIN_VALUE,*/ Long.MAX_VALUE};
     private static final Long[] longLefts = concat(smallLongs, extremeLongs);
-
     private static final Long[] longRights = {3L, -3L, 10151082135029369L, null};
     private static final Long[] longMiddle = {9L, -3L, 88L, null};
     private static final Double[] doubleLefts = {9.0, 10.0, 11.0, -9.0, -10.0, -11.0, 9.1, 10.1, 11.1, -9.1, -10.1, -11.1,
