@@ -88,7 +88,10 @@ import static org.testng.Assert.assertTrue;
 public class TestExpressionCompiler
 {
     private static final Boolean[] booleanValues = {true, false, null};
-    private static final Long[] longLefts = {9L, 10L, 11L, -9L, -10L, -11L, 10151082135029368L, /*Long.MIN_VALUE,*/ Long.MAX_VALUE, null};
+    private static final Long[] smallLongs = {9L, 10L, 11L, -9L, -10L, -11L, null};
+    private static final Long[] extremeLongs = {10151082135029368L, /*Long.MIN_VALUE,*/ Long.MAX_VALUE};
+    private static final Long[] longLefts = concat(smallLongs, extremeLongs);
+
     private static final Long[] longRights = {3L, -3L, 10151082135029369L, null};
     private static final Long[] longMiddle = {9L, -3L, 88L, null};
     private static final Double[] doubleLefts = {9.0, 10.0, 11.0, -9.0, -10.0, -11.0, 9.1, 10.1, 11.1, -9.1, -10.1, -11.1,
@@ -128,6 +131,13 @@ public class TestExpressionCompiler
     private ListeningExecutorService executor;
     private FunctionAssertions functionAssertions;
     private List<ListenableFuture<Void>> futures;
+
+    private static <T> T[] concat(T[] first, T[] second)
+    {
+        T[] result = Arrays.copyOf(first, first.length + second.length);
+        System.arraycopy(second, 0, result, first.length, second.length);
+        return result;
+    }
 
     @BeforeSuite
     public void setupClass()
@@ -282,7 +292,7 @@ public class TestExpressionCompiler
     public void testBinaryOperatorsLongLong()
             throws Exception
     {
-        for (Long left : longLefts) {
+        for (Long left : smallLongs) {
             for (Long right : longRights) {
                 assertExecute(generateExpression("%s = %s", left, right), BOOLEAN, left == null || right == null ? null : (long) left == right);
                 assertExecute(generateExpression("%s <> %s", left, right), BOOLEAN, left == null || right == null ? null : (long) left != right);
