@@ -14,11 +14,17 @@
 
 package com.facebook.presto.type;
 
+import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.block.BlockBuilderStatus;
+import com.facebook.presto.spi.type.DecimalType;
+import io.airlift.slice.Slice;
 import org.testng.annotations.Test;
 
 import static com.facebook.presto.spi.StandardErrorCode.DIVISION_BY_ZERO;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DecimalType.createDecimalType;
+import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToSlice;
+import static org.testng.Assert.assertEquals;
 
 public class TestDecimalOperators
         extends AbstractTestDecimalFunctions
@@ -637,5 +643,24 @@ public class TestDecimalOperators
         assertFunction("NULL BETWEEN DECIMAL '-5.00000000000000000000'  AND DECIMAL '5.00000000000000000000'", BOOLEAN, null);
         assertFunction("DECIMAL '1.00000000000000000000' BETWEEN NULL  AND DECIMAL '5.00000000000000000000'", BOOLEAN, null);
         assertFunction("DECIMAL '1.00000000000000000000' BETWEEN DECIMAL '-5.00000000000000000000'  AND NULL", BOOLEAN, null);
+    }
+
+    @Test
+    public void testHashCode()
+            throws Exception
+    {
+        DecimalType shortDecimalType = createDecimalType(3, 0);
+        long shortDecimalValue = 123L;
+        BlockBuilder shortDecimalBlock = shortDecimalType.createBlockBuilder(new BlockBuilderStatus(), 1);
+        shortDecimalBlock.writeLong(shortDecimalValue);
+        shortDecimalBlock.closeEntry();
+        assertEquals(DecimalOperators.hashCode(shortDecimalValue), shortDecimalType.hash(shortDecimalBlock.build(), 0));
+
+        DecimalType longDecimalType = createDecimalType(29, 9);
+        Slice longDecimalValue = unscaledValueToSlice("12345678901234567890123456789");
+        BlockBuilder longDecimalBlock = longDecimalType.createBlockBuilder(new BlockBuilderStatus(), 1);
+        longDecimalBlock.writeBytes(longDecimalValue, 0, longDecimalValue.length());
+        longDecimalBlock.closeEntry();
+        assertEquals(DecimalOperators.hashCode(longDecimalValue), longDecimalType.hash(longDecimalBlock.build(), 0));
     }
 }
