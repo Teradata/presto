@@ -41,6 +41,7 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.annotations.Test;
 
+import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.Time;
 import java.sql.Timestamp;
@@ -50,6 +51,7 @@ import java.util.Set;
 import static com.facebook.presto.connector.informationSchema.InformationSchemaMetadata.INFORMATION_SCHEMA;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DateType.DATE;
+import static com.facebook.presto.spi.type.DecimalType.createDecimalType;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.TimeType.TIME;
 import static com.facebook.presto.spi.type.TimeWithTimeZoneType.TIME_WITH_TIME_ZONE;
@@ -2484,9 +2486,9 @@ public abstract class AbstractTestQueries
     {
         MaterializedResult actual = computeActual("SELECT orderkey, 1.0 / row_number() OVER (ORDER BY orderkey) FROM orders LIMIT 2");
 
-        MaterializedResult expected = resultBuilder(getSession(), BIGINT, DOUBLE)
-                .row(1, 1.0)
-                .row(2, 0.5)
+        MaterializedResult expected = resultBuilder(getSession(), BIGINT, createDecimalType(1, 1))
+                .row(1, new BigDecimal("1.0"))
+                .row(2, new BigDecimal("0.5"))
                 .build();
 
         assertEquals(actual, expected);
@@ -5477,7 +5479,7 @@ public abstract class AbstractTestQueries
     public void testValuesWithNonTrivialType()
             throws Exception
     {
-        MaterializedResult actual = computeActual("VALUES (0.0/0.0, 1.0/0.0, -1.0/0.0)");
+        MaterializedResult actual = computeActual("VALUES (0.0/CAST(0.0 AS DOUBLE), 1.0/CAST(0.0 AS DOUBLE), -1.0/CAST(0.0 AS DOUBLE))");
 
         List<MaterializedRow> rows = actual.getMaterializedRows();
         assertEquals(rows.size(), 1);
