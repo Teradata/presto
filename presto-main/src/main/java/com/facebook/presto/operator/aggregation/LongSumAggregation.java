@@ -14,10 +14,13 @@
 package com.facebook.presto.operator.aggregation;
 
 import com.facebook.presto.operator.aggregation.state.NullableLongState;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.type.SqlType;
+
+import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_OVERFLOW;
 
 @AggregationFunction("sum")
 public final class LongSumAggregation
@@ -31,7 +34,12 @@ public final class LongSumAggregation
     public static void sum(NullableLongState state, @SqlType(StandardTypes.BIGINT) long value)
     {
         state.setNull(false);
-        state.setLong(state.getLong() + value);
+        try {
+            state.setLong(Math.addExact(state.getLong(), value));
+        }
+        catch (ArithmeticException e) {
+            throw new PrestoException(NUMERIC_OVERFLOW, e);
+        }
     }
 
     @OutputFunction(StandardTypes.BIGINT)
