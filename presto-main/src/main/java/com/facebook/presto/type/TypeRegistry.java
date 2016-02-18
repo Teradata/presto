@@ -212,6 +212,12 @@ public final class TypeRegistry
         return true;
     }
 
+    private static boolean isDateTimeType(String type)
+    {
+        return ImmutableList.of(StandardTypes.DATE, StandardTypes.TIME, StandardTypes.TIME_WITH_TIME_ZONE,
+                StandardTypes.TIMESTAMP, StandardTypes.TIMESTAMP_WITH_TIME_ZONE).contains(type);
+    }
+
     private static boolean canCastTypeBase(String fromTypeBase, String toTypeBase)
     {
         // canCastTypeBase and isCovariantParameterPosition defines all hand-coded rules for type coercion.
@@ -233,7 +239,7 @@ public final class TypeRegistry
             case StandardTypes.TIMESTAMP:
                 return StandardTypes.TIMESTAMP_WITH_TIME_ZONE.equals(toTypeBase);
             case StandardTypes.VARCHAR:
-                return RegexpType.NAME.equals(toTypeBase) || LikePatternType.NAME.equals(toTypeBase) || JsonPathType.NAME.equals(toTypeBase);
+                return RegexpType.NAME.equals(toTypeBase) || LikePatternType.NAME.equals(toTypeBase) || JsonPathType.NAME.equals(toTypeBase) || isDateTimeType(toTypeBase);
             case StandardTypes.P4_HYPER_LOG_LOG:
                 return StandardTypes.HYPER_LOG_LOG.equals(toTypeBase);
             case StandardTypes.DECIMAL:
@@ -249,6 +255,12 @@ public final class TypeRegistry
 
         // if we ever introduce contravariant, this function should be changed to return an enumeration: INVARIANT, COVARIANT, CONTRAVARIANT
         return firstTypeBase.equals(StandardTypes.ARRAY) || firstTypeBase.equals(StandardTypes.MAP);
+    }
+
+    private static boolean areParametersIgnorableInCoersionTo(String targetType)
+    {
+        // areParametersIgnorableInCoersion defines which implicit casts are allowed to loose or gain parameters of types.
+        return isDateTimeType(targetType);
     }
 
     public static boolean canCoerce(Type actualType, Type expectedType)
@@ -374,8 +386,14 @@ public final class TypeRegistry
     public static Optional<TypeSignature> getCommonSuperTypeSignature(TypeSignature firstType, TypeSignature secondType)
     {
         TypeSignaturePair typeSignaturePair = new TypeSignaturePair(firstType, secondType);
-        if (typeSignaturePair.containsAnyOf(StandardTypes.VARCHAR, StandardTypes.DECIMAL)) {
+        if (typeSignaturePair.containsAnyOf(StandardTypes.DECIMAL)) {
             return getCommonSuperTypeForTypesWithLongParameters(typeSignaturePair);
+        }
+        if (typeSignaturePair.containsAnyOf(StandardTypes.VARCHAR)) {
+            Optional<TypeSignature> commonSuperType = getCommonSuperTypeForTypesWithLongParameters(typeSignaturePair);
+            if (commonSuperType.isPresent()) {
+                return commonSuperType;
+            }
         }
 
         // Special handling for UnknownType is necessary because we forbid cast between types with different number of type parameters.
@@ -394,8 +412,14 @@ public final class TypeRegistry
 
         List<TypeSignatureParameter> firstTypeTypeParameters = firstType.getParameters();
         List<TypeSignatureParameter> secondTypeTypeParameters = secondType.getParameters();
+
         if (firstTypeTypeParameters.size() != secondTypeTypeParameters.size()) {
-            return Optional.empty();
+            if (areParametersIgnorableInCoersionTo(commonSuperTypeBase.get())) {
+                return Optional.of(new TypeSignature(commonSuperTypeBase.get()));
+            }
+            else {
+                return Optional.empty();
+            }
         }
 
         ImmutableList.Builder<TypeSignatureParameter> typeParameters = ImmutableList.builder();

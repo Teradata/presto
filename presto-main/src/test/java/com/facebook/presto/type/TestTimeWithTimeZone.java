@@ -59,6 +59,11 @@ public class TestTimeWithTimeZone
         functionAssertions.assertFunction(projection, expectedType, expected);
     }
 
+    private void assertEvaluates(String projection, Type expectedType)
+    {
+        functionAssertions.tryEvaluate(projection, expectedType);
+    }
+
     @Test
     public void testLiteral()
     {
@@ -232,5 +237,77 @@ public class TestTimeWithTimeZone
         assertFunction("cast(TIME '03:04:05.321 +07:09' as varchar)", VARCHAR, "03:04:05.321 +07:09");
         assertFunction("cast(TIME '03:04:05 +07:09' as varchar)", VARCHAR, "03:04:05.000 +07:09");
         assertFunction("cast(TIME '03:04 +07:09' as varchar)", VARCHAR, "03:04:00.000 +07:09");
+    }
+
+    @Test
+    public void testCastFromSlice()
+    {
+        assertFunction("cast('03:04:05.321 +07:09' as time with time zone) = TIME '03:04:05.321 +07:09'", BOOLEAN, true);
+        assertFunction("cast('03:04:05 +07:09' as time with time zone) = TIME '03:04:05.000 +07:09'", BOOLEAN, true);
+        assertFunction("cast('03:04 +07:09' as time with time zone) = TIME '03:04:00.000 +07:09'", BOOLEAN, true);
+    }
+
+    @Test
+    public void twoSidedVarcharComparisonDoesNotCauseImplicitCastToTime()
+    {
+        assertFunction("'05:30:00.0 +01:00' < '05:00:00.0 -01:00'", BOOLEAN, false);
+    }
+
+    @Test
+    public void timeWithTimeZoneCanBeImplicitlyCastedFromVarchar()
+            throws Exception
+    {
+        assertEvaluates("'05:30:00.0 +01:00' < TIME '05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIME '05:30:00.0 +01:00' < '05:00:00.0 -01:00'", BOOLEAN);
+
+        assertEvaluates("'05:30:00.01 +01:00' < TIME '05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIME '05:30:00.0 +01:00' < '05:00:00.01 -01:00'", BOOLEAN);
+
+        assertEvaluates("'05:00 +01:00' < TIME '05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIME '05:30:00.0 +01:00' < '05:00 -01:00'", BOOLEAN);
+    }
+
+    @Test
+    public void timeZoneIsNotDroppedWhileImplicitlyCastingFromVarchar()
+            throws Exception
+    {
+        assertFunction("'05:30:00.0 +01:00' < TIME '05:00:00.0 -01:00'", BOOLEAN, true);
+        assertFunction("TIME '05:30:00.0 +01:00' < '05:00:00.0 -01:00'", BOOLEAN, true);
+    }
+
+    @Test
+    public void timeWithTimeZoneCanBeImplicitlyCastedFromVarcharWithoutTimezone()
+            throws Exception
+    {
+        assertEvaluates("'05:30:00.0' < TIME '05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIME '05:30:00.0 +01:00' < '05:00:00.0'", BOOLEAN);
+
+        assertEvaluates("'05:30:00.01' < TIME '05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIME '05:30:00.0 +01:00' < '05:00:00.01'", BOOLEAN);
+
+        assertEvaluates("'05:30' < TIME '05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIME '05:30:00.0 +01:00' < '05:00'", BOOLEAN);
+    }
+
+    @Test
+    public void timeZoneIsNotDroppedWhileImplicitlyCastingFromVarcharWithoutTimeZone()
+            throws Exception
+    {
+        assertFunction("'10:00:00.0' < TIME '09:30:00.0 -01:00'", BOOLEAN, true);
+        assertFunction("'10:00:00.0' < TIME '09:30:00.0 +00:00'", BOOLEAN, true);
+
+        assertFunction("TIME '10:00:00.0 +01:00' < '09:30:00.0'", BOOLEAN, false);
+        assertFunction("TIME '10:00:00.0 -00:00' < '09:30:00.0'", BOOLEAN, false);
+    }
+
+    @Test
+    public void timeWithTimeZoneCoertForCompareOperators()
+    {
+        assertEvaluates("'05:30:00.0' < TIME '05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("'05:30:00.0' = TIME '05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("'05:30:00.0' > TIME '05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("'05:30:00.0' <> TIME '05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("'05:30:00.0' <= TIME '05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("'05:30:00.0' >= TIME '05:00:00.0 -01:00'", BOOLEAN);
     }
 }
