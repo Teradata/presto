@@ -57,6 +57,11 @@ public class TestTime
         functionAssertions.assertFunction(projection, expectedType, expected);
     }
 
+    private void assertEvaluates(String projection, Type expectedType)
+    {
+        functionAssertions.tryEvaluate(projection, expectedType);
+    }
+
     @Test
     public void testLiteral()
             throws Exception
@@ -180,5 +185,24 @@ public class TestTime
         assertFunction("cast('03:04:05.321' as time) = TIME '03:04:05.321'", BOOLEAN, true);
         assertFunction("cast('03:04:05' as time) = TIME '03:04:05.000'", BOOLEAN, true);
         assertFunction("cast('03:04' as time) = TIME '03:04:00.000'", BOOLEAN, true);
+    }
+
+    @Test
+    public void timeCanBeImplicitlyCastedFromVarchar()
+            throws Exception
+    {
+        assertFunction("'05:30:00.0' < TIME '05:00:00.0'", BOOLEAN, false);
+        assertFunction("TIME '05:30:00.0' < '05:00:00.0'", BOOLEAN, false);
+    }
+
+    @Test
+    public void timeCoertForCompareOperators()
+    {
+        assertEvaluates("'05:30:00.0' < TIME '05:00:00.0'", BOOLEAN);
+        assertEvaluates("'05:30:00.0' = TIME '05:00:00.0'", BOOLEAN);
+        assertEvaluates("'05:30:00.0' > TIME '05:00:00.0'", BOOLEAN);
+        assertEvaluates("'05:30:00.0' <> TIME '05:00:00.0'", BOOLEAN);
+        assertEvaluates("'05:30:00.0' <= TIME '05:00:00.0'", BOOLEAN);
+        assertEvaluates("'05:30:00.0' >= TIME '05:00:00.0'", BOOLEAN);
     }
 }

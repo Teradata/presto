@@ -68,6 +68,11 @@ public class TestTimestampWithTimeZone
         functionAssertions.assertFunction(projection, expectedType, expected);
     }
 
+    private void assertEvaluates(String projection, Type expectedType)
+    {
+        functionAssertions.tryEvaluate(projection, expectedType);
+    }
+
     @Test
     public void testLiteral()
     {
@@ -365,5 +370,80 @@ public class TestTimestampWithTimeZone
                 "least(TIMESTAMP '2001-01-02 03:04:05.321 +07:09', TIMESTAMP '2001-01-02 01:04:05.321 +02:09')",
                 TIMESTAMP_WITH_TIME_ZONE,
                 new SqlTimestampWithTimeZone(new DateTime(2001, 1, 2, 3, 4, 5, 321, WEIRD_ZONE).getMillis(), WEIRD_TIME_ZONE_KEY));
+    }
+
+    @Test
+    public void twoSidedVarcharComparisonDoesNotCauseImplicitCastToTimestamp()
+    {
+        assertFunction("'2000-01-01 05:30:00.0 +01:00' < '2000-01-01 05:00:00.0 -01:00'", BOOLEAN, false);
+    }
+
+    @Test
+    public void timestampWithTimeZoneCanBeImplicitlyCastedFromVarchar()
+            throws Exception
+    {
+        assertEvaluates("'2000-01-01 05:30:00.0 +01:00' < TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIMESTAMP '2000-01-01 05:30:00.0 +01:00' < '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+
+        assertEvaluates("'2000-01-01 05:30:00.01 +01:00' < TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIMESTAMP '2000-01-01 05:30:00.0 +01:00' < '2000-01-01 05:00:00.01 -01:00'", BOOLEAN);
+
+        assertEvaluates("'2000-01-01 05:00 +01:00' < TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIMESTAMP '2000-01-01 05:30:00.0 +01:00' < '2000-01-01 05:00 -01:00'", BOOLEAN);
+    }
+
+    @Test
+    public void timeZoneIsNotDroppedWhileImplicitlyCastingFromVarchar()
+            throws Exception
+    {
+        assertFunction("'2000-01-01 05:30:00.0 +01:00' < TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN, true);
+        assertFunction("TIMESTAMP '2000-01-01 05:30:00.0 +01:00' < '2000-01-01 05:00:00.0 -01:00'", BOOLEAN, true);
+    }
+
+    @Test
+    public void timestampWithTimeZoneCanBeImplicitlyCastedFromVarcharWithoutTimezone()
+            throws Exception
+    {
+        assertEvaluates("'2000-01-01 05:30:00.0' < TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIMESTAMP '2000-01-01 05:30:00.0 +01:00' < '2000-01-01 05:00:00.0'", BOOLEAN);
+
+        assertEvaluates("'2000-01-01 05:30:00.01' < TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIMESTAMP '2000-01-01 05:30:00.0 +01:00' < '2000-01-01 05:00:00.01'", BOOLEAN);
+
+        assertEvaluates("'2000-01-01 05:30' < TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("TIMESTAMP '2000-01-01 05:30:00.0 +01:00' < '2000-01-01 05:00'", BOOLEAN);
+    }
+
+    @Test
+    public void timestampTimeZoneIsNotDroppedWhileImplicitlyCastingFromVarcharWithoutTimeZone()
+            throws Exception
+    {
+        assertFunction("'2000-01-01 05:30:00.0' < TIMESTAMP '2000-01-01 05:00:00.0 +01:00'", BOOLEAN, true);
+        assertFunction("TIMESTAMP '2000-01-01 05:30:00.0 +01:00' < '2000-01-01 05:00:00.0'", BOOLEAN, false);
+
+        assertFunction("'2000-01-01 04:30:00.0 -01:00' < TIMESTAMP '2000-01-01 05:00:00.0'", BOOLEAN, false);
+        assertFunction("TIMESTAMP '2000-01-01 05:30:00.0 +01:00' < '2000-01-01 05:00:00.0'", BOOLEAN, false);
+    }
+
+    @Test
+    public void timestampWithTimeZoneIsNotConvertedToTime()
+            throws Exception
+    {
+        assertFunction("'1999-01-01 05:30' < TIMESTAMP '2000-01-01 04:30:00.0 -01:00'", BOOLEAN, true);
+        assertFunction("TIMESTAMP '1999-01-01 05:30:00.0 +01:00' < '2000-01-01 04:30'", BOOLEAN, true);
+
+        assertFunction("'1999-01-01 05:30 +01:00' < TIMESTAMP '2000-01-01 03:30:00.0 -01:00'", BOOLEAN, true);
+        assertFunction("TIMESTAMP '1999-01-01 05:30:00.0 +01:00' < '2000-01-01 03:30 -01:00'", BOOLEAN, true);
+    }
+
+    @Test
+    public void timestampWithTimeZoneCoertForCompareOperators()
+    {
+        assertEvaluates("'2000-01-01 05:30:00.0' < TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("'2000-01-01 05:30:00.0' = TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("'2000-01-01 05:30:00.0' > TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("'2000-01-01 05:30:00.0' <> TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("'2000-01-01 05:30:00.0' <= TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
+        assertEvaluates("'2000-01-01 05:30:00.0' >= TIMESTAMP '2000-01-01 05:00:00.0 -01:00'", BOOLEAN);
     }
 }

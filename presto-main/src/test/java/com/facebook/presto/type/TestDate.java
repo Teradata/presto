@@ -58,6 +58,11 @@ public class TestDate
         functionAssertions.assertFunction(projection, expectedType, expected);
     }
 
+    private void assertEvaluates(String projection, Type expectedType)
+    {
+        functionAssertions.tryEvaluate(projection, expectedType);
+    }
+
     @Test
     public void testLiteral()
             throws Exception
@@ -192,5 +197,27 @@ public class TestDate
         int days = (int) TimeUnit.MILLISECONDS.toDays(new DateTime(2012, 5, 23, 0, 0, UTC).getMillis());
         assertFunction("least(DATE '2013-03-30', DATE '2012-05-23')", DATE, new SqlDate(days));
         assertFunction("least(DATE '2013-03-30', DATE '2012-05-23', DATE '2012-06-01')", DATE, new SqlDate(days));
+    }
+
+    @Test
+    public void dateCanBeImplicitlyCastedFromVarchar()
+            throws Exception
+    {
+        assertFunction("'1999-01-01' < DATE '2000-01-01'", BOOLEAN, true);
+        assertFunction("DATE '1999-01-01' < '2000-01-01'", BOOLEAN, true);
+
+        assertFunction("'2000-01-01' = DATE '2000-01-01'", BOOLEAN, true);
+        assertFunction("DATE '2000-01-01' = '2000-01-02'", BOOLEAN, false);
+    }
+
+    @Test
+    public void dateCoertForCompareOperators()
+    {
+        assertEvaluates("'2000-01-01' < DATE '2000-01-01'", BOOLEAN);
+        assertEvaluates("'2000-01-01' = DATE '2000-01-01'", BOOLEAN);
+        assertEvaluates("'2000-01-01' > DATE '2000-01-01'", BOOLEAN);
+        assertEvaluates("'2000-01-01' <> DATE '2000-01-01'", BOOLEAN);
+        assertEvaluates("'2000-01-01' <= DATE '2000-01-01'", BOOLEAN);
+        assertEvaluates("'2000-01-01' >= DATE '2000-01-01'", BOOLEAN);
     }
 }

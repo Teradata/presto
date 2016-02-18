@@ -67,6 +67,11 @@ public class TestTimestamp
         functionAssertions.assertFunction(projection, expectedType, expected);
     }
 
+    private void assertEvaluates(String projection, Type expectedType)
+    {
+        functionAssertions.tryEvaluate(projection, expectedType);
+    }
+
     @Test
     public void testLiteral()
     {
@@ -282,5 +287,30 @@ public class TestTimestamp
         assertFunction("least(TIMESTAMP '2013-03-30 01:05', TIMESTAMP '2012-03-30 01:05', TIMESTAMP '2012-05-01 01:05')",
                 TIMESTAMP,
                 new SqlTimestamp(new DateTime(2012, 3, 30, 1, 5, 0, 0, DATE_TIME_ZONE).getMillis(), TIME_ZONE_KEY));
+    }
+
+    @Test
+    public void timestampCanBeImplicitlyCastedFromVarchar()
+            throws Exception
+    {
+        assertFunction("'2000-01-01 05:30:00.0' < TIMESTAMP '2000-01-01 05:00:00.0'", BOOLEAN, false);
+        assertFunction("TIMESTAMP '2000-01-01 05:30:00.0' < '2000-01-01 05:00:00.0'", BOOLEAN, false);
+
+        assertFunction("'1999-01-01 05:30:00.0' < TIMESTAMP '2000-01-01 05:00:00.0'", BOOLEAN, true);
+        assertFunction("TIMESTAMP '1999-01-01 05:30:00.0' < '2000-01-01 05:00:00.0'", BOOLEAN, true);
+
+        assertFunction("'2000-01-01 05:00' = TIMESTAMP '2000-01-01 05:00:00.0'", BOOLEAN, true);
+        assertFunction("TIMESTAMP '2000-01-01 05:30:00.0' = '2000-01-01 05:00'", BOOLEAN, false);
+    }
+
+    @Test
+    public void timestampCoertForCompareOperators()
+    {
+        assertEvaluates("'2000-01-01 05:30:00.0' < TIMESTAMP '2000-01-01 05:00:00.0'", BOOLEAN);
+        assertEvaluates("'2000-01-01 05:30:00.0' = TIMESTAMP '2000-01-01 05:00:00.0'", BOOLEAN);
+        assertEvaluates("'2000-01-01 05:30:00.0' > TIMESTAMP '2000-01-01 05:00:00.0'", BOOLEAN);
+        assertEvaluates("'2000-01-01 05:30:00.0' <> TIMESTAMP '2000-01-01 05:00:00.0'", BOOLEAN);
+        assertEvaluates("'2000-01-01 05:30:00.0' <= TIMESTAMP '2000-01-01 05:00:00.0'", BOOLEAN);
+        assertEvaluates("'2000-01-01 05:30:00.0' >= TIMESTAMP '2000-01-01 05:00:00.0'", BOOLEAN);
     }
 }
