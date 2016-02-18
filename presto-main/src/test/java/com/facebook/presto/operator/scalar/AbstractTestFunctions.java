@@ -24,6 +24,7 @@ import com.facebook.presto.sql.analyzer.SemanticException;
 
 import java.util.List;
 
+import static com.facebook.presto.spi.StandardErrorCode.AMBIGUOUS_FUNCTION_CALL;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.type.UnknownType.UNKNOWN;
@@ -33,7 +34,7 @@ import static org.testng.Assert.fail;
 
 public abstract class AbstractTestFunctions
 {
-    protected final FunctionAssertions functionAssertions = new FunctionAssertions();
+    protected FunctionAssertions functionAssertions = new FunctionAssertions();
 
     protected void assertFunction(String projection, Type expectedType, Object expected)
     {
@@ -109,6 +110,18 @@ public abstract class AbstractTestFunctions
         }
     }
 
+    protected void assertAmbiguousCall(String projection, String message)
+    {
+        try {
+            evaluateInvalid(projection);
+            fail("Expected to throw an AMBIGUOUS_FUNCTION_CALL exception");
+        }
+        catch (PrestoException e) {
+            assertEquals(e.getErrorCode(), AMBIGUOUS_FUNCTION_CALL.toErrorCode());
+            assertEquals(e.getMessage(), message);
+        }
+    }
+
     protected void registerScalar(Class<?> clazz)
     {
         Metadata metadata = functionAssertions.getMetadata();
@@ -116,6 +129,11 @@ public abstract class AbstractTestFunctions
                 .scalar(clazz)
                 .getFunctions();
         metadata.getFunctionRegistry().addFunctions(functions);
+    }
+
+    protected void assertEvaluates(String projection, Type expectedType)
+    {
+        functionAssertions.tryEvaluate(projection, expectedType);
     }
 
     private void evaluateInvalid(String projection)
