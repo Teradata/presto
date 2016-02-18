@@ -268,7 +268,11 @@ class QueryPlanner
             }
             else {
                 Expression expression = fieldOrExpression.getExpression();
-                symbol = symbolAllocator.newSymbol(expression, analysis.getType(expression));
+                Type expressionType = analysis.getCoercion(expression);
+                if (expressionType == null) {
+                    expressionType = analysis.getType(expression);
+                }
+                symbol = symbolAllocator.newSymbol(expression, expressionType);
             }
 
             projections.put(symbol, subPlan.rewrite(fieldOrExpression));
