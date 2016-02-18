@@ -147,7 +147,6 @@ public class TestSqlParser
     {
         assertGenericLiteral("VARCHAR");
         assertGenericLiteral("BIGINT");
-        assertGenericLiteral("DOUBLE");
         assertGenericLiteral("BOOLEAN");
         assertGenericLiteral("DATE");
         assertGenericLiteral("foo");
@@ -229,6 +228,11 @@ public class TestSqlParser
         assertExpression(".4E42", new DoubleLiteral(".4E42"));
         assertExpression(".4E+42", new DoubleLiteral(".4E42"));
         assertExpression(".4E-42", new DoubleLiteral(".4E-42"));
+
+        assertExpression("DOUBLE '.4E42'", new DoubleLiteral(".4E42"));
+        assertExpression("DOUBLE '123E7'", new DoubleLiteral("123E7"));
+        assertExpression("DOUBLE '1.1'", new DoubleLiteral("1.1"));
+        assertExpression("DOUBLE '1'", new DoubleLiteral("1"));
     }
 
     @Test
