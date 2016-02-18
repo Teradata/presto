@@ -16,6 +16,7 @@ package com.facebook.presto.spi.type;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 
+import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Objects;
 
@@ -53,6 +54,22 @@ public final class SqlDecimal
     public int getScale()
     {
         return scale;
+    }
+
+    public static SqlDecimal of(String decimalValue)
+    {
+        BigDecimal bigDecimal = new BigDecimal(decimalValue);
+        return new SqlDecimal(bigDecimal.unscaledValue(), bigDecimal.precision(), bigDecimal.scale());
+    }
+
+    public static SqlDecimal of(String unscaledValue, int precision, int scale)
+    {
+        return new SqlDecimal(new BigInteger(unscaledValue), precision, scale);
+    }
+
+    public static SqlDecimal of(long unscaledValue, int precision, int scale)
+    {
+        return new SqlDecimal(BigInteger.valueOf(unscaledValue), precision, scale);
     }
 
     @Override

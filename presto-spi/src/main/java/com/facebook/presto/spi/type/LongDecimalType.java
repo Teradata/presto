@@ -151,7 +151,7 @@ public final class LongDecimalType
         writeSlice(blockBuilder, bigDecimalToSlice(value));
     }
 
-    public Slice bigDecimalToSlice(BigDecimal value)
+    public static Slice bigDecimalToSlice(BigDecimal value)
     {
         return unscaledValueToSlice(value.unscaledValue());
     }

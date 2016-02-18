@@ -14,6 +14,7 @@
 package com.facebook.presto.type;
 
 import com.facebook.presto.metadata.Signature;
+import com.facebook.presto.metadata.SignatureBuilder;
 import com.facebook.presto.metadata.SqlScalarFunction;
 import com.facebook.presto.metadata.SqlScalarFunctionBuilder;
 import com.facebook.presto.metadata.SqlScalarFunctionBuilder.SpecializeContext;
@@ -316,22 +317,32 @@ public final class DecimalOperators
 
     private static SqlScalarFunction decimalModulusOperator()
     {
-        Signature signature = Signature.builder()
+        Signature signature = modulusSignatureBuilder()
                 .kind(SCALAR)
                 .operatorType(MODULUS)
+                .build();
+        return modulusScalarFunction(signature);
+    }
+
+    public static SqlScalarFunction modulusScalarFunction(Signature signature)
+    {
+        return SqlScalarFunction.builder(DecimalOperators.class)
+                .signature(signature)
+                .methods("modulusShortShortShort", "modulusLongLongLong", "modulusShortLongLong", "modulusShortLongShort", "modulusLongShortShort", "modulusLongShortLong")
+                .extraParameters(DecimalOperators::longRescaleExtraParameters)
+                .build();
+    }
+
+    public static SignatureBuilder modulusSignatureBuilder()
+    {
+        return Signature.builder()
                 .literalParameters("a_precision", "a_scale", "b_precision", "b_scale", "r_precision", "r_scale")
                 .longVariableConstraints(
                         longVariableCalculation("r_precision", "min(b_precision - b_scale, a_precision - a_scale) + max(a_scale, b_scale)"),
                         longVariableCalculation("r_scale", "max(a_scale, b_scale)")
                 )
                 .argumentTypes("decimal(a_precision, a_scale)", "decimal(b_precision, b_scale)")
-                .returnType("decimal(r_precision, r_scale)")
-                .build();
-        return SqlScalarFunction.builder(DecimalOperators.class)
-                .signature(signature)
-                .methods("modulusShortShortShort", "modulusLongLongLong", "modulusShortLongLong", "modulusShortLongShort", "modulusLongShortShort", "modulusLongShortLong")
-                .extraParameters(DecimalOperators::longRescaleExtraParameters)
-                .build();
+                .returnType("decimal(r_precision, r_scale)");
     }
 
     private static List<Object> longRescaleExtraParameters(SpecializeContext context)

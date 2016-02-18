@@ -134,6 +134,8 @@ import static com.facebook.presto.operator.aggregation.ArbitraryAggregationFunct
 import static com.facebook.presto.operator.aggregation.ArrayAggregationFunction.ARRAY_AGGREGATION;
 import static com.facebook.presto.operator.aggregation.ChecksumAggregationFunction.CHECKSUM_AGGREGATION;
 import static com.facebook.presto.operator.aggregation.CountColumn.COUNT_COLUMN;
+import static com.facebook.presto.operator.aggregation.DecimalAverageAggregation.DECIMAL_AVERAGE_AGGREGATION;
+import static com.facebook.presto.operator.aggregation.DecimalSumAggregation.DECIMAL_SUM_AGGREGATION;
 import static com.facebook.presto.operator.aggregation.Histogram.HISTOGRAM;
 import static com.facebook.presto.operator.aggregation.MapAggregationFunction.MAP_AGG;
 import static com.facebook.presto.operator.aggregation.MaxAggregationFunction.MAX_AGGREGATION;
@@ -189,6 +191,10 @@ import static com.facebook.presto.operator.scalar.MapNotEqualOperator.MAP_NOT_EQ
 import static com.facebook.presto.operator.scalar.MapSubscriptOperator.MAP_SUBSCRIPT;
 import static com.facebook.presto.operator.scalar.MapToJsonCast.MAP_TO_JSON;
 import static com.facebook.presto.operator.scalar.MapValues.MAP_VALUES;
+import static com.facebook.presto.operator.scalar.MathFunctions.DECIMAL_CEILING_FUNCTIONS;
+import static com.facebook.presto.operator.scalar.MathFunctions.DECIMAL_FLOOR_FUNCTION;
+import static com.facebook.presto.operator.scalar.MathFunctions.DECIMAL_MOD_FUNCTION;
+import static com.facebook.presto.operator.scalar.MathFunctions.DECIMAL_ROUND_FUNCTIONS;
 import static com.facebook.presto.operator.scalar.RowEqualOperator.ROW_EQUAL;
 import static com.facebook.presto.operator.scalar.RowHashCodeOperator.ROW_HASH_CODE;
 import static com.facebook.presto.operator.scalar.RowNotEqualOperator.ROW_NOT_EQUAL;
@@ -394,7 +400,13 @@ public class FunctionRegistry
                 .functions(ROW_HASH_CODE, ROW_TO_JSON, ROW_EQUAL, ROW_NOT_EQUAL)
                 .function(CONCAT)
                 .function(DECIMAL_TO_DECIMAL_CAST)
-                .function(TRY_CAST);
+                .function(TRY_CAST)
+                .function(DECIMAL_AVERAGE_AGGREGATION)
+                .function(DECIMAL_SUM_AGGREGATION)
+                .functions(DECIMAL_CEILING_FUNCTIONS)
+                .function(DECIMAL_FLOOR_FUNCTION)
+                .function(DECIMAL_MOD_FUNCTION)
+                .functions(DECIMAL_ROUND_FUNCTIONS);
 
         if (experimentalSyntaxEnabled) {
             builder.aggregate(ApproximateAverageAggregations.class)
