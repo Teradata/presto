@@ -20,10 +20,14 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.LongDecimalType;
 import com.facebook.presto.spi.type.ShortDecimalType;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.google.common.collect.ImmutableList;
+import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.Slice;
+import io.airlift.slice.SliceOutput;
 import io.airlift.slice.Slices;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -32,11 +36,13 @@ import java.util.List;
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
 import static com.facebook.presto.metadata.OperatorType.CAST;
 import static com.facebook.presto.metadata.Signature.comparableWithVariadicBound;
+import static com.facebook.presto.operator.scalar.JsonOperators.JSON_FACTORY;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
 import static com.facebook.presto.spi.type.StandardTypes.BIGINT;
 import static com.facebook.presto.spi.type.StandardTypes.BOOLEAN;
 import static com.facebook.presto.spi.type.StandardTypes.DECIMAL;
 import static com.facebook.presto.spi.type.StandardTypes.DOUBLE;
+import static com.facebook.presto.spi.type.StandardTypes.JSON;
 import static com.facebook.presto.spi.type.StandardTypes.VARCHAR;
 import static com.facebook.presto.util.DecimalUtils.overflows;
 import static com.facebook.presto.util.Types.checkType;
@@ -56,6 +62,7 @@ public final class DecimalCasts
     public static final SqlScalarFunction DOUBLE_TO_DECIMAL_CAST = castFunctionToDecimalFrom(DOUBLE, "doubleToShortDecimal", "doubleToLongDecimal");
     public static final SqlScalarFunction DECIMAL_TO_VARCHAR_CAST = castFunctionFromDecimalTo(VARCHAR, "shortDecimalToVarchar", "longDecimalToVarchar");
     public static final SqlScalarFunction VARCHAR_TO_DECIMAL_CAST = castFunctionToDecimalFrom(VARCHAR, "varcharToShortDecimal", "varcharToLongDecimal");
+    public static final SqlScalarFunction DECIMAL_TO_JSON_CAST = castFunctionFromDecimalTo(JSON, "shortDecimalToJson", "longDecimalToJson");
 
     private static SqlScalarFunction castFunctionFromDecimalTo(String to, String... methodNames)
     {
@@ -242,5 +249,29 @@ public final class DecimalCasts
             throw new PrestoException(INVALID_CAST_ARGUMENT, format("Cannot cast VARCHAR '%s' to DECIMAL(%s, %s)", varcharStr, precision, scale));
         }
         return LongDecimalType.unscaledValueToSlice(decimal.unscaledValue());
+    }
+
+    public static Slice shortDecimalToJson(long decimal, long precision, long scale, long tenToScale) throws IOException
+    {
+        return decimalToJson(BigDecimal.valueOf(decimal, (int) scale));
+    }
+
+    public static Slice longDecimalToJson(Slice decimal, long precision, long scale, long tenToScale) throws IOException
+    {
+        return decimalToJson(LongDecimalType.toBigDecimal(decimal, (int) scale));
+    }
+
+    private static Slice decimalToJson(BigDecimal bigDecimal)
+    {
+        try {
+            SliceOutput dynamicSliceOutput = new DynamicSliceOutput(32);
+            try (JsonGenerator jsonGenerator = JSON_FACTORY.createGenerator(dynamicSliceOutput)) {
+                jsonGenerator.writeNumber(bigDecimal);
+            }
+            return dynamicSliceOutput.slice();
+        }
+        catch (IOException e) {
+            throw new PrestoException(INVALID_CAST_ARGUMENT, format("Cannot cast '%f' to %s", bigDecimal, JSON));
+        }
     }
 }
