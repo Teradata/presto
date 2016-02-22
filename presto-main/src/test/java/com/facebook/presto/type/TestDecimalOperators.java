@@ -640,4 +640,68 @@ public class TestDecimalOperators
         assertFunction("DECIMAL '1.00000000000000000000' BETWEEN NULL  AND DECIMAL '5.00000000000000000000'", BOOLEAN, null);
         assertFunction("DECIMAL '1.00000000000000000000' BETWEEN DECIMAL '-5.00000000000000000000'  AND NULL", BOOLEAN, null);
     }
+
+    @Test
+    public void testIsDistinctFrom()
+            throws Exception
+    {
+        // short short
+        assertFunction("DECIMAL '-2' IS DISTINCT FROM DECIMAL '-3'", BOOLEAN, true);
+        assertFunction("DECIMAL '-2' IS DISTINCT FROM CAST(NULL AS DECIMAL(1,0))", BOOLEAN, true);
+        assertFunction("CAST(NULL AS DECIMAL(2,0)) IS DISTINCT FROM CAST(NULL AS DECIMAL(1,0))", BOOLEAN, false);
+        assertFunction("DECIMAL '-2' IS DISTINCT FROM DECIMAL '-2'", BOOLEAN, false);
+        assertFunction("CAST(NULL AS DECIMAL(1,0)) IS DISTINCT FROM DECIMAL '-2'", BOOLEAN, true);
+
+        // long long
+        assertFunction("DECIMAL '12345678901234567.89012345678901234567' IS DISTINCT FROM DECIMAL '12345678901234567.8902345678901234567'", BOOLEAN, true);
+        assertFunction("DECIMAL '12345678901234567.89012345678901234567' IS DISTINCT FROM CAST(NULL AS DECIMAL(36,1))", BOOLEAN, true);
+        assertFunction("CAST(NULL AS DECIMAL(36,1)) IS DISTINCT FROM CAST(NULL AS DECIMAL(27,3))", BOOLEAN, false);
+        assertFunction("DECIMAL '-12345678901234567.89012345678901234567' IS DISTINCT FROM DECIMAL '-12345678901234567.89012345678901234567'", BOOLEAN, false);
+        assertFunction("CAST(NULL AS DECIMAL(36,1)) IS DISTINCT FROM DECIMAL '12345678901234567.89012345678901234567'", BOOLEAN, true);
+
+        // short long
+        assertFunction("DECIMAL '12345678901234567.89012345678901234567' IS DISTINCT FROM DECIMAL '-3'", BOOLEAN, true);
+        assertFunction("DECIMAL '12345678901234567.89012345678901234567' IS DISTINCT FROM CAST(NULL AS DECIMAL(1,0))", BOOLEAN, true);
+        assertFunction("CAST(NULL AS DECIMAL(36,1)) IS DISTINCT FROM CAST(NULL AS DECIMAL(1,0))", BOOLEAN, false);
+        assertFunction("DECIMAL '00000000000000007.80000000000000000000' IS DISTINCT FROM DECIMAL '7.8'", BOOLEAN, false);
+        assertFunction("CAST(NULL AS DECIMAL(36,1)) IS DISTINCT FROM DECIMAL '7.8'", BOOLEAN, true);
+
+        // with unknown
+        assertFunction("NULL IS DISTINCT FROM DECIMAL '-2'", BOOLEAN, true);
+        assertFunction("DECIMAL '-2' IS DISTINCT FROM NULL", BOOLEAN, true);
+        assertFunction("NULL IS DISTINCT FROM DECIMAL '12345678901234567.89012345678901234567'", BOOLEAN, true);
+        assertFunction("DECIMAL '12345678901234567.89012345678901234567' IS DISTINCT FROM NULL", BOOLEAN, true);
+    }
+
+    @Test
+    public void testNullIf()
+            throws Exception
+    {
+        // short short
+        assertDecimalFunction("nullif(DECIMAL '-2', DECIMAL '-3')", decimal("-2"));
+        assertDecimalFunction("nullif(DECIMAL '-2', CAST(NULL AS DECIMAL(1,0)))", decimal("-2"));
+        assertFunction("nullif(DECIMAL '-2', DECIMAL '-2')", createDecimalType(1, 0), null);
+        assertFunction("nullif(CAST(NULL AS DECIMAL(1,0)), DECIMAL '-2')", createDecimalType(1, 0), null);
+        assertFunction("nullif(CAST(NULL AS DECIMAL(1,0)), CAST(NULL AS DECIMAL(1,0)))", createDecimalType(1, 0), null);
+
+        // long long
+        assertDecimalFunction("nullif(DECIMAL '12345678901234567.89012345678901234567', DECIMAL '12345678901234567.8902345678901234567')", decimal("12345678901234567.89012345678901234567"));
+        assertDecimalFunction("nullif(DECIMAL '12345678901234567.89012345678901234567', CAST(NULL AS DECIMAL(36,1)))", decimal("12345678901234567.89012345678901234567"));
+        assertFunction("nullif(DECIMAL '12345678901234567.89012345678901234567', DECIMAL '12345678901234567.89012345678901234567')", createDecimalType(37, 20), null);
+        assertFunction("nullif(CAST(NULL AS DECIMAL(38,0)), DECIMAL '12345678901234567.89012345678901234567')", createDecimalType(38, 0), null);
+        assertFunction("nullif(CAST(NULL AS DECIMAL(38,0)), CAST(NULL AS DECIMAL(38,0)))", createDecimalType(38, 0), null);
+
+        // short long
+        assertDecimalFunction("nullif(DECIMAL '12345678901234567.89012345678901234567', DECIMAL '-3')", decimal("12345678901234567.89012345678901234567"));
+        assertDecimalFunction("nullif(DECIMAL '12345678901234567.89012345678901234567', CAST(NULL AS DECIMAL(1,0)))", decimal("12345678901234567.89012345678901234567"));
+        assertFunction("nullif(DECIMAL '00000000000000007.80000000000000000000', DECIMAL '7.8')", createDecimalType(37, 20), null);
+        assertFunction("nullif(CAST(NULL AS DECIMAL(1,0)), DECIMAL '12345678901234567.89012345678901234567')", createDecimalType(1, 0), null);
+
+        // with unknown
+        assertFunction("nullif(NULL, NULL)", UnknownType.UNKNOWN, null);
+        assertFunction("nullif(NULL, DECIMAL '-2')", UnknownType.UNKNOWN, null);
+        assertDecimalFunction("nullif(DECIMAL '-2', NULL)", decimal("-2"));
+        assertFunction("nullif(NULL, DECIMAL '12345678901234567.89012345678901234567')", UnknownType.UNKNOWN, null);
+        assertDecimalFunction("nullif(DECIMAL '12345678901234567.89012345678901234567', NULL)", decimal("12345678901234567.89012345678901234567"));
+    }
 }
