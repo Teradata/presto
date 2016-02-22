@@ -30,6 +30,7 @@ import java.util.Optional;
 import static com.facebook.presto.metadata.SignatureBinder.bindVariables;
 import static com.facebook.presto.type.TypeUtils.resolveTypes;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.primitives.Primitives.unwrap;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
@@ -122,11 +123,11 @@ class PolymorphicScalarFunction
 
         List<Class<?>> methodParameterJavaTypes = methodHandleType.parameterList();
         for (int i = 0; i < resolvedTypes.size(); ++i) {
-            if (!methodParameterJavaTypes.get(i).equals(resolvedTypes.get(i).getJavaType())) {
+            if (!unwrap(methodParameterJavaTypes.get(i)).equals(unwrap(resolvedTypes.get(i).getJavaType()))) {
                 return false;
             }
         }
-        return methodHandleType.returnType().equals(returnType.getJavaType());
+        return unwrap(methodHandleType.returnType()).equals(unwrap(returnType.getJavaType()));
     }
 
     private boolean onlyFirstMatchedMethodHasPredicate(MethodsGroup matchingMethodsGroup, MethodsGroup methodsGroup)
