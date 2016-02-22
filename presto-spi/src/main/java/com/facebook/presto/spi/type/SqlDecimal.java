@@ -98,4 +98,9 @@ public final class SqlDecimal
     {
         return new BigDecimal(unscaledValue, scale, new MathContext(precision));
     }
+
+    public BigInteger getUnscaledValue()
+    {
+        return unscaledValue;
+    }
 }

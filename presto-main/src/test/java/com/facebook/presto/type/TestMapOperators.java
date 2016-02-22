@@ -163,6 +163,7 @@ public class TestMapOperators
     public void testJsonToMap()
             throws Exception
     {
+        assertInvalidCast("CAST(CAST(MAP(ARRAY[12345.12345], ARRAY[12345.12345]) AS JSON) AS MAP<DECIMAL(10,5), DECIMAL(2,1)>)");
         assertFunction("CAST(JSON '{\"1\":2, \"3\": 4}' AS MAP<BIGINT, BIGINT>)",
                 new MapType(BIGINT, BIGINT),
                 ImmutableMap.of(1L, 2L, 3L, 4L));
@@ -206,10 +207,17 @@ public class TestMapOperators
                 ImmutableMap.of("k1", "{\"7klmnopq\":7,\"6klmnopq\":6,\"5klmnopq\":5,\"4klmnopq\":4,\"3klmnopq\":3,\"2klmnopq\":2,\"1klmnopq\":1}")
         );
 
-        // TODO implement decimal serialization
-        /*assertFunction("CAST(JSON '{\"1.0\" : 2.2, \"383838383838383.12324234234234\":3.3}' AS MAP<DECIMAL(29,14), DECIMAL(2,1)>)",
+        // cannot use JSON literal containing DECIMAL values right now.
+        // Decimal literal are interpreted internally by JSON parser as double and precision is lost.
+
+        assertFunction("CAST(CAST(MAP(ARRAY[1.0, 383838383838383.12324234234234], ARRAY[2.2, 3.3]) AS JSON) AS MAP<DECIMAL(29,14), DECIMAL(2,1)>)",
                 new MapType(createDecimalType(29, 14), createDecimalType(2, 1)),
-                ImmutableMap.of(decimal("000000000000001.00000000000000"), decimal("2.2"), decimal("383838383838383.12324234234234"), decimal("3.3")));*/
+                ImmutableMap.of(decimal("000000000000001.00000000000000"), decimal("2.2"), decimal("383838383838383.12324234234234"), decimal("3.3")));
+        assertFunction("CAST(CAST(MAP(ARRAY[2.2, 3.3], ARRAY[1.0, 383838383838383.12324234234234]) AS JSON) AS MAP<DECIMAL(2,1), DECIMAL(29,14)>)",
+                new MapType(createDecimalType(2, 1), createDecimalType(29, 14)),
+                ImmutableMap.of(decimal("2.2"), decimal("000000000000001.00000000000000"), decimal("3.3"), decimal("383838383838383.12324234234234")));
+        assertInvalidCast("CAST(CAST(MAP(ARRAY[12345.12345], ARRAY[12345.12345]) AS JSON) AS MAP<DECIMAL(2,1), DECIMAL(10,5)>)");
+        assertInvalidCast("CAST(CAST(MAP(ARRAY[12345.12345], ARRAY[12345.12345]) AS JSON) AS MAP<DECIMAL(10,5), DECIMAL(2,1)>)");
 
         assertInvalidCast("CAST(JSON '{\"true\":\"kittens\"}' AS MAP<BOOLEAN, VARBINARY>)");
         assertInvalidCast("CAST(JSON '{\"[1, 2]\": 1}' AS MAP<ARRAY<BIGINT>, BIGINT>)");
