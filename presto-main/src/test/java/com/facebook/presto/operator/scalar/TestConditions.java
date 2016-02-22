@@ -19,14 +19,13 @@ import static com.facebook.presto.spi.StandardErrorCode.DIVISION_BY_ZERO;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.SqlDecimal.decimal;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
 
 public class TestConditions
         extends AbstractTestFunctions
 {
-    // todo add decimal cases
-
     @Test
     public void testLike()
     {
@@ -89,6 +88,7 @@ public class TestConditions
         assertFunction("1 IS NOT DISTINCT FROM 1", BOOLEAN, true);
         assertFunction("1 IS NOT DISTINCT FROM 2", BOOLEAN, false);
     }
+
     @Test
     public void testBetween()
     {
@@ -212,6 +212,31 @@ public class TestConditions
                         "end",
                 DOUBLE,
                 33.0);
+
+        assertDecimalFunction("case " +
+                        "when false then 2.2 " +
+                        "when true then 2.2 " +
+                        "end",
+                decimal("2.2"));
+
+        assertDecimalFunction("case " +
+                        "when false then 1234567890.0987654321 " +
+                        "when true then 3.3 " +
+                        "end",
+                decimal("0000000003.3000000000"));
+
+        assertDecimalFunction("case " +
+                        "when false then 1 " +
+                        "when true then 2.2 " +
+                        "end",
+                decimal("0000000000000000002.2"));
+
+        assertFunction("case " +
+                        "when false then 1.1 " +
+                        "when true then DOUBLE '33.0' " +
+                        "end",
+                DOUBLE,
+                33.0);
     }
 
     @Test
@@ -276,6 +301,31 @@ public class TestConditions
         assertFunction("case true " +
                         "when false then CAST(1.0 as DOUBLE) " +
                         "when true then 33 " +
+                        "end",
+                DOUBLE,
+                33.0);
+
+        assertDecimalFunction("case true " +
+                        "when false then 2.2 " +
+                        "when true then 2.2 " +
+                        "end",
+                decimal("2.2"));
+
+        assertDecimalFunction("case true " +
+                        "when false then 1234567890.0987654321 " +
+                        "when true then 3.3 " +
+                        "end",
+                decimal("0000000003.3000000000"));
+
+        assertDecimalFunction("case true " +
+                        "when false then 1 " +
+                        "when true then 2.2 " +
+                        "end",
+                decimal("0000000000000000002.2"));
+
+        assertFunction("case true " +
+                        "when false then 1.1 " +
+                        "when true then DOUBLE '33.0' " +
                         "end",
                 DOUBLE,
                 33.0);
