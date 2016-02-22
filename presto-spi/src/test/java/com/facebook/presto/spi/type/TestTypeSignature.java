@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
 import java.util.List;
+import java.util.Set;
 
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.google.common.collect.Lists.transform;
@@ -28,7 +29,8 @@ import static org.testng.Assert.fail;
 public class TestTypeSignature
 {
     @Test
-    public void parseSignatureWithLiterals() throws Exception
+    public void parseSignatureWithLiterals()
+            throws Exception
     {
         TypeSignature result = parseTypeSignature("decimal(X,42)", ImmutableSet.of("X"));
         assertEquals(result.getParameters().size(), 2);
@@ -66,6 +68,10 @@ public class TestTypeSignature
                 "row<array(row<bigint,double>('col0','col1'))>('col0')",
                 rowSignature(namedParameter("col0", array(
                         rowSignature(namedParameter("col0", signature("bigint")), namedParameter("col1", signature("double")))))));
+        assertRowSignature(
+                "row<decimal(p1,s1),decimal(p2,s2)>('a','b')",
+                ImmutableSet.of("p1", "s1", "p2", "s2"),
+                rowSignature(namedParameter("a", decimal("p1", "s1")), namedParameter("b", decimal("p2", "s2"))));
     }
 
     private TypeSignature varchar()
@@ -76,6 +82,12 @@ public class TestTypeSignature
     private TypeSignature varchar(long length)
     {
         return new TypeSignature(StandardTypes.VARCHAR, TypeSignatureParameter.of(length));
+    }
+
+    private TypeSignature decimal(String precisionVariable, String scaleVariable)
+    {
+        return new TypeSignature(StandardTypes.DECIMAL, ImmutableList.of(
+                TypeSignatureParameter.of(precisionVariable), TypeSignatureParameter.of(scaleVariable)));
     }
 
     private static TypeSignature rowSignature(NamedTypeSignature... columns)
@@ -142,11 +154,19 @@ public class TestTypeSignature
 
     private static void assertRowSignature(
             String typeName,
+            Set<String> literalParameters,
             TypeSignature expectedSignature)
     {
-        TypeSignature signature = parseTypeSignature(typeName);
+        TypeSignature signature = parseTypeSignature(typeName, literalParameters);
         assertEquals(signature, expectedSignature);
         assertEquals(signature.toString(), typeName);
+    }
+
+    private static void assertRowSignature(
+            String typeName,
+            TypeSignature expectedSignature)
+    {
+        assertRowSignature(typeName, ImmutableSet.of(), expectedSignature);
     }
 
     private static void assertSignature(String typeName, String base, List<String> parameters)

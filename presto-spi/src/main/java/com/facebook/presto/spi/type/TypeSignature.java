@@ -106,7 +106,7 @@ public class TypeSignature
             return new TypeSignature(signature, new ArrayList<>());
         }
         if (signature.toLowerCase(Locale.ENGLISH).startsWith(StandardTypes.ROW + "<")) {
-            return parseRowTypeSignature(signature);
+            return parseRowTypeSignature(signature, literalCalculationParameters);
         }
 
         String baseName = null;
@@ -154,7 +154,7 @@ public class TypeSignature
     }
 
     @Deprecated
-    private static TypeSignature parseRowTypeSignature(String signature)
+    private static TypeSignature parseRowTypeSignature(String signature, Set<String> literalParameters)
     {
         String baseName = null;
         List<TypeSignature> parameters = new ArrayList<>();
@@ -179,7 +179,7 @@ public class TypeSignature
                 checkArgument(bracketCount >= 0, "Bad type signature: '%s'", signature);
                 if (bracketCount == 0) {
                     checkArgument(parameterStart >= 0, "Bad type signature: '%s'", signature);
-                    parameters.add(parseTypeSignature(signature.substring(parameterStart, i)));
+                    parameters.add(parseTypeSignature(signature.substring(parameterStart, i), literalParameters));
                     parameterStart = i + 1;
                     verify(i < signature.length() - 1, "Row's signature can not end with angle bracket");
                 }
@@ -188,7 +188,7 @@ public class TypeSignature
                 if (bracketCount == 1) {
                     if (!inLiteralParameters) {
                         checkArgument(parameterStart >= 0, "Bad type signature: '%s'", signature);
-                        parameters.add(parseTypeSignature(signature.substring(parameterStart, i)));
+                        parameters.add(parseTypeSignature(signature.substring(parameterStart, i), literalParameters));
                         parameterStart = i + 1;
                     }
                     else {
