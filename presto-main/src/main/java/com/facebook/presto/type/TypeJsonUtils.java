@@ -190,6 +190,7 @@ public final class TypeJsonUtils
                 baseType.equals(StandardTypes.BIGINT) ||
                 baseType.equals(StandardTypes.DOUBLE) ||
                 baseType.equals(StandardTypes.VARCHAR) ||
+                baseType.equals(StandardTypes.DECIMAL) ||
                 baseType.equals(StandardTypes.JSON)) {
             return true;
         }
