@@ -128,9 +128,8 @@ public class TestArrayOperators
         assertFunction("CAST(ARRAY [TRUE, FALSE] AS JSON)", JSON, "[true,false]");
         assertFunction("CAST(ARRAY [from_unixtime(1)] AS JSON)", JSON, "[\"" + sqlTimestamp(1000) + "\"]");
         assertFunction("CAST(ARRAY [ARRAY [1], ARRAY [2, 3]] AS JSON)", JSON, "[[1],[2,3]]");
-
-        // TODO implement decimal serialization
-        // assertFunction("CAST(ARRAY [1.0, 2.0, 3.0] AS JSON)", JSON, "[1.0,2.0,3.0]");
+        assertFunction("CAST(ARRAY [12345.12345, 12345.12345, 3.0] AS JSON)", JSON, "[12345.12345,12345.12345,3.00000]");
+        assertFunction("CAST(ARRAY [123456789012345678901234567890.87654321, 123456789012345678901234567890.12345678] AS JSON)", JSON, "[123456789012345678901234567890.87654321,123456789012345678901234567890.12345678]");
     }
 
     @Test
