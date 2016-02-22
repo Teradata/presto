@@ -155,11 +155,8 @@ public class TestMapOperators
         assertFunction("CAST(MAP(ARRAY[TRUE], ARRAY[2]) AS JSON)", JSON, "{\"true\":2}");
         assertFunction("CAST(MAP(ARRAY['1'], ARRAY[from_unixtime(1)]) AS JSON)", JSON, "{\"1\":\"" + new SqlTimestamp(1000, TEST_SESSION.getTimeZoneKey()) + "\"}");
         assertFunction("CAST(MAP(ARRAY[from_unixtime(1)], ARRAY[CAST(1.0 as DOUBLE)]) AS JSON)", JSON, "{\"" + new SqlTimestamp(1000, TEST_SESSION.getTimeZoneKey()) + "\":1.0}");
-
-        // TODO implement decimal serialization
-        /*assertFunction("CAST(MAP(ARRAY [1.0, 383838383838383.12324234234234], ARRAY [2.2, 3.3]) AS JSON)", JSON,
-                "{\"000000000000001.00000000000000\":2.2, \"383838383838383.12324234234234\" : 3.3}");
-        assertFunction("CAST(MAP(ARRAY [1.0], ARRAY [2.2]) AS JSON)", JSON, "{\"1.0\":2.2}");*/
+        assertFunction("CAST(MAP(ARRAY [1.0, 383838383838383.12324234234234], ARRAY [2.2, 3.3]) AS JSON)", JSON, "{\"1.00000000000000\":2.2,\"383838383838383.12324234234234\":3.3}");
+        assertFunction("CAST(MAP(ARRAY [1.0], ARRAY [2.2]) AS JSON)", JSON, "{\"1.0\":2.2}");
     }
 
     @Test
