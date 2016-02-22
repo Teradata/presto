@@ -20,6 +20,7 @@ import com.facebook.presto.spi.block.InterleavedBlockBuilder;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.type.ArrayType;
+import com.facebook.presto.type.LiteralParameters;
 import com.facebook.presto.type.MapType;
 import com.facebook.presto.type.RowType;
 import com.facebook.presto.type.SqlType;
@@ -181,5 +182,13 @@ public final class TestingRowConstructor
             appendToBlockBuilder(parameterTypes.get(i), values[i], blockBuilder);
         }
         return blockBuilder.build();
+    }
+
+    @ScalarFunction("test_row")
+    @LiteralParameters({"p1", "s1", "p2", "s2"})
+    @SqlType("row<decimal(p1,s1),decimal(p2,s2)>('col0','col1')")
+    public static Block testRowDecimalDecimal(@Nullable @SqlType("decimal(p1,s1)") Long arg1, @Nullable @SqlType("decimal(p2,s2)") Slice arg2)
+    {
+        return toStackRepresentation(ImmutableList.of(BIGINT, DOUBLE), arg1, arg2);
     }
 }
