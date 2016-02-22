@@ -149,9 +149,12 @@ public class TestArrayOperators
         assertInvalidCast("CAST(JSON '[1, null, 3]' AS ARRAY<ARRAY<TIMESTAMP>>)");
         assertInvalidCast("CAST(JSON '[1, 2, 3]' AS ARRAY<BOOLEAN>)");
         assertInvalidCast("CAST(JSON '[\"puppies\", \"kittens\"]' AS ARRAY<BIGINT>)");
-
-        // TODO implement decimal serialization
-        // assertFunction("CAST(JSON '[1.0, 2.5, 3.0]' AS ARRAY<DECIMAL(2,1)>)", new ArrayType(createDecimalType(2, 1)), ImmutableList.of(decimal("1.0"), decimal("2.5"), decimal("3.0")));
+        assertFunction("CAST(JSON '[1, 2.0, 3]' AS ARRAY(DECIMAL(10,5)))", new ArrayType(createDecimalType(10, 5)), ImmutableList.of(decimal("1.00000"), decimal("2.00000"), decimal("3.00000")));
+        assertFunction("CAST(CAST(ARRAY [1, 2.0, 3] as JSON) AS ARRAY(DECIMAL(10,5)))", new ArrayType(createDecimalType(10, 5)), ImmutableList.of(decimal("1.00000"), decimal("2.00000"), decimal("3.00000")));
+        assertFunction("CAST(CAST(ARRAY [123456789012345678901234567890.12345678, 1.2] as JSON) AS ARRAY(DECIMAL(38,8)))", new ArrayType(createDecimalType(38, 8)),
+                ImmutableList.of(decimal("123456789012345678901234567890.12345678"), decimal("1.20000000")));
+        assertFunction("CAST(CAST(ARRAY [12345.87654] as JSON) AS ARRAY(DECIMAL(7,2)))", new ArrayType(createDecimalType(7, 2)), ImmutableList.of(decimal("12345.88")));
+        assertInvalidCast("CAST(CAST(ARRAY [12345.12345] as JSON) AS ARRAY(DECIMAL(6,2)))");
     }
 
     @Test
