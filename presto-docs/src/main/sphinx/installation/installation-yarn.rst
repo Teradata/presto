@@ -643,10 +643,24 @@ Using YARN label
 This is an optional feature and is not required to run Presto in YARN.
 To guarantee that a certain set of nodes are reserved for deploying
 Presto or to configure a particular node for a component type we can
-make use of YARN label expressions.
+make use of YARN label expressions. To create and assign node to labels refer the below link.
+See http://docs.hortonworks.com/HDPDocuments/HDP2/HDP-2.3.0/bk\_yarn\_resource\_mgt/content/ch\_node\_labels.html
 
--  First assign the nodes/subset of nodes with appropriate labels. See
-   http://docs.hortonworks.com/HDPDocuments/HDP2/HDP-2.3.0/bk\_yarn\_resource\_mgt/content/ch\_node\_labels.html
+Let's say you have an 8 node cluster with
+3 master nodes - m1, m2, m3
+3 data nodes- d1, d2, d3
+2 edge nodes - e1, e2 (edge nodes are basically nodes with various client like Hbase, Hive, Oozie, etc)
+
+Without yarn lables, when we deploy presto-on-yarn the presto-coordinator/worker can be on any of the nodes d1,d2,d3.
+In case, we want coordinator to be always on d1 and workers on d2 and d3, we can create 2 yarn labels.
+1. Coordinator
+2. Worker
+
+Assign coordinator to d1 and workers to d2 and d3. Now coordinator will always be running on d1.
+Note: YARN labels can only be assigned to nodes which have Node Manager service running on them.Generally data nodes are the nodes which have Node Manager service running.
+
+For assigning YARN labels to nodes, you can either use the Ambari Slider View( Create App-->Allocate Resource --> YARN Labels) or do it manually as given below.
+-  First assign the nodes/subset of nodes with appropriate labels.
 -  Then set the components in ``resource.json`` with
    ``yarn.label.expression`` to have labels to be used when allocating
    containers for Presto.
