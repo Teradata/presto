@@ -5585,6 +5585,19 @@ public abstract class AbstractTestQueries
     }
 
     @Test
+    public void testDescribeOutputNamedAndUnnamed()
+    {
+        Session session = getSession().withPreparedStatement("my_query", "select 1, name, regionkey as my_alias from nation");
+        MaterializedResult actual = computeActual(session, "DESCRIBE OUTPUT my_query");
+        MaterializedResult expected = resultBuilder(session, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN, BOOLEAN)
+                .row("_col0", "", "", "", "bigint", 8, false, false)
+                .row("name", "nation", session.getSchema().get(), session.getCatalog().get(), "varchar", 0, false, false)
+                .row("my_alias", "nation", session.getSchema().get(), session.getCatalog().get(), "bigint", 8, true, false)
+                .build();
+        assertEqualsIgnoreOrder(actual, expected);
+    }
+
+    @Test
     public void testDescribeOutputRowCountQuery()
     {
         Session session = getSession().withPreparedStatement("my_query", "show tables");

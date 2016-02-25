@@ -1695,7 +1695,8 @@ class StatementAnalyzer
                 SingleColumn column = (SingleColumn) item;
 
                 Expression expression = column.getExpression();
-                Optional<String> alias = column.getAlias();
+                Optional<String> fieldName = column.getAlias();
+                boolean isAliased = fieldName.isPresent();
 
                 Optional<QualifiedObjectName> qualifiedOriginTable = Optional.empty();
                 QualifiedName name = null;
@@ -1714,13 +1715,13 @@ class StatementAnalyzer
                     }
                 }
 
-                if (!alias.isPresent()) {
+                if (!fieldName.isPresent()) {
                     if (name != null) {
-                        alias = Optional.of(getLast(name.getOriginalParts()));
+                        fieldName = Optional.of(getLast(name.getOriginalParts()));
                     }
                 }
 
-                outputFields.add(Field.newUnqualified(alias, analysis.getType(expression), qualifiedOriginTable, alias.isPresent())); // TODO don't use analysis as a side-channel. Use outputExpressions to look up the type
+                outputFields.add(Field.newUnqualified(fieldName, analysis.getType(expression), qualifiedOriginTable, isAliased)); // TODO don't use analysis as a side-channel. Use outputExpressions to look up the type
             }
             else {
                 throw new IllegalArgumentException("Unsupported SelectItem type: " + item.getClass().getName());
