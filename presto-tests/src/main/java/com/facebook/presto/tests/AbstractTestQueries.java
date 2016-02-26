@@ -5587,10 +5587,21 @@ public abstract class AbstractTestQueries
     @Test
     public void testDescribeOutputRowCountQuery()
     {
-        Session session = getSession().withPreparedStatement("my_query", "show tables");
+        Session session = getSession().withPreparedStatement("my_query", "CREATE TABLE foo AS SELECT * FROM nation");
         MaterializedResult actual = computeActual(session, "DESCRIBE OUTPUT my_query");
         MaterializedResult expected = resultBuilder(session, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN, BOOLEAN)
                 .row(null, null, null, null, null, null, null, true)
+                .build();
+        assertEqualsIgnoreOrder(actual, expected);
+    }
+
+    @Test
+    public void testDescribeOutputShowTables()
+    {
+        Session session = getSession().withPreparedStatement("my_query", "SHOW TABLES");
+        MaterializedResult actual = computeActual(session, "DESCRIBE OUTPUT my_query");
+        MaterializedResult expected = resultBuilder(session, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN, BOOLEAN)
+                .row("Table", "tables", "information_schema", session.getCatalog().get(), "varchar", 0, true, false)
                 .build();
         assertEqualsIgnoreOrder(actual, expected);
     }
