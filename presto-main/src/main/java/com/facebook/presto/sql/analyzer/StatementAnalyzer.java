@@ -286,7 +286,6 @@ class StatementAnalyzer
                 predicate,
                 ordering(ascending("table_name")));
 
-        analysis.setRowCountQuery(true);
         return process(query, context);
     }
 
@@ -302,7 +301,6 @@ class StatementAnalyzer
                 from(node.getCatalog().orElseGet(() -> session.getCatalog().get()), TABLE_SCHEMATA),
                 ordering(ascending("schema_name")));
 
-        analysis.setRowCountQuery(true);
         return process(query, context);
     }
 
@@ -317,7 +315,6 @@ class StatementAnalyzer
                 selectList(new AllColumns()),
                 aliased(new Values(rows), "catalogs", ImmutableList.of("Catalog")));
 
-        analysis.setRowCountQuery(true);
         return process(query, context);
     }
 
@@ -342,7 +339,6 @@ class StatementAnalyzer
                         equal(nameReference("table_name"), new StringLiteral(tableName.getObjectName()))),
                 ordering(ascending("ordinal_position")));
 
-        analysis.setRowCountQuery(true);
         return process(query, context);
     }
 
@@ -522,7 +518,6 @@ class StatementAnalyzer
                         .build(),
                 showPartitions.getLimit());
 
-        analysis.setRowCountQuery(true);
         return process(query, context);
     }
 
@@ -563,7 +558,6 @@ class StatementAnalyzer
                         ascending("argument_types"),
                         ascending("function_type")));
 
-        analysis.setRowCountQuery(true);
         return process(query, context);
     }
 
@@ -620,7 +614,6 @@ class StatementAnalyzer
                         ImmutableList.of("name", "value", "default", "type", "description", "include")),
                 nameReference("include"));
 
-        analysis.setRowCountQuery(true);
         return process(query, context);
     }
 
@@ -865,7 +858,6 @@ class StatementAnalyzer
                         "plan",
                         ImmutableList.of("Query Plan")));
 
-        analysis.setRowCountQuery(true);
         return process(query, context);
     }
 
