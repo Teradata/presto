@@ -116,6 +116,7 @@ public final class HttpRemoteTask
 {
     private static final Logger log = Logger.get(HttpRemoteTask.class);
     private static final Duration MAX_CLEANUP_RETRY_TIME = new Duration(2, TimeUnit.MINUTES);
+    private static final int MIN_NUMBER_OF_HTTP_REMOTE_TASKS_RETRIES = 3;
 
     private final TaskId taskId;
     private final int partition;
@@ -233,7 +234,7 @@ public final class HttpRemoteTask
                     ImmutableList.<ExecutionFailureInfo>of(),
                     true));
 
-            long timeout = minErrorDuration.toMillis() / 3;
+            long timeout = minErrorDuration.toMillis() / MIN_NUMBER_OF_HTTP_REMOTE_TASKS_RETRIES;
             requestTimeout = new Duration(timeout + refreshMaxWait.toMillis(), MILLISECONDS);
             continuousTaskInfoFetcher = new ContinuousTaskInfoFetcher(refreshMaxWait);
 
