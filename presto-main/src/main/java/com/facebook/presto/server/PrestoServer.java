@@ -18,6 +18,7 @@ import com.facebook.presto.execution.scheduler.FlatNetworkTopology;
 import com.facebook.presto.execution.scheduler.LegacyNetworkTopology;
 import com.facebook.presto.execution.scheduler.NetworkTopology;
 import com.facebook.presto.execution.scheduler.NodeSchedulerConfig;
+import com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType;
 import com.facebook.presto.metadata.CatalogManager;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.security.AccessControlManager;
@@ -52,7 +53,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.LEGACY_NETWORK_TOPOLOGY;
 import static com.facebook.presto.server.CodeCacheGcTrigger.installCodeCacheGcTrigger;
 import static com.facebook.presto.server.ConditionalModule.installModuleIf;
 import static com.facebook.presto.server.PrestoSystemRequirements.verifyJvmRequirements;
@@ -111,13 +111,12 @@ public class PrestoServer
                 new GracefulShutdownModule(),
                 installModuleIf(
                         NodeSchedulerConfig.class,
-                        config -> LEGACY_NETWORK_TOPOLOGY.equalsIgnoreCase(config.getNetworkTopology()),
+                        config -> NetworkTopologyType.LEGACY.equalsIgnoreCase(config.getNetworkTopology()),
                         binder -> binder.bind(NetworkTopology.class).to(LegacyNetworkTopology.class).in(Scopes.SINGLETON)),
                 installModuleIf(
                         NodeSchedulerConfig.class,
-                        config -> "flat".equalsIgnoreCase(config.getNetworkTopology()),
+                        config -> NetworkTopologyType.FLAT.equalsIgnoreCase(config.getNetworkTopology()),
                         binder -> binder.bind(NetworkTopology.class).to(FlatNetworkTopology.class).in(Scopes.SINGLETON))
-
         );
 
         modules.addAll(getAdditionalModules());

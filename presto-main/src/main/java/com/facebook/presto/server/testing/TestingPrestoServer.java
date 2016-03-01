@@ -79,7 +79,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 
-import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.LEGACY_NETWORK_TOPOLOGY;
+import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType;
 import static com.facebook.presto.server.ConditionalModule.installModuleIf;
 import static com.facebook.presto.server.testing.FileUtils.deleteRecursively;
 import static com.google.common.base.Strings.nullToEmpty;
@@ -194,11 +194,11 @@ public class TestingPrestoServer
                 .add(new ServerMainModule(new SqlParserOptions()))
                 .add(installModuleIf(
                         NodeSchedulerConfig.class,
-                        config -> LEGACY_NETWORK_TOPOLOGY.equalsIgnoreCase(config.getNetworkTopology()),
+                        config -> NetworkTopologyType.LEGACY.equalsIgnoreCase(config.getNetworkTopology()),
                         binder -> binder.bind(NetworkTopology.class).to(LegacyNetworkTopology.class).in(Scopes.SINGLETON)))
                 .add(installModuleIf(
                         NodeSchedulerConfig.class,
-                        config -> "flat".equalsIgnoreCase(config.getNetworkTopology()),
+                        config -> NetworkTopologyType.FLAT.equalsIgnoreCase(config.getNetworkTopology()),
                         binder -> binder.bind(NetworkTopology.class).to(FlatNetworkTopology.class).in(Scopes.SINGLETON)))
                 .add(binder -> {
                     binder.bind(TestingAccessControlManager.class).in(Scopes.SINGLETON);

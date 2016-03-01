@@ -65,7 +65,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 
-import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.LEGACY_NETWORK_TOPOLOGY;
+import static com.facebook.presto.execution.scheduler.NodeSchedulerConfig.NetworkTopologyType;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 
 @SuppressWarnings("MethodMayBeStatic")
@@ -120,8 +120,10 @@ public class BenchmarkNodeScheduler
     @State(Scope.Thread)
     public static class BenchmarkData
     {
-        @Param({LEGACY_NETWORK_TOPOLOGY, "benchmark", "flat"})
-        private String topologyName = LEGACY_NETWORK_TOPOLOGY;
+        @Param({NetworkTopologyType.LEGACY,
+                NetworkTopologyType.BENCHMARK,
+                NetworkTopologyType.FLAT})
+        private String topologyName = NetworkTopologyType.LEGACY;
 
         private FinalizerService finalizerService = new FinalizerService();
         private NodeSelector nodeSelector;
@@ -184,13 +186,13 @@ public class BenchmarkNodeScheduler
         {
             NetworkTopology topology;
             switch (topologyName) {
-                case LEGACY_NETWORK_TOPOLOGY:
+                case NetworkTopologyType.LEGACY:
                     topology = new LegacyNetworkTopology();
                     break;
-                case "flat":
+                case NetworkTopologyType.FLAT:
                     topology = new FlatNetworkTopology();
                     break;
-                case "benchmark":
+                case NetworkTopologyType.BENCHMARK:
                     topology = new BenchmarkNetworkTopology();
                     break;
                 default:
