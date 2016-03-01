@@ -18,6 +18,13 @@ import io.airlift.configuration.LegacyConfig;
 
 public class FeaturesConfig
 {
+    public static class ProcessingOptimization
+    {
+        public static final String DISABLED = "disabled";
+        public static final String COLUMNAR = "columnar";
+        public static final String COLUMNAR_DICTIONARY = "columnar_dictionary";
+    }
+
     private boolean experimentalSyntaxEnabled;
     private boolean distributedIndexJoinsEnabled;
     private boolean distributedJoinsEnabled = true;
@@ -28,8 +35,7 @@ public class FeaturesConfig
     private boolean pushTableWriteThroughUnion = true;
     private boolean intermediateAggregationsEnabled;
 
-    private boolean columnarProcessing;
-    private boolean columnarProcessingDictionary;
+    private String processingOptimization = ProcessingOptimization.DISABLED;
     private boolean dictionaryAggregation;
 
     @LegacyConfig("analyzer.experimental-syntax-enabled")
@@ -141,27 +147,15 @@ public class FeaturesConfig
         return this;
     }
 
-    public boolean isColumnarProcessing()
+    public String getProcessingOptimization()
     {
-        return columnarProcessing;
+        return processingOptimization;
     }
 
-    @Config("optimizer.columnar-processing")
-    public FeaturesConfig setColumnarProcessing(boolean columnarProcessing)
+    @Config("optimizer.processing-optimization")
+    public FeaturesConfig setProcessingOptimization(String processingOptimization)
     {
-        this.columnarProcessing = columnarProcessing;
-        return this;
-    }
-
-    public boolean isColumnarProcessingDictionary()
-    {
-        return columnarProcessingDictionary;
-    }
-
-    @Config("optimizer.columnar-processing-dictionary")
-    public FeaturesConfig setColumnarProcessingDictionary(boolean columnarProcessingDictionary)
-    {
-        this.columnarProcessingDictionary = columnarProcessingDictionary;
+        this.processingOptimization = processingOptimization;
         return this;
     }
 
