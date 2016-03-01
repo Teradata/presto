@@ -18,6 +18,7 @@ General Changes
   of non-constant expressions that are null and non-null.
 * Improve performance of joins, aggregations, etc. by removing unnecessarily
   duplicated columns.
+* ``query.max-age`` property was renamed to ``query.min-expire-age``.
 
 Hive Changes
 ------------

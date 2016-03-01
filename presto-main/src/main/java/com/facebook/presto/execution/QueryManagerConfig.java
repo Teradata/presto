@@ -36,7 +36,7 @@ public class QueryManagerConfig
     private String queueConfigFile;
 
     private int initialHashPartitions = 8;
-    private Duration maxQueryAge = new Duration(15, TimeUnit.MINUTES);
+    private Duration minQueryExpireAge = new Duration(15, TimeUnit.MINUTES);
     private int maxQueryHistory = 100;
     private Duration clientTimeout = new Duration(5, TimeUnit.MINUTES);
 
@@ -117,15 +117,15 @@ public class QueryManagerConfig
     }
 
     @NotNull
-    public Duration getMaxQueryAge()
+    public Duration getMinQueryExpireAge()
     {
-        return maxQueryAge;
+        return minQueryExpireAge;
     }
 
-    @Config("query.max-age")
-    public QueryManagerConfig setMaxQueryAge(Duration maxQueryAge)
+    @Config("query.min-expire-age")
+    public QueryManagerConfig setMinQueryExpireAge(Duration minQueryExpireAge)
     {
-        this.maxQueryAge = maxQueryAge;
+        this.minQueryExpireAge = minQueryExpireAge;
         return this;
     }
 
