@@ -38,8 +38,7 @@ public class TestFeaturesConfig
                 .setOptimizeSingleDistinct(true)
                 .setPushTableWriteThroughUnion(true)
                 .setIntermediateAggregationsEnabled(false)
-                .setColumnarProcessing(false)
-                .setColumnarProcessingDictionary(false)
+                .setProcessingOptimization(FeaturesConfig.ProcessingOptimization.DISABLED)
                 .setDictionaryAggregation(false));
     }
 
@@ -56,8 +55,7 @@ public class TestFeaturesConfig
                 .put("optimizer.optimize-single-distinct", "false")
                 .put("optimizer.push-table-write-through-union", "false")
                 .put("optimizer.use-intermediate-aggregations", "true")
-                .put("optimizer.columnar-processing", "true")
-                .put("optimizer.columnar-processing-dictionary", "true")
+                .put("optimizer.processing-optimization", "columnar_dictionary")
                 .put("optimizer.dictionary-aggregation", "true")
                 .build();
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
@@ -70,8 +68,7 @@ public class TestFeaturesConfig
                 .put("optimizer.optimize-single-distinct", "false")
                 .put("optimizer.push-table-write-through-union", "false")
                 .put("optimizer.use-intermediate-aggregations", "true")
-                .put("optimizer.columnar-processing", "true")
-                .put("optimizer.columnar-processing-dictionary", "true")
+                .put("optimizer.processing-optimization", "columnar_dictionary")
                 .put("optimizer.dictionary-aggregation", "true")
                 .build();
 
@@ -85,8 +82,7 @@ public class TestFeaturesConfig
                 .setOptimizeSingleDistinct(false)
                 .setPushTableWriteThroughUnion(false)
                 .setIntermediateAggregationsEnabled(true)
-                .setColumnarProcessing(true)
-                .setColumnarProcessingDictionary(true)
+                .setProcessingOptimization(FeaturesConfig.ProcessingOptimization.COLUMNAR_DICTIONARY)
                 .setDictionaryAggregation(true);
 
         assertFullMapping(properties, expected);

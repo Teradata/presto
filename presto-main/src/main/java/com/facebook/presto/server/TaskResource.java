@@ -74,6 +74,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 public class TaskResource
 {
     private static final Duration DEFAULT_MAX_WAIT_TIME = new Duration(1, SECONDS);
+    private static final Duration HARD_TIMEOUT_ADDITIONAL_WAIT_TIME = new Duration(5, SECONDS);
 
     private final TaskManager taskManager;
     private final SessionPropertyManager sessionPropertyManager;
@@ -155,8 +156,8 @@ public class TaskResource
             futureTaskInfo = futureTaskInfo.thenApply(TaskInfo::summarize);
         }
 
-        // For hard timeout, add an additional 5 seconds to max wait for thread scheduling contention and GC
-        Duration timeout = new Duration(maxWait.toMillis() + 5000, MILLISECONDS);
+        // For hard timeout, add an additional time to max wait for thread scheduling contention and GC
+        Duration timeout = new Duration(maxWait.toMillis() + HARD_TIMEOUT_ADDITIONAL_WAIT_TIME.toMillis(), MILLISECONDS);
         bindAsyncResponse(asyncResponse, futureTaskInfo, responseExecutor)
                 .withTimeout(timeout);
     }
