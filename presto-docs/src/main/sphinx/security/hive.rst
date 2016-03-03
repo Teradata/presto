@@ -2,11 +2,11 @@
 Hive Security Configuration
 ===========================
 
-The default security mode of the :doc:`/connector/hive` is to use simple
-authentication.  In this mode, the hive connector can connect to a Hadoop
-cluster that has been configured with ``simple`` authentication. All queries
-are executed as the user who runs the Presto process, regardless of the user
-who submits the query.
+The default security configuration of the :doc:`/connector/hive` uses simple
+authentication.  In this mode, the Hive connector connects to a Hadoop cluster
+that has been configured to use ``simple`` authentication. All queries are
+executed as the user who runs the Presto process, regardless of the user who
+submits the query.
 
 The Hive connector provides addional security options to support Hadoop
 clusters that have been configured to use :ref:`Kerberos
@@ -89,7 +89,7 @@ using the keytab specified by the ``hive.metastore.presto.keytab`` property,
 and will verify that the identity of the metastore matches
 ``hive.metastore.principal``.
 
-Keytab files must be distributed to every node in the cluster.
+Keytab files must be distributed to every node in the cluster that runs Presto.
 
 :ref:`Additional information on keytab files.<hive-security-additional-keytab>`
 
@@ -97,7 +97,7 @@ Hive HDFS Authentication
 ------------------------
 
 In a Kerberized Hadoop cluster, Presto authenticates to HDFS using Kerberos.
-Kerberos authentication for HDFS is configurted in the connector's properties
+Kerberos authentication for HDFS is configured in the connector's properties
 file using the following properties:
 
 ================================================== ============================================================ ==========
@@ -146,7 +146,7 @@ specified by the ``hive.hdfs.presto.principal`` property. Presto will
 authenticate this principal using the keytab specified by the
 ``hive.hdfs.presto.keytab`` keytab.
 
-Keytab files must be distributed to every node in the cluster.
+Keytab files must be distributed to every node in the cluster that runs Presto.
 
 :ref:`Additional information on keytab files.<hive-security-additional-keytab>`
 
