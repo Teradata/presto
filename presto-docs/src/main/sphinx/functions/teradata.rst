@@ -19,7 +19,7 @@ Date Functions
 --------------
 
 The functions in this section use a format string that is compatible with
-the Teradata date-time functions. The following table, based on the
+the Teradata datetime functions. The following table, based on the
 Teradata reference manual, describes the supported format specifiers:
 
 =============== ===========
