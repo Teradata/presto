@@ -52,6 +52,12 @@ public class Cube
     }
 
     @Override
+    public <R, C> R accept(AstVisitor<R, C> visitor, C context)
+    {
+        return visitor.visitCube(this, context);
+    }
+
+    @Override
     public Set<Set<Expression>> enumerateGroupingSets()
     {
         return Sets.powerSet(columns.stream()

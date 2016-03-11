@@ -458,4 +458,18 @@ public abstract class RewritingTraversalVisitor<C>
     {
         return visitNode(node, context);
     }
+
+    @Override
+    protected Node visitInsert(Insert node, C context)
+    {
+        Query query = (Query) process(node.getQuery(), context);
+        return new Insert(node.getLocation(), node.getColumns(), node.getTarget(), query);
+    }
+
+    @Override
+    protected Node visitSimpleGroupBy(SimpleGroupBy node, C context)
+    {
+        List<Expression> groupByExpressions = ImmutableList.copyOf(Lists.transform(node.getColumnExpressions(), (value -> (Expression) process(value, context))));
+        return new SimpleGroupBy(node.getLocation(), groupByExpressions);
+    }
 }
