@@ -166,6 +166,9 @@ username associated with the Presto cli process or argument to the optional
 ``--user`` option.  Impersonating the end user can provide additional security
 when accessing HDFS if HDFS permissions or ACLs are used.
 
+HDFS Permissions and ACLs are explained in the `HDFS Permissions Guide
+<https://hadoop.apache.org/docs/current/hadoop-project-dist/hadoop-hdfs/HdfsPermissionsGuide.html>`_.
+
 .. _hive-security-simple-impersonation:
 
 ``SIMPLE`` authentication with HDFS impersonation
