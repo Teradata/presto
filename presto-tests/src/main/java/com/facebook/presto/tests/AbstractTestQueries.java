@@ -3955,6 +3955,15 @@ public abstract class AbstractTestQueries
     }
 
     @Test
+    public void testExplainExecute()
+    {
+        Session session = getSession().withPreparedStatement("my_query", "SELECT * FROM orders");
+        String query = "EXECUTE my_query";
+        MaterializedResult result = computeActual(session, "EXPLAIN (TYPE LOGICAL) " + query);
+        assertEquals(getOnlyElement(result.getOnlyColumnAsSet()), getExplainPlan("SELECT * FROM orders", LOGICAL));
+    }
+
+    @Test
     public void testShowCatalogs()
             throws Exception
     {
