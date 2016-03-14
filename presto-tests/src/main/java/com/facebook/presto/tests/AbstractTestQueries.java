@@ -5898,6 +5898,17 @@ public abstract class AbstractTestQueries
     }
 
     @Test
+    public void testDescribeOutputDataDefinitionQuery()
+    {
+        Session session = getSession().withPreparedStatement("my_query", "SET SESSION optimize_hash_generation=false");
+        MaterializedResult actual = computeActual(session, "DESCRIBE OUTPUT my_query");
+        MaterializedResult expected = resultBuilder(session, VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR, BIGINT, BOOLEAN, BOOLEAN)
+                .row(null, null, null, null, null, null, null, true)
+                .build();
+        assertEqualsIgnoreOrder(actual, expected);
+    }
+
+    @Test
     public void testDescribeOutputShowTables()
     {
         Session session = getSession().withPreparedStatement("my_query", "SHOW TABLES");
