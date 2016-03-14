@@ -89,6 +89,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -279,11 +280,11 @@ public class PlanPrinter
 
         if (stageStats.isPresent()) {
             builder.append(indentString(1))
-                    .append(format("Cost: CPU %s, Input %d (%s), Output %d (%s)\n",
+                    .append(format("Cost: CPU %s, Input: %s (%s), Output: %s (%s)\n",
                             stageStats.get().getTotalCpuTime(),
-                            stageStats.get().getProcessedInputPositions(),
+                            formatPositions(stageStats.get().getProcessedInputPositions()),
                             stageStats.get().getProcessedInputDataSize(),
-                            stageStats.get().getOutputPositions(),
+                            formatPositions(stageStats.get().getOutputPositions()),
                             stageStats.get().getOutputDataSize()));
         }
 
@@ -382,11 +383,11 @@ public class PlanPrinter
             output.append(indentString(indent));
             output.append("Cost: ?");
             if (printInput) {
-                output.append(", Input: ? (?B)");
+                output.append(", Input: ? lines (?B)");
             }
-            output.append(", Output ? (?B)");
+            output.append(", Output: ? lines (?B)");
             if (printFiltered) {
-                output.append(", Filtered: ?");
+                output.append(", Filtered: ? %");
             }
             output.append('\n');
             return;
@@ -398,23 +399,33 @@ public class PlanPrinter
         }
 
         output.append(indentString(indent));
-        output.append(format("Cost: %.2f%%", 100.0 * fraction));
+        output.append(format(Locale.US, "Cost: %.2f%%", 100.0 * fraction));
         if (printInput) {
-            output.append(format(", Input %d (%s)",
-                    nodeStats.getInputPositions(),
+            output.append(format(", Input: %s (%s)",
+                    formatPositions(nodeStats.getInputPositions()),
                     nodeStats.getInputDataSize().toString()));
         }
-        output.append(format(", Output %d (%s)",
-                nodeStats.getOutputPositions(),
+        output.append(format(", Output: %s (%s)",
+                formatPositions(nodeStats.getOutputPositions()),
                 nodeStats.getOutputDataSize().toString()));
         if (printFiltered) {
             double filtered = 100.0 * (nodeStats.getInputPositions() - nodeStats.getOutputPositions()) / nodeStats.getInputPositions();
             if (isNaN(filtered)) {
                 filtered = 0.0;
             }
-            output.append(format(", Filtered: %.2f%%", filtered));
+            output.append(format(Locale.US, ", Filtered: %.2f%%", filtered));
         }
         output.append('\n');
+    }
+
+    private static String formatPositions(long positions)
+    {
+        if (positions == 1) {
+            return "1 line";
+        }
+        else {
+            return positions + " lines";
+        }
     }
 
     private static String indentString(int indent)

@@ -35,11 +35,11 @@ public class TestTpchDistributedQueries
     {
         assertExplainAnalyze("EXPLAIN ANALYZE SELECT * FROM orders",
                 "Fragment 1 \\[SOURCE\\]\n" +
-                        "    Cost: CPU .*, Input 15000 \\(1\\.92MB\\), Output 15000 \\(1\\.92MB\\)\n" +
+                        "    Cost: CPU .*, Input: 15000 lines \\(1\\.92MB\\), Output: 15000 lines \\(1\\.92MB\\)\n" +
                         "    Output layout: \\[orderkey, custkey, orderstatus, totalprice, orderdate, orderpriority, clerk, shippriority, comment\\]\n" +
                         "    Output partitioning: SINGLE \\[\\]\n" +
                         "    - TableScan\\[tpch:tpch:orders:sf0\\.01, originalConstraint = true] => \\[orderkey:bigint, custkey:bigint, orderstatus:varchar, totalprice:double, orderdate:date, orderpriority:varchar, clerk:varchar, shippriority:bigint, comment:varchar\\]\n" +
-                        "            Cost: 100,00%, Output 15000 \\(1\\.92MB\\)\n" +
+                        "            Cost: .*%, Output: 15000 lines \\(1\\.92MB\\)\n" +
                         "            orderkey := tpch:orderkey\n" +
                         "            custkey := tpch:custkey\n" +
                         "            orderstatus := tpch:orderstatus\n" +
@@ -52,24 +52,24 @@ public class TestTpchDistributedQueries
 
         assertExplainAnalyze("EXPLAIN ANALYZE SELECT count(*), clerk FROM orders GROUP BY clerk",
                 "Fragment 1 \\[HASH\\]\n" +
-                        "    Cost: CPU .*, Input 12046 \\(447\\.51kB\\), Output 1000 \\(37\\.17kB\\)\n" +
+                        "    Cost: CPU .*, Input: 12046 lines \\(447\\.51kB\\), Output: 1000 lines \\(37\\.17kB\\)\n" +
                         "    Output layout: \\[clerk, \\$hashvalue, count\\]\n" +
                         "    Output partitioning: SINGLE \\[\\]\n" +
                         "    - Aggregate\\(FINAL\\)\\[clerk\\] => \\[clerk:varchar, \\$hashvalue:bigint, count:bigint\\]\n" +
-                        "            Cost: .*, Output 1000 \\(37\\.17kB\\)\n" +
+                        "            Cost: .*, Output: 1000 lines \\(37\\.17kB\\)\n" +
                         "            count := \"count\"\\(\"count_8\"\\)\n" +
                         "        - RemoteSource\\[2\\] => \\[clerk:varchar, \\$hashvalue:bigint, count_8:bigint\\]\n" +
-                        "                Cost: .*, Output 12046 \\(447\\.51kB\\)\n" +
+                        "                Cost: .*, Output: 12046 lines \\(447\\.51kB\\)\n" +
                         "\n" +
                         "Fragment 2 \\[SOURCE\\]\n" +
-                        "    Cost: CPU .*, Input 15000 \\(424\\.92kB\\), Output 12046 \\(447\\.14kB\\)\n" +
+                        "    Cost: CPU .*, Input: 15000 lines \\(424\\.92kB\\), Output: 12046 lines \\(447\\.14kB\\)\n" +
                         "    Output layout: \\[clerk, \\$hashvalue, count_8\\]\n" +
                         "    Output partitioning: HASH \\[clerk\\]\n" +
                         "    - Aggregate\\(PARTIAL\\)\\[clerk\\] => \\[clerk:varchar, \\$hashvalue:bigint, count_8:bigint\\]\n" +
-                        "            Cost: .*, Output 12046 \\(447\\.14kB\\)\n" +
+                        "            Cost: .*, Output: 12046 lines \\(447\\.14kB\\)\n" +
                         "            count_8 := \"count\"\\(\\*\\)\n" +
                         "        - ScanFilterAndProject\\[table = tpch:tpch:orders:sf0\\.01, originalConstraint = true\\] => \\[clerk:varchar, \\$hashvalue:bigint\\]\n" +
-                        "                Cost: .*, Input 15000 \\(0B\\), Output 15000 \\(424\\.92kB\\), Filtered: 0,00%\n" +
+                        "                Cost: .*, Input: 15000 lines \\(0B\\), Output: 15000 lines \\(424\\.92kB\\), Filtered: 0\\.00%\n" +
                         "                \\$hashvalue := \"combine_hash\"\\(0, COALESCE\\(\"\\$operator\\$hash_code\"\\(\"clerk\"\\), 0\\)\\)\n" +
                         "                clerk := tpch:clerk\n\n");
 
