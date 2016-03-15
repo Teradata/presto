@@ -1852,7 +1852,8 @@ class StatementAnalyzer
                 .collect(toImmutableList());
 
         // is this an aggregation query?
-        if (!groupingSets.isEmpty()) {
+        // skip describe queries because if there are parameters involved we can't verify equality
+        if (!groupingSets.isEmpty() && !analysis.isDescribe()) {
             // ensure SELECT, ORDER BY and HAVING are constant with respect to group
             // e.g, these are all valid expressions:
             //     SELECT f(a) GROUP BY a

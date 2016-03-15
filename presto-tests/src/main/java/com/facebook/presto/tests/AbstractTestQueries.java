@@ -5810,6 +5810,19 @@ public abstract class AbstractTestQueries
     }
 
     @Test
+    public void testDescribeInputParametersInGrouping()
+    {
+        Session session = getSession().withPreparedStatement("my_query", "select count(nationkey), regionkey + ? from nation group by regionkey + ? order by regionkey + ?");
+        MaterializedResult actual = computeActual(session, "DESCRIBE INPUT my_query");
+        MaterializedResult expected = resultBuilder(session, BIGINT, VARCHAR)
+                .row(0, "bigint")
+                .row(1, "bigint")
+                .row(2, "bigint")
+                .build();
+        assertEqualsIgnoreOrder(actual, expected);
+    }
+
+    @Test
     public void testDescribeInputNoParameters()
     {
         Session session = getSession().withPreparedStatement("my_query", "select * from nation");
