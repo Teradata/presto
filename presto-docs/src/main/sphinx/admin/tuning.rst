@@ -5,6 +5,8 @@ Tuning Presto
 The default Presto settings should work well for most workloads. The following
 information may help you if your cluster is facing a specific performance problem.
 
+.. _tuning-pref-general:
+
 General properties
 ------------------
 
@@ -49,6 +51,8 @@ General properties
 +                                                            +                                          +                                         +presto node will fail effectively slowing down IO   +
 +                                                            +                                          +                                         +in unstable environment.                            +
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
+
+.. _tuning-pref-exchange:
 
 Exchange properties
 -------------------
@@ -98,6 +102,8 @@ Exchange properties
 +                                                            +                                          +                                         +increase stability drastically by decreasing number +
 +                                                            +                                          +                                         +of data lost in network.                            +
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
+
+.. _tuning-pref-node:
 
 Node scheduler properties
 -------------------------
@@ -162,6 +168,8 @@ Node scheduler properties
 +                                                            +                                          +                                         +presto workers.                                     +
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
 
+
+.. _tuning-pref-optimizer:
 
 Optimizer properties
 --------------------
@@ -235,6 +243,8 @@ Optimizer properties
 +                                                            +                                          +                                         +higher overall time when splitting aggregation      +
 +                                                            +                                          +                                         +between nodes.                                      +
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
+
+.. _tuning-pref-query:
 
 Query execution properties
 --------------------------
@@ -407,6 +417,8 @@ Query execution properties
 +                                                            +                                          +                                         +potentially lower.                                  +
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
 
+.. _tuning-pref-task:
+
 Tasks managment properties
 --------------------------
 
@@ -525,106 +537,123 @@ Tasks managment properties
 +                                                            +                                          +                                         +computation time while writing.                     +
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
 
+.. _tuning-pref-session:
 
 Session properties
 ------------------
 
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+            property name            +                   type                   +                     default value                      +short description                                           +
-+=====================================+==========================================+========================================================+============================================================+
-+ ``columnar_processing_dictionary``  +               ``Boolean``                +``optimizer.columnar-processing-dictionary`` (``false``)+See ``optimizer.columnar-processing-dictionary``.           +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+       ``columnar_processing``       +               ``Boolean``                +     ``optimizer.columnar-processing`` (``false``)      +See ``optimizer.columnar-processing``.                      +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+     ``dictionary_aggregation``      +               ``Boolean``                +    ``optimizer.dictionary-aggregation`` (``false``)    +See ``optimizer.dictionary-aggregation``.                   +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+        ``execution_policy``         +``String`` (``all-at-once`` or ``phased``)+      ``query.execution-policy`` (``all-at-once``)      +See ``query.execution-policy``.                             +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+      ``hash_partition_count``       +               ``Integer``                +       ``query.initial-hash-partitions`` (``8``)        +See ``query.initial-hash-partitions``.                      +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+    ``optimize_hash_generation``     +               ``Boolean``                +   ``optimizer.optimize-hash-generation`` (``true``)    +See ``optimizer.optimize-hash-generation``                  +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+       ``orc_max_buffer_size``       +          ``String`` (data size)          +        ``hive.orc.max-buffer-size`` (``8 MB``)         +See ``hive.orc.max-buffer-size``.                           +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+     ``orc_max_merge_distance``      +          ``String`` (data size)          +       ``hive.orc.max-merge-distance`` (``1 MB``)       +See ``hive.orc.max-merge-distance``.                        +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+     ``orc_stream_buffer_size``      +          ``String`` (data size)          +        ``hive.orc.max-buffer-size`` (``8 MB``)         +See ``hive.orc.max-buffer-size``.                           +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+``plan_with_table_node_partitioning``+               ``Boolean``                +                        ``true``                        +**Experimental.** Adapt plan to use backend partitioning.   +
-+                                     +                                          +                                                        +By setting this property you allow to use partitioning      +
-+                                     +                                          +                                                        +provided by table layout itself while collecting required   +
-+                                     +                                          +                                                        +data. This may allow to utilize optimization of table       +
-+                                     +                                          +                                                        +layout provided by specific connector. In particular, when  +
-+                                     +                                          +                                                        +this is set presto will try to partition data for workers   +
-+                                     +                                          +                                                        +in a way that each workers gets a chunk of data that comes  +
-+                                     +                                          +                                                        +from one backend partition. It can be particularly useful   +
-+                                     +                                          +                                                        +due to the I/O distribution optimization in table           +
-+                                     +                                          +                                                        +partitioning. Note that this property may only be utilized  +
-+                                     +                                          +                                                        +if given projection uses all columns used for table         +
-+                                     +                                          +                                                        +partitioning inside connector.                              +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+   ``prefer_streaming_operators``    +               ``Boolean``                +                       ``false``                        +Prefer source table layouts that produce streaming          +
-+                                     +                                          +                                                        +operators. Setting this property will allow workers not to  +
-+                                     +                                          +                                                        +wait for chunks of data to start processing them while      +
-+                                     +                                          +                                                        +scanning tables. This may cause faster processing with      +
-+                                     +                                          +                                                        +lower latency and downtime but some operators may do things +
-+                                     +                                          +                                                        +more efficiently when working with chunks of data.          +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+ ``push_table_write_through_union``  +               ``Boolean``                +``optimizer.push-table-write-through-union`` (``true``) +See ``optimizer.push-table-writethrough-union``.            +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+        ``query_max_memory``         +          ``String`` (data size)          +            ``query.max-memory`` (``20 GB``)            +This property can be use to be nice to the cluster for      +
-+                                     +                                          +                                                        +example when our query is not as important then the usual   +
-+                                     +                                          +                                                        +cluster routines. Setting this value to smaller then server +
-+                                     +                                          +                                                        +property ``query.max-memory`` will cause server to drop     +
-+                                     +                                          +                                                        +session query if it will require more then                  +
-+                                     +                                          +                                                        +``query_max_memory`` memory instead of                      +
-+                                     +                                          +                                                        +``query.max-memory``. On the other hand setting this value  +
-+                                     +                                          +                                                        +to higher then ``query.max-memory`` will not have effect at +
-+                                     +                                          +                                                        +all.                                                        +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+       ``query_max_run_time``        +          ``String`` (duration)           +           ``query.max-run-time`` (``100 d``)           +The default value of this is defined by server. If expected +
-+                                     +                                          +                                                        +query processing time is higher then property               +
-+                                     +                                          +                                                        +``query.max-run-time`` it's crucial to set this session     +
-+                                     +                                          +                                                        +property - otherwise there is a risk of dropping all result +
-+                                     +                                          +                                                        +of long processing after ``query.max-run-time`` ends.       +
-+                                     +                                          +                                                        +Session may also set this value to lower than               +
-+                                     +                                          +                                                        +``query.max-run-time`` in order to crosscheck for bugs in   +
-+                                     +                                          +                                                        +queries. In may be particularly use full when setting up    +
-+                                     +                                          +                                                        +session with very large number of queries each of which     +
-+                                     +                                          +                                                        +should take very short time in order to be able to end all  +
-+                                     +                                          +                                                        +of queries in acceptable time. Even in this scenario it's   +
-+                                     +                                          +                                                        +crucial though, to set this value to much higher value than +
-+                                     +                                          +                                                        +average query time to avoid problems with outliers (some    +
-+                                     +                                          +                                                        +queries may randomly take much longer then other due to     +
-+                                     +                                          +                                                        +cluster load and many other circumstances).                 +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+       ``resource_overcommit``       +               ``Boolean``                +                       ``false``                        +Use resources which are not guaranteed to be available to   +
-+                                     +                                          +                                                        +the query. By setting this property you allow to exceed     +
-+                                     +                                          +                                                        +limits of memory available per query processing and         +
-+                                     +                                          +                                                        +session. This may cause resources to be used more           +
-+                                     +                                          +                                                        +efficiently allowing to but may cause some indeterministic  +
-+                                     +                                          +                                                        +query drops due to lacking memory on machine. perform more  +
-+                                     +                                          +                                                        +demanding queries                                           +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+  ``task_aggregation_concurrency``   +               ``Integer``                +          ``task.default-concurrency`` (``1``)          +**Experimental.** Default number of local parallel          +
-+                                     +                                          +                                                        +aggregation jobs per worker. Same as                        +
-+                                     +                                          +                                                        +``task_join_concurrency`` but it is used for aggregation.   +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+   ``task_hash_build_concurrency``   +               ``Integer``                +          ``task.default-concurrency`` (``1``)          +**Experimental.** Default number of local parallel hash     +
-+                                     +                                          +                                                        +build jobs per worker. Same as ``task_join_concurrency``    +
-+                                     +                                          +                                                        +but it is used for building hashes. The value is always     +
-+                                     +                                          +                                                        +rounded down to the power of 2 so it's recommended to use   +
-+                                     +                                          +                                                        +such value in order to avoid unexpected behavior.           +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+  ``task_intermediate_aggregation``  +               ``Boolean``                +``optimizer.use-intermediate-aggregations`` (``false``) +See ``optimizer.use-intermediate-aggregations``.            +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+      ``task_join_concurrency``      +               ``Integer``                +           ``task.join-concurrency`` (``1``)            +**Experimental.** Default number of local parallel join     +
-+                                     +                                          +                                                        +jobs per worker. This value may be increased to perform     +
-+                                     +                                          +                                                        +join on worker using more then one thread to increase CPU   +
-+                                     +                                          +                                                        +utilization with the cost of increased memory usage.        +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
-+        ``task_writer_count``        +               ``Integer``                +             ``task.writer-count`` (``1``)              +See ``task.writer-count``.                                  +
-+-------------------------------------+------------------------------------------+--------------------------------------------------------+------------------------------------------------------------+
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++            property name            +                   type                   +                        default value                        +tuning the property                                    +
++=====================================+==========================================+=============================================================+=======================================================+
++ ``columnar_processing_dictionary``  +               ``Boolean``                +``optimizer.columnar-`` ``processing-dictionary`` (``false``)+See :ref:`optimizer.columnar-processing-dictionary     +
++                                     +                                          +                                                             +<tuning-pref-optimizer>`.                              +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++       ``columnar_processing``       +               ``Boolean``                +     ``optimizer.columnar-`` ``processing`` (``false``)      +See :ref:`optimizer.columnar-processing                +
++                                     +                                          +                                                             +<tuning-pref-optimizer>`.                              +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++     ``dictionary_aggregation``      +               ``Boolean``                +    ``optimizer.dictionary-`` ``aggregation`` (``false``)    +See :ref:`optimizer.dictionary-aggregation             +
++                                     +                                          +                                                             +<tuning-pref-optimizer>`.                              +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++        ``execution_policy``         +``String`` (``all-at-once`` or ``phased``)+      ``query.execution-`` ``policy`` (``all-at-once``)      +See :ref:`query.execution-policy <tuning-pref-query>`. +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++      ``hash_partition_count``       +               ``Integer``                +       ``query.initial-hash-`` ``partitions`` (``8``)        +See :ref:`query.initial-hash-partitions                +
++                                     +                                          +                                                             +<tuning-pref-query>`.                                  +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++    ``optimize_hash_generation``     +               ``Boolean``                +   ``optimizer.optimize-`` ``hash-generation`` (``true``)    +See :ref:`optimizer.optimize-hash-generation           +
++                                     +                                          +                                                             +<tuning-pref-optimizer>`.                              +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++       ``orc_max_buffer_size``       +          ``String`` (data size)          +        ``hive.orc.max-`` ``buffer-size`` (``8 MB``)         +See :ref:`hive.orc.max-buffer-size                     +
++                                     +                                          +                                                             +<tuning-pref-hive>`.                                   +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++     ``orc_max_merge_distance``      +          ``String`` (data size)          +       ``hive.orc.max-`` ``merge-distance`` (``1 MB``)       +See :ref:`hive.orc.max-merge-distance                  +
++                                     +                                          +                                                             +<tuning-pref-hive>`.                                   +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++     ``orc_stream_buffer_size``      +          ``String`` (data size)          +        ``hive.orc.max-`` ``buffer-size`` (``8 MB``)         +See :ref:`hive.orc.max-buffer-size                     +
++                                     +                                          +                                                             +<tuning-pref-hive>`.                                   +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++``plan_with_table_node_partitioning``+               ``Boolean``                +                          ``true``                           +**Experimental.** Adapt plan to use backend            +
++                                     +                                          +                                                             +partitioning. By setting this property you allow to    +
++                                     +                                          +                                                             +use partitioning provided by table layout itself while +
++                                     +                                          +                                                             +collecting required data. This may allow to utilize    +
++                                     +                                          +                                                             +optimization of table layout provided by specific      +
++                                     +                                          +                                                             +connector. In particular, when this is set presto will +
++                                     +                                          +                                                             +try to partition data for workers in a way that each   +
++                                     +                                          +                                                             +workers gets a chunk of data that comes from one       +
++                                     +                                          +                                                             +backend partition. It can be particularly useful due   +
++                                     +                                          +                                                             +to the I/O distribution optimization in table          +
++                                     +                                          +                                                             +partitioning. Note that this property may only be      +
++                                     +                                          +                                                             +utilized if given projection uses all columns used for +
++                                     +                                          +                                                             +table partitioning inside connector.                   +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++   ``prefer_streaming_operators``    +               ``Boolean``                +                          ``false``                          +Prefer source table layouts that produce streaming     +
++                                     +                                          +                                                             +operators. Setting this property will allow workers    +
++                                     +                                          +                                                             +not to wait for chunks of data to start processing     +
++                                     +                                          +                                                             +them while scanning tables. This may cause faster      +
++                                     +                                          +                                                             +processing with lower latency and downtime but some    +
++                                     +                                          +                                                             +operators may do things more efficiently when working  +
++                                     +                                          +                                                             +with chunks of data.                                   +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++ ``push_table_write_through_union``  +               ``Boolean``                +``optimizer.push-table-`` ``write-through-union`` (``true``) +See :ref:`optimizer.push-table-writethrough-union      +
++                                     +                                          +                                                             +<tuning-pref-optimizer>`.                              +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++        ``query_max_memory``         +          ``String`` (data size)          +              ``query.max-memory`` (``20 GB``)               +This property can be use to be nice to the cluster for +
++                                     +                                          +                                                             +example when our query is not as important then the    +
++                                     +                                          +                                                             +usual cluster routines. Setting this value to smaller  +
++                                     +                                          +                                                             +then server property ``query.max-memory`` will cause   +
++                                     +                                          +                                                             +server to drop session query if it will require more   +
++                                     +                                          +                                                             +then ``query_max_memory`` memory instead of            +
++                                     +                                          +                                                             +``query.max-memory``. On the other hand setting this   +
++                                     +                                          +                                                             +value to higher then ``query.max-memory`` will not     +
++                                     +                                          +                                                             +have effect at all.                                    +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++       ``query_max_run_time``        +          ``String`` (duration)           +             ``query.max-run-time`` (``100 d``)              +The default value of this is defined by server. If     +
++                                     +                                          +                                                             +expected query processing time is higher then property +
++                                     +                                          +                                                             +``query.max-run-time`` it's crucial to set this        +
++                                     +                                          +                                                             +session property - otherwise there is a risk of        +
++                                     +                                          +                                                             +dropping all result of long processing after           +
++                                     +                                          +                                                             +``query.max-run-time`` ends. Session may also set this +
++                                     +                                          +                                                             +value to lower than ``query.max-run-time`` in order to +
++                                     +                                          +                                                             +crosscheck for bugs in queries. In may be particularly +
++                                     +                                          +                                                             +use full when setting up session with very large       +
++                                     +                                          +                                                             +number of queries each of which should take very short +
++                                     +                                          +                                                             +time in order to be able to end all of queries in      +
++                                     +                                          +                                                             +acceptable time. Even in this scenario it's crucial    +
++                                     +                                          +                                                             +though, to set this value to much higher value than    +
++                                     +                                          +                                                             +average query time to avoid problems with outliers     +
++                                     +                                          +                                                             +(some queries may randomly take much longer then other +
++                                     +                                          +                                                             +due to cluster load and many other circumstances).     +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++       ``resource_overcommit``       +               ``Boolean``                +                          ``false``                          +Use resources which are not guaranteed to be available +
++                                     +                                          +                                                             +to the query. By setting this property you allow to    +
++                                     +                                          +                                                             +exceed limits of memory available per query processing +
++                                     +                                          +                                                             +and session. This may cause resources to be used more  +
++                                     +                                          +                                                             +efficiently allowing to but may cause some             +
++                                     +                                          +                                                             +indeterministic query drops due to lacking memory on   +
++                                     +                                          +                                                             +machine. perform more demanding queries                +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++  ``task_aggregation_concurrency``   +               ``Integer``                +          ``task.default-`` ``concurrency`` (``1``)          +**Experimental.** Default number of local parallel     +
++                                     +                                          +                                                             +aggregation jobs per worker. Same as                   +
++                                     +                                          +                                                             +``task_join_concurrency`` but it is used for           +
++                                     +                                          +                                                             +aggregation.                                           +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++   ``task_hash_build_concurrency``   +               ``Integer``                +          ``task.default-`` ``concurrency`` (``1``)          +**Experimental.** Default number of local parallel     +
++                                     +                                          +                                                             +hash build jobs per worker. Same as                    +
++                                     +                                          +                                                             +``task_join_concurrency`` but it is used for building  +
++                                     +                                          +                                                             +hashes. The value is always rounded down to the power  +
++                                     +                                          +                                                             +of 2 so it's recommended to use such value in order to +
++                                     +                                          +                                                             +avoid unexpected behavior.                             +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++  ``task_intermediate_aggregation``  +               ``Boolean``                +``optimizer.use-`` ``intermediate-aggregations`` (``false``) +See :ref:`optimizer.use-intermediate-aggregations      +
++                                     +                                          +                                                             +<tuning-pref-optimizer>`.                              +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++      ``task_join_concurrency``      +               ``Integer``                +              ``task.join-concurrency`` (``1``)              +**Experimental.** Default number of local parallel     +
++                                     +                                          +                                                             +join jobs per worker. This value may be increased to   +
++                                     +                                          +                                                             +perform join on worker using more then one thread to   +
++                                     +                                          +                                                             +increase CPU utilization with the cost of increased    +
++                                     +                                          +                                                             +memory usage.                                          +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
++        ``task_writer_count``        +               ``Integer``                +                ``task.writer-count`` (``1``)                +See :ref:`task.writer-count <tuning-pref-task>`.       +
++-------------------------------------+------------------------------------------+-------------------------------------------------------------+-------------------------------------------------------+
 
 
 JVM Settings

@@ -153,6 +153,8 @@ This table can then be queried in Presto::
     SELECT * FROM hive.web.page_view;
 
 
+.. _tuning-pref-hive:
+
 Tuning
 -------
 
