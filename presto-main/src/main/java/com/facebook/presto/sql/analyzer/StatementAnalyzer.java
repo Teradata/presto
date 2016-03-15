@@ -53,6 +53,7 @@ import com.facebook.presto.sql.tree.Cast;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.CreateTableAsSelect;
 import com.facebook.presto.sql.tree.CreateView;
+import com.facebook.presto.sql.tree.DataDefinitionStatement;
 import com.facebook.presto.sql.tree.DefaultTraversalVisitor;
 import com.facebook.presto.sql.tree.Delete;
 import com.facebook.presto.sql.tree.DereferenceExpression;
@@ -820,6 +821,13 @@ class StatementAnalyzer
 
         analysis.setRowCountQuery(true);
         return descriptor;
+    }
+
+    @Override
+    protected RelationType visitDataDefinitionStatement(DataDefinitionStatement node, AnalysisContext context)
+    {
+        analysis.setRowCountQuery(true);
+        return new RelationType(Field.newUnqualified("rows", BIGINT));
     }
 
     private static void validateColumns(Statement node, RelationType descriptor)
