@@ -24,11 +24,14 @@ import org.testng.annotations.Test;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 
 import static com.facebook.presto.tests.TestGroups.STORAGE_FORMATS;
 import static com.facebook.presto.tests.utils.JdbcDriverUtils.setSessionProperty;
+import static com.facebook.presto.tests.utils.JdbcDriverUtils.usingFacebookJdbcDriver;
+import static com.facebook.presto.tests.utils.JdbcDriverUtils.usingSimbaJdbcDriver;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.teradata.tempto.assertions.QueryAssert.Row.row;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
@@ -226,11 +229,26 @@ public class TestHiveStorageFormats
     {
         Connection connection = defaultQueryExecutor().getConnection();
         try {
-            // create more than one split
-            setSessionProperty(connection, "task_writer_count", "4");
-            setSessionProperty(connection, "redistribute_writes", "false");
-            for (Map.Entry<String, String> sessionProperty : sessionProperties.entrySet()) {
-                setSessionProperty(connection, sessionProperty.getKey(), sessionProperty.getValue());
+            if (usingFacebookJdbcDriver(connection)) {
+                PrestoConnection prestoConnection = connection.unwrap(PrestoConnection.class);
+                // create more than one split
+                prestoConnection.setSessionProperty("task_writer_count", "4");
+                prestoConnection.setSessionProperty("redistribute_writes", "false");
+                for (Map.Entry<String, String> sessionProperty : sessionProperties.entrySet()) {
+                    prestoConnection.setSessionProperty(sessionProperty.getKey(), sessionProperty.getValue());
+                }
+            }
+            else if (usingSimbaJdbcDriver(connection)) {
+                try (Statement statement = connection.createStatement()) {
+                    statement.execute("set session task_writer_count=4");
+                    statement.execute("set session redistribute_writes=false");
+                    for (Map.Entry<String, String> sessionProperty : sessionProperties.entrySet()) {
+                        statement.execute(String.format("set session %s=%s", sessionProperty.getKey(), sessionProperty.getValue()));
+                    }
+                }
+            }
+            else {
+                throw new IllegalStateException();
             }
         }
         catch (SQLException e) {
