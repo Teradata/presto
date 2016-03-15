@@ -5,10 +5,8 @@ Tuning Presto
 The default Presto settings should work well for most workloads. The following
 information may help you if your cluster is facing a specific performance problem.
 
-Config Properties
------------------
-
-These configuration options may require tuning in specific situations:
+General properties
+------------------
 
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
 +                       property name                        +                   type                   +              default value              +tuning the property                                 +
@@ -28,6 +26,36 @@ These configuration options may require tuning in specific situations:
 +                                                            +                                          +                                         +also be specified on a per-query basis using the    +
 +                                                            +                                          +                                         +``distributed_join`` session property.              +
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
++                  ``redistribute-writes``                   +               ``Boolean``                +                ``true``                 +Force parallel distributed writes. Serves as        +
++                                                            +                                          +                                         +default value for ``redistribute_writes`` session   +
++                                                            +                                          +                                         +property. Setting this property will cause write    +
++                                                            +                                          +                                         +operator to be distributed between nodes. This      +
++                                                            +                                          +                                         +allows to utilize distributed storage backend       +
++                                                            +                                          +                                         +especially in case of small number of huge queries. +
++------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
++         ``resources.reserved-system-`` ``memory``          +          ``String`` (data size)          +      ``JVM max memory`` * ``0.4``       +Amount of memory set up as allocation limit for     +
++                                                            +                                          +                                         +single presto node. Reaching this limit will cause  +
++                                                            +                                          +                                         +operations to start dropping on server. Higher      +
++                                                            +                                          +                                         +value may increase server stability but may cause   +
++                                                            +                                          +                                         +problems if physical server is used for other       +
++                                                            +                                          +                                         +purposes as well. In some configurations it may     +
++                                                            +                                          +                                         +even cause presto to be shut down by host if to     +
++                                                            +                                          +                                         +much memory will be allocated.                      +
++------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
++                  ``sink.max-buffer-size``                  +          ``String`` (data size)          +                ``32 MB``                +Buffer size for IO writes while collecting pipeline +
++                                                            +                                          +                                         +results. Higher value may increase speed of IO      +
++                                                            +                                          +                                         +operations with the cost of additional memory. Also +
++                                                            +                                          +                                         +higher value may increase number of data lost when  +
++                                                            +                                          +                                         +presto node will fail effectively slowing down IO   +
++                                                            +                                          +                                         +in unstable environment.                            +
++------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
+
+Exchange properties
+-------------------
+
++------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
++                       property name                        +                   type                   +              default value              +tuning the property                                 +
++============================================================+==========================================+=========================================+====================================================+
 +                ``exchange.client-threads``                 +       ``Integer`` (at least ``1``)       +                 ``25``                  +Number of threads that exchange server can spawn to +
 +                                                            +                                          +                                         +handle clients. Higher value will increase          +
 +                                                            +                                          +                                         +concurrency but may cause general drop in           +
@@ -70,6 +98,13 @@ These configuration options may require tuning in specific situations:
 +                                                            +                                          +                                         +increase stability drastically by decreasing number +
 +                                                            +                                          +                                         +of data lost in network.                            +
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
+
+Node scheduler properties
+-------------------------
+
++------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
++                       property name                        +                   type                   +              default value              +tuning the property                                 +
++============================================================+==========================================+=========================================+====================================================+
 +``node-scheduler.max-pending-`` ``splits-per-node-per-task``+               ``Integer``                +                 ``10``                  +Must be smaller then                                +
 +                                                            +                                          +                                         +``node-scheduler.max-splits-per-node``. This        +
 +                                                            +                                          +                                         +property describes how many splits can be queued to +
@@ -126,6 +161,14 @@ These configuration options may require tuning in specific situations:
 +                                                            +                                          +                                         +where distributed storage runs on same nodes as     +
 +                                                            +                                          +                                         +presto workers.                                     +
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
+
+
+Optimizer properties
+--------------------
+
++------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
++                       property name                        +                   type                   +              default value              +tuning the property                                 +
++============================================================+==========================================+=========================================+====================================================+
 +     ``optimizer.columnar-processing-`` ``dictionary``      +               ``Boolean``                +                ``false``                +Serves as default value for                         +
 +                                                            +                                          +                                         +``columnar_processing_dictionary`` session          +
 +                                                            +                                          +                                         +property. Setting this property will allow to use   +
@@ -192,6 +235,13 @@ These configuration options may require tuning in specific situations:
 +                                                            +                                          +                                         +higher overall time when splitting aggregation      +
 +                                                            +                                          +                                         +between nodes.                                      +
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
+
+Query execution properties
+--------------------------
+
++------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
++                       property name                        +                   type                   +              default value              +tuning the property                                 +
++============================================================+==========================================+=========================================+====================================================+
 +                 ``query.execution-policy``                 +``String`` (``all-at-once`` or ``phased``)+             ``all-at-once``             +Serves as default value for ``execution_policy``    +
 +                                                            +                                          +                                         +session property. Setting this value to ``phased``  +
 +                                                            +                                          +                                         +will allow query scheduler to split a single query  +
@@ -356,29 +406,13 @@ These configuration options may require tuning in specific situations:
 +                                                            +                                          +                                         +reason the lost computation time will be            +
 +                                                            +                                          +                                         +potentially lower.                                  +
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
-+                  ``redistribute-writes``                   +               ``Boolean``                +                ``true``                 +Force parallel distributed writes. Serves as        +
-+                                                            +                                          +                                         +default value for ``redistribute_writes`` session   +
-+                                                            +                                          +                                         +property. Setting this property will cause write    +
-+                                                            +                                          +                                         +operator to be distributed between nodes. This      +
-+                                                            +                                          +                                         +allows to utilize distributed storage backend       +
-+                                                            +                                          +                                         +especially in case of small number of huge queries. +
+
+Tasks managment properties
+--------------------------
+
 +------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
-+         ``resources.reserved-system-`` ``memory``          +          ``String`` (data size)          +      ``JVM max memory`` * ``0.4``       +Amount of memory set up as allocation limit for     +
-+                                                            +                                          +                                         +single presto node. Reaching this limit will cause  +
-+                                                            +                                          +                                         +operations to start dropping on server. Higher      +
-+                                                            +                                          +                                         +value may increase server stability but may cause   +
-+                                                            +                                          +                                         +problems if physical server is used for other       +
-+                                                            +                                          +                                         +purposes as well. In some configurations it may     +
-+                                                            +                                          +                                         +even cause presto to be shut down by host if to     +
-+                                                            +                                          +                                         +much memory will be allocated.                      +
-+------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
-+                  ``sink.max-buffer-size``                  +          ``String`` (data size)          +                ``32 MB``                +Buffer size for IO writes while collecting pipeline +
-+                                                            +                                          +                                         +results. Higher value may increase speed of IO      +
-+                                                            +                                          +                                         +operations with the cost of additional memory. Also +
-+                                                            +                                          +                                         +higher value may increase number of data lost when  +
-+                                                            +                                          +                                         +presto node will fail effectively slowing down IO   +
-+                                                            +                                          +                                         +in unstable environment.                            +
-+------------------------------------------------------------+------------------------------------------+-----------------------------------------+----------------------------------------------------+
++                       property name                        +                   type                   +              default value              +tuning the property                                 +
++============================================================+==========================================+=========================================+====================================================+
 +                ``task.default-concurrency``                +               ``Integer``                +                  ``1``                  +Default local concurrency for parallel operators.   +
 +                                                            +                                          +                                         +Serves as default value for                         +
 +                                                            +                                          +                                         +``task_hash_build_concurrency`` and                 +
