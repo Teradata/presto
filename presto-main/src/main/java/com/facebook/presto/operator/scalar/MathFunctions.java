@@ -107,6 +107,15 @@ public final class MathFunctions
         return Math.ceil(num);
     }
 
+    @Description("truncate decimal places")
+    @ScalarFunction
+    @SqlType(StandardTypes.DOUBLE)
+    public static double truncate(@SqlType(StandardTypes.DOUBLE) double num, @SqlType(StandardTypes.BIGINT) long truncate_to)
+    {
+        double multiplier = Math.pow(10.0, truncate_to);
+        return Math.signum(num) * Math.floor(Math.abs(num) * multiplier) / multiplier;
+    }
+
     @Description("cosine")
     @ScalarFunction
     @SqlType(StandardTypes.DOUBLE)
