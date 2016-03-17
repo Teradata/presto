@@ -279,13 +279,14 @@ The following configuration properties may have an impact on connector performan
  * **Default value:** ``8 MB``
  * **Description:** *Unused*
 
+.. _parquet-optimized-reader:
 
 ``hive.parquet-optimized-reader.enabled``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
  * **Type:** ``Boolean``
  * **Default value:** ``false``
- * **Description:** *Deprecated* Enables number of reader improvements introduced by alternative parquet implementation. The new reader supports vectorized reads, lazy loading, and predicate push down, all of which make the reader more efficient and typically reduces wall clock time for a query. However as the code has changed significantly it may or may not introduce some minor issues, so it can be disabled if some  problems with environment are noticed.
+ * **Description:** *Deprecated* Serves as default value for ``parquet_optimized_reader_enabled`` session property. Enables number of reader improvements introduced by alternative parquet implementation. The new reader supports vectorized reads, lazy loading, and predicate push down, all of which make the reader more efficient and typically reduces wall clock time for a query. However as the code has changed significantly it may or may not introduce some minor issues, so it can be disabled if some  problems with environment are noticed. This property enables/disables all optimizations except of predicate pushdown as it is managed by ``hive.parquet-predicate-pushdown.enabled`` property.
 
 
 ``hive.parquet-predicate-pushdown.enabled``
@@ -293,7 +294,7 @@ The following configuration properties may have an impact on connector performan
 
  * **Type:** ``Boolean``
  * **Default value:** ``false``
- * **Description:** *Deprecated* Works as ``hive.parquet-predicate-pushdown.enabled`` but allows to only disable predicate pushdown optimization from new implementation of parquet reader.
+ * **Description:** *Deprecated* Serves as default value for ``parquet_predicate_pushdown_enabled`` sesssion property. See :ref:`hive.parquet-optimized-reader.enabled<parquet-optimized-reader>`.
 
 
 ``hive.parquet.use-column-names``
