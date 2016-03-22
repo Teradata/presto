@@ -35,9 +35,9 @@ import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMEN
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.type.Decimals.bigIntegerTenToNth;
 import static com.facebook.presto.spi.type.Decimals.checkOverflow;
-import static com.facebook.presto.spi.type.Decimals.longTenToNth;
 import static com.facebook.presto.spi.type.Decimals.decodeUnscaledValue;
 import static com.facebook.presto.spi.type.Decimals.encodeUnscaledValue;
+import static com.facebook.presto.spi.type.Decimals.longTenToNth;
 import static com.facebook.presto.spi.type.StandardTypes.BIGINT;
 import static com.facebook.presto.type.DecimalOperators.modulusScalarFunction;
 import static com.facebook.presto.type.DecimalOperators.modulusSignatureBuilder;
