@@ -30,16 +30,17 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
-import static com.facebook.presto.metadata.Signature.longVariableCalculation;
+import static com.facebook.presto.metadata.Signature.longVariableExpression;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
-import static com.facebook.presto.spi.type.LongDecimalType.tenToNth;
-import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToBigInteger;
-import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToSlice;
+import static com.facebook.presto.spi.type.Decimals.bigIntegerTenToNth;
+import static com.facebook.presto.spi.type.Decimals.checkOverflow;
+import static com.facebook.presto.spi.type.Decimals.longTenToNth;
+import static com.facebook.presto.spi.type.Decimals.decodeUnscaledValue;
+import static com.facebook.presto.spi.type.Decimals.encodeUnscaledValue;
 import static com.facebook.presto.spi.type.StandardTypes.BIGINT;
 import static com.facebook.presto.type.DecimalOperators.modulusScalarFunction;
 import static com.facebook.presto.type.DecimalOperators.modulusSignatureBuilder;
-import static com.facebook.presto.util.DecimalUtils.checkOverflow;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.Character.MAX_RADIX;
@@ -87,7 +88,7 @@ public final class MathFunctions
     @SqlType("decimal(p, s)")
     public static Slice absDecimal(@SqlType("decimal(p, s)") Slice num)
     {
-        return unscaledValueToSlice(unscaledValueToBigInteger(num).abs());
+        return encodeUnscaledValue(decodeUnscaledValue(num).abs());
     }
 
     @Description("arc cosine")
@@ -152,27 +153,31 @@ public final class MathFunctions
                 .kind(SCALAR)
                 .name(name)
                 .literalParameters("num_precision", "num_scale", "return_precision")
-                .longVariableConstraints(longVariableCalculation("return_precision", "num_precision - num_scale + min(num_scale, 1)"))
+                .longVariableConstraints(longVariableExpression("return_precision", "num_precision - num_scale + min(num_scale, 1)"))
                 .argumentTypes("decimal(num_precision, num_scale)")
                 .returnType("decimal(return_precision,0)")
                 .build();
         return SqlScalarFunction.builder(MathFunctions.class)
                 .signature(signature)
-                .methods("ceilingShortShortDecimal")
-                .extraParameters(MathFunctions::decimalTenToScaleAsLongExtraParameters)
-                .methods("ceilingLongShortDecimal", "ceilingLongLongDecimal")
-                .extraParameters(MathFunctions::decimalTenToScaleAsBigDecimalExtraParameters)
+                .implementation(b -> b
+                        .methods("ceilingShortShortDecimal")
+                        .withExtraParameters(MathFunctions::decimalTenToScaleAsLongExtraParameters)
+                )
+                .implementation(b -> b
+                        .methods("ceilingLongShortDecimal", "ceilingLongLongDecimal")
+                        .withExtraParameters(MathFunctions::decimalTenToScaleAsBigDecimalExtraParameters)
+                )
                 .build();
     }
 
     private static List<Object> decimalTenToScaleAsBigDecimalExtraParameters(SpecializeContext context)
     {
-        return ImmutableList.of(tenToNth(context.getLiteral("num_scale").intValue()));
+        return ImmutableList.of(longTenToNth(context.getLiteral("num_scale").intValue()));
     }
 
     private static List<Object> decimalTenToScaleAsLongExtraParameters(SpecializeContext context)
     {
-        return ImmutableList.of(tenToNth(context.getLiteral("num_scale").intValue()).longValueExact());
+        return ImmutableList.of(longTenToNth(context.getLiteral("num_scale").intValue()));
     }
 
     public static long ceilingShortShortDecimal(long num, long divisor)
@@ -188,12 +193,12 @@ public final class MathFunctions
 
     public static Slice ceilingLongLongDecimal(Slice num, BigInteger divisor)
     {
-        return unscaledValueToSlice(ceiling(num, divisor));
+        return encodeUnscaledValue(ceiling(num, divisor));
     }
 
     private static BigInteger ceiling(Slice num, BigInteger divisor)
     {
-        BigInteger[] divideAndRemainder = unscaledValueToBigInteger(num).divideAndRemainder(divisor);
+        BigInteger[] divideAndRemainder = decodeUnscaledValue(num).divideAndRemainder(divisor);
         return divideAndRemainder[0].add(BigInteger.valueOf(divideAndRemainder[1].signum() > 0 ? 1 : 0));
     }
 
@@ -259,16 +264,20 @@ public final class MathFunctions
                 .kind(SCALAR)
                 .name("floor")
                 .literalParameters("num_precision", "num_scale", "return_precision")
-                .longVariableConstraints(longVariableCalculation("return_precision", "num_precision - num_scale + min(num_scale, 1)"))
+                .longVariableConstraints(longVariableExpression("return_precision", "num_precision - num_scale + min(num_scale, 1)"))
                 .argumentTypes("decimal(num_precision, num_scale)")
                 .returnType("decimal(return_precision,0)")
                 .build();
         return SqlScalarFunction.builder(MathFunctions.class)
                 .signature(signature)
-                .methods("floorShortShortDecimal")
-                .extraParameters(MathFunctions::decimalTenToScaleAsLongExtraParameters)
-                .methods("floorLongShortDecimal", "floorLongLongDecimal")
-                .extraParameters(MathFunctions::decimalTenToScaleAsBigDecimalExtraParameters)
+                .implementation(b -> b
+                        .methods("floorShortShortDecimal")
+                        .withExtraParameters(MathFunctions::decimalTenToScaleAsLongExtraParameters)
+                )
+                .implementation(b -> b
+                        .methods("floorLongShortDecimal", "floorLongLongDecimal")
+                        .withExtraParameters(MathFunctions::decimalTenToScaleAsBigDecimalExtraParameters)
+                )
                 .build();
     }
 
@@ -280,7 +289,7 @@ public final class MathFunctions
 
     public static Slice floorLongLongDecimal(Slice num, BigInteger divisor)
     {
-        return unscaledValueToSlice(floor(num, divisor));
+        return encodeUnscaledValue(floor(num, divisor));
     }
 
     public static long floorLongShortDecimal(Slice num, BigInteger divisor)
@@ -290,7 +299,7 @@ public final class MathFunctions
 
     private static BigInteger floor(Slice num, BigInteger divisor)
     {
-        BigInteger[] divideAndRemainder = unscaledValueToBigInteger(num).divideAndRemainder(divisor);
+        BigInteger[] divideAndRemainder = decodeUnscaledValue(num).divideAndRemainder(divisor);
         return divideAndRemainder[0].add(BigInteger.valueOf(divideAndRemainder[1].signum() < 0 ? -1 : 0));
     }
 
@@ -439,24 +448,28 @@ public final class MathFunctions
                 .name("round")
                 .literalParameters("num_precision", "num_scale", "result_precision")
                 .longVariableConstraints(
-                        longVariableCalculation("result_precision", "min(38, num_precision - num_scale + min(1, num_scale))"))
+                        longVariableExpression("result_precision", "min(38, num_precision - num_scale + min(1, num_scale))"))
                 .argumentTypes("decimal(num_precision, num_scale)")
                 .returnType("decimal(result_precision,0)")
                 .build();
         return SqlScalarFunction.builder(MathFunctions.class)
                 .signature(signature)
                 .description("round to nearest integer")
-                .methods("roundShortDecimal")
-                .extraParameters(MathFunctions::decimalRoundShortExtraParameters)
-                .methods("roundLongDecimal")
-                .extraParameters(MathFunctions::decimalRoundLongExtraParameters)
+                .implementation(b -> b
+                        .methods("roundShortDecimal")
+                        .withExtraParameters(MathFunctions::decimalRoundShortExtraParameters)
+                )
+                .implementation(b -> b
+                        .methods("roundLongDecimal")
+                        .withExtraParameters(MathFunctions::decimalRoundLongExtraParameters)
+                )
                 .build();
     }
 
     private static List<Object> decimalRoundShortExtraParameters(SpecializeContext context)
     {
         long scale = context.getLiteral("num_scale");
-        long rescaleFactor = tenToNth((int) scale).longValueExact();
+        long rescaleFactor = longTenToNth((int) scale);
         return ImmutableList.of(rescaleFactor, scale);
     }
 
@@ -481,23 +494,23 @@ public final class MathFunctions
     private static List<Object> decimalRoundLongExtraParameters(SpecializeContext context)
     {
         long scale = context.getLiteral("num_scale");
-        BigInteger rescaleFactor = tenToNth((int) scale);
+        BigInteger rescaleFactor = bigIntegerTenToNth((int) scale);
         return ImmutableList.of(rescaleFactor, scale);
     }
 
     public static Slice roundLongDecimal(Slice numSlice, BigInteger rescaleFactor, long inputScale)
     {
-        BigInteger num = unscaledValueToBigInteger(numSlice);
+        BigInteger num = decodeUnscaledValue(numSlice);
         if (num.signum() == 0) {
-            return unscaledValueToSlice(0);
+            return encodeUnscaledValue(0);
         }
         if (inputScale == 0) {
-            return unscaledValueToSlice(num);
+            return encodeUnscaledValue(num);
         }
         if (num.signum() < 0) {
-            return unscaledValueToSlice(roundLongDecimal(num.negate(), rescaleFactor).negate());
+            return encodeUnscaledValue(roundLongDecimal(num.negate(), rescaleFactor).negate());
         }
-        return unscaledValueToSlice(roundLongDecimal(num, rescaleFactor));
+        return encodeUnscaledValue(roundLongDecimal(num, rescaleFactor));
     }
 
     private static BigInteger roundLongDecimal(BigInteger num, BigInteger rescaleFactor)
@@ -515,15 +528,17 @@ public final class MathFunctions
                 .literalParameters("num_precision", "num_scale", "result_precision")
                 .longVariableConstraints(
                         //result precision = increment the input precision only if the input number has a decimal point (scale > 0)
-                        longVariableCalculation("result_precision", "min(38, num_precision + 1)"))
+                        longVariableExpression("result_precision", "min(38, num_precision + 1)"))
                 .argumentTypes("decimal(num_precision, num_scale)", BIGINT)
                 .returnType("decimal(result_precision, num_scale)")
                 .build();
         return SqlScalarFunction.builder(MathFunctions.class)
                 .signature(signature)
                 .description("round to given number of decimal places")
-                .methods("roundNShortDecimal", "roundNLongDecimal")
-                .extraParameters(MathFunctions::decimalRoundNExtraParameters)
+                .implementation(b -> b
+                    .methods("roundNShortDecimal", "roundNLongDecimal")
+                    .withExtraParameters(MathFunctions::decimalRoundNExtraParameters)
+                )
                 .build();
     }
 
@@ -544,7 +559,7 @@ public final class MathFunctions
             return -roundNShortDecimal(-num, roundScale, inputPrecision, inputScale);
         }
 
-        long rescaleFactor = tenToNth((int) (inputScale - roundScale)).longValueExact();
+        long rescaleFactor = longTenToNth((int) (inputScale - roundScale));
         long remainder = num % rescaleFactor;
         int roundUp = (remainder >= rescaleFactor >> 1) ? 1 : 0;
         return (num / rescaleFactor + roundUp) * rescaleFactor;
@@ -552,18 +567,18 @@ public final class MathFunctions
 
     public static Slice roundNLongDecimal(Slice num, long roundScale, long inputPrecision, long inputScale)
     {
-        BigInteger unscaledVal = unscaledValueToBigInteger(num);
+        BigInteger unscaledVal = decodeUnscaledValue(num);
         if (unscaledVal.signum() == 0 || inputPrecision - inputScale + roundScale <= 0) {
-            return unscaledValueToSlice(0);
+            return encodeUnscaledValue(0);
         }
         if (roundScale >= inputScale) {
             return num;
         }
-        BigInteger rescaleFactor = tenToNth((int) (inputScale - roundScale));
+        BigInteger rescaleFactor = bigIntegerTenToNth((int) (inputScale - roundScale));
         if (unscaledVal.signum() < 0) {
-            return unscaledValueToSlice(roundNLongDecimal(unscaledVal.negate(), rescaleFactor).negate());
+            return encodeUnscaledValue(roundNLongDecimal(unscaledVal.negate(), rescaleFactor).negate());
         }
-        return unscaledValueToSlice(roundNLongDecimal(unscaledVal, rescaleFactor));
+        return encodeUnscaledValue(roundNLongDecimal(unscaledVal, rescaleFactor));
     }
 
     public static BigInteger roundNLongDecimal(BigInteger num, BigInteger rescaleFactor)
