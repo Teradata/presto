@@ -19,8 +19,8 @@ import com.facebook.presto.spi.type.Type;
 import io.airlift.slice.DynamicSliceOutput;
 import io.airlift.slice.SliceInput;
 
-import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToBigInteger;
-import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToSlice;
+import static com.facebook.presto.spi.type.Decimals.decodeUnscaledValue;
+import static com.facebook.presto.spi.type.Decimals.encodeUnscaledValue;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
 
@@ -42,7 +42,7 @@ public class BigIntegerAndLongStateSerializer
         else {
             DynamicSliceOutput sliceOutput = new DynamicSliceOutput((int) state.getEstimatedSize() + SIZE_OF_LONG);
             sliceOutput.writeLong(state.getLong());
-            sliceOutput.writeBytes(unscaledValueToSlice(state.getBigInteger()));
+            sliceOutput.writeBytes(encodeUnscaledValue(state.getBigInteger()));
             VARBINARY.writeSlice(out, sliceOutput.slice());
         }
     }
@@ -53,7 +53,7 @@ public class BigIntegerAndLongStateSerializer
         if (!block.isNull(index)) {
             SliceInput slice = VARBINARY.getSlice(block, index).getInput();
             state.setLong(slice.readLong());
-            state.setBigInteger(unscaledValueToBigInteger(slice.readSlice(slice.available())));
+            state.setBigInteger(decodeUnscaledValue(slice.readSlice(slice.available())));
         }
     }
 }
