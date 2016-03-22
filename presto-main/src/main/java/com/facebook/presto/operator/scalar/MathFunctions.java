@@ -175,7 +175,7 @@ public final class MathFunctions
 
     private static List<Object> decimalTenToScaleAsBigDecimalExtraParameters(SpecializeContext context)
     {
-        return ImmutableList.of(longTenToNth(context.getLiteral("num_scale").intValue()));
+        return ImmutableList.of(bigIntegerTenToNth(context.getLiteral("num_scale").intValue()));
     }
 
     private static List<Object> decimalTenToScaleAsLongExtraParameters(SpecializeContext context)
