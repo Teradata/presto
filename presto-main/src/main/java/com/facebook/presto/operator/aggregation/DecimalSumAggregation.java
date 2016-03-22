@@ -43,8 +43,9 @@ import static com.facebook.presto.operator.aggregation.AggregationMetadata.Param
 import static com.facebook.presto.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.BLOCK_INPUT_CHANNEL;
 import static com.facebook.presto.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.STATE;
 import static com.facebook.presto.operator.aggregation.AggregationUtils.generateAggregationName;
-import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToBigInteger;
-import static com.facebook.presto.util.DecimalUtils.checkOverflow;
+import static com.facebook.presto.spi.type.Decimals.decodeUnscaledValue;
+import static com.facebook.presto.spi.type.Decimals.writeBigDecimal;
+import static com.facebook.presto.spi.type.Decimals.checkOverflow;
 import static com.facebook.presto.util.Reflection.methodHandle;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
@@ -127,7 +128,7 @@ public class DecimalSumAggregation
 
     public static void inputLongDecimal(Type type, BigIntegerState state, Block block, int position)
     {
-        accumulateValueInState(unscaledValueToBigInteger(type.getSlice(block, position)), state);
+        accumulateValueInState(decodeUnscaledValue(type.getSlice(block, position)), state);
     }
 
     private static void accumulateValueInState(BigInteger value, BigIntegerState state)
@@ -160,8 +161,8 @@ public class DecimalSumAggregation
         }
         else {
             BigDecimal sum = new BigDecimal(state.getBigInteger(), type.getScale());
-            checkOverflow(sum);
-            type.writeBigDecimal(out, sum);
+            checkOverflow(state.getBigInteger());
+            writeBigDecimal(type, out, sum);
         }
     }
 }
