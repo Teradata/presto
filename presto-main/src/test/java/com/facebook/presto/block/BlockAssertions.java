@@ -33,6 +33,7 @@ import java.util.List;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DateType.DATE;
+import static com.facebook.presto.spi.type.Decimals.writeBigDecimal;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
@@ -241,7 +242,7 @@ public final class BlockAssertions
                 builder.appendNull();
             }
             else {
-                longDecimalType.writeBigDecimal(builder, new BigDecimal(value));
+                writeBigDecimal(longDecimalType, builder, new BigDecimal(value));
             }
         }
 
