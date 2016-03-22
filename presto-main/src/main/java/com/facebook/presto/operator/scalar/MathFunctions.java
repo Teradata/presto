@@ -76,19 +76,22 @@ public final class MathFunctions
     }
 
     @ScalarFunction("abs")
-    @LiteralParameters({"p", "s"})
-    @SqlType("decimal(p, s)")
-    public static long absDecimal(@SqlType("decimal(p, s)") long num)
+    @Description("absolute value")
+    public static final class Abs
     {
-        return num > 0 ? num : -num;
-    }
+        @LiteralParameters({"p", "s"})
+        @SqlType("decimal(p, s)")
+        public static long absShort(@SqlType("decimal(p, s)") long arg)
+        {
+            return arg > 0 ? arg : -arg;
+        }
 
-    @ScalarFunction("abs")
-    @LiteralParameters({"p", "s"})
-    @SqlType("decimal(p, s)")
-    public static Slice absDecimal(@SqlType("decimal(p, s)") Slice num)
-    {
-        return encodeUnscaledValue(decodeUnscaledValue(num).abs());
+        @LiteralParameters({"p", "s"})
+        @SqlType("decimal(p, s)")
+        public static Slice absLong(@SqlType("decimal(p, s)") Slice arg)
+        {
+            return encodeUnscaledValue(decodeUnscaledValue(arg).abs());
+        }
     }
 
     @Description("arc cosine")
