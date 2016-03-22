@@ -19,7 +19,6 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.SqlDecimal;
-import org.jetbrains.annotations.NotNull;
 
 import java.math.BigDecimal;
 
@@ -43,7 +42,6 @@ public abstract class AbstractTestDecimalAverageAggregation
 
     protected abstract void writeDecimalToBlock(BigDecimal decimal, BlockBuilder blockBuilder);
 
-    @NotNull
     private BigDecimal getBigDecimalForCounter(int i)
     {
         String iAsString = String.valueOf(Math.abs(i));
