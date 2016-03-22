@@ -463,29 +463,9 @@ public final class DecimalOperators
     {
         return SqlScalarFunction.builder(DecimalOperators.class)
                 .signature(signature)
-                .methods("modulusShortShortShort", "modulusLongLongLong", "modulusShortLongLong", "modulusShortLongShort", "modulusLongShortShort", "modulusLongShortLong")
-                .extraParameters(DecimalOperators::longRescaleExtraParameters)
-                .build();
-    }
-
-    private static SqlScalarFunction decimalModulusOperator()
-    {
-        Signature signature = Signature.builder()
-                .kind(SCALAR)
-                .operatorType(MODULUS)
-                .literalParameters("a_precision", "a_scale", "b_precision", "b_scale", "r_precision", "r_scale")
-                .longVariableConstraints(
-                        longVariableExpression("r_precision", "min(b_precision - b_scale, a_precision - a_scale) + max(a_scale, b_scale)"),
-                        longVariableExpression("r_scale", "max(a_scale, b_scale)")
-                )
-                .argumentTypes("decimal(a_precision, a_scale)", "decimal(b_precision, b_scale)")
-                .returnType("decimal(r_precision, r_scale)")
-                .build();
-        return SqlScalarFunction.builder(DecimalOperators.class)
-                .signature(signature)
                 .implementation(b -> b
-                        .methods("modulusShortShortShort", "modulusLongLongLong", "modulusShortLongLong", "modulusShortLongShort", "modulusLongShortShort", "modulusLongShortLong")
-                        .withExtraParameters(DecimalOperators::longRescaleExtraParameters)
+                    .methods("modulusShortShortShort", "modulusLongLongLong", "modulusShortLongLong", "modulusShortLongShort", "modulusLongShortShort", "modulusLongShortLong")
+                    .withExtraParameters(DecimalOperators::longRescaleExtraParameters)
                 )
                 .build();
     }
@@ -495,8 +475,8 @@ public final class DecimalOperators
         return Signature.builder()
                 .literalParameters("a_precision", "a_scale", "b_precision", "b_scale", "r_precision", "r_scale")
                 .longVariableConstraints(
-                        longVariableCalculation("r_precision", "min(b_precision - b_scale, a_precision - a_scale) + max(a_scale, b_scale)"),
-                        longVariableCalculation("r_scale", "max(a_scale, b_scale)")
+                        longVariableExpression("r_precision", "min(b_precision - b_scale, a_precision - a_scale) + max(a_scale, b_scale)"),
+                        longVariableExpression("r_scale", "max(a_scale, b_scale)")
                 )
                 .argumentTypes("decimal(a_precision, a_scale)", "decimal(b_precision, b_scale)")
                 .returnType("decimal(r_precision, r_scale)");
