@@ -42,7 +42,8 @@ import static com.facebook.presto.operator.aggregation.AggregationMetadata.Param
 import static com.facebook.presto.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.BLOCK_INPUT_CHANNEL;
 import static com.facebook.presto.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.STATE;
 import static com.facebook.presto.operator.aggregation.AggregationUtils.generateAggregationName;
-import static com.facebook.presto.spi.type.LongDecimalType.unscaledValueToBigInteger;
+import static com.facebook.presto.spi.type.Decimals.decodeUnscaledValue;
+import static com.facebook.presto.spi.type.Decimals.writeBigDecimal;
 import static com.facebook.presto.spi.type.StandardTypes.DECIMAL;
 import static com.facebook.presto.util.Reflection.methodHandle;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -131,7 +132,7 @@ public class DecimalAverageAggregation
 
     public static void inputLongDecimal(Type type, BigIntegerAndLongState state, Block block, int position)
     {
-        accumulateValueInState(unscaledValueToBigInteger(type.getSlice(block, position)), state);
+        accumulateValueInState(decodeUnscaledValue(type.getSlice(block, position)), state);
     }
 
     private static void accumulateValueInState(BigInteger value, BigIntegerAndLongState state)
@@ -175,7 +176,7 @@ public class DecimalAverageAggregation
             out.appendNull();
         }
         else {
-            type.writeBigDecimal(out, average(state, type));
+            writeBigDecimal(type, out, average(state, type));
         }
     }
 
