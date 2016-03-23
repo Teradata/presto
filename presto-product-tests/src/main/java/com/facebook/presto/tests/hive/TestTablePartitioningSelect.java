@@ -35,7 +35,6 @@ import static com.teradata.tempto.fulfillment.table.MutableTableRequirement.Stat
 import static com.teradata.tempto.fulfillment.table.TableRequirements.mutableTable;
 import static com.teradata.tempto.fulfillment.table.hive.InlineDataSource.createResourceDataSource;
 import static com.teradata.tempto.query.QueryExecutor.query;
-import static org.assertj.core.api.Assertions.assertThat;
 
 public class TestTablePartitioningSelect
         extends HivePartitioningTest
@@ -95,28 +94,9 @@ public class TestTablePartitioningSelect
         String selectFromAllPartitionsSql = "SELECT * FROM " + tableNameInDatabase;
         QueryResult allPartitionsQueryResult = query(selectFromAllPartitionsSql);
         assertThat(allPartitionsQueryResult).containsOnly(row(42, 1), row(42, 2));
-        assertProcessedLinesCountEquals(selectFromAllPartitionsSql, allPartitionsQueryResult, 2);
 
         String selectFromOnePartitionsSql = "SELECT * FROM " + tableNameInDatabase + " WHERE part_col = 2";
         QueryResult onePartitionQueryResult = query(selectFromOnePartitionsSql);
         assertThat(onePartitionQueryResult).containsOnly(row(42, 2));
-        assertProcessedLinesCountEquals(selectFromOnePartitionsSql, onePartitionQueryResult, 1);
-    }
-
-    private static final long GET_PROCESSED_LINES_COUNT_RETRY_SLEEP = 500;
-
-    private void assertProcessedLinesCountEquals(String sqlStatement, QueryResult allPartitionsQueryResult, int expected)
-            throws SQLException
-    {
-        long processedLinesCountAllPartitions = getProcessedLinesCount(sqlStatement, allPartitionsQueryResult);
-        if (processedLinesCountAllPartitions != expected) {
-            try {
-                Thread.sleep(GET_PROCESSED_LINES_COUNT_RETRY_SLEEP);
-            }
-            catch (InterruptedException e) {
-            }
-            processedLinesCountAllPartitions = getProcessedLinesCount(sqlStatement, allPartitionsQueryResult);
-        }
-        assertThat(processedLinesCountAllPartitions).isEqualTo(expected);
     }
 }
