@@ -235,7 +235,7 @@ public class BackgroundHiveSplitLoader
                 }
             }
             else {
-                boolean splittable = isSplittable(files.getInputFormat(), hdfsEnvironment.getFileSystem(file.getPath()), file.getPath());
+                boolean splittable = isSplittable(files.getInputFormat(), hdfsEnvironment.getFileSystem(session.getUser(), file.getPath()), file.getPath());
 
                 CompletableFuture<?> future = hiveSplitSource.addToQueue(createHiveSplits(
                         files.getPartitionName(),
@@ -285,7 +285,7 @@ public class BackgroundHiveSplitLoader
                 FileSplit split = ((SymlinkTextInputFormat.SymlinkTextInputSplit) rawSplit).getTargetSplit();
 
                 // get the filesystem for the target path -- it may be a different hdfs instance
-                FileSystem targetFilesystem = hdfsEnvironment.getFileSystem(split.getPath());
+                FileSystem targetFilesystem = hdfsEnvironment.getFileSystem(session.getUser(), split.getPath());
                 FileStatus file = targetFilesystem.getFileStatus(split.getPath());
                 hiveSplitSource.addToQueue(createHiveSplits(
                         partitionName,
@@ -307,7 +307,7 @@ public class BackgroundHiveSplitLoader
         }
 
         // If only one bucket could match: load that one file
-        FileSystem fs = hdfsEnvironment.getFileSystem(path);
+        FileSystem fs = hdfsEnvironment.getFileSystem(session.getUser(), path);
         HiveFileIterator iterator = new HiveFileIterator(path, fs, directoryLister, namenodeStats, partitionName, inputFormat, schema, partitionKeys, effectivePredicate);
         if (bucket.isPresent()) {
             List<LocatedFileStatus> locatedFileStatuses = listAndSortBucketFiles(iterator, bucket.get().getBucketCount());
@@ -338,7 +338,7 @@ public class BackgroundHiveSplitLoader
 
             for (int bucketIndex = 0; bucketIndex < bucketCount; bucketIndex++) {
                 LocatedFileStatus file = list.get(bucketIndex);
-                boolean splittable = isSplittable(iterator.getInputFormat(), hdfsEnvironment.getFileSystem(file.getPath()), file.getPath());
+                boolean splittable = isSplittable(iterator.getInputFormat(), hdfsEnvironment.getFileSystem(session.getUser(), file.getPath()), file.getPath());
 
                 hiveSplitSource.addToQueue(createHiveSplits(
                         iterator.getPartitionName(),
