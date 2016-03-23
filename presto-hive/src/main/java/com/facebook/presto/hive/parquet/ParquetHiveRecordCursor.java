@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.hive.parquet;
 
+import com.facebook.presto.hive.HdfsEnvironment;
 import com.facebook.presto.hive.HiveColumnHandle;
 import com.facebook.presto.hive.HivePartitionKey;
 import com.facebook.presto.hive.HiveRecordCursor;
@@ -32,6 +33,7 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
@@ -132,6 +134,8 @@ public class ParquetHiveRecordCursor
     private boolean closed;
 
     public ParquetHiveRecordCursor(
+            HdfsEnvironment hdfsEnvironment,
+            String sessionUser,
             Configuration configuration,
             Path path,
             long start,
@@ -228,6 +232,8 @@ public class ParquetHiveRecordCursor
         }
 
         this.recordReader = createParquetRecordReader(
+                hdfsEnvironment,
+                sessionUser,
                 configuration,
                 path,
                 start,
@@ -378,6 +384,8 @@ public class ParquetHiveRecordCursor
     }
 
     private ParquetRecordReader<FakeParquetRecord> createParquetRecordReader(
+            HdfsEnvironment hdfsEnvironment,
+            String sessionUser,
             Configuration configuration,
             Path path,
             long start,
@@ -388,7 +396,10 @@ public class ParquetHiveRecordCursor
             boolean predicatePushdownEnabled,
             TupleDomain<HiveColumnHandle> effectivePredicate)
     {
-        try (ParquetDataSource dataSource = buildHdfsParquetDataSource(path, configuration, start, length)) {
+        ParquetDataSource dataSource = null;
+        try {
+            FileSystem fileSystem = hdfsEnvironment.getFileSystem(sessionUser, path, configuration);
+            dataSource = buildHdfsParquetDataSource(fileSystem, path, start, length);
             ParquetMetadata parquetMetadata = ParquetFileReader.readFooter(configuration, path, NO_FILTER);
             List<BlockMetaData> blocks = parquetMetadata.getBlocks();
             FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
@@ -414,8 +425,9 @@ public class ParquetHiveRecordCursor
 
             if (predicatePushdownEnabled) {
                 ParquetPredicate parquetPredicate = buildParquetPredicate(columns, effectivePredicate, fileMetaData.getSchema(), typeManager);
+                ParquetDataSource finalDataSource = dataSource;
                 splitGroup = splitGroup.stream()
-                        .filter(block -> predicateMatches(parquetPredicate, block, dataSource, requestedSchema, effectivePredicate))
+                        .filter(block -> predicateMatches(parquetPredicate, block, finalDataSource, requestedSchema, effectivePredicate))
                         .collect(toList());
             }
 
@@ -433,6 +445,13 @@ public class ParquetHiveRecordCursor
             return realReader;
         }
         catch (Exception e) {
+            if (dataSource != null) {
+                try {
+                    dataSource.close();
+                }
+                catch (IOException ignored) {
+                }
+            }
             if (e instanceof PrestoException) {
                 throw (PrestoException) e;
             }
