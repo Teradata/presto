@@ -14,12 +14,15 @@
 package com.facebook.presto.operator.scalar;
 
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.type.SqlDecimal;
 import org.testng.annotations.Test;
 
 import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
+import static com.facebook.presto.spi.StandardErrorCode.DIVISION_BY_ZERO;
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
+import static com.facebook.presto.spi.type.DecimalType.createDecimalType;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 
@@ -44,6 +47,11 @@ public class TestMathFunctions
         assertFunction("abs(-123.45)", DOUBLE, 123.45);
         assertFunction("abs(CAST(NULL AS DOUBLE))", DOUBLE, null);
         assertInvalidFunction("abs(-9223372036854775807 - if(rand() < 10, 1, 1))", NUMERIC_VALUE_OUT_OF_RANGE);
+        assertFunction("abs(DECIMAL '123.45')", createDecimalType(5, 2), SqlDecimal.of("12345", 5, 2));
+        assertFunction("abs(DECIMAL '-123.45')", createDecimalType(5, 2), SqlDecimal.of("12345", 5, 2));
+        assertFunction("abs(DECIMAL '1234567890123456.78')", createDecimalType(18, 2), SqlDecimal.of("123456789012345678", 18, 2));
+        assertFunction("abs(DECIMAL '-1234567890123456.78')", createDecimalType(18, 2), SqlDecimal.of("123456789012345678", 18, 2));
+        assertFunction("abs(CAST(NULL AS DECIMAL(1,0)))", createDecimalType(1, 0), null);
     }
 
     @Test
@@ -104,6 +112,8 @@ public class TestMathFunctions
         assertFunction("ceil(123.45)", DOUBLE, 124.0);
         assertFunction("ceil(-123.45)", DOUBLE, -123.0);
         assertFunction("ceil(CAST(NULL as DOUBLE))", DOUBLE, null);
+        assertFunction("ceil(DECIMAL '123.45')", createDecimalType(4), SqlDecimal.of("124"));
+        assertFunction("ceil(DECIMAL '1234567890123456.78')", createDecimalType(17), SqlDecimal.of("1234567890123457"));
         assertFunction("ceiling(123)", BIGINT, 123);
         assertFunction("ceiling(-123)", BIGINT, -123);
         assertFunction("ceiling(CAST(NULL AS BIGINT))", BIGINT, null);
@@ -112,6 +122,20 @@ public class TestMathFunctions
         assertFunction("ceiling(123.45)", DOUBLE, 124.0);
         assertFunction("ceiling(-123.45)", DOUBLE, -123.0);
         assertFunction("ceiling(CAST(NULL AS DOUBLE))", DOUBLE, null);
+        assertFunction("ceiling(DECIMAL '123')", createDecimalType(3), SqlDecimal.of("123"));
+        assertFunction("ceiling(DECIMAL '-123')", createDecimalType(3), SqlDecimal.of("-123"));
+        assertFunction("ceiling(DECIMAL '123.45')", createDecimalType(4), SqlDecimal.of("124"));
+        assertFunction("ceiling(DECIMAL '-123.45')", createDecimalType(4), SqlDecimal.of("-123"));
+        assertFunction("ceiling(DECIMAL '999.9')", createDecimalType(4), SqlDecimal.of("1000"));
+        assertFunction("ceiling(DECIMAL '123456789012345678')", createDecimalType(18), SqlDecimal.of("123456789012345678"));
+        assertFunction("ceiling(DECIMAL '-123456789012345678')", createDecimalType(18), SqlDecimal.of("-123456789012345678"));
+        assertFunction("ceiling(DECIMAL '123456789012345678.00')", createDecimalType(19), SqlDecimal.of("123456789012345678"));
+        assertFunction("ceiling(DECIMAL '123456789012345678.99')", createDecimalType(19), SqlDecimal.of("123456789012345679"));
+        assertFunction("ceiling(DECIMAL '-123456789012345678.99')", createDecimalType(19), SqlDecimal.of("-123456789012345678"));
+        assertFunction("ceiling(DECIMAL '999999999999999999.9')", createDecimalType(19), SqlDecimal.of("1000000000000000000"));
+        assertFunction("ceiling(DECIMAL '1234567890123456.78')", createDecimalType(17), SqlDecimal.of("1234567890123457"));
+        assertFunction("ceiling(DECIMAL '-1234567890123456.78')", createDecimalType(17), SqlDecimal.of("-1234567890123456"));
+        assertFunction("ceiling(CAST(NULL AS DECIMAL(1,0)))", createDecimalType(1), null);
     }
 
     @Test
@@ -167,6 +191,20 @@ public class TestMathFunctions
         assertFunction("floor(123.45)", DOUBLE, 123.0);
         assertFunction("floor(-123.45)", DOUBLE, -124.0);
         assertFunction("floor(CAST(NULL as DOUBLE))", DOUBLE, null);
+        assertFunction("floor(DECIMAL '123')", createDecimalType(3), SqlDecimal.of("123"));
+        assertFunction("floor(DECIMAL '-123')", createDecimalType(3), SqlDecimal.of("-123"));
+        assertFunction("floor(DECIMAL '123.45')", createDecimalType(4), SqlDecimal.of("123"));
+        assertFunction("floor(DECIMAL '-123.45')", createDecimalType(4), SqlDecimal.of("-124"));
+        assertFunction("floor(DECIMAL '-999.9')", createDecimalType(4), SqlDecimal.of("-1000"));
+        assertFunction("floor(DECIMAL '123456789012345678')", createDecimalType(18), SqlDecimal.of("123456789012345678"));
+        assertFunction("floor(DECIMAL '-123456789012345678')", createDecimalType(18), SqlDecimal.of("-123456789012345678"));
+        assertFunction("floor(DECIMAL '123456789012345678.00')", createDecimalType(19), SqlDecimal.of("123456789012345678"));
+        assertFunction("floor(DECIMAL '123456789012345678.99')", createDecimalType(19), SqlDecimal.of("123456789012345678"));
+        assertFunction("floor(DECIMAL '-123456789012345678.99')", createDecimalType(19), SqlDecimal.of("-123456789012345679"));
+        assertFunction("floor(DECIMAL '-999999999999999999.9')", createDecimalType(19), SqlDecimal.of("-1000000000000000000"));
+        assertFunction("floor(DECIMAL '1234567890123456.78')", createDecimalType(17), SqlDecimal.of("1234567890123456"));
+        assertFunction("floor(DECIMAL '-1234567890123456.78')", createDecimalType(17), SqlDecimal.of("-1234567890123457"));
+        assertFunction("floor(CAST(NULL as DECIMAL(1,0)))", createDecimalType(1), null);
     }
 
     @Test
@@ -237,6 +275,20 @@ public class TestMathFunctions
         }
         assertFunction("mod(5.0, NULL)", DOUBLE, null);
         assertFunction("mod(NULL, 5.0)", DOUBLE, null);
+
+        assertFunction("mod(DECIMAL '0.0', DECIMAL '2.0')", createDecimalType(1, 1), SqlDecimal.of("0.0"));
+        assertFunction("mod(DECIMAL '13.0', DECIMAL '5.0')", createDecimalType(2, 1), SqlDecimal.of("3.0"));
+        assertFunction("mod(DECIMAL '-13.0', DECIMAL '5.0')", createDecimalType(2, 1), SqlDecimal.of("-3.0"));
+        assertFunction("mod(DECIMAL '13.0', DECIMAL '-5.0')", createDecimalType(2, 1), SqlDecimal.of("3.0"));
+        assertFunction("mod(DECIMAL '-13.0', DECIMAL '-5.0')", createDecimalType(2, 1), SqlDecimal.of("-3.0"));
+        assertFunction("mod(DECIMAL '5.0', DECIMAL '2.5')", createDecimalType(2, 1), SqlDecimal.of("0.0"));
+        assertFunction("mod(DECIMAL '5.0', DECIMAL '2.05')", createDecimalType(3, 2), SqlDecimal.of("0.90"));
+        assertFunction("mod(DECIMAL '5.0', DECIMAL '2.55')", createDecimalType(3, 2), SqlDecimal.of("2.45"));
+        assertFunction("mod(DECIMAL '5.0001', DECIMAL '2.55')", createDecimalType(5, 4), SqlDecimal.of("2.4501"));
+        assertFunction("mod(DECIMAL '12345678901234567.90', DECIMAL '12345678901234567.89')", createDecimalType(19, 2), SqlDecimal.of("0.01"));
+        assertFunction("mod(DECIMAL '5.0', CAST(NULL as DECIMAL(1,0)))", createDecimalType(2, 1), null);
+        assertFunction("mod(CAST(NULL as DECIMAL(1,0)), DECIMAL '5.0')", createDecimalType(2, 1), null);
+        assertInvalidFunction("mod(DECIMAL '5.0', DECIMAL '0')", DIVISION_BY_ZERO);
     }
 
     @Test
@@ -357,6 +409,31 @@ public class TestMathFunctions
         assertFunction("round(-3.5001)", DOUBLE, -4.0);
         assertFunction("round(-3.99)", DOUBLE, -4.0);
         assertFunction("round(CAST(NULL as DOUBLE))", DOUBLE, null);
+        assertFunction("round(DECIMAL '3')", createDecimalType(1, 0), SqlDecimal.of("3"));
+        assertFunction("round(DECIMAL '-3')", createDecimalType(1, 0), SqlDecimal.of("-3"));
+        assertFunction("round(DECIMAL '3.0')", createDecimalType(2, 0), SqlDecimal.of("3"));
+        assertFunction("round(DECIMAL '-3.0')", createDecimalType(2, 0), SqlDecimal.of("-3"));
+        assertFunction("round(DECIMAL '3.499')", createDecimalType(2, 0), SqlDecimal.of("3"));
+        assertFunction("round(DECIMAL '-3.499')", createDecimalType(2, 0), SqlDecimal.of("-3"));
+        assertFunction("round(DECIMAL '3.5')", createDecimalType(2, 0), SqlDecimal.of("4"));
+        assertFunction("round(DECIMAL '-3.5')", createDecimalType(2, 0), SqlDecimal.of("-4"));
+        assertFunction("round(DECIMAL '-3.5001')", createDecimalType(2, 0), SqlDecimal.of("-4"));
+        assertFunction("round(DECIMAL '-3.99')", createDecimalType(2, 0), SqlDecimal.of("-4"));
+        assertFunction("round(DECIMAL '9.9')", createDecimalType(2, 0), SqlDecimal.of("10"));
+        assertFunction("round(DECIMAL '-9.9')", createDecimalType(2, 0), SqlDecimal.of("-10"));
+        assertFunction("round(DECIMAL '123456789012345678')", createDecimalType(18, 0), SqlDecimal.of("123456789012345678"));
+        assertFunction("round(DECIMAL '-123456789012345678')", createDecimalType(18, 0), SqlDecimal.of("-123456789012345678"));
+        assertFunction("round(DECIMAL '123456789012345678.0')", createDecimalType(19, 0), SqlDecimal.of("123456789012345678"));
+        assertFunction("round(DECIMAL '-123456789012345678.0')", createDecimalType(19, 0), SqlDecimal.of("-123456789012345678"));
+        assertFunction("round(DECIMAL '123456789012345678.49')", createDecimalType(19, 0), SqlDecimal.of("123456789012345678"));
+        assertFunction("round(DECIMAL '-123456789012345678.49')", createDecimalType(19, 0), SqlDecimal.of("-123456789012345678"));
+        assertFunction("round(DECIMAL '123456789012345678.5')", createDecimalType(19, 0), SqlDecimal.of("123456789012345679"));
+        assertFunction("round(DECIMAL '-123456789012345678.5')", createDecimalType(19, 0), SqlDecimal.of("-123456789012345679"));
+        assertFunction("round(DECIMAL '123456789012345678.501')", createDecimalType(19, 0), SqlDecimal.of("123456789012345679"));
+        assertFunction("round(DECIMAL '-123456789012345678.501')", createDecimalType(19, 0), SqlDecimal.of("-123456789012345679"));
+        assertFunction("round(DECIMAL '999999999999999999.9')", createDecimalType(19, 0), SqlDecimal.of("1000000000000000000"));
+        assertFunction("round(DECIMAL '-999999999999999999.9')", createDecimalType(19, 0), SqlDecimal.of("-1000000000000000000"));
+        assertFunction("round(CAST(NULL as DECIMAL(1,0)))", createDecimalType(1, 0), null);
 
         assertFunction("round( 3, 0)", BIGINT, 3);
         assertFunction("round(-3, 0)", BIGINT, -3);
@@ -368,6 +445,31 @@ public class TestMathFunctions
         assertFunction("round(-3.5, 0)", DOUBLE, -4.0);
         assertFunction("round(-3.5001, 0)", DOUBLE, -4.0);
         assertFunction("round(-3.99, 0)", DOUBLE, -4.0);
+        assertFunction("round(DECIMAL '3', 0)", createDecimalType(2, 0), SqlDecimal.of("3"));
+        assertFunction("round(DECIMAL '-3', 0)", createDecimalType(2, 0), SqlDecimal.of("-3"));
+        assertFunction("round(DECIMAL '3.0', 0)", createDecimalType(3, 1), SqlDecimal.of("3.0"));
+        assertFunction("round(DECIMAL '-3.0', 0)", createDecimalType(3, 1), SqlDecimal.of("-3.0"));
+        assertFunction("round(DECIMAL '3.499', 0)", createDecimalType(5, 3), SqlDecimal.of("3.000"));
+        assertFunction("round(DECIMAL '-3.499', 0)", createDecimalType(5, 3), SqlDecimal.of("-3.000"));
+        assertFunction("round(DECIMAL '3.5', 0)", createDecimalType(3, 1), SqlDecimal.of("4.0"));
+        assertFunction("round(DECIMAL '-3.5', 0)", createDecimalType(3, 1), SqlDecimal.of("-4.0"));
+        assertFunction("round(DECIMAL '-3.5001', 0)", createDecimalType(6, 4), SqlDecimal.of("-4.0000"));
+        assertFunction("round(DECIMAL '-3.99', 0)", createDecimalType(4, 2), SqlDecimal.of("-4.00"));
+        assertFunction("round(DECIMAL '9.9', 0)", createDecimalType(3, 1), SqlDecimal.of("10.0"));
+        assertFunction("round(DECIMAL '-9.9', 0)", createDecimalType(3, 1), SqlDecimal.of("-10.0"));
+        assertFunction("round(DECIMAL '123456789012345678', 0)", createDecimalType(19, 0), SqlDecimal.of("123456789012345678"));
+        assertFunction("round(DECIMAL '-123456789012345678', 0)", createDecimalType(19, 0), SqlDecimal.of("-123456789012345678"));
+        assertFunction("round(DECIMAL '123456789012345678.0', 0)", createDecimalType(20, 1), SqlDecimal.of("123456789012345678.0"));
+        assertFunction("round(DECIMAL '-123456789012345678.0', 0)", createDecimalType(20, 1), SqlDecimal.of("-123456789012345678.0"));
+        assertFunction("round(DECIMAL '123456789012345678.49', 0)", createDecimalType(21, 2), SqlDecimal.of("123456789012345678.00"));
+        assertFunction("round(DECIMAL '-123456789012345678.49', 0)", createDecimalType(21, 2), SqlDecimal.of("-123456789012345678.00"));
+        assertFunction("round(DECIMAL '123456789012345678.5', 0)", createDecimalType(20, 1), SqlDecimal.of("123456789012345679.0"));
+        assertFunction("round(DECIMAL '-123456789012345678.5', 0)", createDecimalType(20, 1), SqlDecimal.of("-123456789012345679.0"));
+        assertFunction("round(DECIMAL '123456789012345678.501', 0)", createDecimalType(22, 3), SqlDecimal.of("123456789012345679.000"));
+        assertFunction("round(DECIMAL '-123456789012345678.501', 0)", createDecimalType(22, 3), SqlDecimal.of("-123456789012345679.000"));
+        assertFunction("round(DECIMAL '999999999999999999.9', 0)", createDecimalType(20, 1), SqlDecimal.of("1000000000000000000.0"));
+        assertFunction("round(DECIMAL '-999999999999999999.9', 0)", createDecimalType(20, 1), SqlDecimal.of("-1000000000000000000.0"));
+        assertFunction("round(CAST(NULL as DECIMAL(1,0)), 0)", createDecimalType(2, 0), null);
 
         assertFunction("round( 3, 1)", BIGINT, 3);
         assertFunction("round(-3, 1)", BIGINT, -3);
@@ -385,6 +487,62 @@ public class TestMathFunctions
         assertFunction("round(CAST(NULL as DOUBLE), CAST(NULL as BIGINT))", DOUBLE, null);
         assertFunction("round(-3.0, CAST(NULL as BIGINT))", DOUBLE, null);
         assertFunction("round(CAST(NULL as DOUBLE), 1)", DOUBLE, null);
+        assertFunction("round(DECIMAL '3', 1)", createDecimalType(2, 0), SqlDecimal.of("3"));
+        assertFunction("round(DECIMAL '-3', 1)", createDecimalType(2, 0), SqlDecimal.of("-3"));
+        assertFunction("round(DECIMAL '3.0', 1)", createDecimalType(3, 1), SqlDecimal.of("3.0"));
+        assertFunction("round(DECIMAL '-3.0', 1)", createDecimalType(3, 1), SqlDecimal.of("-3.0"));
+        assertFunction("round(DECIMAL '3.449', 1)", createDecimalType(5, 3), SqlDecimal.of("3.400"));
+        assertFunction("round(DECIMAL '-3.449', 1)", createDecimalType(5, 3), SqlDecimal.of("-3.400"));
+        assertFunction("round(DECIMAL '3.450', 1)", createDecimalType(5, 3), SqlDecimal.of("3.500"));
+        assertFunction("round(DECIMAL '-3.450', 1)", createDecimalType(5, 3), SqlDecimal.of("-3.500"));
+        assertFunction("round(DECIMAL '3.99', 1)", createDecimalType(4, 2), SqlDecimal.of("4.00"));
+        assertFunction("round(DECIMAL '-3.99', 1)", createDecimalType(4, 2), SqlDecimal.of("-4.00"));
+        assertFunction("round(DECIMAL '9.99', 1)", createDecimalType(4, 2), SqlDecimal.of("10.00"));
+        assertFunction("round(DECIMAL '-9.99', 1)", createDecimalType(4, 2), SqlDecimal.of("-10.00"));
+        assertFunction("round(DECIMAL '123456789012345678', 1)", createDecimalType(19, 0), SqlDecimal.of("123456789012345678"));
+        assertFunction("round(DECIMAL '-123456789012345678', 1)", createDecimalType(19, 0), SqlDecimal.of("-123456789012345678"));
+        assertFunction("round(DECIMAL '123456789012345678.0', 1)", createDecimalType(20, 1), SqlDecimal.of("123456789012345678.0"));
+        assertFunction("round(DECIMAL '-123456789012345678.0', 1)", createDecimalType(20, 1), SqlDecimal.of("-123456789012345678.0"));
+        assertFunction("round(DECIMAL '123456789012345678.449', 1)", createDecimalType(22, 3), SqlDecimal.of("123456789012345678.400"));
+        assertFunction("round(DECIMAL '-123456789012345678.449', 1)", createDecimalType(22, 3), SqlDecimal.of("-123456789012345678.400"));
+        assertFunction("round(DECIMAL '123456789012345678.45', 1)", createDecimalType(21, 2), SqlDecimal.of("123456789012345678.50"));
+        assertFunction("round(DECIMAL '-123456789012345678.45', 1)", createDecimalType(21, 2), SqlDecimal.of("-123456789012345678.50"));
+        assertFunction("round(DECIMAL '123456789012345678.501', 1)", createDecimalType(22, 3), SqlDecimal.of("123456789012345678.500"));
+        assertFunction("round(DECIMAL '-123456789012345678.501', 1)", createDecimalType(22, 3), SqlDecimal.of("-123456789012345678.500"));
+        assertFunction("round(DECIMAL '999999999999999999.99', 1)", createDecimalType(21, 2), SqlDecimal.of("1000000000000000000.00"));
+        assertFunction("round(DECIMAL '-999999999999999999.99', 1)", createDecimalType(21, 2), SqlDecimal.of("-1000000000000000000.00"));
+        assertFunction("round(DECIMAL '0.00', 1)", createDecimalType(3, 2), SqlDecimal.of("0.00"));
+        assertFunction("round(DECIMAL '000000000000000000.00', 1)", createDecimalType(3, 2), SqlDecimal.of("0.00"));
+
+        assertFunction("round(CAST(NULL as DECIMAL(1,0)), CAST(NULL as BIGINT))", createDecimalType(2, 0), null);
+        assertFunction("round(DECIMAL '-3.0', CAST(NULL as BIGINT))", createDecimalType(3, 1), null);
+        assertFunction("round(CAST(NULL as DECIMAL(1,0)), 1)", createDecimalType(2, 0), null);
+
+        assertFunction("round(DECIMAL '1234', 7)", createDecimalType(5, 0), SqlDecimal.of("1234"));
+        assertFunction("round(DECIMAL '-1234', 7)", createDecimalType(5, 0), SqlDecimal.of("-1234"));
+        assertFunction("round(DECIMAL '1234', -7)", createDecimalType(5, 0), SqlDecimal.of("0"));
+        assertFunction("round(DECIMAL '-1234', -7)", createDecimalType(5, 0), SqlDecimal.of("0"));
+        assertFunction("round(DECIMAL '1234.5678', 7)", createDecimalType(9, 4), SqlDecimal.of("1234.5678"));
+        assertFunction("round(DECIMAL '-1234.5678', 7)", createDecimalType(9, 4), SqlDecimal.of("-1234.5678"));
+        assertFunction("round(DECIMAL '1234.5678', -2)", createDecimalType(9, 4), SqlDecimal.of("1200.0000"));
+        assertFunction("round(DECIMAL '-1234.5678', -2)", createDecimalType(9, 4), SqlDecimal.of("-1200.0000"));
+        assertFunction("round(DECIMAL '1254.5678', -2)", createDecimalType(9, 4), SqlDecimal.of("1300.0000"));
+        assertFunction("round(DECIMAL '-1254.5678', -2)", createDecimalType(9, 4), SqlDecimal.of("-1300.0000"));
+        assertFunction("round(DECIMAL '1234.5678', -7)", createDecimalType(9, 4), SqlDecimal.of("0.0000"));
+        assertFunction("round(DECIMAL '-1234.5678', -7)", createDecimalType(9, 4), SqlDecimal.of("0.0000"));
+        assertFunction("round(DECIMAL '123456789012345678', 7)", createDecimalType(19, 0), SqlDecimal.of("123456789012345678"));
+        assertFunction("round(DECIMAL '-123456789012345678', 7)", createDecimalType(19, 0), SqlDecimal.of("-123456789012345678"));
+        assertFunction("round(DECIMAL '123456789012345678.99', 7)", createDecimalType(21, 2), SqlDecimal.of("123456789012345678.99"));
+        assertFunction("round(DECIMAL '-123456789012345678.99', 7)", createDecimalType(21, 2), SqlDecimal.of("-123456789012345678.99"));
+        assertFunction("round(DECIMAL '123456789012345611.99', -2)", createDecimalType(21, 2), SqlDecimal.of("123456789012345600.00"));
+        assertFunction("round(DECIMAL '-123456789012345611.99', -2)", createDecimalType(21, 2), SqlDecimal.of("-123456789012345600.00"));
+        assertFunction("round(DECIMAL '123456789012345678.99', -2)", createDecimalType(21, 2), SqlDecimal.of("123456789012345700.00"));
+        assertFunction("round(DECIMAL '-123456789012345678.99', -2)", createDecimalType(21, 2), SqlDecimal.of("-123456789012345700.00"));
+        assertFunction("round(DECIMAL '123456789012345678.99', -30)", createDecimalType(21, 2), SqlDecimal.of("0.00"));
+        assertFunction("round(DECIMAL '-123456789012345678.99', -30)", createDecimalType(21, 2), SqlDecimal.of("0.00"));
+        assertFunction("round(DECIMAL '99', -1)", createDecimalType(3, 0), SqlDecimal.of("100"));
+
+        assertInvalidFunction("round(DECIMAL '9999999999999999999999999999999999999.9', 0)", NUMERIC_VALUE_OUT_OF_RANGE);
     }
 
     @Test
