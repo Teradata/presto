@@ -23,7 +23,7 @@ import static com.facebook.presto.spi.type.Decimals.MAX_PRECISION;
 import static com.facebook.presto.spi.type.Decimals.SIZE_OF_LONG_DECIMAL;
 import static com.facebook.presto.spi.type.Decimals.decodeUnscaledValue;
 
-public final class LongDecimalType
+final class LongDecimalType
         extends DecimalType
 {
     private static final int SIGN_BIT_MASK = 0x80;
