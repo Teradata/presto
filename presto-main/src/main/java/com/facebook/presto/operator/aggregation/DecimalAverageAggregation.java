@@ -26,8 +26,6 @@ import com.facebook.presto.operator.aggregation.state.BigIntegerAndLongStateSeri
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.type.DecimalType;
-import com.facebook.presto.spi.type.LongDecimalType;
-import com.facebook.presto.spi.type.ShortDecimalType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.google.common.collect.ImmutableList;
@@ -44,6 +42,7 @@ import static com.facebook.presto.operator.aggregation.AggregationMetadata.Param
 import static com.facebook.presto.operator.aggregation.AggregationUtils.generateAggregationName;
 import static com.facebook.presto.spi.type.Decimals.decodeUnscaledValue;
 import static com.facebook.presto.spi.type.Decimals.writeBigDecimal;
+import static com.facebook.presto.spi.type.Decimals.writeShortDecimal;
 import static com.facebook.presto.spi.type.StandardTypes.DECIMAL;
 import static com.facebook.presto.util.Reflection.methodHandle;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -57,8 +56,8 @@ public class DecimalAverageAggregation
     private static final MethodHandle SHORT_DECIMAL_INPUT_FUNCTION = methodHandle(DecimalAverageAggregation.class, "inputShortDecimal", Type.class, BigIntegerAndLongState.class, Block.class, int.class);
     private static final MethodHandle LONG_DECIMAL_INPUT_FUNCTION = methodHandle(DecimalAverageAggregation.class, "inputLongDecimal", Type.class, BigIntegerAndLongState.class, Block.class, int.class);
 
-    private static final MethodHandle SHORT_DECIMAL_OUTPUT_FUNCTION = methodHandle(DecimalAverageAggregation.class, "outputShortDecimal", ShortDecimalType.class, BigIntegerAndLongState.class, BlockBuilder.class);
-    private static final MethodHandle LONG_DECIMAL_OUTPUT_FUNCTION = methodHandle(DecimalAverageAggregation.class, "outputLongDecimal", LongDecimalType.class, BigIntegerAndLongState.class, BlockBuilder.class);
+    private static final MethodHandle SHORT_DECIMAL_OUTPUT_FUNCTION = methodHandle(DecimalAverageAggregation.class, "outputShortDecimal", DecimalType.class, BigIntegerAndLongState.class, BlockBuilder.class);
+    private static final MethodHandle LONG_DECIMAL_OUTPUT_FUNCTION = methodHandle(DecimalAverageAggregation.class, "outputLongDecimal", DecimalType.class, BigIntegerAndLongState.class, BlockBuilder.class);
 
     private static final MethodHandle COMBINE_FUNCTION = methodHandle(DecimalAverageAggregation.class, "combine", BigIntegerAndLongState.class, BigIntegerAndLongState.class);
 
@@ -160,17 +159,17 @@ public class DecimalAverageAggregation
         }
     }
 
-    public static void outputShortDecimal(ShortDecimalType type, BigIntegerAndLongState state, BlockBuilder out)
+    public static void outputShortDecimal(DecimalType type, BigIntegerAndLongState state, BlockBuilder out)
     {
         if (state.getLong() == 0) {
             out.appendNull();
         }
         else {
-            type.writeLong(out, average(state, type).unscaledValue().longValueExact());
+            writeShortDecimal(out, average(state, type).unscaledValue().longValueExact());
         }
     }
 
-    public static void outputLongDecimal(LongDecimalType type, BigIntegerAndLongState state, BlockBuilder out)
+    public static void outputLongDecimal(DecimalType type, BigIntegerAndLongState state, BlockBuilder out)
     {
         if (state.getLong() == 0) {
             out.appendNull();
