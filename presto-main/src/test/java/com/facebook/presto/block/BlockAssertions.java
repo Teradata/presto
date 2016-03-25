@@ -19,7 +19,6 @@ import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.DictionaryBlock;
 import com.facebook.presto.spi.block.RunLengthEncodedBlock;
 import com.facebook.presto.spi.type.DecimalType;
-import com.facebook.presto.spi.type.LongDecimalType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.type.ArrayType;
 import io.airlift.slice.Slice;
@@ -234,7 +233,7 @@ public final class BlockAssertions
 
     public static Block createLongDecimalsBlock(Iterable<String> values)
     {
-        LongDecimalType longDecimalType = (LongDecimalType) DecimalType.createDecimalType(18);
+        DecimalType longDecimalType = (DecimalType) DecimalType.createDecimalType(18);
         BlockBuilder builder = longDecimalType.createBlockBuilder(new BlockBuilderStatus(), 100);
 
         for (String value : values) {
