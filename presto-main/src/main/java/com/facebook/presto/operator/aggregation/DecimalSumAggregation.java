@@ -26,7 +26,6 @@ import com.facebook.presto.operator.aggregation.state.BigIntegerStateSerializer;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.type.DecimalType;
-import com.facebook.presto.spi.type.LongDecimalType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.google.common.collect.ImmutableList;
@@ -58,7 +57,7 @@ public class DecimalSumAggregation
     private static final MethodHandle SHORT_DECIMAL_INPUT_FUNCTION = methodHandle(DecimalSumAggregation.class, "inputShortDecimal", Type.class, BigIntegerState.class, Block.class, int.class);
     private static final MethodHandle LONG_DECIMAL_INPUT_FUNCTION = methodHandle(DecimalSumAggregation.class, "inputLongDecimal", Type.class, BigIntegerState.class, Block.class, int.class);
 
-    private static final MethodHandle LONG_DECIMAL_OUTPUT_FUNCTION = methodHandle(DecimalSumAggregation.class, "outputLongDecimal", LongDecimalType.class, BigIntegerState.class, BlockBuilder.class);
+    private static final MethodHandle LONG_DECIMAL_OUTPUT_FUNCTION = methodHandle(DecimalSumAggregation.class, "outputLongDecimal", DecimalType.class, BigIntegerState.class, BlockBuilder.class);
 
     private static final MethodHandle COMBINE_FUNCTION = methodHandle(DecimalSumAggregation.class, "combine", BigIntegerState.class, BigIntegerState.class);
 
@@ -154,15 +153,15 @@ public class DecimalSumAggregation
         }
     }
 
-    public static void outputLongDecimal(LongDecimalType type, BigIntegerState state, BlockBuilder out)
+    public static void outputLongDecimal(DecimalType type, BigIntegerState state, BlockBuilder out)
     {
         if (state.getBigInteger() == null) {
             out.appendNull();
         }
         else {
-            BigDecimal sum = new BigDecimal(state.getBigInteger(), type.getScale());
+            BigDecimal value = new BigDecimal(state.getBigInteger(), type.getScale());
             checkOverflow(state.getBigInteger());
-            writeBigDecimal(type, out, sum);
+            writeBigDecimal(type, out, value);
         }
     }
 }
