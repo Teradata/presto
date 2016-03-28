@@ -8,7 +8,7 @@ Presto Sandboxes
 ================
 Try our Presto preinstalled on a Virtual Machine.
 
-Presto 127t on Cloudera
+Presto 141t on Cloudera
 ***********************
 Try out Presto preinstalled with Cloudera on a Virtual Machine.
 
@@ -21,7 +21,7 @@ Try out Presto preinstalled with Cloudera on a Virtual Machine.
 
 ----
 
-Presto 127t on Hortonworks
+Presto 141t on Hortonworks
 **************************
 Try out Presto preinstalled with Hortonworks on a Virtual Machine.
 

@@ -2,15 +2,15 @@
 Unsupported Features and Known Limitations
 ==========================================
 
-Presto 127t is equivalent to Presto release 0.127, with some additional features. Below
+Presto 141t is equivalent to Presto release 0.141, with some additional features. Below
 are documented unsupported features and known limitations.
 
 Unsupported Functionality
 =========================
 
-Some functionality from Presto 0.127 may work but are not officially supported by Teradata.
+Some functionality from Presto 0.141 may work but are not officially supported by Teradata.
 
-* The installation method as documented on `prestodb.io <https://prestodb.io/docs/0.127/installation/deployment.html>`_. Refer to the documentation for Teradata's :doc:`server-installation installation <>` instead.
+* The installation method as documented on `prestodb.io <https://prestodb.io/docs/0.141/installation/deployment.html>`_. Refer to the documentation for Teradata's :doc:`server-installation installation <>` instead.
 * Web Connector for Tableau
 * The following connectors:
 

@@ -19,7 +19,7 @@ Requirements for Integration
 
 Adding the Presto service
 -------------------------
-This section and all others that follow walk you through the integration steps needed to get Presto working with Ambari. By default, this integration code installs the latest Teradata Presto release (0.127t). 
+This section and all others that follow walk you through the integration steps needed to get Presto working with Ambari. By default, this integration code installs the latest Teradata Presto release (0.141t).
 
 
 To integrate the Presto service with Ambari, follow the steps outlines below:
@@ -104,7 +104,7 @@ Known issues
 		at org.apache.hadoop.hdfs.server.namenode.FSPermissionChecker.checkPermission(FSPermissionChecker.java:190)
 		at org.apache.hadoop.hdfs.server.namenode.FSDirectory.checkPermission(FSDirectory.java:1771)
 
-To work around the issue, edit your ``jvm.config`` settings by adding the following property ``-DHADOOP_USER_NAME=hive``. This problem affects Presto ``0.115t`` but does not affect ``0.127t``. After saving your edit to ``jvm.config``, don't forget to restart all Presto components in order for the changes to take effect.
+To work around the issue, edit your ``jvm.config`` settings by adding the following property ``-DHADOOP_USER_NAME=hive``. This problem affects Presto ``0.115t`` but does not affect ``0.127t`` or later. After saving your edit to ``jvm.config``, don't forget to restart all Presto components in order for the changes to take effect.
 
 * If you decide to deploy an older version of Presto, you may have to adjust some setting manually. Please see :ref:`configuring-presto-label` for an explanation of how to add custom settings. For example, the ``task.max-memory`` setting was deprecated in ``0.127t`` but is valid in ``0.115t``. Therefore, if you're installing ``0.115t`` and would like to change ``task.max-memory`` to something other than its default, add it as a custom property.
 
