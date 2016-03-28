@@ -35,17 +35,17 @@ TD_LINK_ODBC_DOCS = 'http://www.teradata.com/presto'
 
 GROUP_ID = 'com.facebook.presto'
 ARTIFACTS = {
-    'server': ('presto-server-rpm-0.127t', 'rpm', TD_LINK_SERVER),
-    'server-old': ('presto-server-rpm4.6-0.127t', 'rpm', TD_LINK_SERVER),
-    'cli': ('presto-cli-0.127t', 'jar', TD_LINK_CLI),
-    'jdbc': ('presto-jdbc-0.127t', 'jar', TD_LINK_JDBC),
-    'demo-cdh': ('presto-demo-cdh-0.127t', 'ova', TD_LINK_DEMO_CDH),
-    'demo-hdp': ('presto-demo-hdp-0.127t', 'ova', TD_LINK_DEMO_HDP),
-    'presto-yarn-package': ('presto-yarn-package-1.0.1-0.127t', 'zip', TD_LINK_PRESTO_YARN_PACKAGE),
+    'server': ('presto-server-rpm-0.141t', 'rpm', TD_LINK_SERVER),
+    'server-old': ('presto-server-rpm4.6-0.141t', 'rpm', TD_LINK_SERVER),
+    'cli': ('presto-cli-0.141t', 'jar', TD_LINK_CLI),
+    'jdbc': ('presto-jdbc-0.141t', 'jar', TD_LINK_JDBC),
+    'demo-cdh': ('presto-demo-cdh-0.141t', 'ova', TD_LINK_DEMO_CDH),
+    'demo-hdp': ('presto-demo-hdp-0.141t', 'ova', TD_LINK_DEMO_HDP),
+    'presto-yarn-package': ('presto-yarn-package-1.0.1-0.141t', 'zip', TD_LINK_PRESTO_YARN_PACKAGE),
     'presto-ambari-plugin': ('ambari-presto-1.0', 'tar.gz', TD_LINK_PRESTO_DOCS),
     'presto-admin': ('prestoadmin-1.2', 'tar.bz2', TD_LINK_PRESTO_DOCS),
     'apache-slider': ('slider-assembly-0.80.0-incubating-all', 'tar.gz', TD_LINK_PRESTO_DOCS),
-    'presto-docs': ('presto-docs-0.127t-download', 'zip', TD_LINK_PRESTO_DOCS),
+    'presto-docs': ('presto-docs-0.141t-download', 'zip', TD_LINK_PRESTO_DOCS),
 
     'odbc-mac': ('TeradataPrestoODBC-1.0.0.1001', 'dmg', TD_LINK_ODBC_MAC),
     'odbc-windows-64': ('TeradataPrestoODBC64-1.0.0.1001', 'msi', TD_LINK_ODBC_WIN64),
