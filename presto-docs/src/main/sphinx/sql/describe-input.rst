@@ -1,3 +1,5 @@
+.. _describe-input:
+
 ==============
 DESCRIBE INPUT
 ==============

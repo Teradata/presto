@@ -1,3 +1,5 @@
+.. _describe-output:
+
 ===============
 DESCRIBE OUTPUT
 ===============

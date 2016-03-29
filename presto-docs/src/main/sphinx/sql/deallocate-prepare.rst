@@ -1,3 +1,5 @@
+.. _deallocate-prepare:
+
 ==================
 DEALLOCATE PREPARE
 ==================
