@@ -10,3 +10,4 @@ sandbox VMs.
 
     sandboxes/presto-sandbox-cdh
     sandboxes/presto-sandbox-hdp
+    sandboxes/airpal

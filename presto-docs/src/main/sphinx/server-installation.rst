@@ -4,20 +4,13 @@
 
 There are several ways to install and deploy Presto depending on your requirements and preference.
 
-.. toctree::
-    :hidden:
-  
-    installation/installation-ambari
-    installation/installation-yarn
-    installation/installation-presto-admin
-
-
 Automated Installation with Ambari 2.1
-======================================
+**************************************
 
 Install and manage Presto using `Apache Ambari`_.
 
-:doc:`Installation Instructions <installation/installation-ambari>`
+| :doc:`Installation Instructions <installation/installation-ambari>`
+| Download :download:`presto-ambari-plugin`
 
 *Requires*:
 
@@ -30,13 +23,15 @@ Install and manage Presto using `Apache Ambari`_.
 
   .. _Apache Ambari: https://ambari.apache.org/
 
+----
 
 Automated Installation with Ambari 2.1 with YARN integration
-============================================================
+************************************************************
 
 Install and manage Presto integrated with YARN using the `Apache Slider`_ view for `Apache Ambari`_.
 
-:doc:`Installation Instructions <installation/installation-yarn>`
+| :doc:`Installation Instructions <installation/installation-yarn>`
+| Download :download:`presto-yarn-package`
 
 *Requires*:
 
@@ -50,13 +45,16 @@ Install and manage Presto integrated with YARN using the `Apache Slider`_ view f
   .. _Apache Slider: https://slider.incubator.apache.org/
   .. _Apache Ambari: https://ambari.apache.org/
 
+----
 
 Manual Installation via Presto-Admin
-====================================
+************************************
 
 Install and manage Presto manually using Presto-Admin.
 
-:doc:`Installation Instructions <installation/installation-presto-admin>`
+| :doc:`Installation Instructions <installation/installation-presto-admin>`
+| Download :download:`server`
+| Download :download:`presto-admin`
 
 *Requires*:
 
@@ -71,11 +69,13 @@ For RPM Package Manager < 4.6, you need to download :download:`server-old`
 ----
 
 Manual Installation with YARN integration
-=========================================
+*****************************************
 
 Install and manage Presto integrated with YARN manually using `Apache Slider`_.
 
-:doc:`Installation Instructions <installation/installation-yarn>`
+| :doc:`Installation Instructions <installation/installation-yarn>`
+| Download :download:`presto-yarn-package`
+| Download :download:`apache-slider`
 
 *Requires*:
 
@@ -87,3 +87,12 @@ Install and manage Presto integrated with YARN manually using `Apache Slider`_.
 * Minimum 16GB RAM per node allocated for Presto
 
   .. _Apache Slider: https://slider.incubator.apache.org/
+
+.. toctree::
+    :hidden:
+  
+    installation/installation-ambari
+    installation/installation-yarn
+    installation/installation-presto-admin
+
+----
