@@ -31,20 +31,18 @@ Configuration
 
 Presto includes Hive connectors for multiple versions of Hadoop:
 
-* ``hive-hadoop1``: Apache Hadoop 1.x
 * ``hive-hadoop2``: Apache Hadoop 2.x
-* ``hive-cdh4``: Cloudera CDH 4
 * ``hive-cdh5``: Cloudera CDH 5
 
 Create ``/etc/presto/catalog/hive.properties`` with the following contents
-to mount the ``hive-cdh4`` connector as the ``hive`` catalog,
-replacing ``hive-cdh4`` with the proper connector for your version
+to mount the ``hive-hadoop2`` connector as the ``hive`` catalog,
+replacing ``hive-hadoop2`` with the proper connector for your version
 of Hadoop and ``example.net:9083`` with the correct host and port
 for your Hive metastore Thrift service:
 
 .. code-block:: none
 
-    connector.name=hive-cdh4
+    connector.name=hive-hadoop2
     hive.metastore.uri=thrift://example.net:9083
 
 Additionally, you should add the following property to ``jvm.config``, replacing <hdfs_username> with your hdfs user name: ::
