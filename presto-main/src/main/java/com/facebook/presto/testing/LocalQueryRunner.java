@@ -129,15 +129,18 @@ import com.facebook.presto.transaction.TransactionManagerConfig;
 import com.facebook.presto.type.TypeRegistry;
 import com.facebook.presto.type.TypeUtils;
 import com.facebook.presto.util.FinalizerService;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
+import com.google.common.io.Closer;
 import io.airlift.units.Duration;
 import org.intellij.lang.annotations.Language;
 
 import javax.inject.Provider;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -457,7 +460,7 @@ public class LocalQueryRunner
     private MaterializedResult executeInternal(Session session, @Language("SQL") String sql)
     {
         lock.readLock().lock();
-        try {
+        try (Closer closer = Closer.create()) {
             AtomicReference<MaterializedResult.Builder> builder = new AtomicReference<>();
             PageConsumerOutputFactory outputFactory = new PageConsumerOutputFactory(types -> {
                 builder.compareAndSet(null, MaterializedResult.resultBuilder(session, types));
@@ -465,7 +468,9 @@ public class LocalQueryRunner
             });
 
             TaskContext taskContext = createTaskContext(executor, session);
+
             List<Driver> drivers = createDrivers(session, sql, outputFactory, taskContext);
+            drivers.stream().map(closer::register);
 
             boolean done = false;
             while (!done) {
@@ -481,6 +486,9 @@ public class LocalQueryRunner
 
             verify(builder.get() != null, "Output operator was not created");
             return builder.get().build();
+        }
+        catch (IOException e) {
+            throw Throwables.propagate(e);
         }
         finally {
             lock.readLock().unlock();
