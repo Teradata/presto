@@ -11,6 +11,7 @@ Presto Documentation
     getting-started
     sandbox-vms
     server-installation
+    aws
     client-software
     Presto Admin <installation/presto-admin/user-guide>
     configuration
