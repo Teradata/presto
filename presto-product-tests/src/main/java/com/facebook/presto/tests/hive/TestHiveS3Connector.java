@@ -29,6 +29,7 @@ import static com.teradata.tempto.assertions.QueryAssert.Row.row;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
 import static com.teradata.tempto.query.QueryExecutor.query;
 import static com.teradata.tempto.util.DateTimeUtils.parseTimestampInUTC;
+import static java.lang.String.format;
 
 // Tests in this class are all quarantined so that they only run as part of the s3 connector job
 // These tests require access to an s3 cluster as well as some predefined tables with data loaded in s3.
@@ -168,6 +169,16 @@ public class TestHiveS3Connector
                         true
                 )
         );
+    }
+
+    @Test(groups = {S3_CONNECTOR, QUARANTINE})
+    public void shouldCreateTableAsSelect()
+            throws Exception
+    {
+        String tableName = "create_table_as_select";
+        query(format("DROP TABLE IF EXISTS %s", tableName));
+        query(format("CREATE TABLE %s AS SELECT * FROM nation", tableName));
+        assertThat(query(format("SELECT * FROM %s", tableName))).hasRowsCount(25);
     }
 
     private void assertProperAllDatatypesSchema(String tableName)
