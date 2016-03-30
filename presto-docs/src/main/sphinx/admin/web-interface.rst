@@ -11,6 +11,17 @@ query state, percentage completed, username and source from which this query ori
 The currently running queries are at the top of the page, followed by the most recently
 completed or failed queries.
 
+The possible query states are as follows:
+
+* ``QUEUED`` -- Query has been accepted and is awaiting execution.
+* ``PLANNING`` -- Query is being planned.
+* ``STARTING`` -- Query execution is being started.
+* ``RUNNING`` -- Query has at least one running task.
+* ``BLOCKED`` -- Query is blocked and is waiting for resources (buffer space, memory, splits, etc.).
+* ``FINISHING`` -- Query is finishing (e.g. commit for autocommit queries).
+* ``FINISHED`` -- Query has finished executing and all output has been consumed.
+* ``FAILED`` -- Query execution failed.
+
 For more detailed information about a query, simply click the query ID link.
 The query detail page has a summary section, graphical representation of various stages of the
 query and a list of tasks. Each task ID can be clicked to get more information about that task.
