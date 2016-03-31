@@ -57,6 +57,7 @@ import com.facebook.presto.operator.scalar.HyperLogLogFunctions;
 import com.facebook.presto.operator.scalar.JsonFunctions;
 import com.facebook.presto.operator.scalar.JsonOperators;
 import com.facebook.presto.operator.scalar.MathFunctions;
+import com.facebook.presto.operator.scalar.PrestoTypeOfFunction;
 import com.facebook.presto.operator.scalar.RegexpFunctions;
 import com.facebook.presto.operator.scalar.ScalarFunctionImplementation;
 import com.facebook.presto.operator.scalar.StringFunctions;
@@ -353,6 +354,7 @@ public class FunctionRegistry
                 .scalar(ArrayDistinctFunction.class)
                 .scalar(ArrayConcatFunction.class)
                 .scalar(ArrayNotEqualOperator.class)
+                .scalar(PrestoTypeOfFunction.class)
                 .functions(ARRAY_CONTAINS, ARRAY_JOIN, ARRAY_JOIN_WITH_NULL_REPLACEMENT)
                 .functions(ARRAY_TO_ARRAY_CAST, ARRAY_HASH_CODE, ARRAY_EQUAL, ARRAY_LESS_THAN, ARRAY_LESS_THAN_OR_EQUAL, ARRAY_GREATER_THAN_OR_EQUAL)
                 .functions(ARRAY_TO_ELEMENT_CONCAT_FUNCTION, ELEMENT_TO_ARRAY_CONCAT_FUNCTION)
