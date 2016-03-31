@@ -206,13 +206,9 @@ public class SqlStandardAccessControl
 
     private boolean getGrantOptionForPrivilege(Identity identity, Privilege privilege, SchemaTableName tableName)
     {
-        Set<HivePrivilegeInfo> privilegeSet = metastore.getTablePrivileges(identity.getUser(), tableName.getSchemaName(), tableName.getTableName());
-        for (HivePrivilegeInfo privilegeInfo : privilegeSet) {
-            if (privilegeInfo.getHivePrivilege().name().equalsIgnoreCase(privilege.name())) {
-                return privilegeInfo.isGrantOption();
-            }
-        }
-        return false;
+        return metastore.getTablePrivileges(identity.getUser(), tableName.getSchemaName(), tableName.getTableName()).stream()
+                .map(hivePrivilegeInfo -> hivePrivilegeInfo.getHivePrivilege().equals(toHivePrivilege(privilege)) ? hivePrivilegeInfo.isGrantOption() : false)
+                .anyMatch(b -> b == true);
     }
 
     private boolean checkTablePermission(Identity identity, SchemaTableName tableName, HivePrivilegeInfo.HivePrivilege... requiredPrivileges)
