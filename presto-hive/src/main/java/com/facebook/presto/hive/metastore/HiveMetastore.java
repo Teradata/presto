@@ -77,6 +77,8 @@ public interface HiveMetastore
 
     void grantTablePrivileges(String databaseName, String tableName, String grantee, Set<PrivilegeGrantInfo> privilegeGrantInfoSet);
 
+    void revokeTablePrivileges(String databaseName, String tableName, String grantee, Set<PrivilegeGrantInfo> privilegeGrantInfoSet);
+
     boolean hasPrivilegeWithGrantOptionOnTable(String user, String databaseName, String tableName, HivePrivilege hivePrivilege);
 
     default boolean isDatabaseOwner(String user, String databaseName)

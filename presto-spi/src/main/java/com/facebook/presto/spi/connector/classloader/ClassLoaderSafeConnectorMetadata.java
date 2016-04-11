@@ -30,6 +30,7 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.classloader.ThreadContextClassLoader;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
+import com.facebook.presto.spi.security.Privilege;
 import io.airlift.slice.Slice;
 
 import java.util.Collection;

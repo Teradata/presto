@@ -395,6 +395,18 @@ public class InMemoryHiveMetastore
     }
 
     @Override
+    public void revokeTablePrivileges(String databaseName, String tableName, String grantee, Set<PrivilegeGrantInfo> privilegeGrantInfoSet)
+    {
+        Set<HivePrivilege> currentPrivileges = getTablePrivileges(grantee, databaseName, tableName);
+        currentPrivileges.removeAll(privilegeGrantInfoSet.stream()
+                .map(HivePrivilege::parsePrivilege)
+                .flatMap(Collection::stream)
+                .collect(toImmutableSet()));
+
+        setTablePrivileges(grantee, USER, databaseName, tableName, currentPrivileges);
+    }
+
+    @Override
     public boolean hasPrivilegeWithGrantOptionOnTable(String user, String databaseName, String tableName, HivePrivilege hivePrivilege)
     {
         //TODO: add grantOption flag information to privileges stored in cache and implement this check properly.

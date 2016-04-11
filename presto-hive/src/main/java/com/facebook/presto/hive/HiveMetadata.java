@@ -1282,6 +1282,20 @@ public class HiveMetadata
     }
 
     @Override
+    public void revokeTablePrivileges(ConnectorSession session, SchemaTableName schemaTableName, Set<Privilege> privileges, String grantee, boolean grantOption)
+    {
+        String schemaName = schemaTableName.getSchemaName();
+
+        String tableName = schemaTableName.getTableName();
+
+        Set<PrivilegeGrantInfo> privilegeGrantInfoSet = privileges.stream()
+                .map(privilege -> new PrivilegeGrantInfo(privilege.name().toLowerCase(), 0, session.getUser(), PrincipalType.USER, grantOption))
+                .collect(toSet());
+
+        metastore.revokeTablePrivileges(schemaName, tableName, grantee, privilegeGrantInfoSet);
+    }
+
+    @Override
     public String toString()
     {
         return toStringHelper(this)
