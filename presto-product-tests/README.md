@@ -93,12 +93,20 @@ where ``<profile>`` is one of either:
 - **multinode** - pseudo-distributed Hadoop installation running on a
  single Docker container and a distributed Presto installation running on
  multiple Docker containers. For multinode the default configuration is 1 coordinator and 1 worker.
-- **singlenode** - pseudo-distributed kerberized Hadoop installation running on a
- single Docker container and a single node installation of kerberized Presto also running
- on a single Docker container.
-- **singlenode-kerberized** - pseudo-distributed Hadoop installation running on a
+- **singlenode** - pseudo-distributed Hadoop installation running on a
  single Docker container and a single node installation of Presto also running
  on a single Docker container.
+- **singlenode-kerberized** - pseudo-distributed kerberized Hadoop installation running on a
+ single Docker container and a single node installation of kerberized Presto also running
+ on a single Docker container. This profile is having kerberos impersonation. Presto impersonates the user who
+ is running the query when accessing HDFS. The principal specified by the hive.hdfs.presto.principal property
+ in hive.properties file must be allowed to impersonate this user.
+- **singlenode-kerberized-without-impersonation** - pseudo-distributed Hadoop installation running on a
+ single Docker container and a single node installation of kerberized Presto also running
+ on a single Docker container. This profile is running kerberos without impersonation. When running without
+ impersonation all the queries are run with principal specified by hive.hdfs.presto.principal property. The data files
+ for the tables created in hive will belong to user specified in hive.hdfs.presto.principal property.
+
 
 The ``run_on_docker.sh`` script can also run individual product tests. Presto
 product tests are either [Java based](https://github.com/prestodb/tempto#java-based-tests)
@@ -217,8 +225,8 @@ breakpoint is hit.
 ## Troubleshooting
 
 Use the ``docker-compose`` and ``docker`` utilities to control and troubleshoot
-containers. In the following examples ``<profile>`` is either ``singlenode``, ``multinode`` or
-``singlenode-kerberized``.
+containers. In the following examples ``<profile>`` is either ``singlenode``, ``multinode``, ``singlenode-kerberized`` or
+``singlenode-kerberized-without-impersonation``.
 
 1. Use the following command to view output from running containers:
 

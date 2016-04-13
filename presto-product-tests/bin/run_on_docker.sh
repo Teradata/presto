@@ -115,9 +115,8 @@ function terminate() {
 }
 
 ENVIRONMENT=$1
-
-if [[ "$ENVIRONMENT" != "singlenode" && "$ENVIRONMENT" != "multinode" && "$ENVIRONMENT" != "singlenode-kerberized" ]]; then
-   echo "Usage: run_on_docker.sh <singlenode|multinode|singlenode-kerberized> <product test args>"
+if [[ "$ENVIRONMENT" != "singlenode" && "$ENVIRONMENT" != "multinode" && "$ENVIRONMENT" != "singlenode-kerberized" && "$ENVIRONMENT" != "singlenode-kerberized-without-impersonation" ]]; then
+   echo "Usage: run_on_docker.sh <singlenode|multinode|singlenode-kerberized|singlenode-kerberized-without-impersonation> <product test args>"
    exit 1
 fi
 
@@ -137,6 +136,11 @@ fi
 TEMPTO_CONFIGURATION="${DOCKER_PRESTO_VOLUME}/presto-product-tests/conf/tempto/tempto-configuration.yaml"
 if [[ "$ENVIRONMENT" == "singlenode-kerberized" ]]; then
    TEMPTO_CONFIGURATION="${DOCKER_PRESTO_VOLUME}/presto-product-tests/conf/tempto/tempto-configuration-kerberized.yaml"
+   export PRESTO_HIVE_CONFIG="${PRODUCT_TESTS_ROOT}/conf/presto/etc/hive-kerberized.properties"
+elif [[ "$ENVIRONMENT" == "singlenode-kerberized-without-impersonation" ]]; then
+   TEMPTO_CONFIGURATION="${DOCKER_PRESTO_VOLUME}/presto-product-tests/conf/tempto/tempto-configuration-kerberized.yaml"
+   DOCKER_COMPOSE_LOCATION="${PRODUCT_TESTS_ROOT}/conf/docker/singlenode-kerberized/docker-compose.yml"
+   export PRESTO_HIVE_CONFIG="${PRODUCT_TESTS_ROOT}/conf/presto/etc/hive-kerberized-without-impersonation.properties"
 fi
 
 # set presto version environment variable
