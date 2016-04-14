@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
+import static com.facebook.presto.sql.tree.SetOperation.SetOperationType.UNION;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
@@ -26,7 +27,6 @@ public class Union
         extends SetOperation
 {
     private final List<Relation> relations;
-    private final boolean distinct;
 
     public Union(List<Relation> relations, boolean distinct)
     {
@@ -40,21 +40,15 @@ public class Union
 
     protected Union(Optional<NodeLocation> location, List<Relation> relations, boolean distinct)
     {
-        super(location);
+        super(location, distinct);
         requireNonNull(relations, "relations is null");
 
         this.relations = ImmutableList.copyOf(relations);
-        this.distinct = distinct;
     }
 
     public List<Relation> getRelations()
     {
         return relations;
-    }
-
-    public boolean isDistinct()
-    {
-        return distinct;
     }
 
     @Override
@@ -64,11 +58,17 @@ public class Union
     }
 
     @Override
+    public SetOperationType getSetOperationType()
+    {
+        return UNION;
+    }
+
+    @Override
     public String toString()
     {
         return toStringHelper(this)
                 .add("relations", relations)
-                .add("distinct", distinct)
+                .add("distinct", isDistinct())
                 .toString();
     }
 
@@ -83,12 +83,12 @@ public class Union
         }
         Union o = (Union) obj;
         return Objects.equals(relations, o.relations) &&
-                Objects.equals(distinct, o.distinct);
+                Objects.equals(isDistinct(), o.isDistinct());
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(relations, distinct);
+        return Objects.hash(relations, isDistinct());
     }
 }
