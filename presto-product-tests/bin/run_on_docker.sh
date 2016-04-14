@@ -115,32 +115,25 @@ function terminate() {
 }
 
 ENVIRONMENT=$1
-if [[ "$ENVIRONMENT" != "singlenode" && "$ENVIRONMENT" != "multinode" && "$ENVIRONMENT" != "singlenode-kerberized" && "$ENVIRONMENT" != "singlenode-kerberized-without-impersonation" ]]; then
-   echo "Usage: run_on_docker.sh <singlenode|multinode|singlenode-kerberized|singlenode-kerberized-without-impersonation> <product test args>"
+SCRIPT_DIR=$(dirname $(absolutepath "$0"))
+PRODUCT_TESTS_ROOT="${SCRIPT_DIR}/.."
+PROJECT_ROOT="${PRODUCT_TESTS_ROOT}/.."
+ENVIRONMENT_LOCATION="${PRODUCT_TESTS_ROOT}/conf/docker/"
+
+if [[ ! -d "$ENVIRONMENT_LOCATION$ENVIRONMENT" ]]; then
+   echo "Usage: run_on_docker.sh <`ls $ENVIRONMENT_LOCATION -I files | tr '\n' '|'`> <product test args>"
    exit 1
 fi
 
 shift 1
 
-SCRIPT_DIR=$(dirname $(absolutepath "$0"))
-PRODUCT_TESTS_ROOT="${SCRIPT_DIR}/.."
-PROJECT_ROOT="${PRODUCT_TESTS_ROOT}/.."
 DOCKER_COMPOSE_LOCATION="${PRODUCT_TESTS_ROOT}/conf/docker/${ENVIRONMENT}/docker-compose.yml"
 DOCKER_PRESTO_VOLUME="/docker/volumes/presto"
+TEMPTO_CONFIGURATION="${DOCKER_PRESTO_VOLUME}/../tempto/tempto-configuration-local.yaml"
 
 PRESTO_SERVICES="presto-master"
 if [[ "$ENVIRONMENT" == "multinode" ]]; then
    PRESTO_SERVICES="${PRESTO_SERVICES} presto-worker"
-fi
-
-TEMPTO_CONFIGURATION="${DOCKER_PRESTO_VOLUME}/presto-product-tests/conf/tempto/tempto-configuration.yaml"
-if [[ "$ENVIRONMENT" == "singlenode-kerberized" ]]; then
-   TEMPTO_CONFIGURATION="${DOCKER_PRESTO_VOLUME}/presto-product-tests/conf/tempto/tempto-configuration-kerberized.yaml"
-   export PRESTO_HIVE_CONFIG="${PRODUCT_TESTS_ROOT}/conf/presto/etc/hive-kerberized.properties"
-elif [[ "$ENVIRONMENT" == "singlenode-kerberized-without-impersonation" ]]; then
-   TEMPTO_CONFIGURATION="${DOCKER_PRESTO_VOLUME}/presto-product-tests/conf/tempto/tempto-configuration-kerberized.yaml"
-   DOCKER_COMPOSE_LOCATION="${PRODUCT_TESTS_ROOT}/conf/docker/singlenode-kerberized/docker-compose.yml"
-   export PRESTO_HIVE_CONFIG="${PRODUCT_TESTS_ROOT}/conf/presto/etc/hive-kerberized-without-impersonation.properties"
 fi
 
 # set presto version environment variable
@@ -150,10 +143,10 @@ source "${PRODUCT_TESTS_ROOT}/target/classes/presto.env"
 docker-compose version
 docker version
 
-# stop already running containers
-stop_docker_compose_containers "${PRODUCT_TESTS_ROOT}/conf/docker/singlenode/docker-compose.yml"
-stop_docker_compose_containers "${PRODUCT_TESTS_ROOT}/conf/docker/multinode/docker-compose.yml"
-stop_docker_compose_containers "${PRODUCT_TESTS_ROOT}/conf/docker/singlenode-kerberized/docker-compose.yml"
+for docker_env in `ls $ENVIRONMENT_LOCATION -I files`;
+  do
+    stop_docker_compose_containers "${PRODUCT_TESTS_ROOT}/conf/docker/${docker_env}/docker-compose.yml"
+done
 
 # catch terminate signals
 trap terminate INT TERM EXIT

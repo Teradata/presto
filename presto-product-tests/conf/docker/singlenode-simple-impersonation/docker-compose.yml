@@ -2,7 +2,7 @@ version: '2'
 services:
   hadoop-master:
     hostname: hadoop-master
-    image: 'teradatalabs/cdh5-hive-kerberized:2.6.0-cdh5.6.0-sshd-4e54a19'
+    image: 'teradatalabs/cdh5-hive:6945b02'
     ports:
       - '1080:1080'
       - '8020:8020'
@@ -14,21 +14,20 @@ services:
 
   presto-master:
     hostname: presto-master
-    # cdh5-hive-kerberized contains keytabs and the `krb5.conf` within
-    image: 'teradatalabs/cdh5-hive-kerberized:2.6.0-cdh5.6.0-sshd-4e54a19'
+    image: 'teradatalabs/centos6-java8-oracle:jdk1.8.0_40-4e54a19'
     depends_on:
       - 'hadoop-master'
-    command: /docker/volumes/presto/presto-product-tests/conf/docker/files/presto-launcher-wrapper.sh singlenode-kerberized run
+    command: /docker/volumes/presto/presto-product-tests/conf/docker/files/presto-launcher-wrapper.sh singlenode run
     volumes:
       - ../../../../:/docker/volumes/presto
-      - ${PRESTO_HIVE_CONFIG}:/docker/volumes/presto/presto-product-tests/conf/presto/etc/catalog/hive.properties
+      - ../../../../presto-product-tests/conf/presto/etc/singlenode-simple-with-impersonation.properties:/docker/volumes/presto/presto-product-tests/conf/presto/etc/catalog/hive.properties
+      - ../../../../presto-product-tests/conf/tempto/tempto-configuration.yaml:/docker/volumes/tempto/tempto-configuration-local.yaml
     env_file:
       - ../../../target/classes/presto.env
 
   application-runner:
     hostname: application-runner
-    # cdh5-hive-kerberized contains keytabs and the `krb5.conf` within
-    image: 'teradatalabs/cdh5-hive-kerberized:2.6.0-cdh5.6.0-sshd-4e54a19'
+    image: 'teradatalabs/centos6-java8-oracle:jdk1.8.0_40-4e54a19'
     depends_on:
       - 'presto-master'
     volumes_from:
