@@ -93,15 +93,20 @@ where ``<profile>`` is one of either:
 - **multinode** - pseudo-distributed Hadoop installation running on a
  single Docker container and a distributed Presto installation running on
  multiple Docker containers. For multinode the default configuration is 1 coordinator and 1 worker.
-- **singlenode** - pseudo-distributed Hadoop installation running on a
+- **singlenode-simple-impersonation** - pseudo-distributed Hadoop installation running on a
  single Docker container and a single node installation of Presto also running
- on a single Docker container.
-- **singlenode-kerberized** - pseudo-distributed kerberized Hadoop installation running on a
+ on a single Docker container. Presto impersonates the user who is running the query when accessing HDFS.
+ The user mentioned for -DHADOOP_USER_NAME in jvm.config must be allowed to impersonate this user.
+- **singlenode-simple-no-impersonation** - pseudo-distributed Hadoop installation running on a
+ single Docker container and a single node installation of Presto also running
+ on a single Docker container. With no impersonation presto access hdfs as the user mentioned in -DHADOOP_USER_NAME.
+ The data files for the tables created in hive will belong to user specified for -DHADOOP_USER_NAME in jvm.config.
+- **singlenode-kerberos-impersonation** - pseudo-distributed kerberized Hadoop installation running on a
  single Docker container and a single node installation of kerberized Presto also running
  on a single Docker container. This profile is having kerberos impersonation. Presto impersonates the user who
  is running the query when accessing HDFS. The principal specified by the hive.hdfs.presto.principal property
  in hive.properties file must be allowed to impersonate this user.
-- **singlenode-kerberized-without-impersonation** - pseudo-distributed Hadoop installation running on a
+- **singlenode-kerberos-no-impersonation** - pseudo-distributed Hadoop installation running on a
  single Docker container and a single node installation of kerberized Presto also running
  on a single Docker container. This profile is running kerberos without impersonation. When running without
  impersonation all the queries are run with principal specified by hive.hdfs.presto.principal property. The data files

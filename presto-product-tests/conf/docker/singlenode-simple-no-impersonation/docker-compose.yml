@@ -2,7 +2,7 @@ version: '2'
 services:
   hadoop-master:
     hostname: hadoop-master
-    image: 'teradatalabs/cdh5-hive:6945b02'
+    image: 'teradatalabs/cdh5-hive:2'
     ports:
       - '1080:1080'
       - '8020:8020'
