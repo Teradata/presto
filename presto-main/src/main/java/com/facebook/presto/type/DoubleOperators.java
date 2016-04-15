@@ -49,11 +49,6 @@ import static java.math.RoundingMode.FLOOR;
 
 public final class DoubleOperators
 {
-    private static final double MIN_LONG_AS_DOUBLE = -0x1p63;
-    private static final double MAX_LONG_AS_DOUBLE_PLUS_ONE = 0x1p63;
-    private static final double MIN_INT_AS_DOUBLE = -0x1p31;
-    private static final double MAX_INT_AS_DOUBLE = 0x1p31 - 1.0;
-
     private DoubleOperators()
     {
     }
@@ -237,25 +232,38 @@ public final class DoubleOperators
     @SqlType(StandardTypes.BIGINT)
     public static long saturatedFloorCastToBigint(@SqlType(StandardTypes.DOUBLE) double value)
     {
-        if (value <= MIN_LONG_AS_DOUBLE) {
-            return Long.MIN_VALUE;
-        }
-        if (MAX_LONG_AS_DOUBLE_PLUS_ONE - value <= 1) {
-            return Long.MAX_VALUE;
-        }
-        return DoubleMath.roundToLong(value, FLOOR);
+        return saturatedFloorCastToLong(value, 0x1p63, -0x1p63, Long.MAX_VALUE, Long.MIN_VALUE);
     }
 
     @ScalarOperator(SATURATED_FLOOR_CAST)
     @SqlType(StandardTypes.INTEGER)
     public static long saturatedFloorCastToInteger(@SqlType(StandardTypes.DOUBLE) double value)
     {
-        if (value <= MIN_INT_AS_DOUBLE) {
-            return Integer.MIN_VALUE;
+        return saturatedFloorCastToLong(value, 0x1p31, -0x1p31, Integer.MAX_VALUE, Integer.MIN_VALUE);
+    }
+
+    @ScalarOperator(SATURATED_FLOOR_CAST)
+    @SqlType(StandardTypes.SMALLINT)
+    public static long saturatedFloorCastToSmallint(@SqlType(StandardTypes.DOUBLE) double value)
+    {
+        return saturatedFloorCastToLong(value, 0x1p15, -0x1p15, Short.MAX_VALUE, Short.MIN_VALUE);
+    }
+
+    @ScalarOperator(SATURATED_FLOOR_CAST)
+    @SqlType(StandardTypes.TINYINT)
+    public static long saturatedFloorCastToTinyint(@SqlType(StandardTypes.DOUBLE) double value)
+    {
+        return saturatedFloorCastToLong(value, 0x1p7, -0x1p7, Byte.MAX_VALUE, Byte.MIN_VALUE);
+    }
+
+    private static long saturatedFloorCastToLong(double value, double maxValuePlusOneAsDouble, double minValueAsDouble, long maxValue, long minValue)
+    {
+        if (value <= minValueAsDouble) {
+            return minValue;
         }
-        if (MAX_INT_AS_DOUBLE - value <= 1) {
-            return Integer.MAX_VALUE;
+        if (maxValuePlusOneAsDouble - value <= 1) {
+            return maxValue;
         }
-        return DoubleMath.roundToInt(value, FLOOR);
+        return DoubleMath.roundToLong(value, FLOOR);
     }
 }
