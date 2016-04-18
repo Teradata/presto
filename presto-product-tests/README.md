@@ -89,26 +89,26 @@ following command:
     presto-product-tests/bin/run_on_docker.sh <profile> -x quarantine,big_query,mysql_connector,postgresql_connector
     ```
 
-where ``<profile>`` is one of either:
+where [profile](#profile) is one of either:
 - **multinode** - pseudo-distributed Hadoop installation running on a
  single Docker container and a distributed Presto installation running on
  multiple Docker containers. For multinode the default configuration is 1 coordinator and 1 worker.
-- **singlenode-simple-impersonation** - pseudo-distributed Hadoop installation running on a
+- **singlenode** - pseudo-distributed Hadoop installation running on a
+ single Docker container and a single node installation of Presto also running
+ on a single Docker container. With no impersonation presto accesses hdfs as the user mentioned in -DHADOOP_USER_NAME.
+ The data files for the tables created in hive will belong to user specified by -DHADOOP_USER_NAME in jvm.config.
+- **singlenode-hdfs-impersonation** - pseudo-distributed Hadoop installation running on a
  single Docker container and a single node installation of Presto also running
  on a single Docker container. Presto impersonates the user who is running the query when accessing HDFS.
- The user mentioned for -DHADOOP_USER_NAME in jvm.config must be allowed to impersonate this user.
-- **singlenode-simple-no-impersonation** - pseudo-distributed Hadoop installation running on a
- single Docker container and a single node installation of Presto also running
- on a single Docker container. With no impersonation presto access hdfs as the user mentioned in -DHADOOP_USER_NAME.
- The data files for the tables created in hive will belong to user specified for -DHADOOP_USER_NAME in jvm.config.
-- **singlenode-kerberos-impersonation** - pseudo-distributed kerberized Hadoop installation running on a
+ The user specified by -DHADOOP_USER_NAME in jvm.config must be allowed to impersonate this user.
+- **singlenode-kerberos-hdfs-impersonation** - pseudo-distributed kerberized Hadoop installation running on a
  single Docker container and a single node installation of kerberized Presto also running
- on a single Docker container. This profile is having kerberos impersonation. Presto impersonates the user who
+ on a single Docker container. This profile has kerberos impersonation. Presto impersonates the user who
  is running the query when accessing HDFS. The principal specified by the hive.hdfs.presto.principal property
  in hive.properties file must be allowed to impersonate this user.
-- **singlenode-kerberos-no-impersonation** - pseudo-distributed Hadoop installation running on a
+- **singlenode-kerberos-hdfs-no-impersonation** - pseudo-distributed Hadoop installation running on a
  single Docker container and a single node installation of kerberized Presto also running
- on a single Docker container. This profile is running kerberos without impersonation. When running without
+ on a single Docker container. This profile runs kerberos without impersonation. When running without
  impersonation all the queries are run with principal specified by hive.hdfs.presto.principal property. The data files
  for the tables created in hive will belong to user specified in hive.hdfs.presto.principal property.
 
@@ -230,8 +230,7 @@ breakpoint is hit.
 ## Troubleshooting
 
 Use the ``docker-compose`` and ``docker`` utilities to control and troubleshoot
-containers. In the following examples ``<profile>`` is either ``singlenode``, ``multinode``, ``singlenode-kerberized`` or
-``singlenode-kerberized-without-impersonation``.
+containers. In the following examples ``<profile>`` is [profile](#profile).
 
 1. Use the following command to view output from running containers:
 

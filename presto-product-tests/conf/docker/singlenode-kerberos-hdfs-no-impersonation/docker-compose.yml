@@ -21,8 +21,8 @@ services:
     command: /docker/volumes/presto/presto-product-tests/conf/docker/files/presto-launcher-wrapper.sh singlenode-kerberized run
     volumes:
       - ../../../../:/docker/volumes/presto
-      - ../../../../presto-product-tests/conf/presto/etc/hive-kerberized-without-impersonation.properties:/docker/volumes/presto/presto-product-tests/conf/presto/etc/catalog/hive.properties
-      - ../../../../presto-product-tests/conf/tempto/tempto-configuration-kerberized.yaml:/docker/volumes/tempto/tempto-configuration-local.yaml
+      - ../../../../presto-product-tests/conf/presto/etc/environment-specific-catalogs/singlenode-kerberos-hdfs-no-impersonation/hive-kerberos-hdfs-no-impersonation.properties:/docker/volumes/presto/presto-product-tests/conf/presto/etc/catalog/hive.properties
+      - ../../../../presto-product-tests/conf/tempto/tempto-configuration-docker-kerberos.yaml:/docker/volumes/tempto/tempto-configuration-local.yaml
     env_file:
       - ../../../target/classes/presto.env
 
