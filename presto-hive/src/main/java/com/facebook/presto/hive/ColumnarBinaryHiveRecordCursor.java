@@ -30,7 +30,9 @@ import org.apache.hadoop.hive.serde2.lazy.ByteArrayRef;
 import org.apache.hadoop.hive.serde2.lazybinary.LazyBinaryFactory;
 import org.apache.hadoop.hive.serde2.lazybinary.LazyBinaryObject;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.io.WritableUtils;
 import org.apache.hadoop.mapred.RecordReader;
 import org.joda.time.DateTimeZone;
@@ -61,6 +63,7 @@ import static com.facebook.presto.hive.HiveUtil.isStructuralType;
 import static com.facebook.presto.hive.HiveUtil.longDecimalPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.shortDecimalPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.timestampPartitionKey;
+import static com.facebook.presto.hive.HiveUtil.varcharPartitionKey;
 import static com.facebook.presto.hive.util.DecimalUtils.getLongDecimalValue;
 import static com.facebook.presto.hive.util.DecimalUtils.getShortDecimalValue;
 import static com.facebook.presto.hive.util.SerDeUtils.getBlockObject;
@@ -75,7 +78,8 @@ import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.StandardTypes.DECIMAL;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
-import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static com.facebook.presto.spi.type.Varchars.isVarcharType;
+import static com.facebook.presto.spi.type.Varchars.truncateToLength;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Maps.uniqueIndex;
@@ -124,7 +128,7 @@ class ColumnarBinaryHiveRecordCursor<K>
     private static final int SIZE_OF_INT = 4;
     private static final int SIZE_OF_LONG = 8;
 
-    private static final Set<HiveType> VALID_HIVE_STRING_TYPES = ImmutableSet.of(HiveType.HIVE_BINARY, HiveType.HIVE_STRING);
+    private static final Set<PrimitiveCategory> VALID_HIVE_STRING_TYPES = ImmutableSet.of(PrimitiveCategory.BINARY, PrimitiveCategory.VARCHAR, PrimitiveCategory.STRING);
     private static final Set<Category> VALID_HIVE_STRUCTURAL_CATEGORIES = ImmutableSet.of(Category.LIST, Category.MAP, Category.STRUCT);
 
     public ColumnarBinaryHiveRecordCursor(RecordReader<K, BytesRefArrayWritable> recordReader,
@@ -211,8 +215,8 @@ class ColumnarBinaryHiveRecordCursor<K>
                 else if (DOUBLE.equals(type)) {
                     doubles[columnIndex] = doublePartitionKey(partitionKey.getValue(), name);
                 }
-                else if (VARCHAR.equals(type)) {
-                    slices[columnIndex] = Slices.wrappedBuffer(bytes);
+                else if (isVarcharType(type)) {
+                    slices[columnIndex] = varcharPartitionKey(partitionKey.getValue(), name, type);
                 }
                 else if (DATE.equals(type)) {
                     longs[columnIndex] = datePartitionKey(partitionKey.getValue(), name);
@@ -516,7 +520,7 @@ class ColumnarBinaryHiveRecordCursor<K>
         checkState(!closed, "Cursor is closed");
 
         Type type = types[fieldId];
-        if (!type.equals(VARCHAR) && !type.equals(VARBINARY) && !isStructuralType(hiveTypes[fieldId]) && !isLongDecimal(type)) {
+        if (!isVarcharType(type) && !type.equals(VARBINARY) && !isStructuralType(hiveTypes[fieldId]) && !isLongDecimal(type)) {
             // we don't use Preconditions.checkArgument because it requires boxing fieldId, which affects inner loop performance
             throw new IllegalArgumentException(format("Expected field to be VARCHAR, VARBINARY or DECIMAL, actual %s (field %s)", type, fieldId));
         }
@@ -559,7 +563,7 @@ class ColumnarBinaryHiveRecordCursor<K>
 
     private void parseStringColumn(int column, byte[] bytes, int start, int length)
     {
-        checkState(VALID_HIVE_STRING_TYPES.contains(hiveTypes[column]), "%s is not a valid STRING type", hiveTypes[column]);
+        checkState(isValidHiveStringType(hiveTypes[column]), "%s is not a valid STRING type", hiveTypes[column]);
         if (length == 0) {
             nulls[column] = true;
         }
@@ -570,7 +574,14 @@ class ColumnarBinaryHiveRecordCursor<K>
                 slices[column] = Slices.EMPTY_SLICE;
             }
             else {
-                slices[column] = Slices.wrappedBuffer(Arrays.copyOfRange(bytes, start, start + length));
+                Slice value = Slices.wrappedBuffer(Arrays.copyOfRange(bytes, start, start + length));
+                Type type = types[column];
+                if (isVarcharType(type)) {
+                    slices[column] = truncateToLength(value, type);
+                }
+                else {
+                    slices[column] = value;
+                }
             }
         }
     }
@@ -621,6 +632,12 @@ class ColumnarBinaryHiveRecordCursor<K>
                 slices[column] = getLongDecimalValue(decimalWritable, columnType.getScale());
             }
         }
+    }
+
+    private boolean isValidHiveStringType(HiveType hiveType)
+    {
+        return hiveType.getCategory() == Category.PRIMITIVE
+                && VALID_HIVE_STRING_TYPES.contains(((PrimitiveTypeInfo) hiveType.getTypeInfo()).getPrimitiveCategory());
     }
 
     @Override
@@ -712,7 +729,7 @@ class ColumnarBinaryHiveRecordCursor<K>
         else if (DOUBLE.equals(type)) {
             parseDoubleColumn(column);
         }
-        else if (VARCHAR.equals(type) || VARBINARY.equals(type)) {
+        else if (isVarcharType(type) || VARBINARY.equals(type)) {
             parseStringColumn(column);
         }
         else if (isStructuralType(hiveTypes[column])) {
