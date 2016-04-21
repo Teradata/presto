@@ -29,8 +29,6 @@ import java.util.Objects;
 import java.util.Optional;
 
 import static com.facebook.presto.type.TypeCalculation.calculateLiteralValue;
-import static com.facebook.presto.type.TypeRegistry.canCoerce;
-import static com.facebook.presto.type.TypeRegistry.getCommonSuperTypeSignature;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.getLast;
 import static java.util.Objects.requireNonNull;
@@ -162,7 +160,7 @@ public class SignatureBinder
             if (actual.equals(UnknownType.UNKNOWN) && isTypeParametrized(expected)) {
                 return true;
             }
-            Optional<Type> coercedParameterType = calculateParameterTypeWithCoercion(actualArgumentSignature, expected);
+            Optional<Type> coercedParameterType = calculateParameterTypeWithCoercion(actual, expected);
             if (coercedParameterType.isPresent()) {
                 return matchAndBindTypeParameters(expected, coercedParameterType.get(), variableBinder);
             }
@@ -190,7 +188,7 @@ public class SignatureBinder
 
                 TypeSignature actualArgumentSignature = actualType.getTypeSignature();
                 TypeSignature variadicBoundSignature = new TypeSignature(typeVariableConstraint.getVariadicBound());
-                Optional<Type> coercedParameterType = calculateParameterTypeWithCoercion(actualArgumentSignature, variadicBoundSignature);
+                Optional<Type> coercedParameterType = calculateParameterTypeWithCoercion(actualType, variadicBoundSignature);
                 if (coercedParameterType.isPresent()) {
                     variableBinder.setTypeVariable(variable, coercedParameterType.get());
                     return true;
@@ -328,19 +326,12 @@ public class SignatureBinder
         return false;
     }
 
-    private Optional<Type> calculateParameterTypeWithCoercion(TypeSignature actual, TypeSignature expected)
+    private Optional<Type> calculateParameterTypeWithCoercion(Type actual, TypeSignature expected)
     {
-        if (!canCoerce(actual, expected)) {
-            return Optional.empty();
+        if (typeManager.canCoerce(actual, expected)) {
+            return typeManager.getCommonSuperType(actual, expected);
         }
-
-        Optional<TypeSignature> commonSuperTypeSignature = getCommonSuperTypeSignature(actual, expected);
-        checkState(commonSuperTypeSignature.isPresent(), "common supper type signature hasn't been found");
-        checkState(baseTypesAreEqual(expected, commonSuperTypeSignature.get()),
-                "base types are supposed to be equal after coercion");
-        Type type = typeManager.getType(commonSuperTypeSignature.get());
-        checkState(type != null, "type signature for concrete type must be calculated here");
-        return Optional.of(type);
+        return Optional.empty();
     }
 
     private boolean isTypeParametrized(TypeSignature expectedSignature)

@@ -42,7 +42,6 @@ import com.facebook.presto.sql.tree.LongLiteral;
 import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.NullLiteral;
 import com.facebook.presto.sql.tree.QualifiedNameReference;
-import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.PeekingIterator;
@@ -416,7 +415,7 @@ public final class DomainTranslator
 
         private Optional<NullableValue> coerce(NullableValue value, Type targetType)
         {
-            if (!TypeRegistry.canCoerce(value.getType(), targetType)) {
+            if (!metadata.getTypeManager().canCoerce(value.getType(), targetType)) {
                 return Optional.empty();
             }
             if (value.isNull()) {
