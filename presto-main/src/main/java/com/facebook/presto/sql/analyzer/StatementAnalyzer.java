@@ -93,6 +93,7 @@ import com.facebook.presto.sql.tree.Relation;
 import com.facebook.presto.sql.tree.Row;
 import com.facebook.presto.sql.tree.SampledRelation;
 import com.facebook.presto.sql.tree.SelectItem;
+import com.facebook.presto.sql.tree.SetOperation;
 import com.facebook.presto.sql.tree.ShowCatalogs;
 import com.facebook.presto.sql.tree.ShowColumns;
 import com.facebook.presto.sql.tree.ShowFunctions;
@@ -1183,6 +1184,12 @@ class StatementAnalyzer
     @Override
     protected RelationType visitUnion(Union node, AnalysisContext context)
     {
+        return visitSetOperation(node, context);
+    }
+
+    @Override
+    protected RelationType visitSetOperation(SetOperation node, AnalysisContext context)
+    {
         checkState(node.getRelations().size() >= 2);
 
         RelationType[] descriptors = node.getRelations().stream()
@@ -1194,11 +1201,12 @@ class StatementAnalyzer
         for (RelationType descriptor : descriptors) {
             int outputFieldSize = outputFieldTypes.length;
             int descFieldSize = descriptor.getVisibleFields().size();
+            String setOperationName = node.getSetOperationType().name();
             if (outputFieldSize != descFieldSize) {
                 throw new SemanticException(MISMATCHED_SET_COLUMN_TYPES,
                         node,
-                        "union query has different number of fields: %d, %d",
-                        outputFieldSize, descFieldSize);
+                        "%s query has different number of fields: %d, %d",
+                        setOperationName, outputFieldSize, descFieldSize);
             }
             for (int i = 0; i < descriptor.getVisibleFields().size(); i++) {
                 Type descFieldType = descriptor.getFieldByIndex(i).getType();
@@ -1206,8 +1214,8 @@ class StatementAnalyzer
                 if (!commonSuperType.isPresent()) {
                     throw new SemanticException(TYPE_MISMATCH,
                             node,
-                            "column %d in union query has incompatible types: %s, %s",
-                            i, outputFieldTypes[i].getDisplayName(), descFieldType.getDisplayName());
+                            "column %d in %s query has incompatible types: %s, %s",
+                            i, outputFieldTypes[i].getDisplayName(), setOperationName, descFieldType.getDisplayName());
                 }
                 outputFieldTypes[i] = commonSuperType.get();
             }
@@ -1240,14 +1248,17 @@ class StatementAnalyzer
                 }
             }
         }
-
         return outputDescriptor;
     }
 
     @Override
     protected RelationType visitIntersect(Intersect node, AnalysisContext context)
     {
-        throw new SemanticException(NOT_SUPPORTED, node, "INTERSECT not yet implemented");
+        if (!node.isDistinct()) {
+            throw new SemanticException(NOT_SUPPORTED, node, "INTERSECT ALL not yet implemented");
+        }
+
+        return visitSetOperation(node, context);
     }
 
     @Override
