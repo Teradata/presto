@@ -67,7 +67,6 @@ import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
-import static java.util.stream.Collectors.toList;
 
 @ThreadSafe
 public final class TypeRegistry
@@ -135,18 +134,6 @@ public final class TypeRegistry
     public Type getParameterizedType(String baseTypeName, List<TypeSignatureParameter> typeParameters)
     {
         return getType(new TypeSignature(baseTypeName, typeParameters));
-    }
-
-    @Override
-    @Deprecated
-    public Type getParameterizedType(String baseTypeName, List<TypeSignature> typeParameters, List<String> literalParameters)
-    {
-        if (baseTypeName.equals(StandardTypes.ROW)) {
-            return getType(new TypeSignature(baseTypeName, typeParameters, literalParameters));
-        }
-        return getParameterizedType(
-                baseTypeName,
-                typeParameters.stream().map(TypeSignatureParameter::of).collect(toList()));
     }
 
     private Type instantiateParametricType(TypeSignature signature)
