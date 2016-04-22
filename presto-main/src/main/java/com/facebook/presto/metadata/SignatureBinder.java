@@ -140,29 +140,46 @@ public class SignatureBinder
     }
 
     private boolean bind(
-            TypeSignature expected,
-            Type actual,
+            TypeSignature expectedSignature,
+            Type actualType,
             BoundVariables.Builder variableBinder)
     {
-        if (isTypeVariable(expected)) {
-            String variable = expected.getBase();
-            return matchAndBindTypeVariable(variable, actual, variableBinder);
+        if (isTypeVariable(expectedSignature)) {
+            String variable = expectedSignature.getBase();
+            return matchAndBindTypeVariable(variable, actualType, variableBinder);
         }
 
-        TypeSignature actualArgumentSignature = actual.getTypeSignature();
+        // TODO: Refactor VARCHAR function to accept parametrized VARCHAR(X) instead of VARCHAR and remove this hack
+        if (expectedSignature.getBase().equals(StandardTypes.VARCHAR) && expectedSignature.getParameters().isEmpty()) {
+            return actualType.getTypeSignature().getBase().equals(StandardTypes.VARCHAR) ||
+                    (allowCoercion && typeManager.coerceTypeBase(actualType, StandardTypes.VARCHAR).isPresent());
+        }
 
-        if (baseTypesAreEqual(expected, actualArgumentSignature)
-                && matchAndBindTypeParameters(expected, actual, variableBinder)) {
-            return true;
+        // If the expected signature is a signature of the concrete type no variables are need to be bound
+        // For such case it is enough to just check whether the actual type is coercible to the expected
+        if (isConcreteType(expectedSignature)) {
+            Type expectedType = typeManager.getType(expectedSignature);
+            if (allowCoercion) {
+                return typeManager.canCoerce(actualType, expectedType);
+            }
+            else {
+                return actualType.equals(expectedType);
+            }
+        }
+
+        String actualTypeBase = actualType.getTypeSignature().getBase();
+        String expectedTypeBase = expectedSignature.getBase();
+        if (actualTypeBase.equals(expectedTypeBase)) {
+            return matchAndBindTypeParameters(expectedSignature, actualType, variableBinder);
         }
         else if (allowCoercion) {
-            // UNKNOWN matches to all the types, but based on UNKNOWN we can't determine the actual type parameters
-            if (actual.equals(UnknownType.UNKNOWN) && isTypeParametrized(expected)) {
-                return true;
+            Optional<Type> coercionResult = typeManager.coerceTypeBase(actualType, expectedTypeBase);
+            if (coercionResult.isPresent()) {
+                return matchAndBindTypeParameters(expectedSignature, coercionResult.get(), variableBinder);
             }
-            Optional<Type> coercedParameterType = calculateParameterTypeWithCoercion(actual, expected);
-            if (coercedParameterType.isPresent()) {
-                return matchAndBindTypeParameters(expected, coercedParameterType.get(), variableBinder);
+            // UNKNOWN matches to all the types, but based on the UNKNOWN type parameters can't be bound
+            if (actualType.equals(UnknownType.UNKNOWN)) {
+                return true;
             }
         }
 
@@ -186,11 +203,9 @@ public class SignatureBinder
                     return true;
                 }
 
-                TypeSignature actualArgumentSignature = actualType.getTypeSignature();
-                TypeSignature variadicBoundSignature = new TypeSignature(typeVariableConstraint.getVariadicBound());
-                Optional<Type> coercedParameterType = calculateParameterTypeWithCoercion(actualType, variadicBoundSignature);
-                if (coercedParameterType.isPresent()) {
-                    variableBinder.setTypeVariable(variable, coercedParameterType.get());
+                Optional<Type> coercedType = typeManager.coerceTypeBase(actualType, typeVariableConstraint.getVariadicBound());
+                if (coercedType.isPresent() && typeVariableConstraint.canBind(coercedType.get())) {
+                    variableBinder.setTypeVariable(variable, coercedType.get());
                     return true;
                 }
             }
@@ -218,20 +233,10 @@ public class SignatureBinder
             BoundVariables.Builder variableBinder)
     {
         TypeSignature actualArgumentSignature = actualArgumentType.getTypeSignature();
-        checkState(baseTypesAreEqual(expectedArgumentSignature, actualArgumentSignature), "equal base types are expected here");
+        checkState(expectedArgumentSignature.getBase().equals(actualArgumentSignature.getBase()), "equal base types are expected here");
 
         List<TypeSignatureParameter> expectedTypeParameters = expectedArgumentSignature.getParameters();
         List<TypeSignatureParameter> actualTypeParameters = actualArgumentSignature.getParameters();
-
-        // expected no parameters, but actual type has parameters bound
-        // actually such situation may happen only for varchar
-        // in future we should replace not parametrized VARCHAR type with the parametrized in function signatures
-        if (expectedTypeParameters.isEmpty() && !actualTypeParameters.isEmpty()) {
-            checkState(expectedArgumentSignature.getBase().equals(StandardTypes.VARCHAR),
-                    "This is just legacy trick for VARCHAR. " +
-                            "newly added methods for parametrized types must declare literal parameters in signatures");
-            return true;
-        }
 
         if (expectedTypeParameters.size() != actualTypeParameters.size()) {
             return false;
@@ -326,33 +331,34 @@ public class SignatureBinder
         return false;
     }
 
-    private Optional<Type> calculateParameterTypeWithCoercion(Type actual, TypeSignature expected)
+    private boolean isConcreteType(TypeSignature typeSignature)
     {
-        if (typeManager.canCoerce(actual, expected)) {
-            return typeManager.getCommonSuperType(actual, expected);
+        if (isTypeVariable(typeSignature)) {
+            return false;
         }
-        return Optional.empty();
-    }
-
-    private boolean isTypeParametrized(TypeSignature expectedSignature)
-    {
-        if (isTypeVariable(expectedSignature)) {
-            return true;
-        }
-
-        for (TypeSignatureParameter parameter : expectedSignature.getParameters()) {
-            Optional<TypeSignature> typeSignature = parameter.getTypeSignatureOrNamedTypeSignature();
-            if (typeSignature.isPresent() && isTypeParametrized(typeSignature.get())) {
-                return true;
+        for (TypeSignatureParameter typeSignatureParameter : typeSignature.getParameters()) {
+            switch (typeSignatureParameter.getKind()) {
+                case LONG:
+                    continue;
+                case VARIABLE:
+                    return false;
+                case TYPE: {
+                    if (!isConcreteType(typeSignatureParameter.getTypeSignature())) {
+                        return false;
+                    }
+                    continue;
+                }
+                case NAMED_TYPE: {
+                    if (!isConcreteType(typeSignatureParameter.getNamedTypeSignature().getTypeSignature())) {
+                        return false;
+                    }
+                    continue;
+                }
+                default:
+                    throw new UnsupportedOperationException("Unsupported TypeSignatureParameter kind: " + typeSignatureParameter.getKind());
             }
         }
-
-        return false;
-    }
-
-    private boolean baseTypesAreEqual(TypeSignature first, TypeSignature second)
-    {
-        return first.getBase().equals(second.getBase());
+        return true;
     }
 
     private boolean allTypeVariablesBound(BoundVariables boundVariables)

@@ -21,13 +21,16 @@ import java.util.Optional;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DateType.DATE;
+import static com.facebook.presto.spi.type.DecimalType.createDecimalType;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TimeType.TIME;
 import static com.facebook.presto.spi.type.TimeWithTimeZoneType.TIME_WITH_TIME_ZONE;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
 import static com.facebook.presto.type.JsonPathType.JSON_PATH;
 import static com.facebook.presto.type.LikePatternType.LIKE_PATTERN;
 import static com.facebook.presto.type.RegexpType.REGEXP;
@@ -159,26 +162,14 @@ public class TestTypeRegistry
     }
 
     @Test
-    public void testCastTypeBase()
+    public void testCastTypeBaseParametric()
             throws Exception
     {
-        // assertCommonSuperType("varchar(42)", "varchar", "varchar(42)");
-        // assertCommonSuperType("decimal", "decimal(23,1)", "decimal(23,1)");
-        // assertCommonSuperType("bigint", "decimal", "decimal(19,0)");
-        // assertCommonSuperType("bigint", "decimal(p,s)", "decimal(19,0)");
-        // assertCommonSuperType("double", "decimal(p,s)", "double");
-        // assertCommonSuperType("integer", "decimal", "decimal(10,0)");
-        // assertCommonSuperType("integer", decimalPS, "decimal(10,0)");
-        // assertTrue(canCoerce("varchar(44)", "varchar(x)"));
-        // assertTrue(canCoerce(StandardTypes.BIGINT, "decimal"));
-        // assertTrue(canCoerce(StandardTypes.BIGINT, "decimal(p,s)"));
-        // assertTrue(canCoerce("array(decimal(2,1))", "array(decimal)"));
-        // assertTrue(canCoerce("array(bigint)", "array(decimal)"));
-        // assertFalse(canCoerce("array(bigint)", "array(decimal(2,1))"));
-        // assertTrue(canCoerce("unknown", "varchar(x)"));
-        // assertTrue(canCoerce("decimal(22,1)", "decimal(p,s)"));
-        // assertTrue(canCoerce("integer", decimalPS));
-        // assertTrue(canCoerce("integer", "decimal"));
+        assertEquals(typeRegistry.coerceTypeBase(createVarcharType(42), "varchar"), Optional.of(createVarcharType(42)));
+        assertEquals(typeRegistry.coerceTypeBase(createDecimalType(23, 1), "decimal"), Optional.of(createDecimalType(23, 1)));
+        assertEquals(typeRegistry.coerceTypeBase(BIGINT, "decimal"), Optional.of(createDecimalType(19, 0)));
+        assertEquals(typeRegistry.coerceTypeBase(createDecimalType(23, 1), "double"), Optional.of(DOUBLE));
+        assertEquals(typeRegistry.coerceTypeBase(INTEGER, "decimal"), Optional.of(createDecimalType(10, 0)));
     }
 
     private void assertCommonSuperType(Type firstType, Type secondType, Type expected)
