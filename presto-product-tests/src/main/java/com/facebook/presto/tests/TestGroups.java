@@ -42,6 +42,11 @@ public final class TestGroups
     public static final String STRING_FUNCTIONS = "string_functions";
     public static final String MATH_FUNCTIONS = "math_functions";
     public static final String STORAGE_FORMATS = "storage_formats";
+    public static final String PROFILE_SPECIFIC_TESTS = "profilespecifictests";
+    public static final String SINGLENODE = "singlenode";
+    public static final String SINGLENODE_HDFS_IMPERSONATION = "singlenode-hdfs-impersonation";
+    public static final String SINGLENODE_KERBEROS_HDFS_IMPERSONATION = "singlenode-kerberos-hdfs-impersonation";
+    public static final String SINGLENODE_KERBEROS_HDFS_NO_IMPERSONATION = "singlenode-kerberos-hdfs-no-impersonation";
 
     private TestGroups() {}
 }

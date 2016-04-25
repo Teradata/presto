@@ -102,12 +102,12 @@ The Presto product tests must be run explicitly because they do not run
 as part of the Maven build like the unit tests do. Note that the product
 tests cannot be run in parallel. This means that only one instance of a
 test can be run at once in a given environment. To run all product
-tests and exclude the `quarantine` and `big_query` groups run the
+tests and exclude the `quarantine`, `big_query` and `profile` groups run the
 following command:
 
 ```
 ./mvnw install -DskipTests
-presto-product-tests/bin/run_on_docker.sh <profile> -x quarantine,big_query,mysql_connector,postgresql_connector
+presto-product-tests/bin/run_on_docker.sh <profile> -x quarantine,big_query,mysql_connector,postgresql_connector,profilespecifictests
 ```
 
 where [profile](#profile) is one of either:
@@ -142,6 +142,12 @@ presto-product-tests/bin/run_on_docker.sh <profile> -t com.facebook.presto.tests
 # Run single convention based test
 presto-product-tests/bin/run_on_docker.sh <profile> -t sql_tests.testcases.system.selectInformationSchemaTables
 ```
+
+Profile specific tests are tests which runs only for that particular profile. It confirms if the profile is same as what is claims.
+For e.g. singlenode-kerberos-hdfs-impersonation - Test to check if kerberos is working with impersonation
+To run the kerberos/impersonation specific test cases
+presto-product-tests/bin/run_on_docker.sh <profile> -g <profile>
+E.g - presto-product-tests/bin/run_on_docker.sh singlenode-kerberos-hdfs-impersonation -g singlenode-kerberos-hdfs-impersonation
 
 For running Java based tests from IntelliJ see the section on
 [Debugging Java based tests](#debugging-java-based-tests).
