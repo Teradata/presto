@@ -481,9 +481,9 @@ public final class StringFunctions
 
     @Description("transforms the string to normalized form")
     @ScalarFunction
-    @LiteralParameters("x")
+    @LiteralParameters({"x", "y"})
     @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
-    public static Slice normalize(@SqlType(StandardTypes.VARCHAR) Slice slice, @SqlType("varchar(x)") Slice form)
+    public static Slice normalize(@SqlType("varchar(x)") Slice slice, @SqlType("varchar(y)") Slice form)
     {
         Normalizer.Form targetForm;
         try {

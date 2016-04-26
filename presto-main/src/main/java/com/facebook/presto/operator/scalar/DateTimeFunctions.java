@@ -567,9 +567,9 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction
-    @LiteralParameters("x")
+    @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.TIMESTAMP)
-    public static long dateParse(ConnectorSession session, @SqlType("varchar(x)") Slice dateTime, @SqlType(StandardTypes.VARCHAR) Slice formatString)
+    public static long dateParse(ConnectorSession session, @SqlType("varchar(x)") Slice dateTime, @SqlType("varchar(y)") Slice formatString)
     {
         DateTimeFormatter formatter = DATETIME_FORMATTER_CACHE.get(formatString)
                 .withChronology(getChronology(session.getTimeZoneKey()))

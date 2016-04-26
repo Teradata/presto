@@ -13,11 +13,10 @@
  */
 package com.facebook.presto.metadata;
 
+import com.facebook.presto.operator.aggregation.AggregationCompiler;
+import com.facebook.presto.operator.aggregation.AggregationCompiler.BindableAggregationFunction;
 import com.facebook.presto.operator.aggregation.InternalAggregationFunction;
-import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
-import com.facebook.presto.spi.type.TypeSignature;
-import com.facebook.presto.util.ImmutableCollectors;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
@@ -34,9 +33,20 @@ public abstract class SqlAggregationFunction
 {
     private final Signature signature;
 
-    public static SqlAggregationFunction create(String name, String description, InternalAggregationFunction function)
+    public static List<SqlAggregationFunction> createByAnnotations(Class<?> aggregationDefinition)
     {
-        return new SimpleSqlAggregationFunction(name, description, function);
+        ImmutableList.Builder<SqlAggregationFunction> builder = ImmutableList.builder();
+        for (BindableAggregationFunction bindableFunction : AggregationCompiler.generateBindableAggregationFunctions(aggregationDefinition)) {
+            builder.add(new AnnotationBasedSqlAggregationFunction(bindableFunction));
+        }
+
+        return builder.build();
+    }
+
+    protected SqlAggregationFunction(BindableAggregationFunction bindableAggregationFunction)
+    {
+        requireNonNull(bindableAggregationFunction, "bindableAggregationFunction is null");
+        this.signature = bindableAggregationFunction.getSignature();
     }
 
     protected SqlAggregationFunction(
@@ -96,41 +106,27 @@ public abstract class SqlAggregationFunction
 
     public abstract InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, TypeManager typeManager, FunctionRegistry functionRegistry);
 
-    public static class SimpleSqlAggregationFunction
+    public static class AnnotationBasedSqlAggregationFunction
             extends SqlAggregationFunction
     {
-        private final InternalAggregationFunction function;
-        private final String description;
+        private final BindableAggregationFunction aggregationSignature;
 
-        public SimpleSqlAggregationFunction(
-                String name,
-                String description,
-                InternalAggregationFunction function)
+        protected AnnotationBasedSqlAggregationFunction(BindableAggregationFunction aggregationSignature)
         {
-            super(name,
-                    ImmutableList.<TypeVariableConstraint>of(),
-                    ImmutableList.<LongVariableConstraint>of(),
-                    function.getFinalType().getTypeSignature().toString(),
-                    function.getParameterTypes().stream()
-                            .map(Type::getTypeSignature)
-                            .map(TypeSignature::toString)
-                            .collect(ImmutableCollectors.toImmutableList()),
-                    function.isApproximate() ? APPROXIMATE_AGGREGATE : AGGREGATE,
-                    ImmutableSet.of());
-            this.description = description;
-            this.function = requireNonNull(function, "function is null");
+            super(aggregationSignature);
+            this.aggregationSignature = aggregationSignature;
         }
 
         @Override
         public String getDescription()
         {
-            return description;
+            return aggregationSignature.getDescription();
         }
 
         @Override
         public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, TypeManager typeManager, FunctionRegistry functionRegistry)
         {
-            return function;
+            return aggregationSignature.specialize(boundVariables, typeManager, arity);
         }
     }
 }
