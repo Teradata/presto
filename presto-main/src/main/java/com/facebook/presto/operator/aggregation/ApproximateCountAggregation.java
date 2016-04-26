@@ -15,7 +15,6 @@ package com.facebook.presto.operator.aggregation;
 
 import com.facebook.presto.operator.aggregation.state.AccumulatorState;
 import com.facebook.presto.spi.block.BlockBuilder;
-import com.facebook.presto.spi.type.StandardTypes;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 
@@ -44,7 +43,7 @@ public final class ApproximateCountAggregation
         state.setSamples(state.getSamples() + otherState.getSamples());
     }
 
-    @OutputFunction(StandardTypes.VARCHAR)
+    @OutputFunction("varchar(57)")
     public static void output(ApproximateCountState state, double confidence, BlockBuilder out)
     {
         Slice value = Slices.utf8Slice(formatApproximateResult(state.getCount(), countError(state.getSamples(), state.getCount()), confidence, true));

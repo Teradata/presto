@@ -19,7 +19,8 @@ import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.type.SqlType;
 
 import static com.facebook.presto.operator.aggregation.ApproximateUtils.formatApproximateResult;
-import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static com.facebook.presto.spi.type.VarcharType.VARCHAR_MAX_LENGTH;
+import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 
 @AggregationFunction(value = "avg", approximate = true)
 public final class ApproximateAverageAggregations
@@ -79,7 +80,7 @@ public final class ApproximateAverageAggregations
         }
     }
 
-    @OutputFunction(StandardTypes.VARCHAR)
+    @OutputFunction(VARCHAR_MAX_LENGTH)
     public static void output(ApproximateAverageState state, double confidence, BlockBuilder out)
     {
         if (state.getCount() == 0) {
@@ -87,7 +88,7 @@ public final class ApproximateAverageAggregations
         }
         else {
             String result = formatApproximateAverage(state.getSamples(), state.getMean(), state.getM2() / state.getCount(), confidence);
-            VARCHAR.writeString(out, result);
+            createUnboundedVarcharType().writeString(out, result);
         }
     }
 

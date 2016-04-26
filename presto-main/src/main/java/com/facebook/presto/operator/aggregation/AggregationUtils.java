@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.operator.aggregation;
 
-import com.facebook.presto.operator.aggregation.state.AccumulatorStateSerializer;
 import com.facebook.presto.operator.aggregation.state.CorrelationState;
 import com.facebook.presto.operator.aggregation.state.CovarianceState;
 import com.facebook.presto.operator.aggregation.state.RegressionState;
@@ -21,7 +20,6 @@ import com.facebook.presto.operator.aggregation.state.VarianceState;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.google.common.base.CaseFormat;
 
@@ -30,6 +28,7 @@ import javax.annotation.Nullable;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Locale.ENGLISH;
@@ -126,22 +125,24 @@ public final class AggregationUtils
         state.setSumXSquare(state.getSumXSquare() + otherState.getSumXSquare());
     }
 
-    public static Type getOutputType(@Nullable Method outputFunction, AccumulatorStateSerializer<?> serializer, TypeManager typeManager)
+    public static TypeSignature getOutputTypeSignature(@Nullable Method outputFunction)
     {
-        if (outputFunction == null) {
-            return serializer.getSerializedType();
-        }
-        else {
-            return typeManager.getType(TypeSignature.parseTypeSignature(outputFunction.getAnnotation(OutputFunction.class).value()));
-        }
+        checkArgument(outputFunction != null);
+        return TypeSignature.parseTypeSignature(outputFunction.getAnnotation(OutputFunction.class).value());
     }
 
+    @Deprecated
     public static String generateAggregationName(String baseName, Type outputType, List<Type> inputTypes)
     {
+        return generateAggregationName(baseName, outputType.getTypeSignature(), inputTypes.stream().map(x -> x.getTypeSignature()).collect(Collectors.toList()));
+    }
+
+    public static String generateAggregationName(String baseName, TypeSignature outputType, List<TypeSignature> inputTypes)
+    {
         StringBuilder sb = new StringBuilder();
-        sb.append(CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, outputType.getTypeSignature().toString()));
-        for (Type inputType : inputTypes) {
-            sb.append(CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, inputType.getTypeSignature().toString()));
+        sb.append(CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, outputType.toString()));
+        for (TypeSignature inputType : inputTypes) {
+            sb.append(CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, inputType.toString()));
         }
         sb.append(CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, baseName.toLowerCase(ENGLISH)));
 

@@ -46,7 +46,7 @@ public final class ApproximateSumAggregations
         mergeVarianceState(state, otherState);
     }
 
-    @OutputFunction(StandardTypes.VARCHAR)
+    @OutputFunction("varchar(57)")
     public static void output(ApproximateDoubleSumState state, double confidence, BlockBuilder out)
     {
         if (state.getWeightedCount() == 0) {
@@ -78,7 +78,7 @@ public final class ApproximateSumAggregations
         mergeVarianceState(state, otherState);
     }
 
-    @OutputFunction(StandardTypes.VARCHAR)
+    @OutputFunction("varchar(57)")
     public static void evaluateFinal(ApproximateLongSumState state, double confidence, BlockBuilder out)
     {
         if (state.getWeightedCount() == 0) {
