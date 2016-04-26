@@ -148,8 +148,10 @@ public final class IntervalYearMonthOperators
         return min <= value && value <= max;
     }
 
+    // x <= 22
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
     public static Slice castToSlice(@SqlType(StandardTypes.INTERVAL_YEAR_TO_MONTH) long value)
     {
         return utf8Slice(SqlIntervalYearMonth.formatMonths(value));

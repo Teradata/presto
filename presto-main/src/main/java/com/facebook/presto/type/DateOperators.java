@@ -120,8 +120,10 @@ public final class DateOperators
         return packDateTimeWithZone(millis, session.getTimeZoneKey());
     }
 
+    // x <= 16
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
     public static Slice castToSlice(@SqlType(StandardTypes.DATE) long value)
     {
         return utf8Slice(printDate((int) value));
@@ -129,8 +131,9 @@ public final class DateOperators
 
     @ScalarFunction("date")
     @ScalarOperator(CAST)
+    @LiteralParameters("x")
     @SqlType(StandardTypes.DATE)
-    public static long castFromSlice(@SqlType(StandardTypes.VARCHAR) Slice value)
+    public static long castFromSlice(@SqlType("varchar(x)") Slice value)
     {
         try {
             return parseDate(trim(value).toStringUtf8());

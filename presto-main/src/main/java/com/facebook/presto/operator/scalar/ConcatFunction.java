@@ -26,8 +26,8 @@ import com.facebook.presto.metadata.BoundVariables;
 import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.SqlScalarFunction;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.TypeManager;
+import com.facebook.presto.spi.type.VarcharType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slice;
@@ -61,7 +61,8 @@ public final class ConcatFunction
 
     public ConcatFunction()
     {
-        super("concat", ImmutableList.of(), ImmutableList.of(), StandardTypes.VARCHAR, ImmutableList.of(StandardTypes.VARCHAR), true);
+        // TODO design new variadic functions binding mechanism that will allow to produce VARCHAR(x) where x < MAX_LENGTH.
+        super("concat", ImmutableList.of(), ImmutableList.of(), VarcharType.VARCHAR_MAX_LENGTH, ImmutableList.of(VarcharType.VARCHAR_MAX_LENGTH), true);
     }
 
     @Override

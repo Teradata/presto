@@ -28,6 +28,7 @@ import com.facebook.presto.operator.scalar.ScalarFunctionImplementation;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
+import com.facebook.presto.spi.type.VarcharType;
 import com.google.common.base.Throwables;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -74,7 +75,6 @@ import static com.facebook.presto.spi.type.StandardTypes.TIME;
 import static com.facebook.presto.spi.type.StandardTypes.TIMESTAMP;
 import static com.facebook.presto.spi.type.StandardTypes.TIMESTAMP_WITH_TIME_ZONE;
 import static com.facebook.presto.spi.type.StandardTypes.TIME_WITH_TIME_ZONE;
-import static com.facebook.presto.spi.type.StandardTypes.VARCHAR;
 import static com.facebook.presto.type.TypeUtils.resolveTypes;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.facebook.presto.util.Reflection.methodHandle;
@@ -172,8 +172,8 @@ public final class UnknownOperators
     {
         return ImmutableList.of(
                 createUnknownFunction("concat", UnknownType.NAME, UnknownType.NAME, UnknownType.NAME),
-                createUnknownFunction("concat", VARCHAR, UnknownType.NAME, VARCHAR),
-                createUnknownFunction("concat", VARCHAR, VARCHAR, UnknownType.NAME)
+                createUnknownFunction("concat", VarcharType.VARCHAR_MAX_LENGTH, UnknownType.NAME, VarcharType.VARCHAR_MAX_LENGTH),
+                createUnknownFunction("concat", VarcharType.VARCHAR_MAX_LENGTH, VarcharType.VARCHAR_MAX_LENGTH, UnknownType.NAME)
         );
     }
 

@@ -20,6 +20,7 @@ import com.facebook.presto.spi.block.InterleavedBlockBuilder;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.type.ArrayType;
+import com.facebook.presto.type.LiteralParameters;
 import com.facebook.presto.type.MapType;
 import com.facebook.presto.type.RowType;
 import com.facebook.presto.type.SqlType;
@@ -75,9 +76,10 @@ public final class TestingRowConstructor
     }
 
     @ScalarFunction("test_row")
+    @LiteralParameters("x")
     @SqlType("row<integer,double,boolean,varchar,timestamp>('col0','col1','col2','col3','col4')")
     public static Block testRowIntegerDoubleBooleanVarcharTimestamp(@Nullable @SqlType(StandardTypes.INTEGER) Long arg1, @Nullable @SqlType(StandardTypes.DOUBLE) Double arg2,
-                                                          @Nullable @SqlType(StandardTypes.BOOLEAN) Boolean arg3, @Nullable @SqlType(StandardTypes.VARCHAR) Slice arg4,
+                                                          @Nullable @SqlType(StandardTypes.BOOLEAN) Boolean arg3, @Nullable @SqlType("varchar(x)") Slice arg4,
                                                           @Nullable @SqlType(StandardTypes.TIMESTAMP) Long arg5)
     {
         return toStackRepresentation(ImmutableList.of(INTEGER, DOUBLE, BOOLEAN, VARCHAR, TIMESTAMP), arg1, arg2, arg3, arg4, arg5);
@@ -117,8 +119,9 @@ public final class TestingRowConstructor
     }
 
     @ScalarFunction("test_row")
+    @LiteralParameters("x")
     @SqlType("row<double,varchar>('col0','col1')")
-    public static Block testRowDoubleInteger(@Nullable @SqlType(StandardTypes.DOUBLE) Double arg1, @Nullable @SqlType(StandardTypes.VARCHAR) Slice arg2)
+    public static Block testRowDoubleInteger(@Nullable @SqlType(StandardTypes.DOUBLE) Double arg1, @Nullable @SqlType("varchar(x)") Slice arg2)
     {
         return toStackRepresentation(ImmutableList.of(DOUBLE, VARCHAR), arg1, arg2);
     }

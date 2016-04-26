@@ -109,8 +109,10 @@ public final class BooleanOperators
         return value ? 1 : 0;
     }
 
+    // x <= 5
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
     public static Slice castToVarchar(@SqlType(StandardTypes.BOOLEAN) boolean value)
     {
         return value ? TRUE : FALSE;

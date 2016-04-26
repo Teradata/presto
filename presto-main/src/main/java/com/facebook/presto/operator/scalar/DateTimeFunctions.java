@@ -17,6 +17,8 @@ import com.facebook.presto.operator.Description;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.type.StandardTypes;
+import com.facebook.presto.spi.type.VarcharType;
+import com.facebook.presto.type.LiteralParameters;
 import com.facebook.presto.type.SqlType;
 import com.facebook.presto.util.ThreadLocalCache;
 import com.google.common.primitives.Ints;
@@ -116,7 +118,7 @@ public final class DateTimeFunctions
 
     @Description("current time zone")
     @ScalarFunction("current_timezone")
-    @SqlType(StandardTypes.VARCHAR)
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
     public static Slice currentTimeZone(ConnectorSession session)
     {
         return utf8Slice(session.getTimeZoneKey().getId());
@@ -167,7 +169,7 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction("to_iso8601")
-    @SqlType(StandardTypes.VARCHAR)
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
     public static Slice toISO8601FromTimestamp(ConnectorSession session, @SqlType(StandardTypes.TIMESTAMP) long timestamp)
     {
         DateTimeFormatter formatter = ISODateTimeFormat.dateTime()
@@ -176,7 +178,7 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction("to_iso8601")
-    @SqlType(StandardTypes.VARCHAR)
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
     public static Slice toISO8601FromTimestampWithTimeZone(@SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone)
     {
         long millisUtc = unpackMillisUtc(timestampWithTimeZone);
@@ -186,7 +188,7 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction("to_iso8601")
-    @SqlType(StandardTypes.VARCHAR)
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
     public static Slice toISO8601FromDate(ConnectorSession session, @SqlType(StandardTypes.DATE) long date)
     {
         DateTimeFormatter formatter = ISODateTimeFormat.date()
@@ -195,8 +197,9 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction("from_iso8601_timestamp")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)
-    public static long fromISO8601Timestamp(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice iso8601DateTime)
+    public static long fromISO8601Timestamp(ConnectorSession session, @SqlType("varchar(x)") Slice iso8601DateTime)
     {
         DateTimeFormatter formatter = ISODateTimeFormat.dateTimeParser()
                 .withChronology(getChronology(session.getTimeZoneKey()))
@@ -205,8 +208,9 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction("from_iso8601_date")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.DATE)
-    public static long fromISO8601Date(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice iso8601DateTime)
+    public static long fromISO8601Date(ConnectorSession session, @SqlType("varchar(x)") Slice iso8601DateTime)
     {
         DateTimeFormatter formatter = ISODateTimeFormat.dateElementParser()
                 .withChronology(UTC_CHRONOLOGY);
@@ -215,8 +219,9 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction(value = "at_timezone", hidden = true)
+    @LiteralParameters("x")
     @SqlType(StandardTypes.TIME_WITH_TIME_ZONE)
-    public static long timeAtTimeZone(@SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long timeWithTimeZone, @SqlType(StandardTypes.VARCHAR) Slice zoneId)
+    public static long timeAtTimeZone(@SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long timeWithTimeZone, @SqlType("varchar(x)") Slice zoneId)
     {
         return packDateTimeWithZone(unpackMillisUtc(timeWithTimeZone), zoneId.toStringUtf8());
     }
@@ -231,8 +236,9 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction(value = "at_timezone", hidden = true)
+    @LiteralParameters("x")
     @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)
-    public static long timestampAtTimeZone(@SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone, @SqlType(StandardTypes.VARCHAR) Slice zoneId)
+    public static long timestampAtTimeZone(@SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone, @SqlType("varchar(x)") Slice zoneId)
     {
         return packDateTimeWithZone(unpackMillisUtc(timestampWithTimeZone), zoneId.toStringUtf8());
     }
@@ -248,8 +254,9 @@ public final class DateTimeFunctions
 
     @Description("truncate to the specified precision in the session timezone")
     @ScalarFunction("date_trunc")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.DATE)
-    public static long truncateDate(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice unit, @SqlType(StandardTypes.DATE) long date)
+    public static long truncateDate(ConnectorSession session, @SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.DATE) long date)
     {
         long millis = getDateField(UTC_CHRONOLOGY, unit).roundFloor(DAYS.toMillis(date));
         return MILLISECONDS.toDays(millis);
@@ -257,16 +264,18 @@ public final class DateTimeFunctions
 
     @Description("truncate to the specified precision in the session timezone")
     @ScalarFunction("date_trunc")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.TIME)
-    public static long truncateTime(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice unit, @SqlType(StandardTypes.TIME) long time)
+    public static long truncateTime(ConnectorSession session, @SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.TIME) long time)
     {
         return getTimeField(getChronology(session.getTimeZoneKey()), unit).roundFloor(time);
     }
 
     @Description("truncate to the specified precision")
     @ScalarFunction("date_trunc")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.TIME_WITH_TIME_ZONE)
-    public static long truncateTimeWithTimeZone(@SqlType(StandardTypes.VARCHAR) Slice unit, @SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long timeWithTimeZone)
+    public static long truncateTimeWithTimeZone(@SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long timeWithTimeZone)
     {
         long millis = getTimeField(unpackChronology(timeWithTimeZone), unit).roundFloor(unpackMillisUtc(timeWithTimeZone));
         return updateMillisUtc(millis, timeWithTimeZone);
@@ -274,44 +283,49 @@ public final class DateTimeFunctions
 
     @Description("truncate to the specified precision in the session timezone")
     @ScalarFunction("date_trunc")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.TIMESTAMP)
-    public static long truncateTimestamp(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice unit, @SqlType(StandardTypes.TIMESTAMP) long timestamp)
+    public static long truncateTimestamp(ConnectorSession session, @SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.TIMESTAMP) long timestamp)
     {
         return getTimestampField(getChronology(session.getTimeZoneKey()), unit).roundFloor(timestamp);
     }
 
     @Description("truncate to the specified precision")
     @ScalarFunction("date_trunc")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)
-    public static long truncateTimestampWithTimezone(@SqlType(StandardTypes.VARCHAR) Slice unit, @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone)
+    public static long truncateTimestampWithTimezone(@SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone)
     {
         long millis = getTimestampField(unpackChronology(timestampWithTimeZone), unit).roundFloor(unpackMillisUtc(timestampWithTimeZone));
         return updateMillisUtc(millis, timestampWithTimeZone);
     }
 
     @Description("add the specified amount of date to the given date")
+    @LiteralParameters("x")
     @ScalarFunction("date_add")
     @SqlType(StandardTypes.DATE)
-    public static long addFieldValueDate(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice unit, @SqlType(StandardTypes.BIGINT) long value, @SqlType(StandardTypes.DATE) long date)
+    public static long addFieldValueDate(ConnectorSession session, @SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.BIGINT) long value, @SqlType(StandardTypes.DATE) long date)
     {
         long millis = getDateField(UTC_CHRONOLOGY, unit).add(DAYS.toMillis(date), Ints.checkedCast(value));
         return MILLISECONDS.toDays(millis);
     }
 
     @Description("add the specified amount of time to the given time")
+    @LiteralParameters("x")
     @ScalarFunction("date_add")
     @SqlType(StandardTypes.TIME)
-    public static long addFieldValueTime(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice unit, @SqlType(StandardTypes.BIGINT) long value, @SqlType(StandardTypes.TIME) long time)
+    public static long addFieldValueTime(ConnectorSession session, @SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.BIGINT) long value, @SqlType(StandardTypes.TIME) long time)
     {
         ISOChronology chronology = getChronology(session.getTimeZoneKey());
         return modulo24Hour(chronology, getTimeField(chronology, unit).add(time, Ints.checkedCast(value)));
     }
 
     @Description("add the specified amount of time to the given time")
+    @LiteralParameters("x")
     @ScalarFunction("date_add")
     @SqlType(StandardTypes.TIME_WITH_TIME_ZONE)
     public static long addFieldValueTimeWithTimeZone(
-            @SqlType(StandardTypes.VARCHAR) Slice unit,
+            @SqlType("varchar(x)") Slice unit,
             @SqlType(StandardTypes.BIGINT) long value,
             @SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long timeWithTimeZone)
     {
@@ -321,11 +335,12 @@ public final class DateTimeFunctions
     }
 
     @Description("add the specified amount of time to the given timestamp")
+    @LiteralParameters("x")
     @ScalarFunction("date_add")
     @SqlType(StandardTypes.TIMESTAMP)
     public static long addFieldValueTimestamp(
             ConnectorSession session,
-            @SqlType(StandardTypes.VARCHAR) Slice unit,
+            @SqlType("varchar(x)") Slice unit,
             @SqlType(StandardTypes.BIGINT) long value,
             @SqlType(StandardTypes.TIMESTAMP) long timestamp)
     {
@@ -333,10 +348,11 @@ public final class DateTimeFunctions
     }
 
     @Description("add the specified amount of time to the given timestamp")
+    @LiteralParameters("x")
     @ScalarFunction("date_add")
     @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)
     public static long addFieldValueTimestampWithTimeZone(
-            @SqlType(StandardTypes.VARCHAR) Slice unit,
+            @SqlType("varchar(x)") Slice unit,
             @SqlType(StandardTypes.BIGINT) long value,
             @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone)
     {
@@ -346,16 +362,18 @@ public final class DateTimeFunctions
 
     @Description("difference of the given dates in the given unit")
     @ScalarFunction("date_diff")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.BIGINT)
-    public static long diffDate(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice unit, @SqlType(StandardTypes.DATE) long date1, @SqlType(StandardTypes.DATE) long date2)
+    public static long diffDate(ConnectorSession session, @SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.DATE) long date1, @SqlType(StandardTypes.DATE) long date2)
     {
         return getDateField(UTC_CHRONOLOGY, unit).getDifferenceAsLong(DAYS.toMillis(date2), DAYS.toMillis(date1));
     }
 
     @Description("difference of the given times in the given unit")
     @ScalarFunction("date_diff")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.BIGINT)
-    public static long diffTime(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice unit, @SqlType(StandardTypes.TIME) long time1, @SqlType(StandardTypes.TIME) long time2)
+    public static long diffTime(ConnectorSession session, @SqlType("varchar(x)") Slice unit, @SqlType(StandardTypes.TIME) long time1, @SqlType(StandardTypes.TIME) long time2)
     {
         ISOChronology chronology = getChronology(session.getTimeZoneKey());
         return getTimeField(chronology, unit).getDifferenceAsLong(time2, time1);
@@ -363,9 +381,10 @@ public final class DateTimeFunctions
 
     @Description("difference of the given times in the given unit")
     @ScalarFunction("date_diff")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.BIGINT)
     public static long diffTimeWithTimeZone(
-            @SqlType(StandardTypes.VARCHAR) Slice unit,
+            @SqlType("varchar(x)") Slice unit,
             @SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long timeWithTimeZone1,
             @SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long timeWithTimeZone2)
     {
@@ -374,10 +393,11 @@ public final class DateTimeFunctions
 
     @Description("difference of the given times in the given unit")
     @ScalarFunction("date_diff")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.BIGINT)
     public static long diffTimestamp(
             ConnectorSession session,
-            @SqlType(StandardTypes.VARCHAR) Slice unit,
+            @SqlType("varchar(x)") Slice unit,
             @SqlType(StandardTypes.TIMESTAMP) long timestamp1,
             @SqlType(StandardTypes.TIMESTAMP) long timestamp2)
     {
@@ -386,9 +406,10 @@ public final class DateTimeFunctions
 
     @Description("difference of the given times in the given unit")
     @ScalarFunction("date_diff")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.BIGINT)
     public static long diffTimestampWithTimeZone(
-            @SqlType(StandardTypes.VARCHAR) Slice unit,
+            @SqlType("varchar(x)") Slice unit,
             @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone1,
             @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone2)
     {
@@ -457,8 +478,9 @@ public final class DateTimeFunctions
 
     @Description("parses the specified date/time by the given format")
     @ScalarFunction
+    @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)
-    public static long parseDatetime(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice datetime, @SqlType(StandardTypes.VARCHAR) Slice formatString)
+    public static long parseDatetime(ConnectorSession session, @SqlType("varchar(x)") Slice datetime, @SqlType("varchar(y)") Slice formatString)
     {
         try {
             return packDateTimeWithZone(parseDateTimeHelper(DateTimeFormat.forPattern(formatString.toStringUtf8())
@@ -484,19 +506,21 @@ public final class DateTimeFunctions
 
     @Description("formats the given time by the given format")
     @ScalarFunction
-    @SqlType(StandardTypes.VARCHAR)
-    public static Slice formatDatetime(ConnectorSession session, @SqlType(StandardTypes.TIMESTAMP) long timestamp, @SqlType(StandardTypes.VARCHAR) Slice formatString)
+    @LiteralParameters("x")
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
+    public static Slice formatDatetime(ConnectorSession session, @SqlType(StandardTypes.TIMESTAMP) long timestamp, @SqlType("varchar(x)") Slice formatString)
     {
         return formatDatetime(getChronology(session.getTimeZoneKey()), session.getLocale(), timestamp, formatString);
     }
 
     @Description("formats the given time by the given format")
     @ScalarFunction("format_datetime")
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
     public static Slice formatDatetimeWithTimeZone(
             ConnectorSession session,
             @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone,
-            @SqlType(StandardTypes.VARCHAR) Slice formatString)
+            @SqlType("varchar(x)") Slice formatString)
     {
         return formatDatetime(unpackChronology(timestampWithTimeZone), session.getLocale(), unpackMillisUtc(timestampWithTimeZone), formatString);
     }
@@ -515,18 +539,20 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction
-    @SqlType(StandardTypes.VARCHAR)
-    public static Slice dateFormat(ConnectorSession session, @SqlType(StandardTypes.TIMESTAMP) long timestamp, @SqlType(StandardTypes.VARCHAR) Slice formatString)
+    @LiteralParameters("x")
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
+    public static Slice dateFormat(ConnectorSession session, @SqlType(StandardTypes.TIMESTAMP) long timestamp, @SqlType("varchar(x)") Slice formatString)
     {
         return dateFormat(getChronology(session.getTimeZoneKey()), session.getLocale(), timestamp, formatString);
     }
 
     @ScalarFunction("date_format")
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
     public static Slice dateFormatWithTimeZone(
             ConnectorSession session,
             @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone,
-            @SqlType(StandardTypes.VARCHAR) Slice formatString)
+            @SqlType("varchar(x)") Slice formatString)
     {
         return dateFormat(unpackChronology(timestampWithTimeZone), session.getLocale(), unpackMillisUtc(timestampWithTimeZone), formatString);
     }
@@ -541,8 +567,9 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction
+    @LiteralParameters("x")
     @SqlType(StandardTypes.TIMESTAMP)
-    public static long dateParse(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice dateTime, @SqlType(StandardTypes.VARCHAR) Slice formatString)
+    public static long dateParse(ConnectorSession session, @SqlType("varchar(x)") Slice dateTime, @SqlType(StandardTypes.VARCHAR) Slice formatString)
     {
         DateTimeFormatter formatter = DATETIME_FORMATTER_CACHE.get(formatString)
                 .withChronology(getChronology(session.getTimeZoneKey()))

@@ -13,7 +13,6 @@
  */
 package com.facebook.presto.operator.scalar;
 
-import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.type.ArrayType;
 import com.facebook.presto.type.SqlType;
 import com.google.common.collect.ImmutableList;
@@ -27,6 +26,8 @@ import java.util.List;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static com.facebook.presto.spi.type.VarcharType.VARCHAR_MAX_LENGTH;
+import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
 
 public class TestRegexpFunctions
         extends AbstractTestFunctions
@@ -36,7 +37,7 @@ public class TestRegexpFunctions
     }
 
     @ScalarFunction(deterministic = false) // if not non-deterministic, constant folding code accidentally fix invalid characters
-    @SqlType(StandardTypes.VARCHAR)
+    @SqlType(VARCHAR_MAX_LENGTH)
     public static Slice invalidUtf8()
     {
         return Slices.wrappedBuffer(new byte[] {
@@ -65,12 +66,12 @@ public class TestRegexpFunctions
     @Test
     public void testRegexpReplace()
     {
-        assertFunction("REGEXP_REPLACE('fun stuff.', '[a-z]')", VARCHAR, " .");
+        assertFunction("REGEXP_REPLACE('fun stuff.', '[a-z]')", createVarcharType(10), " .");
         assertFunction("REGEXP_REPLACE('fun stuff.', '[a-z]', '*')", VARCHAR, "*** *****.");
 
         assertFunction(
                 "REGEXP_REPLACE('call 555.123.4444 now', '(\\d{3})\\.(\\d{3}).(\\d{4})')",
-                VARCHAR,
+                createVarcharType(21),
                 "call  now");
         assertFunction(
                 "REGEXP_REPLACE('call 555.123.4444 now', '(\\d{3})\\.(\\d{3}).(\\d{4})', '($1) $2-$3')",
@@ -105,10 +106,10 @@ public class TestRegexpFunctions
     @Test
     public void testRegexpExtract()
     {
-        assertFunction("REGEXP_EXTRACT('Hello world bye', '\\b[a-z]([a-z]*)')", VARCHAR, "world");
-        assertFunction("REGEXP_EXTRACT('Hello world bye', '\\b[a-z]([a-z]*)', 1)", VARCHAR, "orld");
-        assertFunction("REGEXP_EXTRACT('rat cat\nbat dog', 'ra(.)|blah(.)(.)', 2)", VARCHAR, null);
-        assertFunction("REGEXP_EXTRACT('12345', 'x')", VARCHAR, null);
+        assertFunction("REGEXP_EXTRACT('Hello world bye', '\\b[a-z]([a-z]*)')", createVarcharType(15), "world");
+        assertFunction("REGEXP_EXTRACT('Hello world bye', '\\b[a-z]([a-z]*)', 1)", createVarcharType(15), "orld");
+        assertFunction("REGEXP_EXTRACT('rat cat\nbat dog', 'ra(.)|blah(.)(.)', 2)", createVarcharType(15), null);
+        assertFunction("REGEXP_EXTRACT('12345', 'x')", createVarcharType(5), null);
 
         assertInvalidFunction("REGEXP_EXTRACT('Hello world bye', '\\b[a-z]([a-z]*)', -1)", INVALID_FUNCTION_ARGUMENT);
         assertInvalidFunction("REGEXP_EXTRACT('Hello world bye', '\\b[a-z]([a-z]*)', 2)", INVALID_FUNCTION_ARGUMENT);

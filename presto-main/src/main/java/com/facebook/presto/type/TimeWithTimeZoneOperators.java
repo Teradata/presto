@@ -107,8 +107,10 @@ public final class TimeWithTimeZoneOperators
         return value;
     }
 
+    // x <= 18
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
     public static Slice castToSlice(@SqlType(StandardTypes.TIME_WITH_TIME_ZONE) long value)
     {
         return utf8Slice(printTimeWithTimeZone(value));

@@ -58,8 +58,9 @@ public class TestMapOperators
     }
 
     @ScalarFunction
+    @LiteralParameters("x")
     @SqlType(StandardTypes.JSON)
-    public static Slice uncheckedToJson(@SqlType(StandardTypes.VARCHAR) Slice slice)
+    public static Slice uncheckedToJson(@SqlType("varchar(x)") Slice slice)
     {
         return slice;
     }

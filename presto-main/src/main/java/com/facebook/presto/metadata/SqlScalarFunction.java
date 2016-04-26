@@ -160,8 +160,8 @@ public abstract class SqlScalarFunction
                 Set<String> literalParameters)
         {
             super(signature.getName(),
-                    ImmutableList.of(),
-                    ImmutableList.of(),
+                    signature.getTypeVariableConstraints(),
+                    signature.getLongVariableConstraints(),
                     signature.getReturnType().toString(),
                     signature.getArgumentTypes().stream()
                             .map(TypeSignature::toString)

@@ -14,6 +14,7 @@
 package com.facebook.presto.operator.scalar;
 
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.type.BigintOperators;
 import com.facebook.presto.type.BooleanOperators;
 import com.facebook.presto.type.DoubleOperators;
@@ -57,7 +58,7 @@ public final class JsonOperators
 
     @ScalarOperator(CAST)
     @Nullable
-    @SqlType(VARCHAR)
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
     public static Slice castToVarchar(@SqlType(JSON) Slice json)
     {
         try (JsonParser parser = JSON_FACTORY.createParser(json.getInput())) {
