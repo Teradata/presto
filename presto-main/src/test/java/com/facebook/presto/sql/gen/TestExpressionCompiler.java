@@ -1017,10 +1017,10 @@ public class TestExpressionCompiler
                         BOOLEAN,
                         value == null || pattern == null ? null : RegexpFunctions.regexpLike(utf8Slice(value), RegexpFunctions.castToRegexp(utf8Slice(pattern))));
                 assertExecute(generateExpression("regexp_replace(%s, %s)", value, pattern),
-                        VARCHAR,
+                        value == null ? VARCHAR : createVarcharType(value.length()),
                         value == null || pattern == null ? null : RegexpFunctions.regexpReplace(utf8Slice(value), RegexpFunctions.castToRegexp(utf8Slice(pattern))));
                 assertExecute(generateExpression("regexp_extract(%s, %s)", value, pattern),
-                        VARCHAR,
+                        value == null ? VARCHAR : createVarcharType(value.length()),
                         value == null || pattern == null ? null : RegexpFunctions.regexpExtract(utf8Slice(value), RegexpFunctions.castToRegexp(utf8Slice(pattern))));
             }
         }
