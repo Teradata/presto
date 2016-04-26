@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static com.facebook.presto.sql.QueryUtil.mangleFieldReference;
-import static com.facebook.presto.type.TypeRegistry.isTypeOnlyCoercion;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -183,12 +182,11 @@ class TranslationMap
                 // cast expression if coercion is registered
                 Type coercion = analysis.getCoercion(node);
                 if (coercion != null) {
-                    Type type = analysis.getType(node);
                     rewrittenExpression = new Cast(
                             rewrittenExpression,
                             coercion.getTypeSignature().toString(),
                             false,
-                            isTypeOnlyCoercion(type, coercion));
+                            analysis.isTypeOnlyCoercion(node));
                 }
 
                 return rewrittenExpression;
@@ -235,14 +233,13 @@ class TranslationMap
                 Expression rewrittenExpression = rewriteFunctionCall(functionCall, context, treeRewriter);
 
                 // cast expression if coercion is registered
-                Type type = analysis.getType(node);
                 Type coercion = analysis.getCoercion(node);
                 if (coercion != null) {
                     rewrittenExpression = new Cast(
                             rewrittenExpression,
                             coercion.getTypeSignature().toString(),
                             false,
-                            isTypeOnlyCoercion(type, coercion));
+                            analysis.isTypeOnlyCoercion(node));
                 }
                 return rewrittenExpression;
             }

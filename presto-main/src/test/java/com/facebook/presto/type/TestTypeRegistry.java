@@ -13,132 +13,116 @@
  */
 package com.facebook.presto.type;
 
-import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeSignature;
-import com.facebook.presto.spi.type.TypeSignatureParameter;
-import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
+import java.util.Set;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DateType.DATE;
+import static com.facebook.presto.spi.type.DecimalType.createDecimalType;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TimeType.TIME;
 import static com.facebook.presto.spi.type.TimeWithTimeZoneType.TIME_WITH_TIME_ZONE;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
-import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
+import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
 import static com.facebook.presto.type.JsonPathType.JSON_PATH;
 import static com.facebook.presto.type.LikePatternType.LIKE_PATTERN;
 import static com.facebook.presto.type.RegexpType.REGEXP;
-import static com.facebook.presto.type.TypeRegistry.getCommonSuperTypeSignature;
 import static com.facebook.presto.type.UnknownType.UNKNOWN;
+import static java.lang.String.format;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 public class TestTypeRegistry
 {
-    private final TypeSignature varcharX = new TypeSignature(StandardTypes.VARCHAR, ImmutableList.of(TypeSignatureParameter.of("x")));
-    private final TypeSignature decimalPS = new TypeSignature(StandardTypes.DECIMAL,
-            ImmutableList.of(TypeSignatureParameter.of("p"), TypeSignatureParameter.of("n")));
+    private final TypeRegistry typeRegistry = new TypeRegistry();
 
     @Test
     public void testIsTypeOnlyCoercion()
     {
-        assertTrue(TypeRegistry.isTypeOnlyCoercion(BIGINT.getTypeSignature(), BIGINT.getTypeSignature()));
-        assertTrue(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("varchar(42)"), parseTypeSignature("varchar(44)")));
-        assertFalse(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("varchar(44)"), parseTypeSignature("varchar(42)")));
+        assertTrue(typeRegistry.isTypeOnlyCoercion(BIGINT, BIGINT));
+        assertTrue(isTypeOnlyCoercion("varchar(42)", "varchar(44)"));
+        assertFalse(isTypeOnlyCoercion("varchar(44)", "varchar(42)"));
 
-        assertTrue(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("array(varchar(42))"), parseTypeSignature("array(varchar(44))")));
-        assertFalse(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("array(varchar(44))"), parseTypeSignature("array(varchar(42))")));
+        assertTrue(isTypeOnlyCoercion("array(varchar(42))", "array(varchar(44))"));
+        assertFalse(isTypeOnlyCoercion("array(varchar(44))", "array(varchar(42))"));
 
-        assertTrue(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("decimal(22,1)"), parseTypeSignature("decimal(23,1)")));
-        assertTrue(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("decimal(2,1)"), parseTypeSignature("decimal(3,1)")));
-        assertFalse(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("decimal(23,1)"), parseTypeSignature("decimal(22,1)")));
-        assertFalse(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("decimal(3,1)"), parseTypeSignature("decimal(2,1)")));
+        assertTrue(isTypeOnlyCoercion("decimal(22,1)", "decimal(23,1)"));
+        assertTrue(isTypeOnlyCoercion("decimal(2,1)", "decimal(3,1)"));
+        assertFalse(isTypeOnlyCoercion("decimal(23,1)", "decimal(22,1)"));
+        assertFalse(isTypeOnlyCoercion("decimal(3,1)", "decimal(2,1)"));
+        assertFalse(isTypeOnlyCoercion("decimal(3,1)", "decimal(22,1)"));
 
-        assertTrue(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("array(decimal(22,1))"), parseTypeSignature("array(decimal(23,1))")));
-        assertTrue(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("array(decimal(2,1))"), parseTypeSignature("array(decimal(3,1))")));
-        assertFalse(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("array(decimal(23,1))"), parseTypeSignature("array(decimal(22,1))")));
-        assertFalse(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("array(decimal(3,1))"), parseTypeSignature("array(decimal(2,1))")));
+        assertTrue(isTypeOnlyCoercion("array(decimal(22,1))", "array(decimal(23,1))"));
+        assertTrue(isTypeOnlyCoercion("array(decimal(2,1))", "array(decimal(3,1))"));
+        assertFalse(isTypeOnlyCoercion("array(decimal(23,1))", "array(decimal(22,1))"));
+        assertFalse(isTypeOnlyCoercion("array(decimal(3,1))", "array(decimal(2,1))"));
 
-        assertTrue(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("map(decimal(2,1), decimal(2,1))"), parseTypeSignature("map(decimal(2,1), decimal(3,1))")));
-        assertFalse(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("map(decimal(2,1), decimal(2,1))"), parseTypeSignature("map(decimal(2,1), decimal(23,1))")));
-        assertFalse(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("map(decimal(2,1), decimal(2,1))"), parseTypeSignature("map(decimal(2,1), decimal(3,2))")));
-        assertTrue(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("map(decimal(22,1), decimal(2,1))"), parseTypeSignature("map(decimal(23,1), decimal(3,1))")));
-        assertFalse(TypeRegistry.isTypeOnlyCoercion(parseTypeSignature("map(decimal(23,1), decimal(3,1))"), parseTypeSignature("map(decimal(22,1), decimal(2,1))")));
+        assertTrue(isTypeOnlyCoercion("map(decimal(2,1), decimal(2,1))", "map(decimal(2,1), decimal(3,1))"));
+        assertFalse(isTypeOnlyCoercion("map(decimal(2,1), decimal(2,1))", "map(decimal(2,1), decimal(23,1))"));
+        assertFalse(isTypeOnlyCoercion("map(decimal(2,1), decimal(2,1))", "map(decimal(2,1), decimal(3,2))"));
+        assertTrue(isTypeOnlyCoercion("map(decimal(22,1), decimal(2,1))", "map(decimal(23,1), decimal(3,1))"));
+        assertFalse(isTypeOnlyCoercion("map(decimal(23,1), decimal(3,1))", "map(decimal(22,1), decimal(2,1))"));
     }
 
     @Test
     public void testCanCoerce()
     {
-        assertTrue(TypeRegistry.canCoerce(BIGINT, BIGINT));
-        assertTrue(TypeRegistry.canCoerce(UNKNOWN, BIGINT));
-        assertFalse(TypeRegistry.canCoerce(BIGINT, UNKNOWN));
+        assertTrue(typeRegistry.canCoerce(BIGINT, BIGINT));
+        assertTrue(typeRegistry.canCoerce(UNKNOWN, BIGINT));
+        assertFalse(typeRegistry.canCoerce(BIGINT, UNKNOWN));
 
-        assertTrue(TypeRegistry.canCoerce(BIGINT, DOUBLE));
-        assertTrue(TypeRegistry.canCoerce(DATE, TIMESTAMP));
-        assertTrue(TypeRegistry.canCoerce(DATE, TIMESTAMP_WITH_TIME_ZONE));
-        assertTrue(TypeRegistry.canCoerce(TIME, TIME_WITH_TIME_ZONE));
-        assertTrue(TypeRegistry.canCoerce(TIMESTAMP, TIMESTAMP_WITH_TIME_ZONE));
-        assertTrue(TypeRegistry.canCoerce(VARCHAR, REGEXP));
-        assertTrue(TypeRegistry.canCoerce(VARCHAR, LIKE_PATTERN));
-        assertTrue(TypeRegistry.canCoerce(VARCHAR, JSON_PATH));
+        assertTrue(typeRegistry.canCoerce(BIGINT, DOUBLE));
+        assertTrue(typeRegistry.canCoerce(DATE, TIMESTAMP));
+        assertTrue(typeRegistry.canCoerce(DATE, TIMESTAMP_WITH_TIME_ZONE));
+        assertTrue(typeRegistry.canCoerce(TIME, TIME_WITH_TIME_ZONE));
+        assertTrue(typeRegistry.canCoerce(TIMESTAMP, TIMESTAMP_WITH_TIME_ZONE));
+        assertTrue(typeRegistry.canCoerce(VARCHAR, REGEXP));
+        assertTrue(typeRegistry.canCoerce(VARCHAR, LIKE_PATTERN));
+        assertTrue(typeRegistry.canCoerce(VARCHAR, JSON_PATH));
 
-        assertFalse(TypeRegistry.canCoerce(DOUBLE, BIGINT));
-        assertFalse(TypeRegistry.canCoerce(TIMESTAMP, TIME_WITH_TIME_ZONE));
-        assertFalse(TypeRegistry.canCoerce(TIMESTAMP_WITH_TIME_ZONE, TIMESTAMP));
-        assertFalse(TypeRegistry.canCoerce(VARBINARY, VARCHAR));
+        assertFalse(typeRegistry.canCoerce(DOUBLE, BIGINT));
+        assertFalse(typeRegistry.canCoerce(TIMESTAMP, TIME_WITH_TIME_ZONE));
+        assertFalse(typeRegistry.canCoerce(TIMESTAMP_WITH_TIME_ZONE, TIMESTAMP));
+        assertFalse(typeRegistry.canCoerce(VARBINARY, VARCHAR));
 
-        assertTrue(TypeRegistry.canCoerce(UNKNOWN.getTypeSignature(), parseTypeSignature("array(bigint)")));
-        assertFalse(TypeRegistry.canCoerce(parseTypeSignature("array(bigint)"), UNKNOWN.getTypeSignature()));
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("array(bigint)"), parseTypeSignature("array(double)")));
-        assertFalse(TypeRegistry.canCoerce(parseTypeSignature("array(double)"), parseTypeSignature("array(bigint)")));
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("map(bigint,double)"), parseTypeSignature("map(bigint,double)")));
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("map(bigint,double)"), parseTypeSignature("map(double,double)")));
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("row<bigint,double,varchar>('a','b','c')"), parseTypeSignature("row<bigint,double,varchar>('a','b','c')")));
+        assertTrue(canCoerce("unknown", "array(bigint)"));
+        assertFalse(canCoerce("array(bigint)", "unknown"));
+        assertTrue(canCoerce("array(bigint)", "array(double)"));
+        assertFalse(canCoerce("array(double)", "array(bigint)"));
+        assertTrue(canCoerce("map(bigint,double)", "map(bigint,double)"));
+        assertTrue(canCoerce("map(bigint,double)", "map(double,double)"));
+        assertTrue(canCoerce("row<bigint,double,varchar>('a','b','c')", "row<bigint,double,varchar>('a','b','c')"));
 
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("varchar(42)"), parseTypeSignature("varchar(42)")));
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("varchar(42)"), parseTypeSignature("varchar(44)")));
-        assertFalse(TypeRegistry.canCoerce(parseTypeSignature("varchar(44)"), parseTypeSignature("varchar(42)")));
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("varchar(44)"), parseTypeSignature("varchar")));
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("varchar(44)"), varcharX));
-        assertTrue(TypeRegistry.canCoerce(varcharX, parseTypeSignature("varchar(44)")));
-        assertTrue(TypeRegistry.canCoerce(UNKNOWN.getTypeSignature(), parseTypeSignature("varchar")));
-        assertTrue(TypeRegistry.canCoerce(UNKNOWN.getTypeSignature(), parseTypeSignature("varchar(44)")));
-        assertTrue(TypeRegistry.canCoerce(UNKNOWN.getTypeSignature(), varcharX));
+        assertTrue(canCoerce("varchar(42)", "varchar(42)"));
+        assertTrue(canCoerce("varchar(42)", "varchar(44)"));
+        assertFalse(canCoerce("varchar(44)", "varchar(42)"));
+        assertTrue(canCoerce("varchar(44)", "varchar"));
+        assertTrue(canCoerce("unknown", "varchar"));
+        assertTrue(canCoerce("unknown", "varchar(44)"));
 
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("decimal(22,1)"), parseTypeSignature("decimal(23,1)")));
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("decimal"), parseTypeSignature("decimal(38,1)")));
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("decimal(22,1)"), decimalPS));
-        assertTrue(TypeRegistry.canCoerce(decimalPS, parseTypeSignature("decimal(23,1)")));
-        assertFalse(TypeRegistry.canCoerce(parseTypeSignature("decimal(23,1)"), parseTypeSignature("decimal(22,1)")));
+        assertTrue(canCoerce("decimal(22,1)", "decimal(23,1)"));
+        assertTrue(canCoerce("decimal", "decimal(38,1)"));
+        assertFalse(canCoerce("decimal(23,1)", "decimal(22,1)"));
+        assertFalse(canCoerce("bigint", "decimal(18,0)"));
+        assertTrue(canCoerce("bigint", "decimal(19,0)"));
+        assertTrue(canCoerce("bigint", "decimal(37,1)"));
+        assertTrue(canCoerce("decimal(22,1)", "double"));
 
-        assertFalse(TypeRegistry.canCoerce(BIGINT.getTypeSignature(), parseTypeSignature("decimal(18,0)")));
-        assertTrue(TypeRegistry.canCoerce(BIGINT.getTypeSignature(), parseTypeSignature("decimal(19,0)")));
-        assertTrue(TypeRegistry.canCoerce(BIGINT.getTypeSignature(), parseTypeSignature("decimal(37,1)")));
-        assertTrue(TypeRegistry.canCoerce(BIGINT.getTypeSignature(), parseTypeSignature("decimal")));
-        assertTrue(TypeRegistry.canCoerce(BIGINT.getTypeSignature(), decimalPS));
-
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("array(decimal(2,1))"), parseTypeSignature("array(decimal)")));
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("array(bigint)"), parseTypeSignature("array(decimal)")));
-        assertFalse(TypeRegistry.canCoerce(parseTypeSignature("array(bigint)"), parseTypeSignature("array(decimal(2,1))")));
-
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("decimal(22,1)"), DOUBLE.getTypeSignature()));
-        assertTrue(TypeRegistry.canCoerce(parseTypeSignature("decimal"), DOUBLE.getTypeSignature()));
-        assertTrue(TypeRegistry.canCoerce(decimalPS, DOUBLE.getTypeSignature()));
-
-        assertFalse(TypeRegistry.canCoerce(INTEGER.getTypeSignature(), parseTypeSignature("decimal(9,0)")));
-        assertTrue(TypeRegistry.canCoerce(INTEGER.getTypeSignature(), parseTypeSignature("decimal(10,0)")));
-        assertTrue(TypeRegistry.canCoerce(INTEGER.getTypeSignature(), parseTypeSignature("decimal(37,1)")));
-        assertTrue(TypeRegistry.canCoerce(INTEGER.getTypeSignature(), parseTypeSignature("decimal")));
-        assertTrue(TypeRegistry.canCoerce(INTEGER.getTypeSignature(), decimalPS));
+        assertFalse(canCoerce("integer", "decimal(9,0)"));
+        assertTrue(canCoerce("integer", "decimal(10,0)"));
+        assertTrue(canCoerce("integer", "decimal(37,1)"));
     }
 
     @Test
@@ -166,35 +150,66 @@ public class TestTypeRegistry
         assertCommonSuperType("map(bigint,double)", "map(bigint,double)", "map(bigint,double)");
         assertCommonSuperType("map(bigint,double)", "map(double,double)", "map(double,double)");
         assertCommonSuperType("row<bigint,double,varchar>('a','b','c')", "row<bigint,double,varchar>('a','b','c')", "row<bigint,double,varchar>('a','b','c')");
-
         assertCommonSuperType("varchar(42)", "varchar(44)", "varchar(44)");
-        assertCommonSuperType("varchar(42)", "varchar", "varchar(42)");
-        assertCommonSuperType(varcharX, parseTypeSignature("varchar(44)"), parseTypeSignature("varchar(44)"));
-
         assertCommonSuperType("decimal(22,1)", "decimal(23,1)", "decimal(23,1)");
-        assertCommonSuperType("decimal", "decimal(23,1)", "decimal(23,1)");
-        assertCommonSuperType(decimalPS, parseTypeSignature("decimal(23,1)"), parseTypeSignature("decimal(23,1)"));
-
-        assertCommonSuperType(BIGINT.getTypeSignature(), parseTypeSignature("decimal(23,1)"), parseTypeSignature("decimal(23,1)"));
-        assertCommonSuperType(BIGINT.getTypeSignature(), parseTypeSignature("decimal(18,0)"), parseTypeSignature("decimal(19,0)"));
-        assertCommonSuperType(BIGINT.getTypeSignature(), parseTypeSignature("decimal(19,0)"), parseTypeSignature("decimal(19,0)"));
-        assertCommonSuperType(BIGINT.getTypeSignature(), parseTypeSignature("decimal(37,1)"), parseTypeSignature("decimal(37,1)"));
-        assertCommonSuperType(BIGINT.getTypeSignature(), parseTypeSignature("decimal"), parseTypeSignature("decimal(19,0)"));
-        assertCommonSuperType(BIGINT.getTypeSignature(), decimalPS, parseTypeSignature("decimal(19,0)"));
-
+        assertCommonSuperType("bigint", "decimal(23,1)", "decimal(23,1)");
+        assertCommonSuperType("bigint", "decimal(18,0)", "decimal(19,0)");
+        assertCommonSuperType("bigint", "decimal(19,0)", "decimal(19,0)");
+        assertCommonSuperType("bigint", "decimal(37,1)", "decimal(37,1)");
         assertCommonSuperType("array(decimal(23,1))", "array(decimal(22,1))", "array(decimal(23,1))");
         assertCommonSuperType("array(bigint)", "array(decimal(2,1))", "array(decimal(20,1))");
-
         assertCommonSuperType("decimal(22,1)", "double", "double");
         assertCommonSuperType("decimal", "double", "double");
-        assertCommonSuperType(decimalPS, DOUBLE.getTypeSignature(), DOUBLE.getTypeSignature());
+        assertCommonSuperType("integer", "decimal(23,1)", "decimal(23,1)");
+        assertCommonSuperType("integer", "decimal(9,0)", "decimal(10,0)");
+        assertCommonSuperType("integer", "decimal(10,0)", "decimal(10,0)");
+        assertCommonSuperType("integer", "decimal(37,1)", "decimal(37,1)");
+    }
 
-        assertCommonSuperType(INTEGER.getTypeSignature(), parseTypeSignature("decimal(23,1)"), parseTypeSignature("decimal(23,1)"));
-        assertCommonSuperType(INTEGER.getTypeSignature(), parseTypeSignature("decimal(9,0)"), parseTypeSignature("decimal(10,0)"));
-        assertCommonSuperType(INTEGER.getTypeSignature(), parseTypeSignature("decimal(10,0)"), parseTypeSignature("decimal(10,0)"));
-        assertCommonSuperType(INTEGER.getTypeSignature(), parseTypeSignature("decimal(37,1)"), parseTypeSignature("decimal(37,1)"));
-        assertCommonSuperType(INTEGER.getTypeSignature(), parseTypeSignature("decimal"), parseTypeSignature("decimal(10,0)"));
-        assertCommonSuperType(INTEGER.getTypeSignature(), decimalPS, parseTypeSignature("decimal(10,0)"));
+    @Test
+    public void testCastTypeBaseParametric()
+            throws Exception
+    {
+        assertEquals(typeRegistry.coerceTypeBase(createVarcharType(42), "varchar"), Optional.of(createVarcharType(42)));
+        assertEquals(typeRegistry.coerceTypeBase(createDecimalType(23, 1), "decimal"), Optional.of(createDecimalType(23, 1)));
+        assertEquals(typeRegistry.coerceTypeBase(BIGINT, "decimal"), Optional.of(createDecimalType(19, 0)));
+        assertEquals(typeRegistry.coerceTypeBase(createDecimalType(23, 1), "double"), Optional.of(DOUBLE));
+        assertEquals(typeRegistry.coerceTypeBase(INTEGER, "decimal"), Optional.of(createDecimalType(10, 0)));
+    }
+
+    @Test
+    public void testCanCoerceIsTransitive()
+            throws Exception
+    {
+        Set<Type> types = getStandardPrimitiveTypes();
+        for (Type sourceType : types) {
+            for (Type resultType : types) {
+                if (typeRegistry.canCoerce(sourceType, resultType)) {
+                    for (Type transitiveType : types) {
+                        if (typeRegistry.canCoerce(transitiveType, sourceType) && !typeRegistry.canCoerce(transitiveType, resultType)) {
+                            fail(format("'%s' -> '%s' coercion is missing when transitive coercion is possible: '%s' -> '%s' -> '%s'",
+                                    transitiveType, resultType, transitiveType, sourceType, resultType));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private Set<Type> getStandardPrimitiveTypes()
+    {
+        ImmutableSet.Builder<Type> builder = ImmutableSet.builder();
+        // add unparametrized types
+        builder.addAll(typeRegistry.getTypes());
+        // add corner cases for parametrized types
+        builder.add(createDecimalType(1, 0));
+        builder.add(createDecimalType(17, 0));
+        builder.add(createDecimalType(38, 0));
+        builder.add(createDecimalType(17, 17));
+        builder.add(createDecimalType(38, 38));
+        builder.add(createVarcharType(0));
+        builder.add(createUnboundedVarcharType());
+        return builder.build();
     }
 
     private void assertCommonSuperType(Type firstType, Type secondType, Type expected)
@@ -206,14 +221,22 @@ public class TestTypeRegistry
 
     private void assertCommonSuperType(String firstType, String secondType, String expected)
     {
-        TypeSignature expectedType = expected == null ? null : parseTypeSignature(expected);
-        assertEquals(getCommonSuperTypeSignature(parseTypeSignature(firstType), parseTypeSignature(secondType)), Optional.ofNullable(expectedType));
-        assertEquals(getCommonSuperTypeSignature(parseTypeSignature(secondType), parseTypeSignature(firstType)), Optional.ofNullable(expectedType));
+        assertEquals(typeRegistry.getCommonSuperType(createType(firstType), createType(secondType)), Optional.ofNullable(expected).map(this::createType));
+        assertEquals(typeRegistry.getCommonSuperType(createType(secondType), createType(firstType)), Optional.ofNullable(expected).map(this::createType));
     }
 
-    private void assertCommonSuperType(TypeSignature firstType, TypeSignature secondType, TypeSignature expected)
+    private boolean canCoerce(String actual, String expected)
     {
-        assertEquals(getCommonSuperTypeSignature(firstType, secondType), Optional.ofNullable(expected));
-        assertEquals(getCommonSuperTypeSignature(secondType, firstType), Optional.ofNullable(expected));
+        return typeRegistry.canCoerce(createType(actual), createType(expected));
+    }
+
+    private boolean isTypeOnlyCoercion(String actual, String expected)
+    {
+        return typeRegistry.isTypeOnlyCoercion(createType(actual), createType(expected));
+    }
+
+    private Type createType(String signature)
+    {
+        return typeRegistry.getType(TypeSignature.parseTypeSignature(signature));
     }
 }

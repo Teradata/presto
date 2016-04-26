@@ -17,6 +17,7 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.StandardErrorCode;
 import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.spi.type.TypeManager;
+import com.facebook.presto.spi.type.TypeSignatureParameter;
 import com.google.common.collect.ImmutableList;
 
 import javax.inject.Inject;
@@ -55,7 +56,7 @@ public class HiveTableProperties
                 new PropertyMetadata<>(
                         PARTITIONED_BY_PROPERTY,
                         "Partition columns",
-                        typeManager.getParameterizedType(ARRAY, ImmutableList.of(VARCHAR.getTypeSignature()), ImmutableList.of()),
+                        typeManager.getParameterizedType(ARRAY, ImmutableList.of(TypeSignatureParameter.of(VARCHAR.getTypeSignature()))),
                         List.class,
                         ImmutableList.of(),
                         false,
@@ -65,7 +66,7 @@ public class HiveTableProperties
                 new PropertyMetadata<>(
                         CLUSTERED_BY_PROPERTY,
                         "Bucketing columns",
-                        typeManager.getParameterizedType(ARRAY, ImmutableList.of(VARCHAR.getTypeSignature()), ImmutableList.of()),
+                        typeManager.getParameterizedType(ARRAY, ImmutableList.of(TypeSignatureParameter.of(VARCHAR.getTypeSignature()))),
                         List.class,
                         ImmutableList.of(),
                         false,
