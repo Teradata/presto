@@ -21,11 +21,7 @@ import com.teradata.tempto.Requires;
 import com.teradata.tempto.hadoop.hdfs.HdfsClient;
 import org.testng.annotations.Test;
 
-import static com.facebook.presto.tests.TestGroups.PROFILE_SPECIFIC_TESTS;
-import static com.facebook.presto.tests.TestGroups.SINGLENODE;
-import static com.facebook.presto.tests.TestGroups.SINGLENODE_HDFS_IMPERSONATION;
-import static com.facebook.presto.tests.TestGroups.SINGLENODE_KERBEROS_HDFS_IMPERSONATION;
-import static com.facebook.presto.tests.TestGroups.SINGLENODE_KERBEROS_HDFS_NO_IMPERSONATION;
+import static com.facebook.presto.tests.TestGroups.*;
 import static com.teradata.tempto.query.QueryExecutor.query;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -33,64 +29,67 @@ import static org.testng.Assert.assertEquals;
 
 @Requires(ImmutableNationTable.class)
 public class ImpersonationTests
-        extends ProductTest
-{
-    @Inject
+        extends ProductTest {
+    @Inject(optional = true)
     private HdfsClient hdfsClient;
-    private static final String tableName = "checkTableOwner";
-    private static final String tablepath = "/user/hive/warehouse/checktableowner";
 
-    @Inject
+    @Inject(optional = true)
     @Named("databases.presto.jdbc_user")
-    private String jdbcuserkerberos;
+    private String prestoJdbcUser;
 
-    @Inject
-    @Named("databases.presto.jdbc_user")
-    private String jdbchdfsimpersonation;
+    @Inject(optional = true)
+    @Named("databases.hive.warehouse_directory_path")
+    private String warehouseDirectoryPath;
+
+    private String getTableLocation(String tablename) {
+        requireNonNull(warehouseDirectoryPath, "databases.hive.warehouse_directory_path is null");
+        requireNonNull(tablename, "Input tablename is null");
+        return warehouseDirectoryPath + tablename;
+    }
+
+    private void checkTableOwner(String tablename, String tablepath, String expectedOwner) {
+        query(format("DROP TABLE IF EXISTS %s", tablename));
+        query(format("CREATE TABLE %s AS SELECT * FROM NATION", tablename));
+        String owner = hdfsClient.getOwner(tablepath);
+        assertEquals(owner, expectedOwner);
+        query(format("DROP TABLE IF EXISTS %s", tablename));
+    }
 
     // Without impersonation, the table is created with user specified for
     // -DHADOOP_USER_NAME in jvm.config
     @Test(groups = {SINGLENODE, PROFILE_SPECIFIC_TESTS})
     public void testOwnerSingleNode()
-            throws Exception
-    {
-        checkTableOwner("hive");
-        query(format("DROP TABLE IF EXISTS %s", tableName));
+            throws Exception {
+        String tableName = "check_owner_singlenode";
+        String tableLocation = getTableLocation(tableName);
+        checkTableOwner(tableName, tableLocation, "hive");
     }
 
     @Test(groups = {SINGLENODE_HDFS_IMPERSONATION, PROFILE_SPECIFIC_TESTS})
     public void testOwnerSingleNodeHdfsImpersonation()
-            throws Exception
-    {
-        requireNonNull(jdbchdfsimpersonation, "databases.presto.jdbc_user is null");
-        checkTableOwner(jdbchdfsimpersonation);
-        query(format("DROP TABLE IF EXISTS %s", tableName));
+            throws Exception {
+        String tableName = "check_owner_singlenode_hdfs_impersonation";
+        requireNonNull(prestoJdbcUser, "databases.presto.jdbc_user is null");
+        String tableLocation = getTableLocation(tableName);
+        checkTableOwner(tableName, tableLocation, prestoJdbcUser);
     }
 
     @Test(groups = {SINGLENODE_KERBEROS_HDFS_IMPERSONATION, PROFILE_SPECIFIC_TESTS})
     public void testOwnerSingleNodeKerberosHdfsImpersonation()
-            throws Exception
-    {
-        requireNonNull(jdbcuserkerberos, "databases.presto.jdbc_user is null");
-        checkTableOwner(jdbcuserkerberos);
-        query(format("DROP TABLE IF EXISTS %s", tableName));
+            throws Exception {
+        String tableName = "check_owner_singlenode_kerberos_hdfs_impersonation";
+        requireNonNull(prestoJdbcUser, "databases.presto.jdbc_user is null");
+        String tableLocation = getTableLocation(tableName);
+        checkTableOwner(tableName, tableLocation, prestoJdbcUser);
     }
 
     // Without hdfs impersonation, the table should be created with user specified for the
     // principal hive.hdfs.presto.principal in hive.properties
     @Test(groups = {SINGLENODE_KERBEROS_HDFS_NO_IMPERSONATION, PROFILE_SPECIFIC_TESTS})
     public void testOwnerSingleNodeKerberosHdfsNoImpersonation()
-            throws Exception
-    {
-        checkTableOwner("hdfs");
-        query(format("DROP TABLE IF EXISTS %s", tableName));
-    }
-
-    private void checkTableOwner(String expectedOwner)
-    {
-        query(format("DROP TABLE IF EXISTS %s", tableName));
-        query(format("create table %s as select * from nation", tableName));
-        String owner = hdfsClient.getOwner(tablepath);
-        assertEquals(owner, expectedOwner);
+            throws Exception {
+        String tableName = "check_owner_singlenode_kerberos_hdfs_no_impersonation";
+        String tableLocation = getTableLocation(tableName);
+        checkTableOwner(tableName, tableLocation, "hdfs");
     }
 }
