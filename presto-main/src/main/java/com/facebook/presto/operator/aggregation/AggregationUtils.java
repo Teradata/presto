@@ -30,6 +30,7 @@ import javax.annotation.Nullable;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Locale.ENGLISH;
@@ -136,12 +137,28 @@ public final class AggregationUtils
         }
     }
 
+    public static TypeSignature getOutputTypeSignature(@Nullable Method outputFunction, AccumulatorStateSerializer<?> serializer)
+    {
+        if (outputFunction == null) {
+            return serializer.getSerializedType().getTypeSignature();
+        }
+        else {
+            return TypeSignature.parseTypeSignature(outputFunction.getAnnotation(OutputFunction.class).value());
+        }
+    }
+
+    @Deprecated
     public static String generateAggregationName(String baseName, Type outputType, List<Type> inputTypes)
     {
+        return generateAggregationName(baseName, outputType.getTypeSignature(), inputTypes.stream().map(x -> x.getTypeSignature()).collect(Collectors.toList()));
+    }
+
+    public static String generateAggregationName(String baseName, TypeSignature outputType, List<TypeSignature> inputTypes)
+    {
         StringBuilder sb = new StringBuilder();
-        sb.append(CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, outputType.getTypeSignature().toString()));
-        for (Type inputType : inputTypes) {
-            sb.append(CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, inputType.getTypeSignature().toString()));
+        sb.append(CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, outputType.toString()));
+        for (TypeSignature inputType : inputTypes) {
+            sb.append(CaseFormat.LOWER_CAMEL.to(CaseFormat.UPPER_CAMEL, inputType.toString()));
         }
         sb.append(CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.UPPER_CAMEL, baseName.toLowerCase(ENGLISH)));
 
