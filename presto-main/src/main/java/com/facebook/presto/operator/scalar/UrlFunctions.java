@@ -146,7 +146,7 @@ public final class UrlFunctions
     @Description("escape a string for use in URL query parameter names and values")
     @ScalarFunction
     @LiteralParameters({"x", "y"})
-    @Constraint(variable = "y", expression = "min(2147483647, x*3)")
+    @Constraint(variable = "y", expression = "min(2147483647, x*12)")
     @SqlType("varchar(y)")
     public static Slice urlEncode(@SqlType("varchar(x)") Slice value)
     {

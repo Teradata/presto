@@ -169,7 +169,7 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction("to_iso8601")
-    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
+    @SqlType("varchar(29)")
     public static Slice toISO8601FromTimestamp(ConnectorSession session, @SqlType(StandardTypes.TIMESTAMP) long timestamp)
     {
         DateTimeFormatter formatter = ISODateTimeFormat.dateTime()
@@ -178,7 +178,7 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction("to_iso8601")
-    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
+    @SqlType("varchar(29)")
     public static Slice toISO8601FromTimestampWithTimeZone(@SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long timestampWithTimeZone)
     {
         long millisUtc = unpackMillisUtc(timestampWithTimeZone);
@@ -188,7 +188,7 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction("to_iso8601")
-    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
+    @SqlType("varchar(10)")
     public static Slice toISO8601FromDate(ConnectorSession session, @SqlType(StandardTypes.DATE) long date)
     {
         DateTimeFormatter formatter = ISODateTimeFormat.date()
@@ -567,9 +567,9 @@ public final class DateTimeFunctions
     }
 
     @ScalarFunction
-    @LiteralParameters("x")
+    @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.TIMESTAMP)
-    public static long dateParse(ConnectorSession session, @SqlType("varchar(x)") Slice dateTime, @SqlType(StandardTypes.VARCHAR) Slice formatString)
+    public static long dateParse(ConnectorSession session, @SqlType("varchar(x)") Slice dateTime, @SqlType("varchar(y)") Slice formatString)
     {
         DateTimeFormatter formatter = DATETIME_FORMATTER_CACHE.get(formatString)
                 .withChronology(getChronology(session.getTimeZoneKey()))

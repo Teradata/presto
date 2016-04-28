@@ -176,10 +176,10 @@ public final class DoubleOperators
         return (long) MathFunctions.round(value);
     }
 
-    // x <= 26
     @ScalarOperator(CAST)
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    // FIXME @Constraint(variable = "x", expression = "x >= 26")
     public static Slice castToVarchar(@SqlType(StandardTypes.DOUBLE) double value)
     {
         return utf8Slice(valueOf(value));

@@ -120,10 +120,10 @@ public final class DateOperators
         return packDateTimeWithZone(millis, session.getTimeZoneKey());
     }
 
-    // x <= 16
     @ScalarOperator(CAST)
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    // FIXME @Constraint(variable = "x", expression = "x >= 16")
     public static Slice castToSlice(@SqlType(StandardTypes.DATE) long value)
     {
         return utf8Slice(printDate((int) value));

@@ -110,10 +110,10 @@ public final class TimeOperators
         return packDateTimeWithZone(value, session.getTimeZoneKey());
     }
 
-    // x <= 12
     @ScalarOperator(CAST)
     @LiteralParameters("x")
     @SqlType("varchar(x)")
+    // FIXME @Constraint(variable = "x", expression = "x >= 12")
     public static Slice castToSlice(ConnectorSession session, @SqlType(StandardTypes.TIME) long value)
     {
         return utf8Slice(printTimeWithoutTimeZone(session.getTimeZoneKey(), value));

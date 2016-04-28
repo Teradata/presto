@@ -21,6 +21,7 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.VarcharType;
+import com.facebook.presto.type.Constraint;
 import com.facebook.presto.type.LiteralParameters;
 import com.facebook.presto.type.RegexpType;
 import com.facebook.presto.type.SqlType;
@@ -89,8 +90,9 @@ public final class RegexpFunctions
 
     @Description("replaces substrings matching a regular expression by given string")
     @ScalarFunction
-    @LiteralParameters({"x", "y"})
-    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
+    @LiteralParameters({"x", "y", "z"})
+    @Constraint(variable = "z", expression = "x * y")
+    @SqlType("varchar(z)")
     public static Slice regexpReplace(@SqlType("varchar(x)") Slice source, @SqlType(RegexpType.NAME) Regex pattern, @SqlType("varchar(y)") Slice replacement)
     {
         Matcher matcher = pattern.matcher(source.getBytes());
@@ -202,7 +204,7 @@ public final class RegexpFunctions
     @Description("string(s) extracted using the given pattern")
     @ScalarFunction
     @LiteralParameters("x")
-    @SqlType("array(varchar)")
+    @SqlType("array(varchar(x))")
     public static Block regexpExtractAll(@SqlType("varchar(x)") Slice source, @SqlType(RegexpType.NAME) Regex pattern)
     {
         return regexpExtractAll(source, pattern, 0);
@@ -211,7 +213,7 @@ public final class RegexpFunctions
     @Description("group(s) extracted using the given pattern")
     @ScalarFunction
     @LiteralParameters("x")
-    @SqlType("array(varchar)")
+    @SqlType("array(varchar(x))")
     public static Block regexpExtractAll(@SqlType("varchar(x)") Slice source, @SqlType(RegexpType.NAME) Regex pattern, @SqlType(StandardTypes.BIGINT) long groupIndex)
     {
         Matcher matcher = pattern.matcher(source.getBytes());
@@ -285,7 +287,7 @@ public final class RegexpFunctions
     @ScalarFunction
     @LiteralParameters("x")
     @Description("returns array of strings split by pattern")
-    @SqlType("array(varchar)")
+    @SqlType("array(varchar(x))")
     public static Block regexpSplit(@SqlType("varchar(x)") Slice source, @SqlType(RegexpType.NAME) Regex pattern)
     {
         Matcher matcher = pattern.matcher(source.getBytes());

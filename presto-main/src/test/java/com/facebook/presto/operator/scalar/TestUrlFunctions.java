@@ -63,8 +63,10 @@ public class TestUrlFunctions
         for (String[] outputInputPair : outputInputPairs) {
             String input = outputInputPair[1];
             String output = outputInputPair[0];
-            assertFunction("url_encode('" + input + "')", createVarcharType(input.length() * 3), output);
+            assertFunction("url_encode('" + input + "')", createVarcharType(input.length() * 12), output);
         }
+
+        assertFunction("url_encode('\uD867\uDE3D')", createVarcharType(12), "%F0%A9%B8%BD");
     }
 
     @Test
