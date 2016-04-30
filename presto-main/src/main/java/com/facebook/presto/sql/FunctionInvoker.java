@@ -48,7 +48,7 @@ public class FunctionInvoker
      */
     public Object invoke(Signature function, ConnectorSession session, List<Object> arguments)
     {
-        MethodHandle method = registry.getScalarFunctionImplementation(function).getMethodHandle();
+        MethodHandle method = registry.getScalarFunctionImplementation(function).ensureReturnValueAsReturn().getMethodHandle();
 
         List<Object> actualArguments = new ArrayList<>(arguments.size() + 1);
 

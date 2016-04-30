@@ -125,7 +125,7 @@ public class InCodeGenerator
         SwitchGenerationCase switchGenerationCase  = checkSwitchGenerationCase(type, values);
 
         Signature hashCodeSignature = internalOperator(HASH_CODE, BIGINT, ImmutableList.of(type));
-        MethodHandle hashCodeFunction = generatorContext.getRegistry().getScalarFunctionImplementation(hashCodeSignature).getMethodHandle();
+        MethodHandle hashCodeFunction = generatorContext.getRegistry().getScalarFunctionImplementation(hashCodeSignature).ensureReturnValueAsReturn().getMethodHandle();
 
         ImmutableListMultimap.Builder<Integer, BytecodeNode> hashBucketsBuilder = ImmutableListMultimap.builder();
         ImmutableList.Builder<BytecodeNode> defaultBucket = ImmutableList.builder();
@@ -303,7 +303,9 @@ public class InCodeGenerator
 
         elseBlock.gotoLabel(noMatchLabel);
 
-        ScalarFunctionImplementation operator = generatorContext.getRegistry().getScalarFunctionImplementation(internalOperator(EQUAL, BOOLEAN, ImmutableList.of(type, type)));
+        ScalarFunctionImplementation operator = generatorContext.getRegistry()
+                .getScalarFunctionImplementation(internalOperator(EQUAL, BOOLEAN, ImmutableList.of(type, type)))
+                .ensureReturnValueAsReturn();
 
         Binding equalsFunction = generatorContext
                 .getCallSiteBinder()

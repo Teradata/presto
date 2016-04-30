@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Primitives;
 import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -39,8 +40,10 @@ import java.util.Optional;
 
 import static com.facebook.presto.bytecode.OpCode.NOP;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.constantFalse;
+import static com.facebook.presto.bytecode.expression.BytecodeExpressions.constantInt;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.constantTrue;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.invokeDynamic;
+import static com.facebook.presto.bytecode.instruction.VariableInstruction.loadVariable;
 import static com.facebook.presto.sql.gen.Bootstrap.BOOTSTRAP_METHOD;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -175,6 +178,15 @@ public final class BytecodeUtils
 
         int index = 0;
         boolean boundInstance = false;
+        boolean boundReturnParameter = false;
+        Optional<Variable> returnVariable = Optional.empty();
+        if (function.isReturnValueAsParameter()) {
+            returnVariable = Optional.of(scope.createTempVariable(Slice.class));
+            block.comment("initialize return variable")
+                    .append(constantInt(function.getReturnValueSliceLength().get()))
+                    .invokeStatic(Slices.class, "allocate", Slice.class, int.class)
+                    .putVariable(returnVariable.get());
+        }
         for (Class<?> type : methodType.parameterArray()) {
             stackTypes.add(type);
             if (function.getInstanceFactory().isPresent() && !boundInstance) {
@@ -184,6 +196,10 @@ public final class BytecodeUtils
             }
             else if (type == ConnectorSession.class) {
                 block.append(scope.getVariable("session"));
+            }
+            else if (function.isReturnValueAsParameter() && !boundReturnParameter) {
+                block.append(loadVariable(returnVariable.get()));
+                boundReturnParameter = true;
             }
             else {
                 block.append(arguments.get(index));
@@ -204,6 +220,10 @@ public final class BytecodeUtils
             block.append(unboxPrimitiveIfNecessary(scope, returnType));
         }
         block.visitLabel(end);
+
+        if (function.isReturnValueAsParameter()) {
+            block.comment("push return parameter to stack").append(loadVariable(returnVariable.get()));
+        }
 
         return block;
     }

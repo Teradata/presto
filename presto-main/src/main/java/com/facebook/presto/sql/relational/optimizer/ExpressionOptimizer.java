@@ -141,6 +141,7 @@ public class ExpressionOptimizer
                         function = registry.getScalarFunctionImplementation(signature);
                 }
             }
+            function = function.ensureReturnValueAsReturn();
 
             List<RowExpression> arguments = call.getArguments().stream()
                     .map(argument -> argument.accept(this, context))

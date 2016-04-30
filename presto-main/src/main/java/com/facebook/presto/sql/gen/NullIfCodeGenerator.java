@@ -96,6 +96,8 @@ public class NullIfCodeGenerator
                 .getCoercion(actualType.getTypeSignature(), requiredType);
 
         // TODO: do we need a full function call? (nullability checks, etc)
-        return generatorContext.generateCall(function.getName(), generatorContext.getRegistry().getScalarFunctionImplementation(function), ImmutableList.of(argument));
+        return generatorContext.generateCall(function.getName(),
+                generatorContext.getRegistry().getScalarFunctionImplementation(function).ensureReturnValueAsReturn(),
+                ImmutableList.of(argument));
     }
 }

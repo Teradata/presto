@@ -253,7 +253,9 @@ public final class LiteralInterpreter
             }
 
             if (JSON.equals(type)) {
-                ScalarFunctionImplementation operator = metadata.getFunctionRegistry().getScalarFunctionImplementation(new Signature("json_parse", SCALAR, JSON.getTypeSignature(), VARCHAR.getTypeSignature()));
+                ScalarFunctionImplementation operator = metadata.getFunctionRegistry()
+                        .getScalarFunctionImplementation(new Signature("json_parse", SCALAR, JSON.getTypeSignature(), VARCHAR.getTypeSignature()))
+                        .ensureReturnValueAsReturn();
                 try {
                     return ExpressionInterpreter.invoke(session, operator, ImmutableList.<Object>of(utf8Slice(node.getValue())));
                 }
@@ -265,7 +267,7 @@ public final class LiteralInterpreter
             ScalarFunctionImplementation operator;
             try {
                 Signature signature = metadata.getFunctionRegistry().getCoercion(VARCHAR, type);
-                operator = metadata.getFunctionRegistry().getScalarFunctionImplementation(signature);
+                operator = metadata.getFunctionRegistry().getScalarFunctionImplementation(signature).ensureReturnValueAsReturn();
             }
             catch (IllegalArgumentException e) {
                 throw new SemanticException(TYPE_MISMATCH, node, "No literal form for type %s", type);

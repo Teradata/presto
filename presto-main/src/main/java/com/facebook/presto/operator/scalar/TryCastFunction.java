@@ -74,7 +74,7 @@ public class TryCastFunction
         else {
             // the resulting method needs to return a boxed type
             Signature signature = functionRegistry.getCoercion(fromType, toType);
-            MethodHandle coercion = functionRegistry.getScalarFunctionImplementation(signature).getMethodHandle();
+            MethodHandle coercion = functionRegistry.getScalarFunctionImplementation(signature).ensureReturnValueAsReturn().getMethodHandle();
             coercion = coercion.asType(methodType(returnType, coercion.type()));
 
             MethodHandle exceptionHandler = dropArguments(constant(returnType, null), 0, RuntimeException.class);

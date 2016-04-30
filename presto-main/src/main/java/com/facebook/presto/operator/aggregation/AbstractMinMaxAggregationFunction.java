@@ -81,7 +81,10 @@ public abstract class AbstractMinMaxAggregationFunction
     public InternalAggregationFunction specialize(BoundVariables boundVariables, int arity, TypeManager typeManager, FunctionRegistry functionRegistry)
     {
         Type type = boundVariables.getTypeVariable("E");
-        MethodHandle compareMethodHandle = functionRegistry.getScalarFunctionImplementation(internalOperator(operatorType, BOOLEAN, ImmutableList.of(type, type))).getMethodHandle();
+        MethodHandle compareMethodHandle = functionRegistry
+                .getScalarFunctionImplementation(internalOperator(operatorType, BOOLEAN, ImmutableList.of(type, type)))
+                .ensureReturnValueAsReturn()
+                .getMethodHandle();
         return generateAggregation(type, compareMethodHandle);
     }
 

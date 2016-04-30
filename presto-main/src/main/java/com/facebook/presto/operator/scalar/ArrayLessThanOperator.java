@@ -51,7 +51,10 @@ public class ArrayLessThanOperator
     public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, TypeManager typeManager, FunctionRegistry functionRegistry)
     {
         Type elementType = boundVariables.getTypeVariable("T");
-        MethodHandle lessThanFunction = functionRegistry.getScalarFunctionImplementation(internalOperator(LESS_THAN, BOOLEAN, ImmutableList.of(elementType, elementType))).getMethodHandle();
+        MethodHandle lessThanFunction = functionRegistry
+                .getScalarFunctionImplementation(internalOperator(LESS_THAN, BOOLEAN, ImmutableList.of(elementType, elementType)))
+                .ensureReturnValueAsReturn()
+                .getMethodHandle();
         MethodHandle method = METHOD_HANDLE.bindTo(lessThanFunction).bindTo(elementType);
         return new ScalarFunctionImplementation(false, ImmutableList.of(false, false), method, isDeterministic());
     }

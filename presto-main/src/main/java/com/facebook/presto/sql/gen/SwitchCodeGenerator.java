@@ -122,7 +122,7 @@ public class SwitchCodeGenerator
             // check if wasNull is true
             BytecodeNode equalsCall = generatorContext.generateCall(
                     equalsFunction.getName(),
-                    generatorContext.getRegistry().getScalarFunctionImplementation(equalsFunction),
+                    generatorContext.getRegistry().getScalarFunctionImplementation(equalsFunction).ensureReturnValueAsReturn(),
                     ImmutableList.of(generatorContext.generate(operand), getTempVariableNode));
 
             BytecodeBlock condition = new BytecodeBlock()

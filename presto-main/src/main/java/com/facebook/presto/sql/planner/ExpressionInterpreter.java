@@ -77,6 +77,7 @@ import com.facebook.presto.util.Failures;
 import com.facebook.presto.util.FastutilSetHelper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Functions;
+import com.google.common.base.Preconditions;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -85,6 +86,7 @@ import com.google.common.collect.Lists;
 import io.airlift.joni.Regex;
 import io.airlift.json.JsonCodec;
 import io.airlift.slice.Slice;
+import io.airlift.slice.Slices;
 
 import java.lang.invoke.MethodHandle;
 import java.util.ArrayList;
@@ -599,7 +601,7 @@ public class ExpressionInterpreter
                     return value;
                 case MINUS:
                     Signature operatorSignature = metadata.getFunctionRegistry().resolveOperator(OperatorType.NEGATION, types(node.getValue()));
-                    MethodHandle handle = metadata.getFunctionRegistry().getScalarFunctionImplementation(operatorSignature).getMethodHandle();
+                    MethodHandle handle = metadata.getFunctionRegistry().getScalarFunctionImplementation(operatorSignature).ensureReturnValueAsReturn().getMethodHandle();
 
                     if (handle.type().parameterCount() > 0 && handle.type().parameterType(0) == ConnectorSession.class) {
                         handle = handle.bindTo(session);
@@ -719,8 +721,8 @@ public class ExpressionInterpreter
 
             Signature firstCast = metadata.getFunctionRegistry().getCoercion(firstType, commonType);
             Signature secondCast = metadata.getFunctionRegistry().getCoercion(secondType, commonType);
-            ScalarFunctionImplementation firstCastFunction = metadata.getFunctionRegistry().getScalarFunctionImplementation(firstCast);
-            ScalarFunctionImplementation secondCastFunction = metadata.getFunctionRegistry().getScalarFunctionImplementation(secondCast);
+            ScalarFunctionImplementation firstCastFunction = metadata.getFunctionRegistry().getScalarFunctionImplementation(firstCast).ensureReturnValueAsReturn();
+            ScalarFunctionImplementation secondCastFunction = metadata.getFunctionRegistry().getScalarFunctionImplementation(secondCast).ensureReturnValueAsReturn();
 
             // cast(first as <common type>) == cast(second as <common type>)
             boolean equal = (Boolean) invokeOperator(
@@ -811,7 +813,7 @@ public class ExpressionInterpreter
                 argumentTypes.add(type);
             }
             Signature functionSignature = metadata.getFunctionRegistry().resolveFunction(node.getName(), Lists.transform(argumentTypes, Type::getTypeSignature), false);
-            ScalarFunctionImplementation function = metadata.getFunctionRegistry().getScalarFunctionImplementation(functionSignature);
+            ScalarFunctionImplementation function = metadata.getFunctionRegistry().getScalarFunctionImplementation(functionSignature).ensureReturnValueAsReturn();
             for (int i = 0; i < argumentValues.size(); i++) {
                 Object value = argumentValues.get(i);
                 if (value == null && !function.getNullableArguments().get(i)) {
@@ -961,7 +963,7 @@ public class ExpressionInterpreter
             Signature operator = metadata.getFunctionRegistry().getCoercion(expressionTypes.get(node.getExpression()), type);
 
             try {
-                return invoke(session, metadata.getFunctionRegistry().getScalarFunctionImplementation(operator), ImmutableList.of(value));
+                return invoke(session, metadata.getFunctionRegistry().getScalarFunctionImplementation(operator).ensureReturnValueAsReturn(), ImmutableList.of(value));
             }
             catch (RuntimeException e) {
                 if (node.isSafe()) {
@@ -1046,7 +1048,7 @@ public class ExpressionInterpreter
         private Object invokeOperator(OperatorType operatorType, List<? extends Type> argumentTypes, List<Object> argumentValues)
         {
             Signature operatorSignature = metadata.getFunctionRegistry().resolveOperator(operatorType, argumentTypes);
-            return invoke(session, metadata.getFunctionRegistry().getScalarFunctionImplementation(operatorSignature), argumentValues);
+            return invoke(session, metadata.getFunctionRegistry().getScalarFunctionImplementation(operatorSignature).ensureReturnValueAsReturn(), argumentValues);
         }
     }
 
@@ -1074,6 +1076,7 @@ public class ExpressionInterpreter
 
     public static Object invoke(ConnectorSession session, ScalarFunctionImplementation function, List<Object> argumentValues)
     {
+        function = function.ensureReturnValueAsReturn();
         MethodHandle handle = function.getMethodHandle();
         if (function.getInstanceFactory().isPresent()) {
             try {
@@ -1089,8 +1092,20 @@ public class ExpressionInterpreter
         if (handle.type().parameterCount() > 0 && handle.type().parameterType(0) == ConnectorSession.class) {
             handle = handle.bindTo(session);
         }
+        Optional<Slice> returnValue = Optional.empty();
+        if (function.isReturnValueAsParameter()) {
+            Preconditions.checkArgument(handle.type().parameterType(0) == Slice.class, "only Slice supported as return parameter");
+            returnValue = Optional.of(Slices.allocate(function.getReturnValueSliceLength().get()));
+            handle = handle.bindTo(returnValue.get());
+        }
         try {
-            return handle.invokeWithArguments(argumentValues);
+            if (returnValue.isPresent()) {
+                handle.invokeWithArguments(argumentValues);
+                return returnValue.get();
+            }
+            else {
+                return handle.invokeWithArguments(argumentValues);
+            }
         }
         catch (Throwable throwable) {
             if (throwable instanceof InterruptedException) {

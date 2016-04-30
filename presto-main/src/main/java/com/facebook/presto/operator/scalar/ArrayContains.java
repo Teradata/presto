@@ -71,7 +71,10 @@ public final class ArrayContains
         Type type = boundVariables.getTypeVariable("T");
 
         MethodHandle methodHandle;
-        MethodHandle equalsHandle = functionRegistry.getScalarFunctionImplementation(internalOperator(OperatorType.EQUAL, BooleanType.BOOLEAN, ImmutableList.of(type, type))).getMethodHandle();
+        MethodHandle equalsHandle = functionRegistry
+                .getScalarFunctionImplementation(internalOperator(OperatorType.EQUAL, BooleanType.BOOLEAN, ImmutableList.of(type, type)))
+                .ensureReturnValueAsReturn()
+                .getMethodHandle();
 
         List<Boolean> nullableArguments;
         if (type.getJavaType() == void.class) {

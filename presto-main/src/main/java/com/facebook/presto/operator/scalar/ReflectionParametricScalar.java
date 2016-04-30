@@ -29,12 +29,14 @@ import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.type.Constraint;
 import com.facebook.presto.type.LiteralParameters;
+import com.facebook.presto.type.ReturnValue;
 import com.facebook.presto.type.SqlType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.primitives.Primitives;
+import io.airlift.slice.Slice;
 
 import javax.annotation.Nullable;
 
@@ -153,7 +155,14 @@ public class ReflectionParametricScalar
             MethodHandleAndConstructor methodHandle = implementation.specialize(boundSignature, boundVariables, typeManager, functionRegistry);
             if (methodHandle != null) {
                 checkCondition(selectedImplementation == null, AMBIGUOUS_FUNCTION_IMPLEMENTATION, "Ambiguous implementation for %s with bindings %s", getSignature(), boundVariables.getTypeVariables());
-                selectedImplementation = new ScalarFunctionImplementation(implementation.isNullable(), implementation.getNullableArguments(), methodHandle.getMethodHandle(), methodHandle.getConstructor(), isDeterministic());
+                selectedImplementation = new ScalarFunctionImplementation(
+                        implementation.isNullable(),
+                        implementation.getNullableArguments(),
+                        methodHandle.getMethodHandle(),
+                        methodHandle.getConstructor(),
+                        isDeterministic(),
+                        implementation.isReturnAsParameter(),
+                        implementation.getReturnTypeSliceLength());
             }
         }
         if (selectedImplementation != null) {
@@ -164,7 +173,14 @@ public class ReflectionParametricScalar
             MethodHandleAndConstructor methodHandle = implementation.specialize(boundSignature, boundVariables, typeManager, functionRegistry);
             if (methodHandle != null) {
                 checkCondition(selectedImplementation == null, AMBIGUOUS_FUNCTION_IMPLEMENTATION, "Ambiguous implementation for %s with bindings %s", getSignature(), boundVariables.getTypeVariables());
-                selectedImplementation = new ScalarFunctionImplementation(implementation.isNullable(), implementation.getNullableArguments(), methodHandle.getMethodHandle(), methodHandle.getConstructor(), isDeterministic());
+                selectedImplementation = new ScalarFunctionImplementation(
+                        implementation.isNullable(),
+                        implementation.getNullableArguments(),
+                        methodHandle.getMethodHandle(),
+                        methodHandle.getConstructor(),
+                        isDeterministic(),
+                        implementation.isReturnAsParameter(),
+                        implementation.getReturnTypeSliceLength());
             }
         }
         if (selectedImplementation != null) {
@@ -227,7 +243,7 @@ public class ReflectionParametricScalar
 
         Map<Set<TypeParameter>, Constructor<?>> constructors = findConstructors(clazz);
 
-        for (Method method : findPublicMethodsWithAnnotation(clazz, SqlType.class)) {
+        for (Method method : findImplementationMethodCandidates(clazz)) {
             Implementation implementation = new ImplementationParser(name, method, constructors).get();
             if (implementation.getSignature().getTypeVariableConstraints().isEmpty()
                     && implementation.getSignature().getArgumentTypes().stream().noneMatch(TypeSignature::isCalculated)) {
@@ -260,18 +276,26 @@ public class ReflectionParametricScalar
                 deterministic);
     }
 
-    private static List<Method> findPublicMethodsWithAnnotation(Class<?> clazz, Class<?> annotationClass)
+    private static List<Method> findImplementationMethodCandidates(Class<?> clazz)
     {
-        ImmutableList.Builder<Method> methods = ImmutableList.builder();
+        ImmutableList.Builder<Method> candidates = ImmutableList.builder();
         for (Method method : clazz.getMethods()) {
-            for (Annotation annotation : method.getAnnotations()) {
-                if (annotationClass.isInstance(annotation)) {
-                    checkArgument(Modifier.isPublic(method.getModifiers()), "%s annotated with %s must be public", method.getName(), annotationClass.getSimpleName());
-                    methods.add(method);
-                }
+            if (getAnnotation(method, SqlType.class).isPresent() || hasReturnValueParameter(method)) {
+                checkArgument(Modifier.isPublic(method.getModifiers()), "%s implementation method must be public", method.getName());
+                candidates.add(method);
             }
         }
-        return methods.build();
+        return candidates.build();
+    }
+
+    private static boolean hasReturnValueParameter(Method method)
+    {
+        for (int i = 0; i < method.getParameterCount(); i++) {
+            if (getAnnotation(method.getParameterAnnotations()[i], ReturnValue.class).isPresent()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static Map<Set<TypeParameter>, Constructor<?>> findConstructors(Class<?> clazz)
@@ -286,12 +310,29 @@ public class ReflectionParametricScalar
         return builder.build();
     }
 
+    private static <T extends Annotation> Optional<T> getAnnotation(Annotation[] annotations, Class<T> annotationClass)
+    {
+        for (Annotation annotation : annotations) {
+            if (annotationClass.isAssignableFrom(annotation.getClass())) {
+                return Optional.of((T) annotation);
+            }
+        }
+        return Optional.empty();
+    }
+
+    private static <T extends Annotation> Optional<T> getAnnotation(Method method, Class<T> annotationClass)
+    {
+        return getAnnotation(method.getDeclaredAnnotations(), annotationClass);
+    }
+
     private static final class ImplementationParser
     {
         private final String functionName;
-        private final boolean nullable;
+        private boolean nullable;
         private final List<Boolean> nullableArguments = new ArrayList<>();
-        private final String returnType;
+        private boolean returnAsParameter;
+        private Optional<Integer> returnTypeSliceLength = Optional.empty();
+        private String returnType;
         private final List<String> argumentTypes = new ArrayList<>();
         private final List<Class<?>> argumentNativeContainerTypes = new ArrayList<>();
         private final MethodHandle methodHandle;
@@ -307,15 +348,6 @@ public class ReflectionParametricScalar
         {
             this.functionName = requireNonNull(functionName, "functionName is null");
             this.nullable = method.getAnnotation(Nullable.class) != null;
-
-            SqlType returnType = method.getAnnotation(SqlType.class);
-            requireNonNull(returnType, format("%s is missing @SqlType annotation", method));
-            this.returnType = returnType.value();
-
-            Class<?> actualReturnType = method.getReturnType();
-            if (Primitives.isWrapperType(actualReturnType)) {
-                checkArgument(nullable, "Method %s has return value with type %s that is missing @Nullable", method, actualReturnType);
-            }
 
             Stream.of(method.getAnnotationsByType(TypeParameter.class))
                     .forEach(typeParameters::add);
@@ -334,9 +366,25 @@ public class ReflectionParametricScalar
 
             parseArguments(method);
 
+            parseReturnType(method);
+
             this.constructorMethodHandle = getConstructor(method, constructors);
 
             this.methodHandle = getMethodHandle(method);
+        }
+
+        private void parseReturnType(Method method)
+        {
+            if (returnAsParameter) {
+                return;
+            }
+            SqlType returnType = method.getAnnotation(SqlType.class);
+            requireNonNull(returnType, format("%s is missing @SqlType annotation and @ReturnValue parameter", method));
+            this.returnType = returnType.value();
+            Class<?> actualReturnType = method.getReturnType();
+            if (Primitives.isWrapperType(actualReturnType)) {
+                checkArgument(nullable, "Method %s has return value with type %s that is missing @Nullable", method, actualReturnType);
+            }
         }
 
         private void parseArguments(Method method)
@@ -353,12 +401,27 @@ public class ReflectionParametricScalar
                 }
                 if (containsMetaParameter(annotations)) {
                     checkArgument(annotations.length == 1, "Meta parameters may only have a single annotation");
-                    checkArgument(argumentTypes.isEmpty(), "Meta parameter must come before parameters");
+                    checkArgument(argumentTypes.isEmpty() && !returnAsParameter, "Meta parameter must come before parameters");
                     Annotation annotation = annotations[0];
                     if (annotation instanceof TypeParameter) {
                         checkArgument(typeParameters.contains(annotation), "Injected type parameters must be declared with @TypeParameter annotation on the method");
                     }
                     dependencies.add(parseDependency(annotation));
+                }
+                else if (containsReturnParameter(annotations)) {
+                    checkArgument(argumentTypes.isEmpty() && !returnAsParameter, "Return parameter must come before parameters and there must be at most one");
+                    returnAsParameter = true;
+                    Optional<SqlType> type = getAnnotation(annotations, SqlType.class);
+                    checkArgument(type.isPresent(), "@SqlType annotation missing for return parameter of %s", method);
+                    this.returnType = type.get().value();
+                    if (parameterType == Slice.class) {
+                        int sliceLength = getAnnotation(annotations, ReturnValue.class).get().sliceLength();
+                        checkArgument(sliceLength >= 0, "@ReturnType.sliceLength not defined for Slice return parameter");
+                        this.returnTypeSliceLength = Optional.of(sliceLength);
+                    }
+                    else {
+                        this.returnTypeSliceLength = Optional.empty();
+                    }
                 }
                 else {
                     SqlType type = null;
@@ -511,15 +574,13 @@ public class ReflectionParametricScalar
 
         private static boolean containsMetaParameter(Annotation[] annotations)
         {
-            for (Annotation annotation : annotations) {
-                if (annotation instanceof TypeParameter) {
-                    return true;
-                }
-                if (annotation instanceof OperatorDependency) {
-                    return true;
-                }
-            }
-            return false;
+            return getAnnotation(annotations, TypeParameter.class).isPresent()
+                    || getAnnotation(annotations, OperatorDependency.class).isPresent();
+        }
+
+        private static boolean containsReturnParameter(Annotation[] annotations)
+        {
+            return getAnnotation(annotations, ReturnValue.class).isPresent();
         }
 
         public Implementation get()
@@ -534,7 +595,9 @@ public class ReflectionParametricScalar
                     constructorMethodHandle,
                     constructorDependencies,
                     argumentNativeContainerTypes,
-                    specializedTypeParameters);
+                    specializedTypeParameters,
+                    returnAsParameter,
+                    returnTypeSliceLength);
         }
     }
 
@@ -549,6 +612,8 @@ public class ReflectionParametricScalar
         private final List<ImplementationDependency> constructorDependencies;
         private final List<Class<?>> argumentNativeContainerTypes;
         private final Map<String, Class<?>> specializedTypeParameters;
+        private final boolean returnAsParameter;
+        private final Optional<Integer> returnTypeSliceLength;
 
         private Implementation(
                 Signature signature,
@@ -559,7 +624,9 @@ public class ReflectionParametricScalar
                 Optional<MethodHandle> constructor,
                 List<ImplementationDependency> constructorDependencies,
                 List<Class<?>> argumentNativeContainerTypes,
-                Map<String, Class<?>> specializedTypeParameters)
+                Map<String, Class<?>> specializedTypeParameters,
+                boolean returnAsParameter,
+                Optional<Integer> returnTypeSliceLength)
         {
             this.signature = requireNonNull(signature, "signature is null");
             this.nullable = nullable;
@@ -570,6 +637,11 @@ public class ReflectionParametricScalar
             this.constructorDependencies = ImmutableList.copyOf(requireNonNull(constructorDependencies, "constructorDependencies is null"));
             this.argumentNativeContainerTypes = ImmutableList.copyOf(requireNonNull(argumentNativeContainerTypes, "argumentNativeContainerTypes is null"));
             this.specializedTypeParameters = ImmutableMap.copyOf(requireNonNull(specializedTypeParameters, "specializedTypeParameters is null"));
+            this.returnAsParameter = returnAsParameter;
+            this.returnTypeSliceLength = requireNonNull(returnTypeSliceLength, "returnTypeSliceLength");
+            if (returnAsParameter) {
+                checkArgument(returnTypeSliceLength.isPresent(), "returnTypeSliceLength not set");
+            }
         }
 
         public MethodHandleAndConstructor specialize(Signature boundSignature, BoundVariables boundVariables, TypeManager typeManager, FunctionRegistry functionRegistry)
@@ -580,7 +652,7 @@ public class ReflectionParametricScalar
                 }
             }
             Class<?> returnContainerType = getNullAwareContainerType(typeManager.getType(boundSignature.getReturnType()).getJavaType(), nullable);
-            if (!returnContainerType.equals(methodHandle.type().returnType())) {
+            if (!returnContainerType.equals(getMethodHandleReturnType())) {
                 return null;
             }
             for (int i = 0; i < boundSignature.getArgumentTypes().size(); i++) {
@@ -601,6 +673,17 @@ public class ReflectionParametricScalar
                 }
             }
             return new MethodHandleAndConstructor(methodHandle, Optional.ofNullable(constructor));
+        }
+
+        private Class<?> getMethodHandleReturnType()
+        {
+            if (returnAsParameter) {
+                // Slice implied for now.
+                return Slice.class;
+            }
+            else {
+                return methodHandle.type().returnType();
+            }
         }
 
         private static Class<?> getNullAwareContainerType(Class<?> clazz, boolean nullable)
@@ -640,6 +723,16 @@ public class ReflectionParametricScalar
         public List<ImplementationDependency> getDependencies()
         {
             return dependencies;
+        }
+
+        public boolean isReturnAsParameter()
+        {
+            return returnAsParameter;
+        }
+
+        public Optional<Integer> getReturnTypeSliceLength()
+        {
+            return returnTypeSliceLength;
         }
     }
 
@@ -698,7 +791,7 @@ public class ReflectionParametricScalar
         public MethodHandle resolve(Map<String, Type> types, TypeManager typeManager, FunctionRegistry functionRegistry)
         {
             Signature signature = FunctionRegistry.bindSignature(this.signature, types, this.signature.getArgumentTypes().size());
-            return functionRegistry.getScalarFunctionImplementation(signature).getMethodHandle();
+            return functionRegistry.getScalarFunctionImplementation(signature).ensureReturnValueAsReturn().getMethodHandle();
         }
     }
 

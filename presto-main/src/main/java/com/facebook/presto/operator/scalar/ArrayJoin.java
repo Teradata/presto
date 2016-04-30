@@ -134,7 +134,9 @@ public final class ArrayJoin
         }
         else {
             try {
-                ScalarFunctionImplementation castFunction = functionRegistry.getScalarFunctionImplementation(internalOperator(CAST.name(), VARCHAR_TYPE_SIGNATURE, ImmutableList.of(type.getTypeSignature())));
+                ScalarFunctionImplementation castFunction = functionRegistry
+                        .getScalarFunctionImplementation(internalOperator(CAST.name(), VARCHAR_TYPE_SIGNATURE, ImmutableList.of(type.getTypeSignature())))
+                        .ensureReturnValueAsReturn();
                 return new ScalarFunctionImplementation(false, nullableArguments, methodHandle.bindTo(castFunction.getMethodHandle()).bindTo(type), true);
             }
             catch (PrestoException e) {

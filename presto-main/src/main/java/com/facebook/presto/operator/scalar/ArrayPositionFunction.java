@@ -71,7 +71,10 @@ public final class ArrayPositionFunction
     public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, TypeManager typeManager, FunctionRegistry functionRegistry)
     {
         Type type = boundVariables.getTypeVariable("E");
-        MethodHandle equalMethodHandle = functionRegistry.getScalarFunctionImplementation(internalOperator(EQUAL, BOOLEAN, ImmutableList.of(type, type))).getMethodHandle();
+        MethodHandle equalMethodHandle = functionRegistry
+                .getScalarFunctionImplementation(internalOperator(EQUAL, BOOLEAN, ImmutableList.of(type, type)))
+                .ensureReturnValueAsReturn()
+                .getMethodHandle();
         MethodHandle arrayPositionMethodHandle;
         if (type.getJavaType() == boolean.class) {
             arrayPositionMethodHandle = METHOD_HANDLE_BOOLEAN;

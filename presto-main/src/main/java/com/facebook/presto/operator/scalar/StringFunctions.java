@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator.scalar;
 
+import com.facebook.presto.annotation.UsedByGeneratedCode;
 import com.facebook.presto.operator.Description;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
@@ -20,7 +21,9 @@ import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.type.LiteralParameters;
+import com.facebook.presto.type.ReturnValue;
 import com.facebook.presto.type.SqlType;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.primitives.Ints;
 import io.airlift.slice.InvalidCodePointException;
 import io.airlift.slice.InvalidUtf8Exception;
@@ -406,9 +409,9 @@ public final class StringFunctions
     private static Slice pad(Slice text, long targetLength, Slice padString, int paddingOffset)
     {
         checkCondition(
-            0 <= targetLength && targetLength <= Integer.MAX_VALUE,
-            INVALID_FUNCTION_ARGUMENT,
-            "Target length must be in the range [0.." + Integer.MAX_VALUE + "]"
+                0 <= targetLength && targetLength <= Integer.MAX_VALUE,
+                INVALID_FUNCTION_ARGUMENT,
+                "Target length must be in the range [0.." + Integer.MAX_VALUE + "]"
         );
         checkCondition(padString.length() > 0, INVALID_FUNCTION_ARGUMENT, "Padding string must not be empty");
 
@@ -540,5 +543,26 @@ public final class StringFunctions
     public static Slice toUtf8(@SqlType(StandardTypes.VARCHAR) Slice slice)
     {
         return slice;
+    }
+
+    @VisibleForTesting
+    @Description("get first 5 bytes of varchar in reversed order")
+    @ScalarFunction("first_five_reversed")
+    public static class FirstFiveCharsReversed
+    {
+        public FirstFiveCharsReversed() {}
+
+        @UsedByGeneratedCode
+        @LiteralParameters({"x"})
+        public void firstFiveCharsReversed(
+                @SqlType("varchar(5)") @ReturnValue(sliceLength = 5) Slice returnParameter,
+                @SqlType("varchar(x)") Slice slice)
+        {
+            returnParameter.fill((byte) ' ');
+            int len = Math.min(5, slice.length());
+            for (int i = 0; i < len; ++i) {
+                returnParameter.setByte(i, slice.getByte(len - i - 1));
+            }
+        }
     }
 }

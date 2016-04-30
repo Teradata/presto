@@ -255,7 +255,7 @@ public class InformationSchemaPageSourceProvider
                 try {
                     ColumnMetadata columnMetadata = metadata.getColumnMetadata(session, tableHandle.get(), columnHandle);
                     Signature operator = metadata.getFunctionRegistry().getCoercion(columnMetadata.getType(), VARCHAR);
-                    MethodHandle methodHandle = metadata.getFunctionRegistry().getScalarFunctionImplementation(operator).getMethodHandle();
+                    MethodHandle methodHandle = metadata.getFunctionRegistry().getScalarFunctionImplementation(operator).ensureReturnValueAsReturn().getMethodHandle();
                     methodHandles.put(columnHandle, methodHandle);
                 }
                 catch (OperatorNotFoundException exception) {

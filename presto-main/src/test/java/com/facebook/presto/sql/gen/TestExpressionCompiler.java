@@ -72,6 +72,7 @@ import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
 import static com.facebook.presto.type.JsonType.JSON;
 import static com.facebook.presto.type.UnknownType.UNKNOWN;
@@ -194,7 +195,7 @@ public class TestExpressionCompiler
         assertExecute("bound_pattern", VARCHAR, "%el%");
         assertExecute("bound_null_string", VARCHAR, null);
         assertExecute("bound_timestamp_with_timezone", TIMESTAMP_WITH_TIME_ZONE, new SqlTimestampWithTimeZone(new DateTime(1970, 1, 1, 0, 1, 0, 999, DateTimeZone.UTC).getMillis(), TimeZoneKey.getTimeZoneKey("Z")));
-        assertExecute("bound_binary_literal", VARBINARY, new SqlVarbinary(new byte[]{(byte) 0xab}));
+        assertExecute("bound_binary_literal", VARBINARY, new SqlVarbinary(new byte[] {(byte) 0xab}));
 
         // todo enable when null output type is supported
         // assertExecute("null", null);
@@ -239,7 +240,7 @@ public class TestExpressionCompiler
         }
 
         for (Integer value : intLefts) {
-            Long longValue = value == null ? null : value *  10000000000L;
+            Long longValue = value == null ? null : value * 10000000000L;
             assertExecute(generateExpression("%s", value), INTEGER, value == null ? null : value);
             assertExecute(generateExpression("- (%s)", value), INTEGER, value == null ? null : -value);
             assertExecute(generateExpression("%s", longValue), BIGINT, value == null ? null : longValue);
@@ -313,7 +314,7 @@ public class TestExpressionCompiler
                 assertExecute(generateExpression("%s / %s", left, right), INTEGER, left == null || right == null ? null : left / right);
                 assertExecute(generateExpression("%s %% %s", left, right), INTEGER, left == null || right == null ? null : left % right);
 
-                Long longLeft = left == null ? null : left *  1000000000L;
+                Long longLeft = left == null ? null : left * 1000000000L;
                 assertExecute(generateExpression("%s + %s", longLeft, right), BIGINT, longLeft == null || right == null ? null : longLeft + right);
                 assertExecute(generateExpression("%s - %s", longLeft, right), BIGINT, longLeft == null || right == null ? null : longLeft - right);
                 assertExecute(generateExpression("%s * %s", longLeft, right), BIGINT, longLeft == null || right == null ? null : longLeft * right);
@@ -1200,6 +1201,19 @@ public class TestExpressionCompiler
         assertExecute("nullif(NULL, 2)", UNKNOWN, null);
         assertExecute("nullif(2, NULL)", INTEGER, 2);
         assertExecute("nullif(BIGINT '2', NULL)", BIGINT, 2L);
+
+        Futures.allAsList(futures).get();
+    }
+
+    @Test
+    public void testReturnByParameter()
+            throws Exception
+    {
+        assertExecute("first_five_reversed('abcdefgh')", createVarcharType(5), "edcba");
+        assertExecute("first_five_reversed('abcdefgh') || first_five_reversed('prstuwv')", createUnboundedVarcharType(), "edcbautsrp");
+        assertExecute("first_five_reversed('abc' || 'xyz')", createVarcharType(5), "yxcba");
+        assertExecute("first_five_reversed(NULL)", createVarcharType(5), null);
+        assertExecute("first_five_reversed(first_five_reversed('abcdefg'))", createVarcharType(5), "abcde");
 
         Futures.allAsList(futures).get();
     }

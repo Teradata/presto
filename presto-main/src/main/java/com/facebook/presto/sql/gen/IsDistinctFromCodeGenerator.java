@@ -51,6 +51,7 @@ public class IsDistinctFromCodeGenerator
         MethodHandle methodHandle = generatorContext
                 .getRegistry()
                 .getScalarFunctionImplementation(equalsSignature)
+                .ensureReturnValueAsReturn()
                 .getMethodHandle();
 
         Binding binding = generatorContext

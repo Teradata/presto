@@ -257,7 +257,7 @@ public class DecimalInequalityOperators
                 2,
                 context.getTypeManager(),
                 context.getFunctionRegistry()
-        ).getMethodHandle();
+        ).ensureReturnValueAsReturn().getMethodHandle();
         MethodHandle upperBoundTestMethodHandle = DECIMAL_GREATER_THAN_OR_EQUAL_OPERATOR.specialize(
                 new BoundVariables(
                         ImmutableMap.of(),
@@ -271,7 +271,7 @@ public class DecimalInequalityOperators
                 2,
                 context.getTypeManager(),
                 context.getFunctionRegistry()
-        ).getMethodHandle();
+        ).ensureReturnValueAsReturn().getMethodHandle();
         return ImmutableList.of(lowerBoundTestMethodHandle, upperBoundTestMethodHandle);
     }
 

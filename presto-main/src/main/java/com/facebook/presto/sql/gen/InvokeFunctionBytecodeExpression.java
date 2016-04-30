@@ -28,6 +28,7 @@ import java.util.Optional;
 import static com.facebook.presto.bytecode.ParameterizedType.type;
 import static com.facebook.presto.sql.gen.BytecodeUtils.generateInvocation;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 public class InvokeFunctionBytecodeExpression
@@ -43,6 +44,7 @@ public class InvokeFunctionBytecodeExpression
         requireNonNull(scope, "scope is null");
         requireNonNull(function, "function is null");
 
+        function = function.ensureReturnValueAsReturn();
         Binding binding = cachedInstanceBinder.getCallSiteBinder().bind(function.getMethodHandle());
         Optional<BytecodeNode> instance = Optional.empty();
         if (function.getInstanceFactory().isPresent()) {
@@ -65,6 +67,7 @@ public class InvokeFunctionBytecodeExpression
     {
         super(type(function.getMethodHandle().type().returnType()));
 
+        checkArgument(!function.isReturnValueAsParameter(), "return value as parameter not supported");
         this.invocation = generateInvocation(scope, name, function, instance, parameters.stream().map(BytecodeNode.class::cast).collect(toImmutableList()), binding);
         this.oneLineDescription = name + "(" + Joiner.on(", ").join(parameters) + ")";
     }
