@@ -56,6 +56,8 @@ public class TestGrantRevoke
         queryExecutorForAlice.executeQuery(format("GRANT INSERT, SELECT ON %s to bob", tableName));
         assertThat(queryExecutorForBob.executeQuery(format("INSERT INTO %s values ('t', 3)", tableName))).hasRowsCount(1);
         assertThat(queryExecutorForBob.executeQuery(format("SELECT * from %s", tableName))).hasRowsCount(1);
+        assertThat(() -> queryExecutorForBob.executeQuery(format("DELETE from %s WHERE day=3", tableName))).
+                failsWithMessage(format("Access Denied: Cannot delete from table default.%s", tableName));
 
         //test REVOKE
         queryExecutorForAlice.executeQuery(format("REVOKE INSERT on %s from bob", tableName));
