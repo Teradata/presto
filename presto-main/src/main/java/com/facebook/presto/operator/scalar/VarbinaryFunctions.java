@@ -16,6 +16,8 @@ package com.facebook.presto.operator.scalar;
 import com.facebook.presto.operator.Description;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.type.StandardTypes;
+import com.facebook.presto.spi.type.VarcharType;
+import com.facebook.presto.type.LiteralParameters;
 import com.facebook.presto.type.SqlType;
 import com.google.common.hash.Hashing;
 import com.google.common.io.BaseEncoding;
@@ -40,7 +42,7 @@ public final class VarbinaryFunctions
 
     @Description("encode binary data as base64")
     @ScalarFunction
-    @SqlType(StandardTypes.VARCHAR)
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
     public static Slice toBase64(@SqlType(StandardTypes.VARBINARY) Slice slice)
     {
         return Slices.wrappedBuffer(Base64.getEncoder().encode(slice.getBytes()));
@@ -48,8 +50,9 @@ public final class VarbinaryFunctions
 
     @Description("decode base64 encoded binary data")
     @ScalarFunction("from_base64")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.VARBINARY)
-    public static Slice fromBase64Varchar(@SqlType(StandardTypes.VARCHAR) Slice slice)
+    public static Slice fromBase64Varchar(@SqlType("varchar(x)") Slice slice)
     {
         try {
             return Slices.wrappedBuffer(Base64.getDecoder().decode(slice.getBytes()));
@@ -74,7 +77,7 @@ public final class VarbinaryFunctions
 
     @Description("encode binary data as base64 using the URL safe alphabet")
     @ScalarFunction("to_base64url")
-    @SqlType(StandardTypes.VARCHAR)
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
     public static Slice toBase64Url(@SqlType(StandardTypes.VARBINARY) Slice slice)
     {
         return Slices.wrappedBuffer(Base64.getUrlEncoder().encode(slice.getBytes()));
@@ -82,8 +85,9 @@ public final class VarbinaryFunctions
 
     @Description("decode URL safe base64 encoded binary data")
     @ScalarFunction("from_base64url")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.VARBINARY)
-    public static Slice fromBase64UrlVarchar(@SqlType(StandardTypes.VARCHAR) Slice slice)
+    public static Slice fromBase64UrlVarchar(@SqlType("varchar(x)") Slice slice)
     {
         try {
             return Slices.wrappedBuffer(Base64.getUrlDecoder().decode(slice.getBytes()));
@@ -108,7 +112,7 @@ public final class VarbinaryFunctions
 
     @Description("encode binary data as hex")
     @ScalarFunction
-    @SqlType(StandardTypes.VARCHAR)
+    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
     public static Slice toHex(@SqlType(StandardTypes.VARBINARY) Slice slice)
     {
         return Slices.utf8Slice(BaseEncoding.base16().encode(slice.getBytes()));
@@ -116,8 +120,9 @@ public final class VarbinaryFunctions
 
     @Description("decode hex encoded binary data")
     @ScalarFunction("from_hex")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.VARBINARY)
-    public static Slice fromHexVarchar(@SqlType(StandardTypes.VARCHAR) Slice slice)
+    public static Slice fromHexVarchar(@SqlType("varchar(x)") Slice slice)
     {
         if (slice.length() % 2 != 0) {
             throw new PrestoException(INVALID_FUNCTION_ARGUMENT, "invalid input length " + slice.length());

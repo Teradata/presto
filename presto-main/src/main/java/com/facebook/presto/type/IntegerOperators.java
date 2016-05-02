@@ -187,7 +187,9 @@ public final class IntegerOperators
     }
 
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
+    // FIXME @Constraint(variable = "x", expression = "x >= 11")
     public static Slice castToVarchar(@SqlType(StandardTypes.INTEGER) long value)
     {
         // todo optimize me

@@ -196,7 +196,9 @@ public final class BigintOperators
     }
 
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
+    // FIXME @Constraint(variable = "x", expression = "x >= 20")
     public static Slice castToVarchar(@SqlType(StandardTypes.BIGINT) long value)
     {
         // todo optimize me

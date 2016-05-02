@@ -149,7 +149,9 @@ public final class IntervalYearMonthOperators
     }
 
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
+    // FIXME @Constraint(variable = "x", expression = "x >= 22")
     public static Slice castToSlice(@SqlType(StandardTypes.INTERVAL_YEAR_TO_MONTH) long value)
     {
         return utf8Slice(SqlIntervalYearMonth.formatMonths(value));

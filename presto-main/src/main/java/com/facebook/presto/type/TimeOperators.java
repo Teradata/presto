@@ -111,15 +111,18 @@ public final class TimeOperators
     }
 
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
+    // FIXME @Constraint(variable = "x", expression = "x >= 12")
     public static Slice castToSlice(ConnectorSession session, @SqlType(StandardTypes.TIME) long value)
     {
         return utf8Slice(printTimeWithoutTimeZone(session.getTimeZoneKey(), value));
     }
 
     @ScalarOperator(CAST)
+    @LiteralParameters("x")
     @SqlType(StandardTypes.TIME)
-    public static long castFromSlice(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice value)
+    public static long castFromSlice(ConnectorSession session, @SqlType("varchar(x)") Slice value)
     {
         try {
             return parseTimeWithoutTimeZone(session.getTimeZoneKey(), value.toStringUtf8());

@@ -177,7 +177,9 @@ public final class DoubleOperators
     }
 
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
+    // FIXME @Constraint(variable = "x", expression = "x >= 26")
     public static Slice castToVarchar(@SqlType(StandardTypes.DOUBLE) double value)
     {
         return utf8Slice(valueOf(value));

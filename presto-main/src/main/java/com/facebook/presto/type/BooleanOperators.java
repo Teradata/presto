@@ -110,7 +110,9 @@ public final class BooleanOperators
     }
 
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
+    // FIXME @Constraint(variable = "x", expression = "x >= 5")
     public static Slice castToVarchar(@SqlType(StandardTypes.BOOLEAN) boolean value)
     {
         return value ? TRUE : FALSE;

@@ -138,15 +138,18 @@ public final class TimestampWithTimeZoneOperators
     }
 
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
+    // FIXME @Constraint(variable = "x", expression = "x >= 36")
     public static Slice castToSlice(@SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE) long value)
     {
         return utf8Slice(printTimestampWithTimeZone(value));
     }
 
     @ScalarOperator(CAST)
+    @LiteralParameters("x")
     @SqlType(StandardTypes.TIMESTAMP_WITH_TIME_ZONE)
-    public static long castFromSlice(ConnectorSession session, @SqlType(StandardTypes.VARCHAR) Slice value)
+    public static long castFromSlice(ConnectorSession session, @SqlType("varchar(x)") Slice value)
     {
         try {
             return parseTimestampWithTimeZone(session.getTimeZoneKey(), trim(value).toStringUtf8());
