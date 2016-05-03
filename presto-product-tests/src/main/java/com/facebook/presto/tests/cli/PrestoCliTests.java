@@ -55,6 +55,10 @@ public class PrestoCliTests
     @Named("databases.presto.server_address")
     private String serverAddress;
 
+    @Inject
+    @Named("databases.presto.jdbc_user")
+    private String jdbcUser;
+
     private PrestoCliProcess presto;
 
     public PrestoCliTests()
@@ -130,7 +134,12 @@ public class PrestoCliTests
     private void launchPrestoCliWithServerArgument(String... arguments)
             throws IOException, InterruptedException
     {
-        launchPrestoCli(ImmutableList.<String>builder().add("--server", serverAddress).add(arguments).build());
+        ImmutableList.Builder<String> prestoClientOptions = ImmutableList.builder();
+        prestoClientOptions.add(
+                "--server", serverAddress,
+                "--user", jdbcUser);
+        prestoClientOptions.add(arguments);
+        launchPrestoCli(prestoClientOptions.build());
     }
 
     private void launchPrestoCli(String... arguments)
