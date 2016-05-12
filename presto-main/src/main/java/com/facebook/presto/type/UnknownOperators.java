@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.type;
 
+import com.facebook.presto.operator.scalar.ScalarFunction;
 import com.facebook.presto.operator.scalar.ScalarOperator;
 import com.facebook.presto.spi.type.StandardTypes;
 
@@ -147,6 +148,14 @@ public final class UnknownOperators
     @Nullable
     @SqlType("unknown")
     public static Void negation(@SqlType("unknown") @Nullable Void value)
+    {
+        return null;
+    }
+
+    @Nullable
+    @ScalarFunction("length")
+    @SqlType(StandardTypes.BIGINT)
+    public static Long length(@SqlType("unknown") @Nullable Void value)
     {
         return null;
     }
