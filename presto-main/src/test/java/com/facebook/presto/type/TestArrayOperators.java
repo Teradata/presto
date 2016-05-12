@@ -36,6 +36,7 @@ import java.util.TimeZone;
 
 import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
 import static com.facebook.presto.block.BlockSerdeUtil.writeBlock;
+import static com.facebook.presto.spi.StandardErrorCode.AMBIGUOUS_FUNCTION_CALL;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -208,7 +209,7 @@ public class TestArrayOperators
         assertInvalidFunction("ARRAY [ARRAY[1]] || ARRAY[ARRAY[true], ARRAY[false]]", FUNCTION_NOT_FOUND);
 
         // This query is ambiguous. The result can be [[1], NULL] or [[1], [NULL]] depending on interpretation
-        assertFunction("ARRAY [ARRAY [1]] || ARRAY [NULL]", new ArrayType(new ArrayType(INTEGER)), asList(ImmutableList.of(1), null));
+        assertInvalidFunction("ARRAY [ARRAY [1]] || ARRAY [NULL]", AMBIGUOUS_FUNCTION_CALL);
 
         try {
             assertFunction("ARRAY [ARRAY [1]] || ARRAY [ARRAY ['x']]", new ArrayType(new ArrayType(INTEGER)), null);
