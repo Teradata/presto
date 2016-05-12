@@ -14,6 +14,7 @@
 package com.facebook.presto.operator.scalar;
 
 import com.facebook.presto.metadata.OperatorType;
+import com.facebook.presto.metadata.SqlScalarFunction;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
@@ -21,12 +22,15 @@ import com.facebook.presto.spi.type.SqlDecimal;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.type.JsonPathType;
+import com.facebook.presto.type.NullFunction;
 import com.facebook.presto.type.SqlType;
+import com.facebook.presto.type.UnknownType;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.MappingJsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Doubles;
 import io.airlift.json.ObjectMapperProvider;
 import io.airlift.slice.DynamicSliceOutput;
@@ -40,6 +44,8 @@ import java.util.LinkedList;
 import java.util.List;
 
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
+import static com.facebook.presto.spi.type.StandardTypes.BIGINT;
+import static com.facebook.presto.spi.type.StandardTypes.BOOLEAN;
 import static com.fasterxml.jackson.core.JsonFactory.Feature.CANONICALIZE_FIELD_NAMES;
 import static com.fasterxml.jackson.core.JsonParser.NumberType;
 import static com.fasterxml.jackson.core.JsonToken.END_ARRAY;
@@ -63,6 +69,20 @@ public final class JsonFunctions
             .disable(CANONICALIZE_FIELD_NAMES);
 
     private static final ObjectMapper SORTED_MAPPER = new ObjectMapperProvider().get().configure(ORDER_MAP_ENTRIES_BY_KEYS, true);
+
+    /**
+     * TODO: Introduce VARCHAR to JSON coercions with the proper casting using 'parse' and remove all
+     * TODO: the `VARCHAR` method together with this hack
+     */
+    public static final SqlScalarFunction[] JSON_UNKNOWN_FUNCTIONS = new SqlScalarFunction[] {
+            NullFunction.create("json_array_length", ImmutableList.of(UnknownType.NAME), BIGINT),
+            NullFunction.create("json_array_contains", ImmutableList.of(UnknownType.NAME, UnknownType.NAME), BOOLEAN),
+            NullFunction.create("json_array_contains", ImmutableList.of(UnknownType.NAME, "T"), BOOLEAN),
+            NullFunction.create("json_array_contains", ImmutableList.of("T", UnknownType.NAME), BOOLEAN),
+            NullFunction.create("json_size", ImmutableList.of(UnknownType.NAME, UnknownType.NAME), BIGINT),
+            NullFunction.create("json_size", ImmutableList.of(UnknownType.NAME, "T"), BIGINT),
+            NullFunction.create("json_size", ImmutableList.of("T", UnknownType.NAME), BIGINT)
+    };
 
     private JsonFunctions() {}
 

@@ -185,6 +185,7 @@ import static com.facebook.presto.operator.scalar.ConcatFunction.CONCAT;
 import static com.facebook.presto.operator.scalar.ElementToArrayConcatFunction.ELEMENT_TO_ARRAY_CONCAT_FUNCTION;
 import static com.facebook.presto.operator.scalar.Greatest.GREATEST;
 import static com.facebook.presto.operator.scalar.IdentityCast.IDENTITY_CAST;
+import static com.facebook.presto.operator.scalar.JsonFunctions.JSON_UNKNOWN_FUNCTIONS;
 import static com.facebook.presto.operator.scalar.JsonToArrayCast.JSON_TO_ARRAY;
 import static com.facebook.presto.operator.scalar.JsonToMapCast.JSON_TO_MAP;
 import static com.facebook.presto.operator.scalar.Least.LEAST;
@@ -384,6 +385,7 @@ public class FunctionRegistry
                 .scalar(ArrayPositionFunction.class)
                 .scalar(CombineHashFunction.class)
                 .scalar(JsonOperators.class)
+                .functions(JSON_UNKNOWN_FUNCTIONS)
                 .scalar(FailureFunction.class)
                 .scalar(DecimalOperators.Negation.class)
                 .scalar(DecimalOperators.HashCode.class)
