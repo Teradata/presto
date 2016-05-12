@@ -13,9 +13,11 @@
  */
 package com.facebook.presto.type;
 
+import com.facebook.presto.metadata.SqlScalarFunction;
 import com.facebook.presto.operator.scalar.ScalarOperator;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.type.StandardTypes;
+import com.google.common.collect.ImmutableList;
 import io.airlift.slice.Slice;
 import io.airlift.slice.XxHash64;
 
@@ -36,6 +38,12 @@ public final class VarcharOperators
     private VarcharOperators()
     {
     }
+
+    public static final SqlScalarFunction[] VARCHAR_UNKNOWN_OPERATORS = new SqlScalarFunction[] {
+            NullFunction.create("concat", ImmutableList.of(UnknownType.NAME, UnknownType.NAME), UnknownType.NAME),
+            NullFunction.create("concat", ImmutableList.of(UnknownType.NAME, "T"), "T"),
+            NullFunction.create("concat", ImmutableList.of("T", UnknownType.NAME), "T")
+    };
 
     @LiteralParameters({"x", "y"})
     @ScalarOperator(EQUAL)
