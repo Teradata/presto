@@ -18,14 +18,20 @@ import com.facebook.presto.spi.type.StandardTypes;
 
 import javax.annotation.Nullable;
 
+import static com.facebook.presto.metadata.OperatorType.ADD;
 import static com.facebook.presto.metadata.OperatorType.BETWEEN;
+import static com.facebook.presto.metadata.OperatorType.DIVIDE;
 import static com.facebook.presto.metadata.OperatorType.EQUAL;
 import static com.facebook.presto.metadata.OperatorType.GREATER_THAN;
 import static com.facebook.presto.metadata.OperatorType.GREATER_THAN_OR_EQUAL;
 import static com.facebook.presto.metadata.OperatorType.HASH_CODE;
 import static com.facebook.presto.metadata.OperatorType.LESS_THAN;
 import static com.facebook.presto.metadata.OperatorType.LESS_THAN_OR_EQUAL;
+import static com.facebook.presto.metadata.OperatorType.MODULUS;
+import static com.facebook.presto.metadata.OperatorType.MULTIPLY;
+import static com.facebook.presto.metadata.OperatorType.NEGATION;
 import static com.facebook.presto.metadata.OperatorType.NOT_EQUAL;
+import static com.facebook.presto.metadata.OperatorType.SUBTRACT;
 
 public final class UnknownOperators
 {
@@ -93,6 +99,54 @@ public final class UnknownOperators
     @Nullable
     @SqlType(StandardTypes.BIGINT)
     public static Long hashCode(@SqlType("unknown") @Nullable Void value)
+    {
+        return null;
+    }
+
+    @ScalarOperator(ADD)
+    @Nullable
+    @SqlType("unknown")
+    public static Void add(@SqlType("unknown") @Nullable Void left, @SqlType("unknown") @Nullable Void right)
+    {
+        return null;
+    }
+
+    @ScalarOperator(SUBTRACT)
+    @Nullable
+    @SqlType("unknown")
+    public static Void subtract(@SqlType("unknown") @Nullable Void left, @SqlType("unknown") @Nullable Void right)
+    {
+        return null;
+    }
+
+    @ScalarOperator(MULTIPLY)
+    @Nullable
+    @SqlType("unknown")
+    public static Void multiply(@SqlType("unknown") @Nullable Void left, @SqlType("unknown") @Nullable Void right)
+    {
+        return null;
+    }
+
+    @ScalarOperator(DIVIDE)
+    @Nullable
+    @SqlType("unknown")
+    public static Void divide(@SqlType("unknown") @Nullable Void left, @SqlType("unknown") @Nullable Void right)
+    {
+        return null;
+    }
+
+    @ScalarOperator(MODULUS)
+    @Nullable
+    @SqlType("unknown")
+    public static Void modulus(@SqlType("unknown") @Nullable Void left, @SqlType("unknown") @Nullable Void right)
+    {
+        return null;
+    }
+
+    @ScalarOperator(NEGATION)
+    @Nullable
+    @SqlType("unknown")
+    public static Void negation(@SqlType("unknown") @Nullable Void value)
     {
         return null;
     }

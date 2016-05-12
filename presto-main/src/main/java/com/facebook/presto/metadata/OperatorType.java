@@ -15,7 +15,6 @@ package com.facebook.presto.metadata;
 
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.TypeSignature;
-import com.facebook.presto.type.UnknownType;
 import com.google.common.base.Joiner;
 
 import java.util.List;
@@ -204,7 +203,6 @@ public enum OperatorType
     private static void validateOperatorSignature(OperatorType operatorType, TypeSignature returnType, List<TypeSignature> argumentTypes, int expectedArgumentCount)
     {
         String signature = formatSignature(operatorType, returnType, argumentTypes);
-        checkArgument(!returnType.getBase().equals(UnknownType.NAME), "%s operator return type can not be NULL: %s", operatorType, signature);
         checkArgument(argumentTypes.size() == expectedArgumentCount, "%s operator must have exactly %s argument: %s", operatorType, expectedArgumentCount, signature);
     }
 
