@@ -115,7 +115,7 @@ function terminate() {
 }
 
 function getAvailableEnvironments() {
-  for i in $(ls -d $ENVIRONMENT_LOCATION/*/); do echo ${i%%/}; done | grep -v files | xargs -n1 basename
+  ls $ENVIRONMENT_LOCATION -I files
 }
 
 ENVIRONMENT=$1
@@ -132,7 +132,7 @@ fi
 
 shift 1
 
-DOCKER_COMPOSE_LOCATION="${PRODUCT_TESTS_ROOT}/conf/docker/${ENVIRONMENT}/docker-compose.yml"
+DOCKER_COMPOSE_LOCATION="${ENVIRONMENT_LOCATION}/${ENVIRONMENT}/docker-compose.yml"
 DOCKER_PRESTO_VOLUME="/docker/volumes/presto"
 TEMPTO_CONFIGURATION="/docker/volumes/tempto/tempto-configuration-local.yaml"
 
@@ -158,6 +158,10 @@ trap terminate INT TERM EXIT
 
 # start hadoop container
 docker-compose -f "${DOCKER_COMPOSE_LOCATION}" up -d hadoop-master
+
+# start external database containers
+docker-compose -f "${DOCKER_COMPOSE_LOCATION}" up -d mysql
+docker-compose -f "${DOCKER_COMPOSE_LOCATION}" up -d postgres
 
 # start docker logs for hadoop container
 docker-compose -f "${DOCKER_COMPOSE_LOCATION}" logs --no-color hadoop-master &
