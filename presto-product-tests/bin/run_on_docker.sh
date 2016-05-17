@@ -115,7 +115,7 @@ function terminate() {
 }
 
 function getAvailableEnvironments() {
-  ls $ENVIRONMENT_LOCATION -I files
+  for i in $(ls -d $ENVIRONMENT_LOCATION/*/); do echo ${i%%/}; done | grep -v files | xargs -n1 basename
 }
 
 ENVIRONMENT=$1
