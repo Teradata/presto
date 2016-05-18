@@ -3,6 +3,7 @@ databases:
     host: hadoop-master
   presto:
     host: presto-master
+    configured_hdfs_user: hive
 
   mysql:
     jdbc_driver_class: com.mysql.jdbc.Driver

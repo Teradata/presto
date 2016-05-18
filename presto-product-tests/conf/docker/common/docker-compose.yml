@@ -15,7 +15,7 @@ services:
   hadoop-master-kerberos:
     extends:
       service: hadoop-master-common
-    image: 'teradatalabs/cdh5-hive-kerberized:2'    
+    image: 'teradatalabs/cdh5-hive-kerberized:3'    
 
   presto-master-common:
     hostname: presto-master
