@@ -176,23 +176,34 @@ public final class WindowPartition
 
     private boolean emptyFrame(int rowPosition, int endPosition)
     {
-        if (frameInfo.getStartType() != frameInfo.getEndType()) {
+        FrameBound.Type startType = frameInfo.getStartType();
+        FrameBound.Type endType = frameInfo.getEndType();
+
+        int positions = endPosition - rowPosition;
+
+        if (startType == UNBOUNDED_PRECEDING && endType == PRECEDING) {
+            return getEndValue() > rowPosition;
+        }
+
+        if (startType == FOLLOWING && endType == UNBOUNDED_FOLLOWING) {
+            return getStartValue() > positions;
+        }
+
+        if (startType != endType) {
             return false;
         }
 
-        FrameBound.Type type = frameInfo.getStartType();
-        if ((type != PRECEDING) && (type != FOLLOWING)) {
+        if ((startType != PRECEDING) && (startType != FOLLOWING)) {
             return false;
         }
 
         long start = getStartValue();
         long end = getEndValue();
 
-        if (type == PRECEDING) {
+        if (startType == PRECEDING) {
             return (start < end) || ((start > rowPosition) && (end > rowPosition));
         }
 
-        int positions = endPosition - rowPosition;
         return (start > end) || ((start > positions) && (end > positions));
     }
 
