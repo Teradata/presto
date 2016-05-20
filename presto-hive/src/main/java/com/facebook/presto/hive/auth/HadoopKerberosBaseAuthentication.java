@@ -77,6 +77,9 @@ abstract class HadoopKerberosBaseAuthentication
             }
             checkState(ugi.isFromKeytab(), "failed to login user '%s' with keytab '%s'", prestoPrincipal, keytab);
             this.authenticatedUser = Optional.of(ugi);
+
+            // cache next refresh time
+            nextTgtRefreshTime = getNextRefreshTime(ugi);
         }
         catch (IOException e) {
             throw Throwables.propagate(e);
@@ -100,7 +103,7 @@ abstract class HadoopKerberosBaseAuthentication
             throws IOException
     {
         // check cached refresh time
-        if (nextTgtRefreshTime < System.currentTimeMillis()) {
+        if (nextTgtRefreshTime > System.currentTimeMillis()) {
             return;
         }
 
@@ -108,9 +111,14 @@ abstract class HadoopKerberosBaseAuthentication
         ugi.checkTGTAndReloginFromKeytab();
 
         // cache next refresh time
+        nextTgtRefreshTime = getNextRefreshTime(ugi);
+    }
+
+    private long getNextRefreshTime(UserGroupInformation ugi)
+    {
         Subject subject = getSubjectFrom(ugi);
         KerberosTicket tgt = KerberosTicketUtils.getTgt(subject);
-        nextTgtRefreshTime = KerberosTicketUtils.getRefreshTime(tgt);
+        return KerberosTicketUtils.getRefreshTime(tgt);
     }
 
     private Subject getSubjectFrom(UserGroupInformation ugi)
