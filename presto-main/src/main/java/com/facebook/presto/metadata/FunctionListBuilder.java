@@ -33,7 +33,6 @@ import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.type.Constraint;
 import com.facebook.presto.type.LiteralParameters;
 import com.facebook.presto.type.SqlType;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -187,20 +186,18 @@ public class FunctionListBuilder
         ScalarFunction scalarAnnotation = clazz.getAnnotation(ScalarFunction.class);
         ScalarOperator operatorAnnotation = clazz.getAnnotation(ScalarOperator.class);
         if (scalarAnnotation != null || operatorAnnotation != null) {
-            functions.add(ReflectionParametricScalar.parseDefinition(clazz));
+            functions.addAll(ReflectionParametricScalar.parseDefinition(clazz));
             return this;
         }
-        try {
-            boolean foundOne = false;
-            for (Method method : clazz.getMethods()) {
-                foundOne = processScalarFunction(method) || foundOne;
-                foundOne = processScalarOperator(method) || foundOne;
+
+        boolean foundOne = false;
+        for (Method method : clazz.getMethods()) {
+            if (ReflectionParametricScalar.canParseMethodDefinition(method)) {
+                functions.addAll(ReflectionParametricScalar.parseDefinition(method));
+                foundOne = true;
             }
-            checkArgument(foundOne, "Expected class %s to be annotated with @%s, or contain at least one method annotated with @%s", clazz.getName(), ScalarFunction.class.getSimpleName(), ScalarFunction.class.getSimpleName());
         }
-        catch (IllegalAccessException e) {
-            throw Throwables.propagate(e);
-        }
+        checkArgument(foundOne, "Expected class %s to be annotated with @%s, or contain at least one method annotated with @%s", clazz.getName(), ScalarFunction.class.getSimpleName(), ScalarFunction.class.getSimpleName());
         return this;
     }
 

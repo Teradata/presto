@@ -69,7 +69,7 @@ public abstract class SqlScalarFunction
         return new SqlScalarFunctionBuilder(clazz);
     }
 
-    private static class SimpleSqlScalarFunction
+    public static class SimpleSqlScalarFunction
             extends SqlScalarFunction
     {
         private final MethodHandle methodHandle;
@@ -80,7 +80,7 @@ public abstract class SqlScalarFunction
         private final List<Boolean> nullableArguments;
         private final boolean deterministic;
 
-        public SimpleSqlScalarFunction(
+        private SimpleSqlScalarFunction(
                 Signature signature,
                 String description,
                 boolean hidden,
