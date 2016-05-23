@@ -181,11 +181,13 @@ public class ReflectionParametricScalar
         throw new PrestoException(FUNCTION_IMPLEMENTATION_MISSING, format("Unsupported type parameters (%s) for %s", boundVariables, getSignature()));
     }
 
-    public static List<SqlScalarFunction> parseDefinition(Class<?> clazz)
+    public static List<SqlScalarFunction> parseFunctionDefinitionClass(Class<?> clazz)
     {
         ScalarFunction scalarAnnotation = clazz.getAnnotation(ScalarFunction.class);
         ScalarOperator operatorAnnotation = clazz.getAnnotation(ScalarOperator.class);
         Description descriptionAnnotation = clazz.getAnnotation(Description.class);
+
+        checkArgument(operatorAnnotation != null ^ scalarAnnotation != null, "Function defining class must have exacly one of ScalarFunction and ScalarOperator annotation.");
 
         if (scalarAnnotation != null) {
             return ImmutableList.of(createReflectionParametricScalar(scalarAnnotation.value(), scalarAnnotation.hidden(), scalarAnnotation.deterministic(), descriptionAnnotation, findPublicMethodsWithAnnotation(clazz, SqlType.class), clazz.getSimpleName(), findConstructors(clazz)));
@@ -195,6 +197,20 @@ public class ReflectionParametricScalar
         }
         checkArgument(false);
         return ImmutableList.of();
+    }
+
+    public static List<SqlScalarFunction> parseFunctionSetClass(Class<?> clazz)
+    {
+        ImmutableList.Builder<SqlScalarFunction> scalars = ImmutableList.builder();
+        for (Method method : clazz.getMethods()) {
+            if (canParseMethodDefinition(method)) {
+                scalars.addAll(parseDefinition(method));
+            }
+        }
+
+        List<SqlScalarFunction> resultScalars = scalars.build();
+        checkArgument(!resultScalars.isEmpty(), "Expected class %s to contain at least one method annotated with @%s or @%s", clazz.getName(), ScalarFunction.class.getSimpleName(), ScalarOperator.class.getSimpleName());
+        return resultScalars;
     }
 
     public static boolean canParseMethodDefinition(Method method)

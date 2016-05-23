@@ -183,21 +183,13 @@ public class FunctionListBuilder
 
     public FunctionListBuilder scalar(Class<?> clazz)
     {
-        ScalarFunction scalarAnnotation = clazz.getAnnotation(ScalarFunction.class);
-        ScalarOperator operatorAnnotation = clazz.getAnnotation(ScalarOperator.class);
-        if (scalarAnnotation != null || operatorAnnotation != null) {
-            functions.addAll(ReflectionParametricScalar.parseDefinition(clazz));
-            return this;
-        }
+        functions.addAll(ReflectionParametricScalar.parseFunctionDefinitionClass(clazz));
+        return this;
+    }
 
-        boolean foundOne = false;
-        for (Method method : clazz.getMethods()) {
-            if (ReflectionParametricScalar.canParseMethodDefinition(method)) {
-                functions.addAll(ReflectionParametricScalar.parseDefinition(method));
-                foundOne = true;
-            }
-        }
-        checkArgument(foundOne, "Expected class %s to be annotated with @%s, or contain at least one method annotated with @%s", clazz.getName(), ScalarFunction.class.getSimpleName(), ScalarFunction.class.getSimpleName());
+    public FunctionListBuilder scalars(Class<?> clazz)
+    {
+        functions.addAll(ReflectionParametricScalar.parseFunctionSetClass(clazz));
         return this;
     }
 
