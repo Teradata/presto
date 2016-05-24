@@ -15,7 +15,7 @@ package com.facebook.presto.metadata;
 
 import com.facebook.presto.block.BlockEncodingManager;
 import com.facebook.presto.operator.scalar.CustomFunctions;
-import com.facebook.presto.operator.scalar.ScalarFunction;
+import com.facebook.presto.operator.scalar.annotations.ScalarFunction;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.facebook.presto.sql.tree.QualifiedName;

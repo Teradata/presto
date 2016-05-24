@@ -17,55 +17,32 @@ import com.facebook.presto.operator.Description;
 import com.facebook.presto.operator.aggregation.GenericAggregationFunctionFactory;
 import com.facebook.presto.operator.aggregation.InternalAggregationFunction;
 import com.facebook.presto.operator.scalar.JsonPath;
-import com.facebook.presto.operator.scalar.ScalarFunction;
-import com.facebook.presto.operator.scalar.ScalarOperator;
 import com.facebook.presto.operator.scalar.annotations.ScalarFromAnnotationsParser;
 import com.facebook.presto.operator.window.ReflectionWindowFunctionSupplier;
 import com.facebook.presto.operator.window.SqlWindowFunction;
 import com.facebook.presto.operator.window.ValueWindowFunction;
 import com.facebook.presto.operator.window.WindowFunction;
 import com.facebook.presto.operator.window.WindowFunctionSupplier;
-import com.facebook.presto.spi.ConnectorSession;
-import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
-import com.facebook.presto.type.Constraint;
-import com.facebook.presto.type.LiteralParameters;
-import com.facebook.presto.type.SqlType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.google.common.primitives.Primitives;
 import io.airlift.joni.Regex;
 
-import javax.annotation.Nullable;
-
-import java.lang.annotation.Annotation;
-
-import java.lang.invoke.MethodHandle;
 import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
-import static com.facebook.presto.metadata.FunctionKind.SCALAR;
 import static com.facebook.presto.metadata.FunctionKind.WINDOW;
-import static com.facebook.presto.metadata.Signature.longVariableExpression;
 import static com.facebook.presto.metadata.Signature.typeVariable;
-import static com.facebook.presto.spi.StandardErrorCode.FUNCTION_IMPLEMENTATION_ERROR;
-import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
-import static com.google.common.base.CaseFormat.LOWER_CAMEL;
-import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.String.format;
-import static java.lang.invoke.MethodHandles.lookup;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
 
