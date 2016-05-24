@@ -86,8 +86,8 @@ public abstract class AbstractTestQueries
     protected static final List<SqlFunction> CUSTOM_FUNCTIONS = new FunctionListBuilder(new TypeRegistry())
             .aggregate(CustomSum.class)
             .window("custom_rank", BIGINT, ImmutableList.<Type>of(), CustomRank.class)
-            .scalar(CustomAdd.class)
-            .scalar(CreateHll.class)
+            .scalars(CustomAdd.class)
+            .scalars(CreateHll.class)
             .getFunctions();
 
     public static final List<PropertyMetadata<?>> TEST_SYSTEM_PROPERTIES = ImmutableList.of(

@@ -126,7 +126,7 @@ public abstract class AbstractTestFunctions
     {
         Metadata metadata = functionAssertions.getMetadata();
         List<SqlFunction> functions = new FunctionListBuilder(metadata.getTypeManager())
-                .scalar(clazz)
+                .scalars(clazz)
                 .getFunctions();
         metadata.getFunctionRegistry().addFunctions(functions);
     }
