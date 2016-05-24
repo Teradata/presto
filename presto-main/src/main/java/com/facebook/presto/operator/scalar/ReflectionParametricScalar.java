@@ -21,7 +21,7 @@ import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.metadata.SignatureBinder;
 import com.facebook.presto.metadata.SqlScalarFunction;
 import com.facebook.presto.metadata.TypeVariableConstraint;
-import com.facebook.presto.operator.Description;
+import com.facebook.presto.operator.scalar.annotations.ScalarHeader;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.type.Type;
@@ -76,9 +76,8 @@ import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
-import static com.google.common.base.CaseFormat.LOWER_CAMEL;
-import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.String.format;
 import static java.lang.invoke.MethodHandles.lookup;
 import static java.lang.invoke.MethodHandles.permuteArguments;
@@ -100,44 +99,74 @@ public class ReflectionParametricScalar
     private final List<Implementation> specializedImplementations;
     // These are generic implementations
     private final List<Implementation> implementations;
-    private final String description;
-    private final boolean hidden;
-    private final boolean deterministic;
+
+    public static class ScalarHeaderAndImplementations
+    {
+        private final ScalarHeader header;
+        private final List<Method> methods;
+
+        public ScalarHeaderAndImplementations(ScalarHeader header, List<Method> methods) {
+            this.header = header;
+            this.methods = methods;
+        }
+
+        public static List<ScalarHeaderAndImplementations> fromFunctionDefinitionClassAnnotations(Class annotated)
+        {
+            ImmutableList.Builder<ScalarHeaderAndImplementations> builder = ImmutableList.builder();
+            List<ScalarHeader> classHeaders = ScalarHeader.fromAnnotatedElement(annotated);
+            checkArgument(!classHeaders.isEmpty(), "Class that defines function must be annotated with @ScalarFunction or @ScalarOperator.");
+
+            for (ScalarHeader header : classHeaders) {
+                builder.add(new ScalarHeaderAndImplementations(header, findPublicMethodsWithAnnotation(annotated, SqlType.class)));
+            }
+
+            return builder.build();
+        }
+
+        public static List<ScalarHeaderAndImplementations> fromFunctionSetClassAnnotations(Class annotated)
+        {
+            ImmutableList.Builder<ScalarHeaderAndImplementations> builder = ImmutableList.builder();
+            for (Method method : findPublicMethodsWithAnnotation(annotated, SqlType.class)) {
+                for (ScalarHeader header : ScalarHeader.fromAnnotatedElement(method)) {
+                    builder.add(new ScalarHeaderAndImplementations(header, ImmutableList.of(method)));
+                }
+            }
+            return builder.build();
+        }
+    }
+
+    ScalarHeader details;
 
     private ReflectionParametricScalar(
             Signature signature,
-            String description,
-            boolean hidden,
+            ScalarHeader details,
             Map<Signature, Implementation> exactImplementations,
             List<Implementation> specializedImplementations,
-            List<Implementation> implementations,
-            boolean deterministic)
+            List<Implementation> implementations)
     {
         super(signature);
-        this.description = description;
-        this.hidden = hidden;
+        this.details = details;
         this.exactImplementations = ImmutableMap.copyOf(requireNonNull(exactImplementations, "exactImplementations is null"));
         this.specializedImplementations = ImmutableList.copyOf(requireNonNull(specializedImplementations, "specializedImplementations is null"));
         this.implementations = ImmutableList.copyOf(requireNonNull(implementations, "implementations is null"));
-        this.deterministic = deterministic;
     }
 
     @Override
     public boolean isHidden()
     {
-        return hidden;
+        return details.isHidden();
     }
 
     @Override
     public boolean isDeterministic()
     {
-        return deterministic;
+        return details.isDeterministic();
     }
 
     @Override
     public String getDescription()
     {
-        return description;
+        return details.getDescription().isPresent() ? details.getDescription().get() : "";
     }
 
     @Override
@@ -183,97 +212,33 @@ public class ReflectionParametricScalar
 
     public static List<SqlScalarFunction> parseFunctionDefinitionClass(Class<?> clazz)
     {
-        ScalarFunction scalarAnnotation = clazz.getAnnotation(ScalarFunction.class);
-        ScalarOperator operatorAnnotation = clazz.getAnnotation(ScalarOperator.class);
-        Description descriptionAnnotation = clazz.getAnnotation(Description.class);
-
-        checkArgument(operatorAnnotation != null ^ scalarAnnotation != null, "Function defining class must have exacly one of ScalarFunction and ScalarOperator annotation.");
-
-        if (scalarAnnotation != null) {
-            return ImmutableList.of(createReflectionParametricScalar(scalarAnnotation.value(), scalarAnnotation.hidden(), scalarAnnotation.deterministic(), descriptionAnnotation, findPublicMethodsWithAnnotation(clazz, SqlType.class), clazz.getSimpleName(), findConstructors(clazz)));
+        ImmutableList.Builder<SqlScalarFunction> builder = ImmutableList.builder();
+        for (ScalarHeaderAndImplementations scalar : ScalarHeaderAndImplementations.fromFunctionDefinitionClassAnnotations(clazz)) {
+            builder.add(parseScalarImplementations(scalar, findConstructors(clazz), clazz.getSimpleName()));
         }
-        else if (operatorAnnotation != null) {
-            return ImmutableList.of(createReflectionParametricScalar(mangleOperatorName(operatorAnnotation.value()), true, true, descriptionAnnotation, findPublicMethodsWithAnnotation(clazz, SqlType.class), clazz.getSimpleName(), findConstructors(clazz)));
-        }
-        checkArgument(false);
-        return ImmutableList.of();
+        return builder.build();
     }
 
     public static List<SqlScalarFunction> parseFunctionSetClass(Class<?> clazz)
     {
-        ImmutableList.Builder<SqlScalarFunction> scalars = ImmutableList.builder();
-        for (Method method : clazz.getMethods()) {
-            if (canParseMethodDefinition(method)) {
-                scalars.addAll(parseDefinition(method));
-            }
-        }
-
-        List<SqlScalarFunction> resultScalars = scalars.build();
-        checkArgument(!resultScalars.isEmpty(), "Expected class %s to contain at least one method annotated with @%s or @%s", clazz.getName(), ScalarFunction.class.getSimpleName(), ScalarOperator.class.getSimpleName());
-        return resultScalars;
-    }
-
-    public static boolean canParseMethodDefinition(Method method)
-    {
-        ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
-        ScalarOperator scalarOperator = method.getAnnotation(ScalarOperator.class);
-
-        return (scalarOperator != null || scalarFunction != null);
-    }
-
-    public static List<SqlScalarFunction> parseDefinition(Method method)
-    {
-        ScalarFunction scalarFunction = method.getAnnotation(ScalarFunction.class);
-        ScalarOperator scalarOperator = method.getAnnotation(ScalarOperator.class);
-        Description descriptionAnnotation = method.getAnnotation(Description.class);
-
         ImmutableList.Builder<SqlScalarFunction> builder = ImmutableList.builder();
-        Map<Set<TypeParameter>, Constructor<?>> constructors = ImmutableMap.of();
-        if (!Modifier.isStatic(method.getModifiers())) {
-            try {
-                constructors = ImmutableMap.of(ImmutableSet.of(), method.getDeclaringClass().getConstructor());
-            }
-            catch (NoSuchMethodException e) {
-                throw new PrestoException(FUNCTION_IMPLEMENTATION_ERROR, format("%s is non-static, but its declaring class is missing a default constructor", method));
-            }
+        for (ScalarHeaderAndImplementations methods : ScalarHeaderAndImplementations.fromFunctionSetClassAnnotations(clazz)) {
+            builder.add(parseScalarImplementations(methods, findConstructors(clazz), clazz.getSimpleName()));
         }
-
-        if (scalarFunction != null) {
-            String baseName = scalarFunction.value().isEmpty() ? camelToSnake(method.getName()) : scalarFunction.value();
-            builder.add(createReflectionParametricScalar(baseName, scalarFunction.hidden(), scalarFunction.deterministic(), descriptionAnnotation, ImmutableList.of(method), baseName, constructors));
-            for (String alias : scalarFunction.alias()) {
-                builder.add(createReflectionParametricScalar(alias, scalarFunction.hidden(), scalarFunction.deterministic(), descriptionAnnotation, ImmutableList.of(method), baseName, constructors));
-            }
-        }
-
-        if (scalarOperator != null) {
-            builder.add(createReflectionParametricScalar(mangleOperatorName(scalarOperator.value()), true, true, descriptionAnnotation, ImmutableList.of(method), method.getName(), constructors));
-        }
-
         return builder.build();
     }
 
-    private static String camelToSnake(String name)
+    private static SqlScalarFunction parseScalarImplementations(ScalarHeaderAndImplementations scalar, Map<Set<TypeParameter>, Constructor<?>> constructors, String objectName)
     {
-        return LOWER_CAMEL.to(LOWER_UNDERSCORE, name);
-    }
-
-    private static SqlScalarFunction createReflectionParametricScalar(String name, boolean hidden, boolean deterministic, Description descriptionAnnotation, List<Method> methods, String objectName, Map<Set<TypeParameter>, Constructor<?>> constructors)
-    {
-        checkArgument(!name.isEmpty());
-        String description = descriptionAnnotation == null ? "" : descriptionAnnotation.value();
-
         ImmutableMap.Builder<Signature, Implementation> exactImplementations = ImmutableMap.builder();
         ImmutableList.Builder<Implementation> specializedImplementations = ImmutableList.builder();
         ImmutableList.Builder<Implementation> implementations = ImmutableList.builder();
         Signature signature = null;
+        ScalarHeader header = scalar.header;
+        checkArgument(!header.getName().isEmpty());
 
-        for (Method method : methods) {
-            if (name.isEmpty()) {
-                name = method.getName();
-            }
-
-            Implementation implementation = new ImplementationParser(name, method, constructors).get();
+        for (Method method : scalar.methods) {
+            Implementation implementation = new ImplementationParser(header.getName(), method, constructors).get();
             if (implementation.getSignature().getTypeVariableConstraints().isEmpty()
                     && implementation.getSignature().getArgumentTypes().stream().noneMatch(TypeSignature::isCalculated)) {
                 exactImplementations.put(implementation.getSignature(), implementation);
@@ -304,12 +269,10 @@ public class ReflectionParametricScalar
 
         return new ReflectionParametricScalar(
                 signature,
-                description,
-                hidden,
+                header,
                 exactImplementationsMap,
                 specializedImplementations.build(),
-                implementations.build(),
-                deterministic);
+                implementations.build());
     }
 
     private static List<Method> findPublicMethodsWithAnnotation(Class<?> clazz, Class<?> annotationClass)
