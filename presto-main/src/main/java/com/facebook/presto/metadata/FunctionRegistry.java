@@ -210,6 +210,7 @@ import static com.facebook.presto.spi.StandardErrorCode.FUNCTION_NOT_FOUND;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.FloatType.FLOAT;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
@@ -520,16 +521,16 @@ public class FunctionRegistry
 
         // search for a 'best' coerced match if it exists
         // TODO: remove when we move to a lattice-based type coercion system
-        // TODO: this is a hack that relies on the fact that all functions are specified for bigints, but not for the narrower integral types
-        // converts any ints to bigints and then see if there is an exact match
+        // TODO: this is a hack that relies on the fact that all functions are specified for "native types" (bigints, doubles), but not for the narrower types (integer, float etc.)
+        // converts any narrower types to "native types" then see if there is an exact match
         List<Type> promotedTypes = resolvedTypes.stream()
-                .map(type -> type == INTEGER ? BIGINT : type)
+                .map(type -> promoteType(type))
                 .collect(Collectors.toList());
 
         for (SqlFunction coercedFunction : coercedCandidates) {
             Optional<Signature> signature = new SignatureBinder(typeManager, coercedFunction.getSignature(), false).bind(promotedTypes);
             if (signature.isPresent()) {
-                checkState(!match.isPresent(), "ambiguous function implementations found when integers were cast to bigints");
+                checkState(!match.isPresent(), "ambiguous function implementations found when narrower types promoted to natives");
                 match = signature;
                 break;
             }
@@ -538,6 +539,21 @@ public class FunctionRegistry
         if (!match.isPresent() || coercedCandidates.size() == 1) {
             // i.e. revert to old behavior
             match = firstCoercedMatch; // TODO: this does not deal with ambiguities
+        }
+
+        if (match.isPresent()) {
+            return match.get();
+        }
+
+        // hack! similar like above but allow coercions
+        // if didn't find exact match after promoting narrower types, try coercions for native types
+        // works for cases like invocation of foo(int, float) when there's only foo(double, double) available. It has to go through bigint, double and being coerced to double, double
+        for (SqlFunction coercedFunction : candidates) {
+            Optional<Signature> signature = new SignatureBinder(typeManager, coercedFunction.getSignature(), true).bind(promotedTypes);
+            if (signature.isPresent()) {
+                checkState(!match.isPresent(), "ambiguous function implementations found when narrower types promoted to natives and coercions allowed");
+                match = signature;
+            }
         }
 
         if (match.isPresent()) {
@@ -575,6 +591,17 @@ public class FunctionRegistry
         }
 
         throw new PrestoException(FUNCTION_NOT_FOUND, message);
+    }
+
+    private static Type promoteType(Type type)
+    {
+        if (type.equals(INTEGER)) {
+            return BIGINT;
+        }
+        if (type.equals(FLOAT)) {
+            return DOUBLE;
+        }
+        return type;
     }
 
     public WindowFunctionSupplier getWindowFunctionImplementation(Signature signature)

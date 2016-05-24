@@ -25,11 +25,14 @@ import com.google.common.base.Functions;
 import com.google.common.collect.ImmutableList;
 import org.testng.annotations.Test;
 
+import javax.validation.constraints.NotNull;
+
 import java.util.List;
 
 import static com.facebook.presto.metadata.FunctionRegistry.getMagicLiteralFunctionSignature;
 import static com.facebook.presto.metadata.FunctionRegistry.mangleOperatorName;
 import static com.facebook.presto.metadata.FunctionRegistry.unmangleOperator;
+import static com.facebook.presto.metadata.Signature.typeVariable;
 import static com.facebook.presto.spi.type.HyperLogLogType.HYPER_LOG_LOG;
 import static com.facebook.presto.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
@@ -134,6 +137,129 @@ public class TestFunctionRegistry
         assertTrue(names.contains("stddev"), "Expected function names " + names + " to contain 'stddev'");
         assertTrue(names.contains("rank"), "Expected function names " + names + " to contain 'rank'");
         assertFalse(names.contains("like"), "Expected function names " + names + " not to contain 'like'");
+    }
+
+    @Test
+    public void testFloatToDoubleCoercion()
+    {
+        TypeRegistry typeRegistry = new TypeRegistry();
+        FunctionRegistry functionRegistry = new FunctionRegistry(typeRegistry, new BlockEncodingManager(typeRegistry), true);
+        Signature functionSignature = createFunctionSignature(
+                "boolean",
+                ImmutableList.of("double"),
+                "TEST_FUNCTION");
+        functionRegistry.addFunctions(ImmutableList.of(createSqlFunction(functionSignature)));
+
+        Signature matchedFunction = functionRegistry.resolveFunction(
+                QualifiedName.of("TEST_FUNCTION"),
+                ImmutableList.of(TypeSignature.parseTypeSignature("float")),
+                false);
+        assertEquals(matchedFunction, functionSignature);
+    }
+
+    @Test
+    public void testTwoNarrowTypesCoerceForWideTypesFunction()
+    {
+        TypeRegistry typeRegistry = new TypeRegistry();
+        FunctionRegistry functionRegistry = new FunctionRegistry(typeRegistry, new BlockEncodingManager(typeRegistry), true);
+        Signature functionSignature = createFunctionSignature(
+                "boolean",
+                ImmutableList.of("bigint", "double"),
+                "TEST_FUNCTION");
+        functionRegistry.addFunctions(ImmutableList.of(createSqlFunction(functionSignature)));
+
+        Signature matchedFunction = functionRegistry.resolveFunction(
+                QualifiedName.of("TEST_FUNCTION"),
+                ImmutableList.of(TypeSignature.parseTypeSignature("integer"), TypeSignature.parseTypeSignature("float")),
+                false);
+        assertEquals(matchedFunction, functionSignature);
+    }
+
+    @Test
+    public void testIntFloatCoerceToDoubleDouble()
+    {
+        TypeRegistry typeRegistry = new TypeRegistry();
+        FunctionRegistry functionRegistry = new FunctionRegistry(typeRegistry, new BlockEncodingManager(typeRegistry), true);
+        Signature functionSignature = createFunctionSignature(
+                "boolean",
+                ImmutableList.of("double", "double"),
+                "TEST_FUNCTION");
+        functionRegistry.addFunctions(ImmutableList.of(createSqlFunction(functionSignature)));
+
+        Signature matchedFunction = functionRegistry.resolveFunction(
+                QualifiedName.of("TEST_FUNCTION"),
+                ImmutableList.of(TypeSignature.parseTypeSignature("integer"), TypeSignature.parseTypeSignature("float")),
+                false);
+        assertEquals(matchedFunction, functionSignature);
+    }
+
+    @Test
+    public void testIntFloatCoerceToDoubleDoubleForGenericFunction()
+    {
+        TypeRegistry typeRegistry = new TypeRegistry();
+        FunctionRegistry functionRegistry = new FunctionRegistry(typeRegistry, new BlockEncodingManager(typeRegistry), true);
+        functionRegistry.addFunctions(ImmutableList.of(createSqlFunction(createGenericFunctionSignature("TEST_FUNCTION"))));
+
+        Signature matchedFunction = functionRegistry.resolveFunction(
+                QualifiedName.of("TEST_FUNCTION"),
+                ImmutableList.of(TypeSignature.parseTypeSignature("integer"), TypeSignature.parseTypeSignature("float")),
+                false);
+        Signature expectedFunction = createFunctionSignature(
+                "double",
+                ImmutableList.of("double", "double"),
+                "TEST_FUNCTION");
+        assertEquals(matchedFunction, expectedFunction);
+    }
+
+    @NotNull
+    private static SqlFunction createSqlFunction(final Signature functionSignature)
+    {
+        return new SqlFunction()
+        {
+            @Override
+            public Signature getSignature()
+            {
+                return functionSignature;
+            }
+
+            @Override
+            public boolean isHidden()
+            {
+                return false;
+            }
+
+            @Override
+            public boolean isDeterministic()
+            {
+                return false;
+            }
+
+            @Override
+            public String getDescription()
+            {
+                return "testing function";
+            }
+        };
+    }
+
+    private static Signature createFunctionSignature(String returnType, List<String> arguments, String name)
+    {
+        SignatureBuilder signatureBuilder = new SignatureBuilder()
+                .returnType(parseTypeSignature(returnType))
+                .argumentTypes(arguments.stream().map(argument -> parseTypeSignature(argument)).collect(toImmutableList()))
+                .kind(FunctionKind.SCALAR);
+        return signatureBuilder.name(name).build();
+    }
+
+    private static Signature createGenericFunctionSignature(String name)
+    {
+        SignatureBuilder signatureBuilder = new SignatureBuilder()
+                .returnType(parseTypeSignature("E"))
+                .typeVariableConstraints(typeVariable("E"))
+                .argumentTypes(parseTypeSignature("E"))
+                .kind(FunctionKind.SCALAR)
+                .setVariableArity(true);
+        return signatureBuilder.name(name).build();
     }
 
     public static final class ScalarSum
