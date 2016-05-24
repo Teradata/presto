@@ -104,9 +104,4 @@ public class ParametricScalar
 
         throw new PrestoException(FUNCTION_IMPLEMENTATION_MISSING, format("Unsupported type parameters (%s) for %s", boundVariables, getSignature()));
     }
-
-
-
-
-
 }
