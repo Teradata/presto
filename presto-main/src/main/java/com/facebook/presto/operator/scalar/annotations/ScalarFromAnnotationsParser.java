@@ -17,11 +17,14 @@ import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.metadata.SqlScalarFunction;
 import com.facebook.presto.operator.scalar.ParametricScalar;
 import com.facebook.presto.spi.type.TypeSignature;
+import com.facebook.presto.type.SqlType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +44,7 @@ public class ScalarFromAnnotationsParser
     public static List<SqlScalarFunction> parseFunctionDefinitionClass(Class<?> clazz)
     {
         ImmutableList.Builder<SqlScalarFunction> builder = ImmutableList.builder();
-        for (ScalarHeaderAndMethods scalar : ScalarHeaderAndMethods.fromFunctionDefinitionClassAnnotations(clazz)) {
+        for (ScalarHeaderAndMethods scalar : findScalarsInFunctionDefinitionClass(clazz)) {
             builder.add(parseParametricScalar(scalar, findConstructors(clazz), clazz.getSimpleName()));
         }
         return builder.build();
@@ -50,8 +53,32 @@ public class ScalarFromAnnotationsParser
     public static List<SqlScalarFunction> parseFunctionSetClass(Class<?> clazz)
     {
         ImmutableList.Builder<SqlScalarFunction> builder = ImmutableList.builder();
-        for (ScalarHeaderAndMethods methods : ScalarHeaderAndMethods.fromFunctionSetClassAnnotations(clazz)) {
+        for (ScalarHeaderAndMethods methods : findScalarsInFunctionSetClass(clazz)) {
             builder.add(parseParametricScalar(methods, findConstructors(clazz), clazz.getSimpleName()));
+        }
+        return builder.build();
+    }
+
+    private static List<ScalarHeaderAndMethods> findScalarsInFunctionDefinitionClass(Class annotated)
+    {
+        ImmutableList.Builder<ScalarHeaderAndMethods> builder = ImmutableList.builder();
+        List<ScalarHeader> classHeaders = ScalarHeader.fromAnnotatedElement(annotated);
+        checkArgument(!classHeaders.isEmpty(), "Class that defines function must be annotated with @ScalarFunction or @ScalarOperator.");
+
+        for (ScalarHeader header : classHeaders) {
+            builder.add(new ScalarHeaderAndMethods(header, findPublicMethodsWithAnnotation(annotated, SqlType.class)));
+        }
+
+        return builder.build();
+    }
+
+    private static List<ScalarHeaderAndMethods> findScalarsInFunctionSetClass(Class annotated)
+    {
+        ImmutableList.Builder<ScalarHeaderAndMethods> builder = ImmutableList.builder();
+        for (Method method : findPublicMethodsWithAnnotation(annotated, SqlType.class)) {
+            for (ScalarHeader header : ScalarHeader.fromAnnotatedElement(method)) {
+                builder.add(new ScalarHeaderAndMethods(header, ImmutableList.of(method)));
+            }
         }
         return builder.build();
     }
@@ -114,5 +141,19 @@ public class ScalarFromAnnotationsParser
             builder.put(typeParameters, constructor);
         }
         return builder.build();
+    }
+
+    private static List<Method> findPublicMethodsWithAnnotation(Class<?> clazz, Class<?> annotationClass)
+    {
+        ImmutableList.Builder<Method> methods = ImmutableList.builder();
+        for (Method method : clazz.getMethods()) {
+            for (Annotation annotation : method.getAnnotations()) {
+                if (annotationClass.isInstance(annotation)) {
+                    checkArgument(Modifier.isPublic(method.getModifiers()), "%s annotated with %s must be public", method.getName(), annotationClass.getSimpleName());
+                    methods.add(method);
+                }
+            }
+        }
+        return methods.build();
     }
 }

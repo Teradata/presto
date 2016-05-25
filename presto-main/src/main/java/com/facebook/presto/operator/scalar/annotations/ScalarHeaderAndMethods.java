@@ -13,15 +13,10 @@
  */
 package com.facebook.presto.operator.scalar.annotations;
 
-import com.facebook.presto.type.SqlType;
-import com.google.common.collect.ImmutableList;
-
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 import java.util.List;
 
-import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.Objects.requireNonNull;
 
 public class ScalarHeaderAndMethods
 {
@@ -30,32 +25,8 @@ public class ScalarHeaderAndMethods
 
     public ScalarHeaderAndMethods(ScalarHeader header, List<Method> methods)
     {
-        this.header = header;
-        this.methods = methods;
-    }
-
-    public static List<ScalarHeaderAndMethods> fromFunctionDefinitionClassAnnotations(Class annotated)
-    {
-        ImmutableList.Builder<ScalarHeaderAndMethods> builder = ImmutableList.builder();
-        List<ScalarHeader> classHeaders = ScalarHeader.fromAnnotatedElement(annotated);
-        checkArgument(!classHeaders.isEmpty(), "Class that defines function must be annotated with @ScalarFunction or @ScalarOperator.");
-
-        for (ScalarHeader header : classHeaders) {
-            builder.add(new ScalarHeaderAndMethods(header, findPublicMethodsWithAnnotation(annotated, SqlType.class)));
-        }
-
-        return builder.build();
-    }
-
-    public static List<ScalarHeaderAndMethods> fromFunctionSetClassAnnotations(Class annotated)
-    {
-        ImmutableList.Builder<ScalarHeaderAndMethods> builder = ImmutableList.builder();
-        for (Method method : findPublicMethodsWithAnnotation(annotated, SqlType.class)) {
-            for (ScalarHeader header : ScalarHeader.fromAnnotatedElement(method)) {
-                builder.add(new ScalarHeaderAndMethods(header, ImmutableList.of(method)));
-            }
-        }
-        return builder.build();
+        this.header = requireNonNull(header);
+        this.methods = requireNonNull(methods);
     }
 
     public ScalarHeader getHeader()
@@ -66,19 +37,5 @@ public class ScalarHeaderAndMethods
     public List<Method> getMethods()
     {
         return methods;
-    }
-
-    private static List<Method> findPublicMethodsWithAnnotation(Class<?> clazz, Class<?> annotationClass)
-    {
-        ImmutableList.Builder<Method> methods = ImmutableList.builder();
-        for (Method method : clazz.getMethods()) {
-            for (Annotation annotation : method.getAnnotations()) {
-                if (annotationClass.isInstance(annotation)) {
-                    checkArgument(Modifier.isPublic(method.getModifiers()), "%s annotated with %s must be public", method.getName(), annotationClass.getSimpleName());
-                    methods.add(method);
-                }
-            }
-        }
-        return methods.build();
     }
 }
