@@ -34,6 +34,7 @@ import java.util.stream.Stream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static java.util.Objects.requireNonNull;
 
 public class ScalarFromAnnotationsParser
 {
@@ -155,5 +156,27 @@ public class ScalarFromAnnotationsParser
             }
         }
         return methods.build();
+    }
+
+    private static class ScalarHeaderAndMethods
+    {
+        private final ScalarHeader header;
+        private final List<Method> methods;
+
+        public ScalarHeaderAndMethods(ScalarHeader header, List<Method> methods)
+        {
+            this.header = requireNonNull(header);
+            this.methods = requireNonNull(methods);
+        }
+
+        public ScalarHeader getHeader()
+        {
+            return header;
+        }
+
+        public List<Method> getMethods()
+        {
+            return methods;
+        }
     }
 }
