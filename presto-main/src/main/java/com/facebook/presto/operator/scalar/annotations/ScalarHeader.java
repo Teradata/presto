@@ -25,7 +25,7 @@ import static com.facebook.presto.metadata.FunctionRegistry.mangleOperatorName;
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.LOWER_UNDERSCORE;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 public class ScalarHeader
 {
@@ -36,10 +36,10 @@ public class ScalarHeader
 
     private ScalarHeader(String name, Optional<String> description, boolean hidden, boolean deterministic)
     {
-        this.name = checkNotNull(name);
-        this.description = checkNotNull(description);
-        this.hidden = checkNotNull(hidden);
-        this.deterministic = checkNotNull(deterministic);
+        this.name = requireNonNull(name);
+        this.description = requireNonNull(description);
+        this.hidden = requireNonNull(hidden);
+        this.deterministic = requireNonNull(deterministic);
     }
 
     private static String annotatedName(AnnotatedElement annotatedElement)

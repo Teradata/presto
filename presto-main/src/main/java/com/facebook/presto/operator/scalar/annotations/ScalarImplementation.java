@@ -35,6 +35,7 @@ import com.google.common.collect.Iterables;
 import com.google.common.primitives.Primitives;
 
 import javax.annotation.Nullable;
+
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
@@ -519,9 +520,9 @@ public class ScalarImplementation
                     specializedTypeParameters);
         }
 
-        public static ScalarImplementation parseImplementation(String functionName, Method method, Map<Set<TypeParameter>, Constructor<?>> constructors) {
+        public static ScalarImplementation parseImplementation(String functionName, Method method, Map<Set<TypeParameter>, Constructor<?>> constructors)
+        {
             return new Parser(functionName, method, constructors).get();
         }
-
     }
 }

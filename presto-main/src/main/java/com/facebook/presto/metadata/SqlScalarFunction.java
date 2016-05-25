@@ -14,17 +14,9 @@
 package com.facebook.presto.metadata;
 
 import com.facebook.presto.operator.scalar.ScalarFunctionImplementation;
-import com.facebook.presto.operator.scalar.annotations.ScalarHeader;
-import com.facebook.presto.operator.scalar.annotations.ScalarImplementation;
 import com.facebook.presto.spi.type.TypeManager;
 
-import java.lang.invoke.MethodHandle;
-import java.util.List;
-import java.util.Optional;
-
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
-import static com.facebook.presto.spi.StandardErrorCode.AMBIGUOUS_FUNCTION_IMPLEMENTATION;
-import static com.facebook.presto.util.Failures.checkCondition;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 

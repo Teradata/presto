@@ -18,7 +18,8 @@ import com.facebook.presto.metadata.Signature;
 import java.util.List;
 import java.util.Map;
 
-public class ScalarImplementations {
+public class ScalarImplementations
+{
     // These three collections implement something similar to partial template specialization from C++, and allow more optimized implementations to be provided for specific types
     // These are implementations for concrete types (they have no unbound type parameters), and have the highest priority when picking an implementation
     private final Map<Signature, ScalarImplementation> exactImplementations;
@@ -27,7 +28,8 @@ public class ScalarImplementations {
     // These are generic implementations
     private final List<ScalarImplementation> genericImplementations;
 
-    public ScalarImplementations(Map<Signature, ScalarImplementation> exactImplementations, List<ScalarImplementation> specializedImplementations, List<ScalarImplementation> genericImplementations) {
+    public ScalarImplementations(Map<Signature, ScalarImplementation> exactImplementations, List<ScalarImplementation> specializedImplementations, List<ScalarImplementation> genericImplementations)
+    {
         this.exactImplementations = exactImplementations;
         this.specializedImplementations = specializedImplementations;
         this.genericImplementations = genericImplementations;
@@ -47,5 +49,4 @@ public class ScalarImplementations {
     {
         return specializedImplementations;
     }
-
 }

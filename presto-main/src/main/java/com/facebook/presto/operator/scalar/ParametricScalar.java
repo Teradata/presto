@@ -27,8 +27,8 @@ import com.facebook.presto.spi.type.TypeManager;
 import static com.facebook.presto.spi.StandardErrorCode.AMBIGUOUS_FUNCTION_IMPLEMENTATION;
 import static com.facebook.presto.spi.StandardErrorCode.FUNCTION_IMPLEMENTATION_MISSING;
 import static com.facebook.presto.util.Failures.checkCondition;
-import static com.google.common.base.Preconditions.checkNotNull;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
 public class ParametricScalar
         extends SqlScalarFunction
@@ -42,8 +42,8 @@ public class ParametricScalar
             ScalarImplementations implementations)
     {
         super(signature);
-        this.details = checkNotNull(details);
-        this.implementations = checkNotNull(implementations);
+        this.details = requireNonNull(details);
+        this.implementations = requireNonNull(implementations);
     }
 
     @Override

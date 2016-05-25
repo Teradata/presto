@@ -28,7 +28,8 @@ public class ScalarHeaderAndMethods
     private final ScalarHeader header;
     private final List<Method> methods;
 
-    public ScalarHeaderAndMethods(ScalarHeader header, List<Method> methods) {
+    public ScalarHeaderAndMethods(ScalarHeader header, List<Method> methods)
+    {
         this.header = header;
         this.methods = methods;
     }

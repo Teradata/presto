@@ -32,7 +32,12 @@ import java.util.stream.Stream;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 
-public class ScalarFromAnnotationsParser {
+public class ScalarFromAnnotationsParser
+{
+    private ScalarFromAnnotationsParser()
+    {
+    }
+
     public static List<SqlScalarFunction> parseFunctionDefinitionClass(Class<?> clazz)
     {
         ImmutableList.Builder<SqlScalarFunction> builder = ImmutableList.builder();
@@ -91,9 +96,11 @@ public class ScalarFromAnnotationsParser {
                 implementations);
     }
 
-    private static void validateSignature(Optional<Signature> signatureOld, Signature signatureNew) {
-        if (!signatureOld.isPresent())
+    private static void validateSignature(Optional<Signature> signatureOld, Signature signatureNew)
+    {
+        if (!signatureOld.isPresent()) {
             return;
+        }
         checkArgument(signatureOld.get().equals(signatureNew), "Implementations with type parameters must all have matching signatures. %s does not match %s", signatureOld.get(), signatureNew);
     }
 
