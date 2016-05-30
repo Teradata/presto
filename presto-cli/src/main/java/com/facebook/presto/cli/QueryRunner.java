@@ -32,6 +32,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static java.util.Objects.requireNonNull;
 
@@ -59,7 +60,7 @@ public class QueryRunner
                 getHttpClientConfig(socksProxy, keystorePath, keystorePassword, kerberosPrincipal, kerberosRemoteServiceName, authenticationEnabled),
                 kerberosConfig,
                 Optional.<JettyIoPool>empty(),
-                ImmutableList.<HttpRequestFilter>of());
+                getRequestFilters(session));
     }
 
     public ClientSession getSession()
@@ -132,5 +133,14 @@ public class QueryRunner
         kerberosRemoteServiceName.ifPresent(httpClientConfig::setKerberosRemoteServiceName);
 
         return httpClientConfig;
+    }
+
+    public Iterable<HttpRequestFilter> getRequestFilters(ClientSession session)
+    {
+        if (session.getPassword() != null) {
+            checkArgument(session.getServer().getScheme().equalsIgnoreCase("https"), "Authentication using username/password requires https enabled");
+            return ImmutableList.<HttpRequestFilter>of(new LdapRequestFilter(session.getUser(), session.getPassword()));
+        }
+        return ImmutableList.<HttpRequestFilter>of();
     }
 }

@@ -21,6 +21,7 @@ import io.airlift.http.server.TheServlet;
 
 import javax.servlet.Filter;
 
+import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 
 public class ServerSecurityModule
@@ -29,9 +30,31 @@ public class ServerSecurityModule
     @Override
     protected void setup(Binder binder)
     {
-        configBinder(binder).bindConfig(SecurityConfig.class);
+        configBinder(binder).bindConfig(LdapServerConfig.class);
+        LdapServerConfig ldapServerConfig = buildConfigObject(LdapServerConfig.class);
 
+        configBinder(binder).bindConfig(SecurityConfig.class);
         SecurityConfig config = buildConfigObject(SecurityConfig.class);
+
+        checkState(!(ldapServerConfig.getAuthenticationEnabled() && config.getAuthenticationEnabled()), "Enabling both Kerberos and LDAP authentication not supported");
+
+        if (ldapServerConfig.getAuthenticationEnabled()) {
+            checkState((ldapServerConfig.getBaseDistinguishedName() != null) != (ldapServerConfig.getActiveDirectoryDomain() != null), "Set either ldap.base.dn or ldap.ad.domain server property");
+
+            if (ldapServerConfig.getBaseDistinguishedName() != null) {
+                Multibinder.newSetBinder(binder, Filter.class, TheServlet.class)
+                        .addBinding()
+                        .to(OpenLdapFilter.class)
+                        .in(Scopes.SINGLETON);
+            }
+            else if (ldapServerConfig.getActiveDirectoryDomain() != null) {
+                Multibinder.newSetBinder(binder, Filter.class, TheServlet.class)
+                        .addBinding()
+                        .to(ActiveDirectoryFilter.class)
+                        .in(Scopes.SINGLETON);
+            }
+        }
+
         if (config.getAuthenticationEnabled()) {
             Multibinder.newSetBinder(binder, Filter.class, TheServlet.class)
                     .addBinding()
