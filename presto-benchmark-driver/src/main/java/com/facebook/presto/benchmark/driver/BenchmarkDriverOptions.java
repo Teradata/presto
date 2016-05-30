@@ -89,6 +89,7 @@ public class BenchmarkDriverOptions
         return new ClientSession(
                 parseServer(server),
                 user,
+                null,
                 "presto-benchmark",
                 catalog,
                 schema,
