@@ -24,7 +24,9 @@ Examples
 
 In the example below, you can see the CPU time spent in each stage, as well as the relative
 cost of each operator in the stage. Note that the relative cost of the operators is based on
-wall time, which may or may not be correlated to CPU time.
+wall time, which may or may not be correlated to CPU time. For each plan node you can see
+statistics for individual operators. Such statistics are useful when one wants to detect data
+anomalies for a query (skewness, abnormal hash collisions).
 
 .. code-block:: none
 
