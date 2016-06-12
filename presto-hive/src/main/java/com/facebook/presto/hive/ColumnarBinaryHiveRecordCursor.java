@@ -77,10 +77,10 @@ import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.Decimals.isLongDecimal;
 import static com.facebook.presto.spi.type.Decimals.isShortDecimal;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.FloatType.FLOAT;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.StandardTypes.DECIMAL;
-import static com.facebook.presto.spi.type.StandardTypes.FLOAT;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.TinyintType.TINYINT;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
@@ -461,12 +461,22 @@ class ColumnarBinaryHiveRecordCursor<K>
                 longs[column] = bytes[start];
             }
             else {
-                longs[column] = readVInt(bytes, start, length);
+                longs[column] = readRawBits(bytes, start, length);
             }
         }
         else {
             throw new RuntimeException(format("%s is not a valid LONG type", hiveTypes[column]));
         }
+    }
+
+    private static int readRawBits(byte[] bytes, int start, int length)
+    {
+        int value = bytes[start] & 0xFF;
+        for (int i = 1; i < length; i++) {
+            value <<= 8;
+            value |= (bytes[start + i] & 0xFF);
+        }
+        return value;
     }
 
     private static long readVInt(byte[] bytes, int start, int length)

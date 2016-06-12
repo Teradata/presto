@@ -48,6 +48,7 @@ import static com.facebook.presto.hive.HiveUtil.bigintPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.booleanPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.datePartitionKey;
 import static com.facebook.presto.hive.HiveUtil.doublePartitionKey;
+import static com.facebook.presto.hive.HiveUtil.floatPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.getDeserializer;
 import static com.facebook.presto.hive.HiveUtil.getTableObjectInspector;
 import static com.facebook.presto.hive.HiveUtil.integerPartitionKey;
@@ -209,6 +210,9 @@ class GenericHiveRecordCursor<K, V extends Writable>
                 }
                 else if (TINYINT.equals(type)) {
                     longs[columnIndex] = tinyintPartitionKey(partitionKey.getValue(), name);
+                }
+                else if (FLOAT.equals(type)) {
+                    longs[columnIndex] = floatPartitionKey(partitionKey.getValue(), name);
                 }
                 else if (DOUBLE.equals(type)) {
                     doubles[columnIndex] = doublePartitionKey(partitionKey.getValue(), name);
