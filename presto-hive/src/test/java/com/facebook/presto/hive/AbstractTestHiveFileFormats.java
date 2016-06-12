@@ -22,6 +22,7 @@ import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.DateType;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
+import com.facebook.presto.spi.type.FloatType;
 import com.facebook.presto.spi.type.SqlDate;
 import com.facebook.presto.spi.type.SqlDecimal;
 import com.facebook.presto.spi.type.SqlTimestamp;
@@ -90,6 +91,7 @@ import static com.facebook.presto.hive.HiveUtil.isStructuralType;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.FloatType.FLOAT;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.TinyintType.TINYINT;
@@ -198,7 +200,7 @@ public abstract class AbstractTestHiveFileFormats
             .add(new TestColumn("p_smallint", javaShortObjectInspector, "2", (short) 2, true))
             .add(new TestColumn("p_int", javaIntObjectInspector, "3", 3, true))
             .add(new TestColumn("p_bigint", javaLongObjectInspector, "4", 4L, true))
-            .add(new TestColumn("p_float", javaFloatObjectInspector, "5.1", 5.1, true))
+            .add(new TestColumn("p_float", javaFloatObjectInspector, "5.1", 5.1f, true))
             .add(new TestColumn("p_double", javaDoubleObjectInspector, "6.2", 6.2, true))
             .add(new TestColumn("p_boolean", javaBooleanObjectInspector, "true", true, true))
             .add(new TestColumn("p_date", javaDateObjectInspector, DATE_STRING, DATE_DAYS, true))
@@ -247,7 +249,7 @@ public abstract class AbstractTestHiveFileFormats
             .add(new TestColumn("t_smallint", javaShortObjectInspector, (short) 2, (short) 2))
             .add(new TestColumn("t_int", javaIntObjectInspector, 3, 3))
             .add(new TestColumn("t_bigint", javaLongObjectInspector, 4L, 4L))
-            .add(new TestColumn("t_float", javaFloatObjectInspector, 5.1f, 5.1))
+            .add(new TestColumn("t_float", javaFloatObjectInspector, 5.1f, 5.1f))
             .add(new TestColumn("t_double", javaDoubleObjectInspector, 6.2, 6.2))
             .add(new TestColumn("t_boolean_true", javaBooleanObjectInspector, true, true))
             .add(new TestColumn("t_boolean_false", javaBooleanObjectInspector, false, false))
@@ -279,7 +281,7 @@ public abstract class AbstractTestHiveFileFormats
             .add(new TestColumn("t_map_null_key", getStandardMapObjectInspector(javaLongObjectInspector, javaLongObjectInspector), asMap(new Long[] {null, 2L}, new Long[] {0L,  3L}), mapBlockOf(BIGINT, BIGINT, 2, 3)))
             .add(new TestColumn("t_map_int", getStandardMapObjectInspector(javaIntObjectInspector, javaIntObjectInspector), ImmutableMap.of(3, 3), mapBlockOf(INTEGER, INTEGER, 3, 3)))
             .add(new TestColumn("t_map_bigint", getStandardMapObjectInspector(javaLongObjectInspector, javaLongObjectInspector), ImmutableMap.of(4L, 4L), mapBlockOf(BIGINT, BIGINT, 4L, 4L)))
-            .add(new TestColumn("t_map_float", getStandardMapObjectInspector(javaFloatObjectInspector, javaFloatObjectInspector), ImmutableMap.of(5.0f, 5.0f), mapBlockOf(DOUBLE, DOUBLE, 5.0f, 5.0f)))
+            .add(new TestColumn("t_map_float", getStandardMapObjectInspector(javaFloatObjectInspector, javaFloatObjectInspector), ImmutableMap.of(5.0f, 5.0f), mapBlockOf(FLOAT, FLOAT, 5.0f, 5.0f)))
             .add(new TestColumn("t_map_double", getStandardMapObjectInspector(javaDoubleObjectInspector, javaDoubleObjectInspector), ImmutableMap.of(6.0, 6.0), mapBlockOf(DOUBLE, DOUBLE, 6.0, 6.0)))
             .add(new TestColumn("t_map_boolean",
                     getStandardMapObjectInspector(javaBooleanObjectInspector, javaBooleanObjectInspector),
@@ -329,7 +331,7 @@ public abstract class AbstractTestHiveFileFormats
             .add(new TestColumn("t_array_smallint", getStandardListObjectInspector(javaShortObjectInspector), ImmutableList.of((short) 2), arrayBlockOf(SMALLINT, (short) 2)))
             .add(new TestColumn("t_array_int", getStandardListObjectInspector(javaIntObjectInspector), ImmutableList.of(3), arrayBlockOf(INTEGER, 3)))
             .add(new TestColumn("t_array_bigint", getStandardListObjectInspector(javaLongObjectInspector), ImmutableList.of(4L), arrayBlockOf(BIGINT, 4L)))
-            .add(new TestColumn("t_array_float", getStandardListObjectInspector(javaFloatObjectInspector), ImmutableList.of(5.0f), arrayBlockOf(DOUBLE, 5.0f)))
+            .add(new TestColumn("t_array_float", getStandardListObjectInspector(javaFloatObjectInspector), ImmutableList.of(5.0f), arrayBlockOf(FLOAT, 5.0f)))
             .add(new TestColumn("t_array_double", getStandardListObjectInspector(javaDoubleObjectInspector), ImmutableList.of(6.0), StructuralTestUtil.arrayBlockOf(DOUBLE, 6.0)))
             .add(new TestColumn("t_array_boolean", getStandardListObjectInspector(javaBooleanObjectInspector), ImmutableList.of(true), arrayBlockOf(BOOLEAN, true)))
             .add(new TestColumn(
