@@ -18,7 +18,8 @@ import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.Type;
 import parquet.column.ColumnDescriptor;
 
-import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.FloatType.FLOAT;
+import static java.lang.Float.floatToRawIntBits;
 
 public class ParquetFloatColumnReader
         extends ParquetColumnReader
@@ -30,7 +31,7 @@ public class ParquetFloatColumnReader
 
     public BlockBuilder createBlockBuilder(Type type)
     {
-        return DOUBLE.createBlockBuilder(new BlockBuilderStatus(), nextBatchSize);
+        return FLOAT.createBlockBuilder(new BlockBuilderStatus(), nextBatchSize);
     }
 
     @Override
@@ -38,7 +39,7 @@ public class ParquetFloatColumnReader
     {
         for (int i = 0; i < valueNumber; i++) {
             if (definitionReader.readLevel() == columnDescriptor.getMaxDefinitionLevel()) {
-                DOUBLE.writeDouble(blockBuilder, valuesReader.readFloat());
+                FLOAT.writeLong(blockBuilder, floatToRawIntBits(valuesReader.readFloat()));
             }
             else {
                 blockBuilder.appendNull();
