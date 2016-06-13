@@ -22,7 +22,6 @@ import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.DateType;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
-import com.facebook.presto.spi.type.FloatType;
 import com.facebook.presto.spi.type.SqlDate;
 import com.facebook.presto.spi.type.SqlDecimal;
 import com.facebook.presto.spi.type.SqlTimestamp;
@@ -591,6 +590,9 @@ public abstract class AbstractTestHiveFileFormats
                         fieldFromCursor = new BigDecimal(Decimals.decodeUnscaledValue(cursor.getSlice(i)), decimalType.getScale());
                     }
                 }
+                else if (FLOAT.equals(type)) {
+                    fieldFromCursor = Float.intBitsToFloat((int) cursor.getLong(i));
+                }
                 else {
                     throw new RuntimeException("unknown type");
                 }
@@ -598,8 +600,10 @@ public abstract class AbstractTestHiveFileFormats
                 if (fieldFromCursor == null) {
                     assertEquals(null, testColumn.getExpectedValue(), String.format("Expected null for column %s", testColumn.getName()));
                 }
-                else if (testColumn.getObjectInspector().getTypeName().equals("float") ||
-                        testColumn.getObjectInspector().getTypeName().equals("double")) {
+                else if (testColumn.getObjectInspector().getTypeName().equals("float")) {
+                    assertEquals((float) fieldFromCursor, (float) testColumn.getExpectedValue(), EPSILON);
+                }
+                else if (testColumn.getObjectInspector().getTypeName().equals("double")) {
                     assertEquals((double) fieldFromCursor, (double) testColumn.getExpectedValue(), EPSILON);
                 }
                 else if (testColumn.getObjectInspector().getTypeName().equals("tinyint")) {
@@ -645,8 +649,9 @@ public abstract class AbstractTestHiveFileFormats
                     if (actualValue == null || expectedValue == null) {
                         assertEquals(actualValue, expectedValue, "Wrong value for column " + testColumn.getName());
                     }
-                    else if (testColumn.getObjectInspector().getTypeName().equals("float") ||
-                            testColumn.getObjectInspector().getTypeName().equals("double")) {
+                    else if (testColumn.getObjectInspector().getTypeName().equals("float")) {
+                        assertEquals((float) actualValue, (float) expectedValue, EPSILON, "Wrong value for column " + testColumn.getName());
+                    } else if(testColumn.getObjectInspector().getTypeName().equals("double")) {
                         assertEquals((double) actualValue, (double) expectedValue, EPSILON, "Wrong value for column " + testColumn.getName());
                     }
                     else if (testColumn.getObjectInspector().getTypeName().equals("date")) {
