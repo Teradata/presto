@@ -24,7 +24,6 @@ import org.testng.annotations.Test;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 
@@ -229,26 +228,11 @@ public class TestHiveStorageFormats
     {
         Connection connection = defaultQueryExecutor().getConnection();
         try {
-            if (usingFacebookJdbcDriver(connection)) {
-                PrestoConnection prestoConnection = connection.unwrap(PrestoConnection.class);
-                // create more than one split
-                prestoConnection.setSessionProperty("task_writer_count", "4");
-                prestoConnection.setSessionProperty("redistribute_writes", "false");
-                for (Map.Entry<String, String> sessionProperty : sessionProperties.entrySet()) {
-                    prestoConnection.setSessionProperty(sessionProperty.getKey(), sessionProperty.getValue());
-                }
-            }
-            else if (usingSimbaJdbcDriver(connection)) {
-                try (Statement statement = connection.createStatement()) {
-                    statement.execute("set session task_writer_count=4");
-                    statement.execute("set session redistribute_writes=false");
-                    for (Map.Entry<String, String> sessionProperty : sessionProperties.entrySet()) {
-                        statement.execute(String.format("set session %s=%s", sessionProperty.getKey(), sessionProperty.getValue()));
-                    }
-                }
-            }
-            else {
-                throw new IllegalStateException();
+            // create more than one split
+            setSessionProperty(connection, "task_writer_count", "4");
+            setSessionProperty(connection, "redistribute_writes", "false");
+            for (Map.Entry<String, String> sessionProperty : sessionProperties.entrySet()) {
+                setSessionProperty(connection, sessionProperty.getKey(), sessionProperty.getValue());
             }
         }
         catch (SQLException e) {
