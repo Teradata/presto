@@ -651,7 +651,8 @@ public abstract class AbstractTestHiveFileFormats
                     }
                     else if (testColumn.getObjectInspector().getTypeName().equals("float")) {
                         assertEquals((float) actualValue, (float) expectedValue, EPSILON, "Wrong value for column " + testColumn.getName());
-                    } else if(testColumn.getObjectInspector().getTypeName().equals("double")) {
+                    }
+                    else if (testColumn.getObjectInspector().getTypeName().equals("double")) {
                         assertEquals((double) actualValue, (double) expectedValue, EPSILON, "Wrong value for column " + testColumn.getName());
                     }
                     else if (testColumn.getObjectInspector().getTypeName().equals("date")) {
