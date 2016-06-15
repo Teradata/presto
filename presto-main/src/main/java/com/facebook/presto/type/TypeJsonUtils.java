@@ -47,6 +47,7 @@ import java.util.Map;
 import static com.fasterxml.jackson.core.JsonFactory.Feature.CANONICALIZE_FIELD_NAMES;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static java.lang.Float.floatToRawIntBits;
 import static java.util.Objects.requireNonNull;
 
 public final class TypeJsonUtils
@@ -283,6 +284,9 @@ public final class TypeJsonUtils
         else if (javaType == long.class) {
             if (element instanceof SqlDecimal) {
                 type.writeLong(blockBuilder, ((SqlDecimal) element).getUnscaledValue().longValue());
+            }
+            else if (element instanceof Float) {
+                type.writeLong(blockBuilder, floatToRawIntBits((Float) element));
             }
             else {
                 type.writeLong(blockBuilder, ((Number) element).longValue());

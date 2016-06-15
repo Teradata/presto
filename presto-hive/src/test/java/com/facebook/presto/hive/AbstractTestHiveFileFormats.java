@@ -108,6 +108,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
+import static java.lang.Float.intBitsToFloat;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.fill;
 import static java.util.Objects.requireNonNull;
@@ -564,6 +565,9 @@ public abstract class AbstractTestHiveFileFormats
                 else if (BIGINT.equals(type)) {
                     fieldFromCursor = cursor.getLong(i);
                 }
+                else if (FLOAT.equals(type)) {
+                    fieldFromCursor = cursor.getLong(i);
+                }
                 else if (DOUBLE.equals(type)) {
                     fieldFromCursor = cursor.getDouble(i);
                 }
@@ -598,8 +602,11 @@ public abstract class AbstractTestHiveFileFormats
                 if (fieldFromCursor == null) {
                     assertEquals(null, testColumn.getExpectedValue(), String.format("Expected null for column %s", testColumn.getName()));
                 }
-                else if (testColumn.getObjectInspector().getTypeName().equals("float") ||
-                        testColumn.getObjectInspector().getTypeName().equals("double")) {
+                else if (testColumn.getObjectInspector().getTypeName().equals("float")) {
+                    int intBits = (int) ((long) fieldFromCursor);
+                    assertEquals(intBitsToFloat(intBits), (float) testColumn.getExpectedValue(), (float) EPSILON);
+                }
+                else if (testColumn.getObjectInspector().getTypeName().equals("double")) {
                     assertEquals((double) fieldFromCursor, (double) testColumn.getExpectedValue(), EPSILON);
                 }
                 else if (testColumn.getObjectInspector().getTypeName().equals("tinyint")) {
