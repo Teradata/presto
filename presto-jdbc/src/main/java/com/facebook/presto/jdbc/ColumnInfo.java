@@ -127,6 +127,12 @@ class ColumnInfo
                 builder.setScale(0);
                 builder.setColumnDisplaySize(24);
                 break;
+            case "real":
+                builder.setSigned(true);
+                builder.setPrecision(9);
+                builder.setScale(0);
+                builder.setColumnDisplaySize(16);
+                break;
             case "varchar":
                 builder.setSigned(true);
                 builder.setPrecision(VARCHAR_MAX);
@@ -229,6 +235,8 @@ class ColumnInfo
                 return Types.DATE;
             case "decimal":
                 return Types.DECIMAL;
+            case "real":
+                return Types.REAL;
             default:
                 return Types.JAVA_OBJECT;
         }
