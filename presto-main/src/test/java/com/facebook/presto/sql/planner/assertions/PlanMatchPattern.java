@@ -27,7 +27,6 @@ import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import static java.util.Collections.nCopies;
 import static java.util.Objects.requireNonNull;
@@ -152,7 +151,7 @@ public final class PlanMatchPattern
         ImmutableList.Builder<Expression> builder = ImmutableList.builder();
         for (String arg : args) {
             if (arg.equals("*")) {
-                builder.add(new PlanMatchPattern.AnyExpression());
+                builder.add(new PlanMatchPattern.AnyQualifiedNameReference());
             }
             else {
                 builder.add(new QualifiedNameReference(new QualifiedName(arg)));
@@ -194,11 +193,11 @@ public final class PlanMatchPattern
         return Strings.repeat("    ", indent);
     }
 
-    private static class AnyExpression extends Expression
+    private static class AnyQualifiedNameReference extends QualifiedNameReference
     {
-        AnyExpression()
+        AnyQualifiedNameReference()
         {
-            super(Optional.empty());
+            super(new QualifiedName("*"));
         }
 
         @Override
