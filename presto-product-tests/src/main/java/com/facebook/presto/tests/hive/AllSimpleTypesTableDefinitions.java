@@ -40,9 +40,6 @@ public final class AllSimpleTypesTableDefinitions
     @TableDefinitionsRepository.RepositoryTableDefinition
     public static final HiveTableDefinition ALL_HIVE_SIMPLE_TYPES_RCFILE = allHiveSimpleTypesTableDefinition("RCFILE", Optional.of("SERDE 'org.apache.hadoop.hive.serde2.columnar.ColumnarSerDe'"));
 
-    @TableDefinitionsRepository.RepositoryTableDefinition
-    public static final HiveTableDefinition ALL_HIVE_SIMPLE_TYPES_KNOWN_TO_PRESTO_TEXTFILE = allHiveSimpleTypesKnownToPrestoTextfileTableDefinition();
-
     private static HiveTableDefinition allHiveSimpleTypesTableDefinition(String fileFormat, Optional<String> rowFormat)
     {
         String tableName = fileFormat.toLowerCase() + "_all_types";
@@ -62,7 +59,6 @@ public final class AllSimpleTypesTableDefinitions
                         "   c_date               DATE," +
                         "   c_string             STRING," +
                         "   c_varchar            VARCHAR(10)," +
-                        "   c_char               CHAR(10)," +
                         "   c_boolean            BOOLEAN," +
                         "   c_binary             BINARY" +
                         ") " +
@@ -73,6 +69,7 @@ public final class AllSimpleTypesTableDefinitions
                 .build();
     }
 
+    // Parquet does not support the DATE datatype
     private static HiveTableDefinition allHiveSimpleTypesParquetTableDefinition()
     {
         String tableName = "parquet_all_types";
@@ -86,41 +83,15 @@ public final class AllSimpleTypesTableDefinitions
                         "   c_bigint             BIGINT," +
                         "   c_float              FLOAT," +
                         "   c_double             DOUBLE," +
+                        "   c_decimal            DECIMAL," +
+                        "   c_decimal_w_params   DECIMAL(10,5)," +
                         "   c_timestamp          TIMESTAMP," +
                         "   c_string             STRING," +
                         "   c_varchar            VARCHAR(10)," +
-                        "   c_char               CHAR(10)," +
-                        "   c_boolean            BOOLEAN" +
-                        ") " +
-                        "STORED AS PARQUET " +
-                        "LOCATION '%LOCATION%'")
-                .setDataSource(dataSource)
-                .build();
-    }
-
-    private static HiveTableDefinition allHiveSimpleTypesKnownToPrestoTextfileTableDefinition()
-    {
-        String tableName = "textfile_all_types_known_to_presto";
-        HiveDataSource dataSource = createResourceDataSource(tableName, "" + System.currentTimeMillis(), "com/facebook/presto/tests/hive/data/all_types_known_to_presto/data.textfile");
-        return HiveTableDefinition.builder(tableName)
-                .setCreateTableDDLTemplate("" +
-                        "CREATE EXTERNAL TABLE %NAME%(" +
-                        "   c_tinyint            TINYINT," +
-                        "   c_smallint           SMALLINT," +
-                        "   c_int                INT," +
-                        "   c_bigint             BIGINT," +
-                        "   c_float              FLOAT," +
-                        "   c_double             DOUBLE," +
-                        "   c_timestamp          TIMESTAMP," +
-                        "   c_date               DATE," +
-                        "   c_string             STRING," +
-                        "   c_varchar            VARCHAR(10)," +
-                        "   c_char               CHAR(10)," +
                         "   c_boolean            BOOLEAN," +
                         "   c_binary             BINARY" +
                         ") " +
-                        "ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' " +
-                        "STORED AS TEXTFILE " +
+                        "STORED AS PARQUET " +
                         "LOCATION '%LOCATION%'")
                 .setDataSource(dataSource)
                 .build();
