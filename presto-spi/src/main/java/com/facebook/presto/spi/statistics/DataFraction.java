@@ -14,45 +14,43 @@
 
 package com.facebook.presto.spi.statistics;
 
-public final class Reliability
+public final class DataFraction
 {
     private static final double FULLY_RELIABLE = Double.POSITIVE_INFINITY;
-    private static final double MIN_RELIABILITY = 0.0;
-    private static final double MAX_RELIABILITY = 1.0;
 
-    private final double reliabilityLevel;
+    private final double dataFraction;
 
     /**
-     * Statistics reliability in [0,1] range.
+     * Data fraction used for calculating statistics in [0,1] range.
      */
-    public static Reliability reliabilityLevel(double reliabilityLevel)
+    public static DataFraction dataFraction(double dataFraction)
     {
-        if (reliabilityLevel < MIN_RELIABILITY || reliabilityLevel > MAX_RELIABILITY) {
+        if (dataFraction < 0.0 || dataFraction > 1.0) {
             throw new IllegalArgumentException("reliability level not in [0.0, 1.0] range");
         }
-        return new Reliability(reliabilityLevel);
+        return new DataFraction(dataFraction);
     }
 
     /**
      * Enforces that statistics is fully in sync with actual data in the table
      */
-    public static Reliability fullyReliable()
+    public static DataFraction fullyReliable()
     {
-        return new Reliability(FULLY_RELIABLE);
+        return new DataFraction(FULLY_RELIABLE);
     }
 
-    private Reliability(Double reliabilityLevel)
+    private DataFraction(Double dataFraction)
     {
-        this.reliabilityLevel = reliabilityLevel;
+        this.dataFraction = dataFraction;
     }
 
     public boolean isFullyReliable()
     {
-        return reliabilityLevel == FULLY_RELIABLE;
+        return dataFraction == FULLY_RELIABLE;
     }
 
-    public double getReliabilityLevel()
+    public double getDataFraction()
     {
-        return Math.min(reliabilityLevel, MAX_RELIABILITY);
+        return Math.min(dataFraction, 1.0);
     }
 }

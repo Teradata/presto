@@ -18,12 +18,12 @@ import static java.util.Objects.requireNonNull;
 
 public final class StatisticsValue<T>
 {
-    private final Reliability reliability;
+    private final DataFraction dataFraction;
     private final T value;
 
-    public StatisticsValue(Reliability reliability, T value)
+    public StatisticsValue(DataFraction dataFraction, T value)
     {
-        this.reliability = requireNonNull(reliability, "reliability can not be null");
+        this.dataFraction = requireNonNull(dataFraction, "dataFraction can not be null");
         this.value = value;
     }
 }
