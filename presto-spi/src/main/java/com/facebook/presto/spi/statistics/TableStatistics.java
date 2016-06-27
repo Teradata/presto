@@ -14,15 +14,24 @@
 
 package com.facebook.presto.spi.statistics;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
+
+import static java.util.Objects.requireNonNull;
 
 public class TableStatistics
 {
-    private final Optional<StatisticsValue<Long>> rowsCount;
+    public static final TableStatistics EMPTY_STATISTICS = TableStatistics.builder().build();
 
-    public TableStatistics(Optional<StatisticsValue<Long>> rowsCount)
+    private final Optional<StatisticsValue<Long>> rowsCount;
+    private final Map<String, ColumnStatistics> columnStatisticsMap;
+
+    public TableStatistics(Optional<StatisticsValue<Long>> rowsCount, Map<String, ColumnStatistics> columnStatisticsMap)
     {
-        this.rowsCount = rowsCount;
+        this.rowsCount = requireNonNull(rowsCount, "rowsCount can not be null");
+        this.columnStatisticsMap = Collections.unmodifiableMap(new HashMap<>(requireNonNull(columnStatisticsMap, "columnStatisticsMap can not be null")));
     }
 
     public Optional<StatisticsValue<Long>> getRowsCount()
@@ -30,9 +39,28 @@ public class TableStatistics
         return rowsCount;
     }
 
+    public Map<String, ColumnStatistics> getColumnStatistics()
+    {
+        return columnStatisticsMap;
+    }
+
+    public ColumnStatistics getColumnStatistics(String columnName)
+    {
+        if (columnStatisticsMap.containsKey(columnName)) {
+            return columnStatisticsMap.get(columnName);
+        }
+        return ColumnStatistics.EMPTY_STATISTICS;
+    }
+
+    public static Builder builder()
+    {
+        return new Builder();
+    }
+
     public static class Builder
     {
         private Optional<StatisticsValue<Long>> rowsCount = Optional.empty();
+        private Map<String, ColumnStatistics> columnStatisticsMap = new HashMap<>();
 
         public Builder setRowsCount(StatisticsValue<Long> rowsCount)
         {
@@ -40,9 +68,15 @@ public class TableStatistics
             return this;
         }
 
+        public Builder setColumnStatistics(String columnName, ColumnStatistics columnStatistics)
+        {
+            this.columnStatisticsMap.put(columnName, columnStatistics);
+            return this;
+        }
+
         public TableStatistics build()
         {
-            return new TableStatistics(rowsCount);
+            return new TableStatistics(rowsCount, columnStatisticsMap);
         }
     }
 }
