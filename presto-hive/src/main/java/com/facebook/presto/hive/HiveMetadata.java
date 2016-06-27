@@ -112,6 +112,7 @@ import static com.facebook.presto.hive.HiveWriteUtils.renameDirectory;
 import static com.facebook.presto.hive.util.Types.checkType;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
+import static com.facebook.presto.spi.statistics.TableStatistics.EMPTY_STATISTICS;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -947,6 +948,7 @@ public class HiveMetadata
 
     /**
      * Attempts to remove the file or empty directory.
+     *
      * @return true if the location no longer exists
      */
     public boolean deleteIfExists(String user, String location)
@@ -966,6 +968,7 @@ public class HiveMetadata
 
     /**
      * Attempts to remove the file or empty directory.
+     *
      * @return true if the location no longer exists
      */
     private static boolean deleteIfExists(FileSystem fileSystem, Path path)
@@ -991,6 +994,7 @@ public class HiveMetadata
 
     /**
      * Attempt to remove the {@code fileNames} files within {@code location}.
+     *
      * @return the files that could not be removed
      */
     private List<String> deleteFilesFrom(String user, String location, List<String> fileNames)
@@ -1016,6 +1020,7 @@ public class HiveMetadata
 
     /**
      * Attempt to remove all files in all directories within {@code location} that start with the {@code filePrefix}.
+     *
      * @return the files starting with the {@code filePrefix} that could not be removed
      */
     private List<String> recursiveDeleteFilesStartingWith(String user, String location, String filePrefix)
@@ -1034,6 +1039,7 @@ public class HiveMetadata
 
     /**
      * Attempt to remove all files in all directories within {@code location} that start with the {@code filePrefix}.
+     *
      * @return the files starting with the {@code filePrefix} that could not be removed
      */
     private static List<String> recursiveDeleteFilesStartingWith(FileSystem fileSystem, Path directory, String filePrefix)
@@ -1281,7 +1287,8 @@ public class HiveMetadata
                 Optional.empty(),
                 Optional.empty(),
                 discretePredicates,
-                ImmutableList.of());
+                ImmutableList.of(),
+                EMPTY_STATISTICS);
     }
 
     @Override
