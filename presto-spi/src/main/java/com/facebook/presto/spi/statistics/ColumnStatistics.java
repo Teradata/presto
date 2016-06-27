@@ -16,7 +16,7 @@ package com.facebook.presto.spi.statistics;
 
 import java.util.Optional;
 
-public class ColumnStatistics
+public final class ColumnStatistics
 {
     public static final ColumnStatistics EMPTY_STATISTICS = ColumnStatistics.builder().build();
 
@@ -37,7 +37,7 @@ public class ColumnStatistics
         return new Builder();
     }
 
-    public static class Builder
+    public static final class Builder
     {
         private Optional<StatisticsValue<Long>> dataSize = Optional.empty();
 

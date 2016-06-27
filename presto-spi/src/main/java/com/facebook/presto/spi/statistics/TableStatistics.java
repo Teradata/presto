@@ -21,7 +21,7 @@ import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
-public class TableStatistics
+public final class TableStatistics
 {
     public static final TableStatistics EMPTY_STATISTICS = TableStatistics.builder().build();
 
@@ -57,7 +57,7 @@ public class TableStatistics
         return new Builder();
     }
 
-    public static class Builder
+    public static final class Builder
     {
         private Optional<StatisticsValue<Long>> rowsCount = Optional.empty();
         private Map<String, ColumnStatistics> columnStatisticsMap = new HashMap<>();

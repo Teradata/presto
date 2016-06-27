@@ -16,7 +16,7 @@ package com.facebook.presto.spi.statistics;
 
 import static java.util.Objects.requireNonNull;
 
-public class StatisticsValue<T>
+public final class StatisticsValue<T>
 {
     private final Reliability reliability;
     private final T value;

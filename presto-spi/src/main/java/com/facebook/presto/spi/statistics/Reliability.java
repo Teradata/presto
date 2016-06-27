@@ -14,7 +14,7 @@
 
 package com.facebook.presto.spi.statistics;
 
-public class Reliability
+public final class Reliability
 {
     private static final double FULLY_RELIABLE = Double.POSITIVE_INFINITY;
     private static final double MIN_RELIABILITY = 0.0;
