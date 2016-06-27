@@ -13,13 +13,11 @@
  */
 package com.facebook.presto.spi;
 
-import com.facebook.presto.spi.statistics.ColumnStatistics;
 import com.facebook.presto.spi.type.Type;
 
 import java.util.Objects;
 
 import static java.util.Locale.ENGLISH;
-import static java.util.Objects.requireNonNull;
 
 public class ColumnMetadata
 {
@@ -27,8 +25,6 @@ public class ColumnMetadata
     private final Type type;
     private final String comment;
     private final boolean hidden;
-    // todo should columnStatistics be part of toString/equals/hashCode
-    private final ColumnStatistics columnStatistics;
 
     public ColumnMetadata(String name, Type type)
     {
@@ -36,11 +32,6 @@ public class ColumnMetadata
     }
 
     public ColumnMetadata(String name, Type type, String comment, boolean hidden)
-    {
-        this(name, type, comment, hidden, ColumnStatistics.EMPTY_STATISTICS);
-    }
-
-    public ColumnMetadata(String name, Type type, String comment, boolean hidden, ColumnStatistics columnStatistics)
     {
         if (name == null || name.isEmpty()) {
             throw new NullPointerException("name is null or empty");
@@ -53,7 +44,6 @@ public class ColumnMetadata
         this.type = type;
         this.comment = comment;
         this.hidden = hidden;
-        this.columnStatistics = requireNonNull(columnStatistics, "columnStatistics is null");
     }
 
     public String getName()
