@@ -22,15 +22,11 @@ public class ColumnStatistics
 
     private final Optional<StatisticsValue<Long>> dataSize;
     private final Optional<StatisticsValue<Long>> rowsCount;
-    private final Optional<StatisticsValue<Object>> min;
-    private final Optional<StatisticsValue<Object>> max;
 
-    public ColumnStatistics(Optional<StatisticsValue<Long>> dataSize, Optional<StatisticsValue<Long>> rowsCount, Optional<StatisticsValue<Object>> min, Optional<StatisticsValue<Object>> max)
+    public ColumnStatistics(Optional<StatisticsValue<Long>> dataSize, Optional<StatisticsValue<Long>> rowsCount)
     {
         this.dataSize = dataSize;
         this.rowsCount = rowsCount;
-        this.min = min;
-        this.max = max;
     }
 
     public Optional<StatisticsValue<Long>> getDataSize()
@@ -43,16 +39,6 @@ public class ColumnStatistics
         return rowsCount;
     }
 
-    public Optional<StatisticsValue<Object>> getMin()
-    {
-        return min;
-    }
-
-    public Optional<StatisticsValue<Object>> getMax()
-    {
-        return max;
-    }
-
     public static Builder builder()
     {
         return new Builder();
@@ -62,8 +48,6 @@ public class ColumnStatistics
     {
         private Optional<StatisticsValue<Long>> dataSize = Optional.empty();
         private Optional<StatisticsValue<Long>> rowsCount = Optional.empty();
-        private Optional<StatisticsValue<Object>> min = Optional.empty();
-        private Optional<StatisticsValue<Object>> max = Optional.empty();
 
         public Builder setDataSize(StatisticsValue<Long> dataSize)
         {
@@ -77,21 +61,9 @@ public class ColumnStatistics
             return this;
         }
 
-        public Builder setMin(StatisticsValue<Object> min)
-        {
-            this.min = Optional.of(min);
-            return this;
-        }
-
-        public Builder setMax(StatisticsValue<Object> max)
-        {
-            this.max = Optional.of(max);
-            return this;
-        }
-
         public ColumnStatistics build()
         {
-            return new ColumnStatistics(dataSize, rowsCount, min, max);
+            return new ColumnStatistics(dataSize, rowsCount);
         }
     }
 }
