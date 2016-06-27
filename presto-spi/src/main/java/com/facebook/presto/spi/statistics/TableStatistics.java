@@ -16,40 +16,33 @@ package com.facebook.presto.spi.statistics;
 
 import java.util.Optional;
 
-public class ColumnStatistics
+public class TableStatistics
 {
-    public static final ColumnStatistics EMPTY_STATISTICS = ColumnStatistics.builder().build();
+    private final Optional<StatisticsValue<Long>> rowsCount;
 
-    private final Optional<StatisticsValue<Long>> dataSize;
-
-    private ColumnStatistics(Optional<StatisticsValue<Long>> dataSize)
+    public TableStatistics(Optional<StatisticsValue<Long>> rowsCount)
     {
-        this.dataSize = dataSize;
+        this.rowsCount = rowsCount;
     }
 
-    public Optional<StatisticsValue<Long>> getDataSize()
+    public Optional<StatisticsValue<Long>> getRowsCount()
     {
-        return dataSize;
-    }
-
-    public static Builder builder()
-    {
-        return new Builder();
+        return rowsCount;
     }
 
     public static class Builder
     {
-        private Optional<StatisticsValue<Long>> dataSize = Optional.empty();
+        private Optional<StatisticsValue<Long>> rowsCount = Optional.empty();
 
-        public Builder setDataSize(StatisticsValue<Long> dataSize)
+        public Builder setRowsCount(StatisticsValue<Long> rowsCount)
         {
-            this.dataSize = Optional.of(dataSize);
+            this.rowsCount = Optional.of(rowsCount);
             return this;
         }
 
-        public ColumnStatistics build()
+        public TableStatistics build()
         {
-            return new ColumnStatistics(dataSize);
+            return new TableStatistics(rowsCount);
         }
     }
 }
