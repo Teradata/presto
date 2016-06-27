@@ -14,25 +14,23 @@
 
 package com.facebook.presto.spi.statistics;
 
-import java.util.Optional;
-
-import static java.util.Objects.requireNonNull;
-
 public class Reliability
 {
-    private final boolean fullyReliable;
+    private static final double FULLY_RELIABLE = Double.POSITIVE_INFINITY;
+    private static final double MIN_RELIABILITY = 0.0;
+    private static final double MAX_RELIABILITY = 1.0;
 
-    private final Optional<Double> reliabilityLevel;
+    private final double reliabilityLevel;
 
     /**
      * Statistics reliability in [0,1] range.
      */
-    public static Reliability reliabilityLevel(Double reliabilityLevel)
+    public static Reliability reliabilityLevel(double reliabilityLevel)
     {
-        if (reliabilityLevel < 0.0 || reliabilityLevel > 1.0) {
+        if (reliabilityLevel < MIN_RELIABILITY || reliabilityLevel > MAX_RELIABILITY) {
             throw new IllegalArgumentException("reliability level not in [0.0, 1.0] range");
         }
-        return new Reliability(false, Optional.of(reliabilityLevel));
+        return new Reliability(reliabilityLevel);
     }
 
     /**
@@ -40,29 +38,21 @@ public class Reliability
      */
     public static Reliability fullyReliable()
     {
-        return new Reliability(true, Optional.empty());
+        return new Reliability(FULLY_RELIABLE);
     }
 
-    private Reliability(boolean fullyReliable, Optional<Double> reliabilityLevel)
+    private Reliability(Double reliabilityLevel)
     {
-        reliabilityLevel = requireNonNull(reliabilityLevel, "reliabilityLevel can not be null");
-        if (!fullyReliable ^ reliabilityLevel.isPresent()) {
-            throw new IllegalArgumentException("cannot set both fullyReliable to true and specify reliabilityLevel");
-        }
-        this.fullyReliable = fullyReliable;
         this.reliabilityLevel = reliabilityLevel;
     }
 
     public boolean isFullyReliable()
     {
-        return fullyReliable;
+        return reliabilityLevel == FULLY_RELIABLE;
     }
 
-    public Double getReliabilityLevel()
+    public double getReliabilityLevel()
     {
-        if (!reliabilityLevel.isPresent()) {
-            throw new IllegalStateException("reliabilityLevel not set");
-        }
-        return reliabilityLevel.get();
+        return Math.min(reliabilityLevel, MAX_RELIABILITY);
     }
 }
