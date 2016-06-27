@@ -142,6 +142,14 @@ public class ConnectorTableLayout
         return localProperties;
     }
 
+    /**
+     * Statistics for table.
+     */
+    public TableStatistics getStatistics()
+    {
+        return statistics;
+    }
+
     @Override
     public int hashCode()
     {
