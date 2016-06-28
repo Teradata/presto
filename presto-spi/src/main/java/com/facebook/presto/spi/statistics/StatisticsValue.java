@@ -14,16 +14,24 @@
 
 package com.facebook.presto.spi.statistics;
 
-import static java.util.Objects.requireNonNull;
-
-public final class StatisticsValue<T>
+public final class StatisticsValue
 {
-    private final DataFraction dataFraction;
-    private final T value;
+    private final double value;
+    private final double estimatorVariance;
 
-    public StatisticsValue(DataFraction dataFraction, T value)
+    public StatisticsValue(double value, double estimatorVariance)
     {
-        this.dataFraction = requireNonNull(dataFraction, "dataFraction can not be null");
+        this.estimatorVariance = estimatorVariance;
         this.value = value;
+    }
+
+    public double getValue()
+    {
+        return value;
+    }
+
+    public double getEstimatorVariance()
+    {
+        return estimatorVariance;
     }
 }

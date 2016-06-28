@@ -20,14 +20,14 @@ public final class ColumnStatistics
 {
     public static final ColumnStatistics EMPTY_STATISTICS = ColumnStatistics.builder().build();
 
-    private final Optional<StatisticsValue<Long>> dataSize;
+    private final Optional<StatisticsValue> dataSize;
 
-    private ColumnStatistics(Optional<StatisticsValue<Long>> dataSize)
+    private ColumnStatistics(Optional<StatisticsValue> dataSize)
     {
         this.dataSize = dataSize;
     }
 
-    public Optional<StatisticsValue<Long>> getDataSize()
+    public Optional<StatisticsValue> getDataSize()
     {
         return dataSize;
     }
@@ -39,9 +39,9 @@ public final class ColumnStatistics
 
     public static final class Builder
     {
-        private Optional<StatisticsValue<Long>> dataSize = Optional.empty();
+        private Optional<StatisticsValue> dataSize = Optional.empty();
 
-        public Builder setDataSize(StatisticsValue<Long> dataSize)
+        public Builder setDataSize(StatisticsValue dataSize)
         {
             this.dataSize = Optional.of(dataSize);
             return this;

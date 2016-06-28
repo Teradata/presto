@@ -25,16 +25,16 @@ public final class TableStatistics
 {
     public static final TableStatistics EMPTY_STATISTICS = TableStatistics.builder().build();
 
-    private final Optional<StatisticsValue<Long>> rowsCount;
+    private final Optional<StatisticsValue> rowsCount;
     private final Map<String, ColumnStatistics> columnStatisticsMap;
 
-    public TableStatistics(Optional<StatisticsValue<Long>> rowsCount, Map<String, ColumnStatistics> columnStatisticsMap)
+    public TableStatistics(Optional<StatisticsValue> rowsCount, Map<String, ColumnStatistics> columnStatisticsMap)
     {
         this.rowsCount = requireNonNull(rowsCount, "rowsCount can not be null");
         this.columnStatisticsMap = Collections.unmodifiableMap(new HashMap<>(requireNonNull(columnStatisticsMap, "columnStatisticsMap can not be null")));
     }
 
-    public Optional<StatisticsValue<Long>> getRowsCount()
+    public Optional<StatisticsValue> getRowsCount()
     {
         return rowsCount;
     }
@@ -59,10 +59,10 @@ public final class TableStatistics
 
     public static final class Builder
     {
-        private Optional<StatisticsValue<Long>> rowsCount = Optional.empty();
+        private Optional<StatisticsValue> rowsCount = Optional.empty();
         private Map<String, ColumnStatistics> columnStatisticsMap = new HashMap<>();
 
-        public Builder setRowsCount(StatisticsValue<Long> rowsCount)
+        public Builder setRowsCount(StatisticsValue rowsCount)
         {
             this.rowsCount = Optional.of(rowsCount);
             return this;
