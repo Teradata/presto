@@ -17,24 +17,24 @@ package com.facebook.presto.spi.statistics;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
+import static com.facebook.presto.spi.statistics.StatisticsValue.unknownStatistics;
 import static java.util.Objects.requireNonNull;
 
 public final class TableStatistics
 {
     public static final TableStatistics EMPTY_STATISTICS = TableStatistics.builder().build();
 
-    private final Optional<StatisticsValue> rowsCount;
+    private final StatisticsValue rowsCount;
     private final Map<String, ColumnStatistics> columnStatisticsMap;
 
-    public TableStatistics(Optional<StatisticsValue> rowsCount, Map<String, ColumnStatistics> columnStatisticsMap)
+    public TableStatistics(StatisticsValue rowsCount, Map<String, ColumnStatistics> columnStatisticsMap)
     {
         this.rowsCount = requireNonNull(rowsCount, "rowsCount can not be null");
         this.columnStatisticsMap = Collections.unmodifiableMap(new HashMap<>(requireNonNull(columnStatisticsMap, "columnStatisticsMap can not be null")));
     }
 
-    public Optional<StatisticsValue> getRowsCount()
+    public StatisticsValue getRowsCount()
     {
         return rowsCount;
     }
@@ -59,12 +59,12 @@ public final class TableStatistics
 
     public static final class Builder
     {
-        private Optional<StatisticsValue> rowsCount = Optional.empty();
+        private StatisticsValue rowsCount = unknownStatistics();
         private Map<String, ColumnStatistics> columnStatisticsMap = new HashMap<>();
 
         public Builder setRowsCount(StatisticsValue rowsCount)
         {
-            this.rowsCount = Optional.of(rowsCount);
+            this.rowsCount = rowsCount;
             return this;
         }
 

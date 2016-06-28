@@ -14,20 +14,21 @@
 
 package com.facebook.presto.spi.statistics;
 
-import java.util.Optional;
+import static com.facebook.presto.spi.statistics.StatisticsValue.unknownStatistics;
+import static java.util.Objects.requireNonNull;
 
 public final class ColumnStatistics
 {
     public static final ColumnStatistics EMPTY_STATISTICS = ColumnStatistics.builder().build();
 
-    private final Optional<StatisticsValue> dataSize;
+    private final StatisticsValue dataSize;
 
-    private ColumnStatistics(Optional<StatisticsValue> dataSize)
+    private ColumnStatistics(StatisticsValue dataSize)
     {
-        this.dataSize = dataSize;
+        this.dataSize = requireNonNull(dataSize, "dataSize can not be null");
     }
 
-    public Optional<StatisticsValue> getDataSize()
+    public StatisticsValue getDataSize()
     {
         return dataSize;
     }
@@ -39,11 +40,11 @@ public final class ColumnStatistics
 
     public static final class Builder
     {
-        private Optional<StatisticsValue> dataSize = Optional.empty();
+        private StatisticsValue dataSize = unknownStatistics();
 
         public Builder setDataSize(StatisticsValue dataSize)
         {
-            this.dataSize = Optional.of(dataSize);
+            this.dataSize = dataSize;
             return this;
         }
 

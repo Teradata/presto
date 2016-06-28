@@ -16,13 +16,25 @@ package com.facebook.presto.spi.statistics;
 
 public final class StatisticsValue
 {
+    public static final double UNKNOWN_STATISTICS = Double.NaN;
+
     private final double value;
     private final double estimatorVariance;
+
+    public static final StatisticsValue unknownStatistics()
+    {
+        return new StatisticsValue(UNKNOWN_STATISTICS, 0);
+    }
 
     public StatisticsValue(double value, double estimatorVariance)
     {
         this.estimatorVariance = estimatorVariance;
         this.value = value;
+    }
+
+    public boolean isValueUnknown()
+    {
+        return value == UNKNOWN_STATISTICS;
     }
 
     public double getValue()
