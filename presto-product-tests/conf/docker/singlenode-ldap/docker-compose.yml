@@ -1,0 +1,13 @@
+version: '2'
+services:
+
+  presto-master:
+    image: 'teradatalabs/centos6-java8-oracle-ldap'
+    command: /docker/volumes/presto/presto-product-tests/conf/docker/files/presto-launcher-wrapper.sh singlenode-ldap run
+    extra_hosts:
+       - "${LDAP_SERVER_HOST}:${LDAP_SERVER_IP}"
+
+  application-runner:
+    image: 'teradatalabs/centos6-java8-oracle-ldap'
+    volumes:
+      - ../../../../presto-product-tests/conf/tempto/tempto-configuration-for-docker-ldap.yaml:/docker/volumes/tempto/tempto-configuration-local.yaml

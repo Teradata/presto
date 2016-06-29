@@ -60,8 +60,8 @@ public class PrestoCliTests
     private String serverAddress;
 
     @Inject(optional = true)
-    @Named("databases.presto.cli_authentication")
-    private boolean authentication;
+    @Named("databases.presto.cli_kerberos_authentication")
+    private boolean kerberosAuthentication;
 
     @Inject(optional = true)
     @Named("databases.presto.cli_kerberos_principal")
@@ -94,6 +94,30 @@ public class PrestoCliTests
     @Inject
     @Named("databases.presto.jdbc_user")
     private String jdbcUser;
+
+    @Inject(optional = true)
+    @Named("databases.presto.cli_ldap_authentication")
+    private boolean ldapAuthentication;
+
+    @Inject(optional = true)
+    @Named("databases.presto.cli_ldap_truststore_path")
+    private String ldapTruststorePath;
+
+    @Inject(optional = true)
+    @Named("databases.presto.cli_ldap_truststore_password")
+    private String ldapTruststorePassword;
+
+    @Inject(optional = true)
+    @Named("databases.presto.cli_ldap_user_name")
+    private String ldapUserName;
+
+    @Inject(optional = true)
+    @Named("databases.presto.cli_ldap_server_address")
+    private String ldapServerAddress;
+
+    @Inject(optional = true)
+    @Named("databases.presto.cli_ldap_user_password")
+    private String ldapUserPassword;
 
     private PrestoCliProcess presto;
 
@@ -144,6 +168,7 @@ public class PrestoCliTests
             throws IOException, InterruptedException
     {
         launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
+
         assertThat(trimLines(presto.readRemainingOutputLines())).containsAll(nationTableBatchLines);
     }
 
@@ -200,15 +225,26 @@ public class PrestoCliTests
     private void launchPrestoCliWithServerArgument(String... arguments)
             throws IOException, InterruptedException
     {
-        if (!authentication) {
+        if (ldapAuthentication) {
+            requireNonNull(ldapTruststorePath, "databases.presto.cli_ldap_truststore_path is null");
+            requireNonNull(ldapTruststorePassword, "databases.presto.cli_ldap_truststore_password is null");
+            requireNonNull(ldapUserName, "databases.presto.cli_ldap_user_name is null");
+            requireNonNull(ldapServerAddress, "databases.presto.cli_ldap_server_address is null");
+            requireNonNull(ldapUserPassword, "databases.presto.cli_ldap_user_password is null");
+
             ImmutableList.Builder<String> prestoClientOptions = ImmutableList.builder();
             prestoClientOptions.add(
-                    "--server", serverAddress,
-                    "--user", jdbcUser);
+                    "--server", ldapServerAddress,
+                    "--truststore-path", ldapTruststorePath,
+                    "--truststore-password", ldapTruststorePassword,
+                    "--user", ldapUserName,
+                    "--password");
+
             prestoClientOptions.add(arguments);
             launchPrestoCli(prestoClientOptions.build());
+            setLdapPassword();
         }
-        else {
+        else if (kerberosAuthentication) {
             requireNonNull(kerberosPrincipal, "databases.presto.cli_kerberos_principal is null");
             requireNonNull(kerberosKeytab, "databases.presto.cli_kerberos_keytab is null");
             requireNonNull(kerberosServiceName, "databases.presto.cli_kerberos_service_name is null");
@@ -233,6 +269,14 @@ public class PrestoCliTests
             prestoClientOptions.add(arguments);
             launchPrestoCli(prestoClientOptions.build());
         }
+        else {
+            ImmutableList.Builder<String> prestoClientOptions = ImmutableList.builder();
+            prestoClientOptions.add(
+                    "--server", serverAddress,
+                    "--user", jdbcUser);
+            prestoClientOptions.add(arguments);
+            launchPrestoCli(prestoClientOptions.build());
+        }
     }
 
     private void launchPrestoCli(String... arguments)
@@ -245,5 +289,12 @@ public class PrestoCliTests
             throws IOException, InterruptedException
     {
         presto = new PrestoCliProcess(defaultJavaProcessLauncher().launch(Presto.class, arguments));
+    }
+
+    private void setLdapPassword()
+    {
+        presto.waitForLdapPasswordPrompt();
+        presto.getProcessInput().println(ldapUserPassword);
+        presto.nextOutputToken();
     }
 }
