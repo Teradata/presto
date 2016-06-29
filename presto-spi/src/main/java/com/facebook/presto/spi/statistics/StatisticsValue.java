@@ -16,19 +16,22 @@ package com.facebook.presto.spi.statistics;
 
 public final class StatisticsValue
 {
+    // todo eventually add some notion of statistic reliability
+    //      like estimator variance or confidence-interval.
+    //      Skipping for now as there hard to compute it properly and so far we do not have
+    //      usecase for that.
+
     public static final double UNKNOWN_STATISTICS = Double.NaN;
 
     private final double value;
-    private final double estimatorVariance;
 
     public static final StatisticsValue unknownStatistics()
     {
-        return new StatisticsValue(UNKNOWN_STATISTICS, 0);
+        return new StatisticsValue(UNKNOWN_STATISTICS);
     }
 
-    public StatisticsValue(double value, double estimatorVariance)
+    public StatisticsValue(double value)
     {
-        this.estimatorVariance = estimatorVariance;
         this.value = value;
     }
 
@@ -40,10 +43,5 @@ public final class StatisticsValue
     public double getValue()
     {
         return value;
-    }
-
-    public double getEstimatorVariance()
-    {
-        return estimatorVariance;
     }
 }
