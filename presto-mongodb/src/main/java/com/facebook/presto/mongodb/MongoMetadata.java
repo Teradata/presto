@@ -48,6 +48,7 @@ import java.util.Set;
 
 import static com.facebook.presto.mongodb.MongoColumnHandle.SAMPLE_WEIGHT_COLUMN_NAME;
 import static com.facebook.presto.mongodb.TypeUtils.checkType;
+import static com.facebook.presto.spi.statistics.TableStatistics.EMPTY_STATISTICS;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
@@ -187,7 +188,8 @@ public class MongoMetadata
                 Optional.empty(),
                 partitioningColumns,
                 Optional.empty(),
-                localProperties.build());
+                localProperties.build(),
+                EMPTY_STATISTICS);
 
         return ImmutableList.of(new ConnectorTableLayoutResult(layout, constraint.getSummary()));
     }

@@ -51,6 +51,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.facebook.presto.spi.statistics.TableStatistics.EMPTY_STATISTICS;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
 import static com.facebook.presto.tpch.Types.checkType;
@@ -147,7 +148,8 @@ public class TpchMetadata
                 nodePartition,
                 partitioningColumns,
                 Optional.empty(),
-                localProperties);
+                localProperties,
+                EMPTY_STATISTICS);
 
         return ImmutableList.of(new ConnectorTableLayoutResult(layout, constraint.getSummary()));
     }

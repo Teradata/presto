@@ -14,12 +14,14 @@
 package com.facebook.presto.spi;
 
 import com.facebook.presto.spi.predicate.TupleDomain;
+import com.facebook.presto.spi.statistics.TableStatistics;
 
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.facebook.presto.spi.statistics.TableStatistics.EMPTY_STATISTICS;
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
@@ -32,6 +34,7 @@ public class ConnectorTableLayout
     private final Optional<Set<ColumnHandle>> streamPartitioningColumns;
     private final Optional<DiscretePredicates> discretePredicates;
     private final List<LocalProperty<ColumnHandle>> localProperties;
+    private final TableStatistics statistics;
 
     public ConnectorTableLayout(ConnectorTableLayoutHandle handle)
     {
@@ -41,7 +44,8 @@ public class ConnectorTableLayout
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                emptyList());
+                emptyList(),
+                EMPTY_STATISTICS);
     }
 
     public ConnectorTableLayout(
@@ -51,7 +55,8 @@ public class ConnectorTableLayout
             Optional<ConnectorNodePartitioning> nodePartitioning,
             Optional<Set<ColumnHandle>> streamPartitioningColumns,
             Optional<DiscretePredicates> discretePredicates,
-            List<LocalProperty<ColumnHandle>> localProperties)
+            List<LocalProperty<ColumnHandle>> localProperties,
+            TableStatistics statistics)
     {
         requireNonNull(handle, "handle is null");
         requireNonNull(columns, "columns is null");
@@ -60,6 +65,7 @@ public class ConnectorTableLayout
         requireNonNull(predicate, "predicate is null");
         requireNonNull(discretePredicates, "discretePredicates is null");
         requireNonNull(localProperties, "localProperties is null");
+        requireNonNull(statistics, "statistics can not be null");
 
         this.handle = handle;
         this.columns = columns;
@@ -68,6 +74,7 @@ public class ConnectorTableLayout
         this.predicate = predicate;
         this.discretePredicates = discretePredicates;
         this.localProperties = localProperties;
+        this.statistics = statistics;
     }
 
     public ConnectorTableLayoutHandle getHandle()
@@ -133,6 +140,14 @@ public class ConnectorTableLayout
     public List<LocalProperty<ColumnHandle>> getLocalProperties()
     {
         return localProperties;
+    }
+
+    /**
+     * Statistics for table.
+     */
+    public TableStatistics getStatistics()
+    {
+        return statistics;
     }
 
     @Override

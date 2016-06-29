@@ -112,6 +112,7 @@ import static com.facebook.presto.hive.HiveWriteUtils.renameDirectory;
 import static com.facebook.presto.hive.util.Types.checkType;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
+import static com.facebook.presto.spi.statistics.TableStatistics.EMPTY_STATISTICS;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -1325,7 +1326,8 @@ public class HiveMetadata
                 Optional.empty(),
                 Optional.empty(),
                 discretePredicates,
-                ImmutableList.of());
+                ImmutableList.of(),
+                EMPTY_STATISTICS);
     }
 
     @Override
