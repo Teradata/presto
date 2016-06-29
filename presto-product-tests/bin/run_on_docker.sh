@@ -198,6 +198,11 @@ environment_compose up -d hadoop-master
 environment_compose up -d mysql
 environment_compose up -d postgres
 
+# start ldap container
+if [[ "$ENVIRONMENT" == "singlenode-ldap" ]]; then
+  environment_compose up -d ldapserver
+fi
+
 # start docker logs for hadoop container
 environment_compose logs --no-color hadoop-master &
 HADOOP_LOGS_PID=$!
