@@ -1,0 +1,38 @@
+version: '2'
+services:
+  hadoop-master:
+    extends:
+      file: ../common/standard.yml
+      service: hadoop-master-common
+
+  presto-master:
+    extends:
+      file: ../common/standard.yml
+      service: presto-master-ldap
+    command: /docker/volumes/presto/presto-product-tests/conf/docker/files/presto-launcher-wrapper.sh singlenode-ldap run
+    depends_on:
+       - hadoop-master
+    extra_hosts:
+       - "ad-test.presto.testldap.com:10.25.171.180"
+
+  application-runner:
+    extends:
+      file: ../common/standard.yml
+      service: application-runner-common
+    depends_on:
+      - 'presto-master'
+    volumes_from:
+      - presto-master
+    environment:
+      - PROFILE=singlenode-ldap
+      - LDAP_FILES_PATH=/etc/ldap/rootca
+
+  postgres:
+    extends:
+      file: ../common/jdbc_db.yml
+      service: postgres-common
+
+  mysql:
+    extends:
+      file: ../common/jdbc_db.yml
+      service: mysql-common
