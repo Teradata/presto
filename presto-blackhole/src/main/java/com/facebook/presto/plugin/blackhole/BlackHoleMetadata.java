@@ -51,6 +51,7 @@ import static com.facebook.presto.plugin.blackhole.BlackHoleConnector.SPLIT_COUN
 import static com.facebook.presto.plugin.blackhole.BlackHoleInsertTableHandle.BLACK_HOLE_INSERT_TABLE_HANDLE;
 import static com.facebook.presto.plugin.blackhole.Types.checkType;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_TABLE_PROPERTY;
+import static com.facebook.presto.spi.statistics.TableStatistics.EMPTY_STATISTICS;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.text.MessageFormat.format;
 import static java.util.Objects.requireNonNull;
@@ -247,6 +248,7 @@ public class BlackHoleMetadata
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
-                ImmutableList.of());
+                ImmutableList.of(),
+                EMPTY_STATISTICS);
     }
 }

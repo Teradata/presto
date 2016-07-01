@@ -32,6 +32,7 @@ import com.google.common.collect.Maps;
 import io.airlift.slice.Slice;
 import org.apache.hadoop.hive.common.FileUtils;
 import org.apache.hadoop.hive.metastore.ProtectMode;
+import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.Table;
 import org.joda.time.DateTimeZone;
 
@@ -97,6 +98,16 @@ public class HivePartitionManager
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
     }
 
+    private PartitionStatistics readStatisticsFromParameters(Map<String, String> parameters)
+    {
+        boolean columnStatsAcurate = Boolean.valueOf(Optional.ofNullable(parameters.get("COLUMN_STATS_ACCURATE")).orElse("false"));
+        Optional<Long> numFiles = Optional.ofNullable(parameters.get("numFiles")).map(Long::valueOf);
+        Optional<Long> numRows = Optional.ofNullable(parameters.get("numRows")).map(Long::valueOf);
+        Optional<Long> rawDataSize = Optional.ofNullable(parameters.get("rawDataSize")).map(Long::valueOf);
+        Optional<Long> totalSize = Optional.ofNullable(parameters.get("totalSize")).map(Long::valueOf);
+        return new PartitionStatistics(columnStatsAcurate, numFiles, numRows, rawDataSize, totalSize);
+    }
+
     public HivePartitionResult getPartitions(ConnectorSession session, HiveMetastore metastore, ConnectorTableHandle tableHandle, TupleDomain<ColumnHandle> effectivePredicate)
     {
         HiveTableHandle hiveTableHandle = checkType(tableHandle, HiveTableHandle.class, "tableHandle");
@@ -118,13 +129,15 @@ public class HivePartitionManager
         if (partitionColumns.isEmpty()) {
             return new HivePartitionResult(
                     partitionColumns,
-                    ImmutableList.of(new HivePartition(tableName, compactEffectivePredicate, bucket)),
+                    ImmutableList.of(new HivePartition(tableName, compactEffectivePredicate, bucket, readStatisticsFromParameters(table.getParameters()))),
                     effectivePredicate,
                     TupleDomain.none(),
                     hiveBucketHandle);
         }
 
         List<String> partitionNames = getFilteredPartitionNames(metastore, tableName, partitionColumns, effectivePredicate);
+        Map<String, Partition> metastorePartitions = metastore.getPartitionsByNames(tableName.getSchemaName(), tableName.getTableName(), partitionNames).orElseThrow(
+                () -> new IllegalStateException("Could not obtain list of partitions for table " + tableName + " for following partition names: " + partitionNames));
 
         // do a final pass to filter based on fields that could not be used to filter the partitions
         ImmutableList.Builder<HivePartition> partitions = ImmutableList.builder();
@@ -132,7 +145,8 @@ public class HivePartitionManager
             Optional<Map<ColumnHandle, NullableValue>> values = parseValuesAndFilterPartition(partitionName, partitionColumns, effectivePredicate);
 
             if (values.isPresent()) {
-                partitions.add(new HivePartition(tableName, compactEffectivePredicate, partitionName, values.get(), bucket));
+                PartitionStatistics statistics = readStatisticsFromParameters(metastorePartitions.get(partitionName).getParameters());
+                partitions.add(new HivePartition(tableName, compactEffectivePredicate, partitionName, values.get(), bucket, statistics));
             }
         }
 

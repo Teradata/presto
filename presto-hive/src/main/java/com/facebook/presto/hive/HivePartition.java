@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import static com.facebook.presto.hive.HiveBucketing.HiveBucket;
+import static com.facebook.presto.hive.PartitionStatistics.EMPTY_STATISTICS;
 import static java.util.Objects.requireNonNull;
 
 public class HivePartition
@@ -35,6 +36,7 @@ public class HivePartition
     private final String partitionId;
     private final Map<ColumnHandle, NullableValue> keys;
     private final Optional<HiveBucket> bucket;
+    private final PartitionStatistics statistics;
 
     public HivePartition(SchemaTableName tableName, TupleDomain<HiveColumnHandle> effectivePredicate)
     {
@@ -43,24 +45,27 @@ public class HivePartition
         this.partitionId = UNPARTITIONED_ID;
         this.keys = ImmutableMap.of();
         this.bucket = Optional.empty();
+        this.statistics = EMPTY_STATISTICS;
     }
 
-    public HivePartition(SchemaTableName tableName, TupleDomain<HiveColumnHandle> effectivePredicate, Optional<HiveBucket> bucket)
+    public HivePartition(SchemaTableName tableName, TupleDomain<HiveColumnHandle> effectivePredicate, Optional<HiveBucket> bucket, PartitionStatistics statistics)
     {
-        this(tableName, effectivePredicate, UNPARTITIONED_ID, ImmutableMap.of(), bucket);
+        this(tableName, effectivePredicate, UNPARTITIONED_ID, ImmutableMap.of(), bucket, statistics);
     }
 
     public HivePartition(SchemaTableName tableName,
             TupleDomain<HiveColumnHandle> effectivePredicate,
             String partitionId,
             Map<ColumnHandle, NullableValue> keys,
-            Optional<HiveBucket> bucket)
+            Optional<HiveBucket> bucket,
+            PartitionStatistics statistics)
     {
         this.tableName = requireNonNull(tableName, "tableName is null");
         this.effectivePredicate = requireNonNull(effectivePredicate, "effectivePredicate is null");
         this.partitionId = requireNonNull(partitionId, "partitionId is null");
         this.keys = ImmutableMap.copyOf(requireNonNull(keys, "keys is null"));
         this.bucket = requireNonNull(bucket, "bucket number is null");
+        this.statistics = requireNonNull(statistics, "statistics can not be null");
     }
 
     public SchemaTableName getTableName()
@@ -91,6 +96,11 @@ public class HivePartition
     public Optional<HiveBucket> getBucket()
     {
         return bucket;
+    }
+
+    public PartitionStatistics getStatistics()
+    {
+        return statistics;
     }
 
     @Override
