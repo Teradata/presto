@@ -20,6 +20,7 @@ import org.testng.annotations.Test;
 
 import static com.facebook.presto.tests.TestGroups.AUTHORIZATION;
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
+import static com.facebook.presto.tests.TestGroups.PROFILE_SPECIFIC_TESTS;
 import static com.facebook.presto.tests.utils.QueryExecutors.connectToPresto;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
 import static java.lang.String.format;
@@ -34,9 +35,9 @@ public class TestGrantRevoke
      * (2) tempto-configuration.yaml file should have definitions for two connections to Presto server:
      * "alice@presto" that has "jdbc_user: alice" and
      * "bob@presto" that has "jdbc_user: bob"
-     * (all other values of the connection are same as the default "presto" connection).
+     * (all other values of the connection are same as that of the default "presto" connection).
     */
-    @Test(groups = {HIVE_CONNECTOR, AUTHORIZATION})
+    @Test(groups = {HIVE_CONNECTOR, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
     public void testGrantRevoke()
     {
         String tableName = "alice_owned_table";
@@ -44,32 +45,58 @@ public class TestGrantRevoke
         QueryExecutor queryExecutorForBob = connectToPresto("bob@presto");
 
         queryExecutorForAlice.executeQuery(format("DROP TABLE IF EXISTS %s", tableName));
-        queryExecutorForAlice.executeQuery(format("CREATE TABLE %s(month varchar, day bigint)", tableName));
-        assertThat(queryExecutorForAlice.executeQuery(format("SELECT * from %s", tableName))).hasNoRows();
-        assertThat(() -> queryExecutorForBob.executeQuery(format("SELECT * from %s", tableName))).
+        queryExecutorForAlice.executeQuery(format("CREATE TABLE %s(month bigint, day bigint)", tableName));
+
+        assertThat(() -> queryExecutorForBob.executeQuery(format("SELECT * FROM %s", tableName))).
                 failsWithMessage(format("Access Denied: Cannot select from table default.%s", tableName));
+        assertThat(() -> queryExecutorForBob.executeQuery(format("INSERT INTO %s VALUES (3, 22)", tableName))).
+                failsWithMessage(format("Access Denied: Cannot insert into table default.%s", tableName));
 
         //test GRANT
-        queryExecutorForAlice.executeQuery(format("GRANT INSERT, SELECT ON %s to bob", tableName));
-        assertThat(queryExecutorForBob.executeQuery(format("INSERT INTO %s values ('t', 3)", tableName))).hasRowsCount(1);
-        assertThat(queryExecutorForBob.executeQuery(format("SELECT * from %s", tableName))).hasRowsCount(1);
-        assertThat(() -> queryExecutorForBob.executeQuery(format("DELETE from %s WHERE day=3", tableName))).
+        queryExecutorForAlice.executeQuery(format("GRANT INSERT, SELECT ON %s TO bob", tableName));
+        assertThat(queryExecutorForBob.executeQuery(format("INSERT INTO %s VALUES (3, 22)", tableName))).hasRowsCount(1);
+        assertThat(queryExecutorForBob.executeQuery(format("SELECT * FROM %s", tableName))).hasRowsCount(1);
+        assertThat(() -> queryExecutorForBob.executeQuery(format("DELETE FROM %s WHERE day=3", tableName))).
                 failsWithMessage(format("Access Denied: Cannot delete from table default.%s", tableName));
 
         //test REVOKE
-        queryExecutorForAlice.executeQuery(format("REVOKE INSERT on %s from bob", tableName));
-        assertThat(() -> queryExecutorForBob.executeQuery(format("INSERT into %s values ('y', 5)", tableName))).
+        queryExecutorForAlice.executeQuery(format("REVOKE INSERT ON %s FROM bob", tableName));
+        assertThat(() -> queryExecutorForBob.executeQuery(format("INSERT INTO %s VALUES ('y', 5)", tableName))).
                 failsWithMessage(format("Access Denied: Cannot insert into table default.%s", tableName));
-        assertThat(queryExecutorForBob.executeQuery(format("SELECT * from %s", tableName))).hasRowsCount(1);
-
-        // test GRANT ALL PRIVILEGES
-        queryExecutorForAlice.executeQuery(format("REVOKE SELECT on %s from bob", tableName));
-        queryExecutorForAlice.executeQuery(format("GRANT ALL PRIVILEGES ON %s to bob", tableName));
-        assertThat(queryExecutorForBob.executeQuery(format("INSERT INTO %s values ('x', 4)", tableName))).hasRowsCount(1);
-        assertThat(queryExecutorForBob.executeQuery(format("SELECT * from %s", tableName))).hasRowsCount(2);
-        queryExecutorForBob.executeQuery(format("DELETE from %s", tableName));
-        assertThat(queryExecutorForBob.executeQuery(format("SELECT * from %s", tableName))).hasNoRows();
-
-        //TODO: test PUBLIC: This will require adding users such as alice and bob to the hive metastore
+        assertThat(queryExecutorForBob.executeQuery(format("SELECT * FROM %s", tableName))).hasRowsCount(1);
     }
+
+    @Test(groups = {HIVE_CONNECTOR, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
+    public void testGrantRevokeAll()
+    {
+        String tableName = "alice_owned_table";
+        QueryExecutor queryExecutorForAlice = connectToPresto("alice@presto");
+        QueryExecutor queryExecutorForBob = connectToPresto("bob@presto");
+
+        queryExecutorForAlice.executeQuery(format("DROP TABLE IF EXISTS %s", tableName));
+        queryExecutorForAlice.executeQuery(format("CREATE TABLE %s(month bigint, day bigint)", tableName));
+
+        assertAccessDeniedOnAllOperationsOnTable(queryExecutorForBob, tableName);
+
+        queryExecutorForAlice.executeQuery(format("GRANT ALL PRIVILEGES ON %s TO bob", tableName));
+        assertThat(queryExecutorForBob.executeQuery(format("INSERT INTO %s VALUES (4, 13)", tableName))).hasRowsCount(1);
+        assertThat(queryExecutorForBob.executeQuery(format("SELECT * FROM %s", tableName))).hasRowsCount(1);
+        queryExecutorForBob.executeQuery(format("DELETE FROM %s", tableName));
+        assertThat(queryExecutorForBob.executeQuery(format("SELECT * FROM %s", tableName))).hasNoRows();
+
+        queryExecutorForAlice.executeQuery(format("REVOKE ALL PRIVILEGES ON %s FROM bob", tableName));
+        assertAccessDeniedOnAllOperationsOnTable(queryExecutorForBob, tableName);
+    }
+
+    private static void assertAccessDeniedOnAllOperationsOnTable(QueryExecutor queryExecutor, String tableName)
+    {
+        assertThat(() -> queryExecutor.executeQuery(format("SELECT * FROM %s", tableName))).
+                failsWithMessage(format("Access Denied: Cannot select from table default.%s", tableName));
+        assertThat(() -> queryExecutor.executeQuery(format("INSERT INTO %s VALUES (3, 22)", tableName))).
+                failsWithMessage(format("Access Denied: Cannot insert into table default.%s", tableName));
+        assertThat(() -> queryExecutor.executeQuery(format("DELETE FROM %s WHERE day=3", tableName))).
+                failsWithMessage(format("Access Denied: Cannot delete from table default.%s", tableName));
+    }
+
+    //TODO: test PUBLIC: This will require adding users such as alice and bob to the hive metastore
 }
