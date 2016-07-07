@@ -13,31 +13,93 @@
  */
 package com.facebook.presto.tests.utils;
 
-import static com.teradata.tempto.query.QueryExecutor.defaultQueryExecutor;
+import com.facebook.presto.jdbc.PrestoConnection;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 
 public class JdbcDriverUtils
 {
-    public static boolean usingFacebookJdbcDriver()
+    public static String getSessionProperty(Connection connection, String key) throws SQLException
     {
-        return getClassNameForJdbcDriver().equals("com.facebook.presto.jdbc.PrestoConnection");
+        try (Statement statement = connection.createStatement()) {
+            ResultSet rs = statement.executeQuery("SHOW SESSION");
+            while (rs.next()) {
+                if (rs.getString("Name").equals(key)) {
+                    return rs.getString("Value");
+                }
+            }
+        }
+        return null;
     }
 
-    public static boolean usingSimbaJdbcDriver()
+    public static String getSessionPropertyDefault(Connection connection, String key) throws SQLException
     {
-        String className = getClassNameForJdbcDriver();
+        try (Statement statement = connection.createStatement()) {
+            ResultSet rs = statement.executeQuery("SHOW SESSION");
+            while (rs.next()) {
+                if (rs.getString("Name").equals(key)) {
+                    return rs.getString("Default");
+                }
+            }
+        }
+        return null;
+    }
+
+    public static void setSessionProperty(Connection connection, String key, String value) throws SQLException
+    {
+        if (usingFacebookJdbcDriver(connection)) {
+            PrestoConnection prestoConnection = connection.unwrap(PrestoConnection.class);
+            prestoConnection.setSessionProperty(key, value);
+        }
+        else if (usingSimbaJdbcDriver(connection)) {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute(String.format("set session %s=%s", key, value));
+            }
+        }
+        else {
+            throw new IllegalStateException();
+        }
+    }
+
+    public static void resetSessionProperty(Connection connection, String key) throws SQLException
+    {
+        if (usingFacebookJdbcDriver(connection)) {
+            setSessionProperty(connection, key, getSessionPropertyDefault(connection, key));
+        }
+        else if (usingSimbaJdbcDriver(connection)) {
+            try (Statement statement = connection.createStatement()) {
+                statement.execute(String.format("RESET SESSION %s", key));
+            }
+        }
+        else {
+            throw new IllegalStateException();
+        }
+    }
+
+    public static boolean usingFacebookJdbcDriver(Connection connection)
+    {
+        return getClassNameForJdbcDriver(connection).equals("com.facebook.presto.jdbc.PrestoConnection");
+    }
+
+    public static boolean usingSimbaJdbcDriver(Connection connection)
+    {
+        String className = getClassNameForJdbcDriver(connection);
         return  className.equals("com.teradata.jdbc.jdbc4.S4Connection") ||
                 className.equals("com.teradata.jdbc.jdbc41.S41Connection") ||
                 className.equals("com.teradata.jdbc.jdbc42.S42Connection");
     }
 
-    public static boolean usingSimbaJdbc4Driver()
+    public static boolean usingSimbaJdbc4Driver(Connection connection)
     {
-        return getClassNameForJdbcDriver().contains("jdbc4.");
+        return getClassNameForJdbcDriver(connection).contains("jdbc4.");
     }
 
-    private static String getClassNameForJdbcDriver()
+    private static String getClassNameForJdbcDriver(Connection connection)
     {
-        return defaultQueryExecutor().getConnection().getClass().getCanonicalName();
+        return connection.getClass().getCanonicalName();
     }
 
     private JdbcDriverUtils() {}

@@ -16,10 +16,13 @@ package com.facebook.presto.tests;
 import com.teradata.tempto.ProductTest;
 import org.testng.annotations.Test;
 
+import java.sql.Connection;
+
 import static com.facebook.presto.tests.TestGroups.JMX_CONNECTOR;
 import static com.facebook.presto.tests.utils.JdbcDriverUtils.usingFacebookJdbcDriver;
 import static com.facebook.presto.tests.utils.JdbcDriverUtils.usingSimbaJdbcDriver;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
+import static com.teradata.tempto.query.QueryExecutor.defaultQueryExecutor;
 import static com.teradata.tempto.query.QueryExecutor.query;
 import static java.sql.JDBCType.BIGINT;
 import static java.sql.JDBCType.LONGNVARCHAR;
@@ -31,13 +34,15 @@ public class JmxConnectorTests
     @Test(groups = JMX_CONNECTOR)
     public void selectFromJavaRuntimeJmxMBean()
     {
+        Connection connection = defaultQueryExecutor().getConnection();
         String sql = "SELECT node, vmname, vmversion FROM jmx.current.\"java.lang:type=runtime\"";
-        if (usingFacebookJdbcDriver()) {
+
+        if (usingFacebookJdbcDriver(connection)) {
             assertThat(query(sql))
                     .hasColumns(LONGNVARCHAR, LONGNVARCHAR, LONGNVARCHAR)
                     .hasAnyRows();
         }
-        else if (usingSimbaJdbcDriver()) {
+        else if (usingSimbaJdbcDriver(connection)) {
             assertThat(query(sql))
                     .hasColumns(VARCHAR, VARCHAR, VARCHAR)
                     .hasAnyRows();

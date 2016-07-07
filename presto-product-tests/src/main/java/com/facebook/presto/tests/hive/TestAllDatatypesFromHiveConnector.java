@@ -24,6 +24,7 @@ import com.teradata.tempto.query.QueryType;
 import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
+import java.sql.Connection;
 import java.sql.Date;
 import java.sql.SQLException;
 
@@ -39,6 +40,7 @@ import static com.facebook.presto.tests.utils.JdbcDriverUtils.usingSimbaJdbcDriv
 import static com.teradata.tempto.assertions.QueryAssert.Row.row;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
 import static com.teradata.tempto.fulfillment.table.TableRequirements.immutableTable;
+import static com.teradata.tempto.query.QueryExecutor.defaultQueryExecutor;
 import static com.teradata.tempto.query.QueryExecutor.query;
 import static com.teradata.tempto.util.DateTimeUtils.parseTimestampInUTC;
 import static java.sql.JDBCType.BIGINT;
@@ -216,7 +218,8 @@ public class TestAllDatatypesFromHiveConnector
 
     private void assertColumnTypes(QueryResult queryResult)
     {
-        if (usingFacebookJdbcDriver()) {
+        Connection connection = defaultQueryExecutor().getConnection();
+        if (usingFacebookJdbcDriver(connection)) {
             assertThat(queryResult).hasColumns(
                     BIGINT,
                     BIGINT,
@@ -235,7 +238,7 @@ public class TestAllDatatypesFromHiveConnector
                     LONGVARBINARY
             );
         }
-        else if (usingSimbaJdbcDriver()) {
+        else if (usingSimbaJdbcDriver(connection)) {
             assertThat(queryResult).hasColumns(
                     BIGINT,
                     BIGINT,

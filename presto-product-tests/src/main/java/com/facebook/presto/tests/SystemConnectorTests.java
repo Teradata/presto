@@ -16,10 +16,13 @@ package com.facebook.presto.tests;
 import com.teradata.tempto.ProductTest;
 import org.testng.annotations.Test;
 
+import java.sql.Connection;
+
 import static com.facebook.presto.tests.TestGroups.SYSTEM_CONNECTOR;
 import static com.facebook.presto.tests.utils.JdbcDriverUtils.usingFacebookJdbcDriver;
 import static com.facebook.presto.tests.utils.JdbcDriverUtils.usingSimbaJdbcDriver;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
+import static com.teradata.tempto.query.QueryExecutor.defaultQueryExecutor;
 import static com.teradata.tempto.query.QueryExecutor.query;
 import static java.sql.JDBCType.BIGINT;
 import static java.sql.JDBCType.LONGNVARCHAR;
@@ -32,13 +35,14 @@ public class SystemConnectorTests
     @Test(groups = SYSTEM_CONNECTOR)
     public void selectRuntimeNodes()
     {
+        Connection connection = defaultQueryExecutor().getConnection();
         String sql = "SELECT node_id, http_uri, node_version, state FROM system.runtime.nodes";
-        if (usingFacebookJdbcDriver()) {
+        if (usingFacebookJdbcDriver(connection)) {
             assertThat(query(sql))
                     .hasColumns(LONGNVARCHAR, LONGNVARCHAR, LONGNVARCHAR, LONGNVARCHAR)
                     .hasAnyRows();
         }
-        else if (usingSimbaJdbcDriver()) {
+        else if (usingSimbaJdbcDriver(connection)) {
             assertThat(query(sql))
                     .hasColumns(VARCHAR, VARCHAR, VARCHAR, VARCHAR)
                     .hasAnyRows();
@@ -51,6 +55,7 @@ public class SystemConnectorTests
     @Test(groups = SYSTEM_CONNECTOR)
     public void selectRuntimeQueries()
     {
+        Connection connection = defaultQueryExecutor().getConnection();
         String sql = "SELECT" +
                 "  node_id," +
                 "  query_id," +
@@ -65,13 +70,13 @@ public class SystemConnectorTests
                 "  last_heartbeat," +
                 "  'end' " +
                 "FROM system.runtime.queries";
-        if (usingFacebookJdbcDriver()) {
+        if (usingFacebookJdbcDriver(connection)) {
             assertThat(query(sql))
                     .hasColumns(LONGNVARCHAR, LONGNVARCHAR, LONGNVARCHAR, LONGNVARCHAR, LONGNVARCHAR,
                             BIGINT, BIGINT, BIGINT, TIMESTAMP, TIMESTAMP, TIMESTAMP, LONGNVARCHAR)
                     .hasAnyRows();
         }
-        else if (usingSimbaJdbcDriver()) {
+        else if (usingSimbaJdbcDriver(connection)) {
             assertThat(query(sql))
                     .hasColumns(VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR,
                             BIGINT, BIGINT, BIGINT, TIMESTAMP, TIMESTAMP, TIMESTAMP, VARCHAR)
@@ -85,6 +90,7 @@ public class SystemConnectorTests
     @Test(groups = SYSTEM_CONNECTOR)
     public void selectRuntimeTasks()
     {
+        Connection connection = defaultQueryExecutor().getConnection();
         String sql = "SELECT" +
                 "  node_id," +
                 "  task_id," +
@@ -110,14 +116,14 @@ public class SystemConnectorTests
                 "  last_heartbeat," +
                 "  'end' " +
                 "FROM SYSTEM.runtime.tasks";
-        if (usingFacebookJdbcDriver()) {
+        if (usingFacebookJdbcDriver(connection)) {
             assertThat(query(sql))
                     .hasColumns(LONGNVARCHAR, LONGNVARCHAR, LONGNVARCHAR, LONGNVARCHAR, LONGNVARCHAR,
                             BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT,
                             BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, TIMESTAMP, TIMESTAMP, TIMESTAMP, LONGNVARCHAR)
                     .hasAnyRows();
         }
-        else if (usingSimbaJdbcDriver()) {
+        else if (usingSimbaJdbcDriver(connection)) {
             assertThat(query(sql))
                     .hasColumns(VARCHAR, VARCHAR, VARCHAR, VARCHAR, VARCHAR,
                             BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT, BIGINT,
@@ -132,13 +138,15 @@ public class SystemConnectorTests
     @Test(groups = SYSTEM_CONNECTOR)
     public void selectMetadataCatalogs()
     {
+        Connection connection = defaultQueryExecutor().getConnection();
         String sql = "select catalog_name, connector_id from system.metadata.catalogs";
-        if (usingFacebookJdbcDriver()) {
+
+        if (usingFacebookJdbcDriver(connection)) {
             assertThat(query(sql))
                     .hasColumns(LONGNVARCHAR, LONGNVARCHAR)
                     .hasAnyRows();
         }
-        else if (usingSimbaJdbcDriver()) {
+        else if (usingSimbaJdbcDriver(connection)) {
             assertThat(query(sql))
                     .hasColumns(VARCHAR, VARCHAR)
                     .hasAnyRows();
