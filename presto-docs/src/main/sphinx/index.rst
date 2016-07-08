@@ -10,8 +10,9 @@ Presto Documentation
     system-requirements
     getting-started
     sandbox-vms
-    server-installation
-    aws
+    server-installation-cluster-automated
+    server-installation-cluster-manual
+    server-installation-aws-emr-manual
     client-software
     Presto Admin <installation/presto-admin/user-guide>
     configuration

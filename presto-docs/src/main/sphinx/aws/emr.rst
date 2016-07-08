@@ -1,6 +1,6 @@
-=============
-Presto on EMR
-=============
+=================
+Presto on AWS EMR
+=================
 
 We support deploying Presto on EMR version 4.3.0 or greater. For instructions
 on how to run and install presto-admin on EMR refer to the EMR specific notes

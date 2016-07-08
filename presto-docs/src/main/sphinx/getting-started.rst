@@ -2,45 +2,32 @@
 Getting Started
 ===============
 
-There are a number of ways to try and install Presto. Read this documentation page in full before proceeding.
+You can try Presto:
 
-Presto Sandboxes
-================
-Try our Presto preinstalled on a Virtual Machine.
+* Pre-installed with Cloudera (CDH) or Hortonworks (HDP) on a sandbox 
+  virtual machine
+* Installed on a server in a cloud-based or on-premises cluster
+* Installed on AWS cloud
 
-Presto 141t on Cloudera
-***********************
-Try out Presto preinstalled with Cloudera on a Virtual Machine.
 
-*Requires*
+Presto Installation
+===================
 
-* VirtualBox 5.0
+The following links provide information for installing Presto in 
+your environment.
 
-| :doc:`Documentation <sandboxes/presto-sandbox-cdh>`
-| Download **presto-0.141t-demo-cdh.ova** from :download:`teradata-presto`
+* CDH or HDP on a sandbox VM:
+  :doc:`Presto Installation on a Sandbox VM <sandbox-vms>`
+* Automated installation on a server (cluster or YARN-based cluster):
+  :doc:`Presto Server Installation for a Cluster (Ambari) <server-installation-cluster-automated>`
+* Manual installation on a server (cluster or YARN-based cluster):
+  :doc:`Presto Server Installation for a Cluster (Presto Admin and RPMs) <server-installation-cluster-manual>`
+* Manual installation on AWS Cloud:
+  :doc:`Presto Server Installation for AWS EMR (Presto Admin and RPMs) <server-installation-aws-emr-manual>`
 
-----
 
-Presto 141t on Hortonworks
-**************************
-Try out Presto preinstalled with Hortonworks on a Virtual Machine.
-
-*Requires*
-
-* VirtualBox 5.0
-
-| :doc:`Documentation <sandboxes/presto-sandbox-hdp>`
-| Download **presto-0.141t-demo-hdp.ova** from :download:`teradata-presto`
-
-Presto Server Installation
-==========================
-Install Presto on a cluster of nodes manually or automated using Apache Ambari. And either with or without YARN integration.
-
-.. include:: server-installation.rst
-    :start-line: 5
-
-Presto Client Software
-======================
+Presto Client Software Installation
+===================================
 
 | :doc:`installation/odbc`
 | :doc:`installation/jdbc`
@@ -49,8 +36,6 @@ Presto Client Software
 
 Presto Documentation
 ====================
-This documentation is available for download as HTML.
 
-Download Presto Documentation from :download:`teradata-presto`
-
+This documentation is available for download as HTML from :download:`teradata-presto`.
 
