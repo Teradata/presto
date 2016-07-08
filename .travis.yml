@@ -27,6 +27,11 @@ services:
   - docker
 
 before_install:
+  - sudo rm /etc/default/docker
+  - mkdir /tmp/docker
+  - sudo mount -t tmpfs -o size=2G tmpfs /tmp/docker
+  - echo "DOCKER_OPTS=\"-H tcp://127.0.0.1:2375 -H unix:///var/run/docker.sock -g /tmp/docker\"" | sudo tee /etc/default/docker > /dev/null
+  - sudo restart docker
   # This is needed until Travis #4629 is fixed (https://github.com/travis-ci/travis-ci/issues/4629)
   - sed -i.bak -e 's|https://nexus.codehaus.org/snapshots/|https://oss.sonatype.org/content/repositories/codehaus-snapshots/|g' ~/.m2/settings.xml
   # This section can be removed once travis get equipped with docker 1.10 and docker-compose 1.6
