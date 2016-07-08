@@ -29,7 +29,7 @@ services:
 before_install:
   - sudo rm /etc/default/docker
   - mkdir /tmp/docker
-  - sudo mount -t tmpfs -o size=2G tmpfs /tmp/docker
+  - sudo mount -t tmpfs -o size=7G tmpfs /tmp/docker
   - echo "DOCKER_OPTS=\"-H tcp://127.0.0.1:2375 -H unix:///var/run/docker.sock -g /tmp/docker\"" | sudo tee /etc/default/docker > /dev/null
   - sudo restart docker
   # This is needed until Travis #4629 is fixed (https://github.com/travis-ci/travis-ci/issues/4629)
