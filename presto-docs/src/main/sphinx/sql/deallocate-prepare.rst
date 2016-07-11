@@ -1,3 +1,5 @@
+.. _deallocate-prepare:
+
 ==================
 DEALLOCATE PREPARE
 ==================
@@ -13,7 +15,8 @@ Description
 -----------
 
 Removes a statement with the name ``statement_name`` from the list of prepared
-statements for a session.
+statements for a session. For more information on preparing a statement see
+:ref:`prepare`.
 
 Examples
 --------
