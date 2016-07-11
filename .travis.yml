@@ -19,6 +19,10 @@ addons:
     packages:
       - oracle-java8-installer
 
+cache:
+  directories:
+    - /var/lib/docker/aufs
+
 services:
   - docker
 
@@ -51,6 +55,9 @@ script:
       presto-hive-hadoop2/bin/run_on_docker.sh
       ./mvnw install -DskipTests=true -B
     fi
+
+before_cache:
+  - rm -rf /var/lib/docker/aufs/mnt
 
 notifications:
   slack:
