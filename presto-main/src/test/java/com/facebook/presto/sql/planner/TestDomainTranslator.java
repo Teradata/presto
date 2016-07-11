@@ -89,6 +89,7 @@ import static com.facebook.presto.testing.TestingConnectorSession.SESSION;
 import static com.facebook.presto.type.ColorType.COLOR;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.slice.Slices.utf8Slice;
+import static java.lang.Float.intBitsToFloat;
 import static java.lang.String.format;
 import static java.util.Collections.nCopies;
 import static org.testng.Assert.assertEquals;
@@ -122,6 +123,7 @@ public class TestDomainTranslator
     private static final Symbol C_DECIMAL_2_0 = new Symbol("c_decimal_2_0");
     private static final Symbol C_SMALLINT = new Symbol("c_smallint");
     private static final Symbol C_TINYINT = new Symbol("c_tinyint");
+    private static final Symbol C_FLOAT = new Symbol("c_float");
 
     private static final Map<Symbol, Type> TYPES = ImmutableMap.<Symbol, Type>builder()
             .put(C_BIGINT, BIGINT)
@@ -147,6 +149,7 @@ public class TestDomainTranslator
             .put(C_DECIMAL_2_0, createDecimalType(2, 0))
             .put(C_SMALLINT, SMALLINT)
             .put(C_TINYINT, TINYINT)
+            .put(C_FLOAT, FLOAT)
             .build();
 
     private static final long TIMESTAMP_VALUE = new DateTime(2013, 3, 30, 1, 5, 0, 0, DateTimeZone.UTC).getMillis();
@@ -1174,8 +1177,9 @@ public class TestDomainTranslator
             throws Exception
     {
         List<NumericValues> translationChain = ImmutableList.of(
-                new NumericValues(C_DOUBLE, (value) -> doubleLiteral((double) value), -1.0 * Double.MAX_VALUE, -22.0, -44.555678, 23.0, 44.555678, Double.MAX_VALUE),
-                new NumericValues(C_DECIMAL_26_5, (value) -> decimalLiteral(Decimals.toString((Slice) value, 5)), longDecimal("-999999999999999999999.99999"), longDecimal("-22.00000"), longDecimal("-44.55568"), longDecimal("23.00000"), longDecimal("44.55567"), longDecimal("999999999999999999999.99999")),
+                new NumericValues(C_DOUBLE, (value) -> doubleLiteral((double) value), -1.0 * Double.MAX_VALUE, -22.0, -44.5556836, 23.0, 44.5556789, Double.MAX_VALUE),
+                new NumericValues(C_FLOAT, (value) -> floatLiteral(intBitsToFloat(((Long) value).intValue())), floatValue(-1.0f * Float.MAX_VALUE), floatValue(-22.0f), floatValue(-44.555687f), floatValue(23.0f), floatValue(44.555676f), floatValue(Float.MAX_VALUE)),
+                new NumericValues(C_DECIMAL_26_5, (value) -> decimalLiteral(Decimals.toString((Slice) value, 5)), longDecimal("-999999999999999999999.99999"), longDecimal("-22.00000"), longDecimal("-44.55569"), longDecimal("23.00000"), longDecimal("44.55567"), longDecimal("999999999999999999999.99999")),
                 new NumericValues(C_DECIMAL_23_4, (value) -> decimalLiteral(Decimals.toString((Slice) value, 4)), longDecimal("-9999999999999999999.9999"), longDecimal("-22.0000"), longDecimal("-44.5557"), longDecimal("23.0000"), longDecimal("44.5556"), longDecimal("9999999999999999999.9999")),
                 new NumericValues(C_BIGINT, (value) -> bigintLiteral((long) value), Long.MIN_VALUE, -22L, -45L, 23L, 44L, Long.MAX_VALUE),
                 new NumericValues(C_DECIMAL_21_3, (value) -> decimalLiteral(Decimals.toString((Slice) value, 3)),
@@ -1449,6 +1453,11 @@ public class TestDomainTranslator
         return new DoubleLiteral(Double.toString(value));
     }
 
+    private static Literal floatLiteral(double value)
+    {
+        return new GenericLiteral("FLOAT", Double.toString(value));
+    }
+
     private static DecimalLiteral decimalLiteral(String value)
     {
         return new DecimalLiteral(value);
@@ -1487,6 +1496,11 @@ public class TestDomainTranslator
     private static Slice longDecimal(String value)
     {
         return encodeScaledValue(new BigDecimal(value));
+    }
+
+    private static Long floatValue(float value)
+    {
+        return (long) Float.floatToIntBits(value);
     }
 
     private static void testSimpleComparison(Expression expression, Symbol symbol, Range expectedDomainRange)
