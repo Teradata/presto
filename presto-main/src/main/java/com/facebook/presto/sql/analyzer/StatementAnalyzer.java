@@ -933,18 +933,19 @@ class StatementAnalyzer
     {
         analysis.setUpdateType("CREATE VIEW");
 
+        QualifiedObjectName viewName = createQualifiedObjectName(session, node, node.getName());
+
         // analyze the query that creates the view
         StatementAnalyzer analyzer = new StatementAnalyzer(
                 analysis,
                 metadata,
                 sqlParser,
-                new ViewAccessControl(accessControl),
+                new ViewAccessControl(accessControl, viewName),
                 session,
                 experimentalSyntaxEnabled,
                 queryExplainer);
         RelationType descriptor = analyzer.process(node.getQuery(), new AnalysisContext());
 
-        QualifiedObjectName viewName = createQualifiedObjectName(session, node, node.getName());
         accessControl.checkCanCreateView(session.getRequiredTransactionId(), session.getIdentity(), viewName);
 
         validateColumns(node, descriptor);
@@ -2129,7 +2130,7 @@ class StatementAnalyzer
             AccessControl viewAccessControl;
             if (owner.isPresent()) {
                 identity = new Identity(owner.get(), Optional.empty());
-                viewAccessControl = new ViewAccessControl(accessControl);
+                viewAccessControl = new ViewAccessControl(accessControl, name);
             }
             else {
                 identity = session.getIdentity();
