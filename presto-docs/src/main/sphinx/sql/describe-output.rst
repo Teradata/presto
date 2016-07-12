@@ -1,3 +1,5 @@
+.. _describe-output:
+
 ===============
 DESCRIBE OUTPUT
 ===============
@@ -17,7 +19,8 @@ with metadata about each output column. Each row in the output provides the
 following information: column name (or the column's alias if it is aliased),
 table, schema, connector, type, type size in bytes, boolean indicating whether
 the column is aliased and boolean indicating whether the query is a row count
-query (DDL/DML query that returns no data).
+query (DDL/DML query that returns no data). For more information on preparing
+a statement see :ref:`prepare`.
 
 Examples
 --------

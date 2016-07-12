@@ -15,7 +15,8 @@ Description
 -----------
 
 Executes a prepared statement with the name ``statement_name``. Parameter values
-are defined in the USING clause.
+are defined in the USING clause. For more information on preparing a statement
+see :ref:`prepare`.
 
 Examples
 --------

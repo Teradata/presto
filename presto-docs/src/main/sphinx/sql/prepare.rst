@@ -1,3 +1,5 @@
+.. _prepare:
+
 =======
 PREPARE
 =======
@@ -17,6 +19,11 @@ are saved on a per-session basis with a given name. The statement can include
 parameters in place of literals to be filled in at execution time. Parameters
 are represented by question marks.
 
+Once a statement is prepared using the :ref:`prepare` syntax above, it can be
+executed using the :ref:`execute` statement and deleted from the session using
+the :ref:`deallocate-prepare` statement. The :ref:`describe-output` and
+:ref:`describe-input` statements provide details on the types and origins of
+a prepared statement's input and output parameters.
 
 Examples
 --------

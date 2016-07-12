@@ -1,3 +1,5 @@
+.. _describe-input:
+
 ==============
 DESCRIBE INPUT
 ==============
@@ -14,8 +16,8 @@ Description
 
 Describes the input parameters for a prepared statement.  It returns a table
 with the position and type of each parameter.  If the type of the parameter can
-not be determined, unknown is returned.
-
+not be determined, unknown is returned. For more information on preparing a
+statement see :ref:`prepare`.
 
 Examples
 --------
