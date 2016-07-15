@@ -21,7 +21,6 @@ import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.metadata.SqlScalarFunction;
 import com.facebook.presto.metadata.SqlScalarFunctionBuilder.SpecializeContext;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.type.Decimals;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -30,7 +29,6 @@ import com.google.common.collect.ImmutableSet;
 import io.airlift.slice.Slice;
 
 import java.lang.invoke.MethodHandle;
-import java.math.BigInteger;
 import java.util.List;
 
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
@@ -44,10 +42,13 @@ import static com.facebook.presto.metadata.OperatorType.NOT_EQUAL;
 import static com.facebook.presto.metadata.SqlScalarFunctionBuilder.concat;
 import static com.facebook.presto.metadata.SqlScalarFunctionBuilder.constant;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
-import static com.facebook.presto.spi.type.Decimals.bigIntegerTenToNth;
 import static com.facebook.presto.spi.type.Decimals.longTenToNth;
+import static com.facebook.presto.spi.type.Decimals.unscaledDecimalTenToNth;
 import static com.facebook.presto.spi.type.StandardTypes.BOOLEAN;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
+import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.compare;
+import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.multiply;
+import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.unscaledDecimal;
 import static com.facebook.presto.util.Reflection.methodHandle;
 import static java.lang.Integer.max;
 
@@ -157,9 +158,11 @@ public class DecimalInequalityOperators
     {
         long aScale = context.getLiteral("a_scale");
         long bScale = context.getLiteral("b_scale");
-        BigInteger aRescale = bigIntegerTenToNth(rescaleFactor(aScale, bScale));
-        BigInteger bRescale = bigIntegerTenToNth(rescaleFactor(bScale, aScale));
-        return ImmutableList.of(aRescale, bRescale);
+        int aRescaleFactor = rescaleFactor(aScale, bScale);
+        int bRescaleFactor = rescaleFactor(bScale, aScale);
+        Slice aRescale = unscaledDecimalTenToNth(aRescaleFactor);
+        Slice bRescale = unscaledDecimalTenToNth(bRescaleFactor);
+        return ImmutableList.of(aRescale, bRescale, aRescaleFactor != 0, bRescaleFactor != 0);
     }
 
     private static int rescaleFactor(long fromScale, long toScale)
@@ -174,35 +177,45 @@ public class DecimalInequalityOperators
     }
 
     @UsedByGeneratedCode
-    public static boolean opShortShortLongRescale(long a, long b, BigInteger aRescale, BigInteger bRescale, MethodHandle getResultMethodHandle)
+    public static boolean opShortShortLongRescale(long a, long b, Slice aRescale, Slice bRescale, boolean aDoRescale, boolean bDoRescale, MethodHandle getResultMethodHandle)
     {
-        BigInteger left = BigInteger.valueOf(a).multiply(aRescale);
-        BigInteger right = BigInteger.valueOf(b).multiply(bRescale);
-        return invokeGetResult(getResultMethodHandle, left.compareTo(right));
+        Slice left = rescale(a, aRescale, aDoRescale);
+        Slice right = rescale(b, bRescale, bDoRescale);
+        return invokeGetResult(getResultMethodHandle, compare(left, right));
     }
 
     @UsedByGeneratedCode
-    public static boolean opShortLong(long a, Slice b, BigInteger aRescale, BigInteger bRescale, MethodHandle getResultMethodHandle)
+    public static boolean opShortLong(long a, Slice b, Slice aRescale, Slice bRescale, boolean aDoRescale, boolean bDoRescale, MethodHandle getResultMethodHandle)
     {
-        BigInteger left = BigInteger.valueOf(a).multiply(aRescale);
-        BigInteger right = Decimals.decodeUnscaledValue(b).multiply(bRescale);
-        return invokeGetResult(getResultMethodHandle, left.compareTo(right));
+        Slice left = rescale(a, aRescale, aDoRescale);
+        Slice right = rescale(b, bRescale, bDoRescale);
+        return invokeGetResult(getResultMethodHandle, compare(left, right));
     }
 
     @UsedByGeneratedCode
-    public static boolean opLongShort(Slice a, long b, BigInteger aRescale, BigInteger bRescale, MethodHandle getResultMethodHandle)
+    public static boolean opLongShort(Slice a, long b, Slice aRescale, Slice bRescale, boolean aDoRescale, boolean bDoRescale, MethodHandle getResultMethodHandle)
     {
-        BigInteger left = Decimals.decodeUnscaledValue(a).multiply(aRescale);
-        BigInteger right = BigInteger.valueOf(b).multiply(bRescale);
-        return invokeGetResult(getResultMethodHandle, left.compareTo(right));
+        Slice left = rescale(a, aRescale, aDoRescale);
+        Slice right = rescale(b, bRescale, bDoRescale);
+        return invokeGetResult(getResultMethodHandle, compare(left, right));
     }
 
     @UsedByGeneratedCode
-    public static boolean opLongLong(Slice a, Slice b, BigInteger aRescale, BigInteger bRescale, MethodHandle getResultMethodHandle)
+    public static boolean opLongLong(Slice a, Slice b, Slice aRescale, Slice bRescale, boolean aDoRescale, boolean bDoRescale, MethodHandle getResultMethodHandle)
     {
-        BigInteger left = Decimals.decodeUnscaledValue(a).multiply(aRescale);
-        BigInteger right = Decimals.decodeUnscaledValue(b).multiply(bRescale);
-        return invokeGetResult(getResultMethodHandle, left.compareTo(right));
+        Slice left = rescale(a, aRescale, aDoRescale);
+        Slice right = rescale(b, bRescale, bDoRescale);
+        return invokeGetResult(getResultMethodHandle, compare(left, right));
+    }
+
+    private static Slice rescale(long value, Slice rescale, boolean doRescale)
+    {
+        return doRescale ? multiply(unscaledDecimal(value), rescale) : unscaledDecimal(value);
+    }
+
+    private static Slice rescale(Slice value, Slice rescale, boolean doRescale)
+    {
+        return doRescale ? multiply(value, rescale) : value;
     }
 
     private static boolean invokeGetResult(MethodHandle getResultMethodHandle, int comparisonResult)
