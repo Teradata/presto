@@ -298,6 +298,7 @@ public class Driver
                 try {
                     long start = System.nanoTime();
                     do {
+                        revokeMemoryIfNecessary();
                         ListenableFuture<?> future = processInternal();
                         if (!future.isDone()) {
                             return future;
@@ -324,7 +325,17 @@ public class Driver
                 // this state change by calling isFinished
                 return NOT_BLOCKED;
             }
+            revokeMemoryIfNecessary();
             return processInternal();
+        }
+    }
+
+    private void revokeMemoryIfNecessary()
+    {
+        if (driverContext.isWaitingForRevocableMemory()) {
+            for (Operator operator : operators) {
+                operator.revokeMemory();
+            }
         }
     }
 
