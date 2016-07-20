@@ -30,6 +30,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 
+import static com.facebook.presto.tests.TestGroups.ACTIVE_DIRECTORY;
 import static com.facebook.presto.tests.TestGroups.CLI;
 import static com.facebook.presto.tests.TestGroups.PREPARED_STATEMENTS;
 import static com.facebook.presto.tests.TestGroups.PROFILE_SPECIFIC_TESTS;
@@ -56,6 +57,10 @@ public class PrestoCliTests
 
     private final List<String> nationTableInteractiveLines;
     private final List<String> nationTableBatchLines;
+
+    @Inject
+    @Named("databases.presto.host")
+    private String serverHost;
 
     @Inject
     @Named("databases.presto.server_address")
@@ -258,6 +263,80 @@ public class PrestoCliTests
         ldapUserName = "OrphanUserInAsia";
         launchPrestoCliWithServerArgument("--catalog", "hive", "--schema", "default", "--execute", "select * from nation;");
         assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Authentication failed: User " + ldapUserName + " not a member of the group")));
+    }
+
+    @Test(groups = {CLI, ACTIVE_DIRECTORY, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailQueryForWrongLdapPassword()
+            throws IOException, InterruptedException
+    {
+        ldapUserPassword = "wrong_password";
+        launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Invalid credentials")));
+    }
+
+    @Test(groups = {CLI, ACTIVE_DIRECTORY, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailQueryForWrongLdapUser()
+            throws IOException, InterruptedException
+    {
+        ldapUserName = "invalid_user";
+        launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Invalid credentials")));
+    }
+
+    @Test(groups = {CLI, ACTIVE_DIRECTORY, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailForComputerContextType()
+            throws IOException, InterruptedException
+    {
+        ldapUserPassword = "ad-test";
+        launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Invalid credentials")));
+    }
+
+    @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailQueryForEmptyUser()
+            throws IOException, InterruptedException
+    {
+        ldapUserName = "";
+        launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Invalid credentials")));
+    }
+
+    @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailQueryForLdapWithoutPassword()
+            throws IOException, InterruptedException
+    {
+        launchPrestoCli("--server", ldapServerAddress,
+                "--truststore-path", ldapTruststorePath,
+                "--truststore-password", ldapTruststorePassword,
+                "--user", ldapUserName,
+                "--execute", "select * from hive.default.nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("statusMessage=Unauthorized")));
+    }
+
+    @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailQueryForLdapWithoutHttps()
+            throws IOException, InterruptedException
+    {
+        ldapServerAddress = format("http://%s:8443", serverHost);
+        launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Authentication using username/password requires HTTPS to be enabled")));
+        skipAfterTestWithContext();
+    }
+
+    private void skipAfterTestWithContext()
+    {
+        presto.close();
+        presto = null;
+    }
+
+    @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailForIncorrectTrustStore()
+            throws IOException, InterruptedException
+    {
+        ldapTruststorePassword = "wrong_password";
+        launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Keystore was tampered with, or password was incorrect")));
+        skipAfterTestWithContext();
     }
 
     private void launchPrestoCliWithServerArgument(String... arguments)

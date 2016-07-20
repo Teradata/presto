@@ -15,6 +15,7 @@ package com.facebook.presto.tests;
 
 public final class TestGroups
 {
+    public static final String ACTIVE_DIRECTORY = "active_directory";
     public static final String CREATE_TABLE = "create_table";
     public static final String CREATE_DROP_VIEW = "create_drop_view";
     public static final String ALTER_TABLE = "alter_table";
