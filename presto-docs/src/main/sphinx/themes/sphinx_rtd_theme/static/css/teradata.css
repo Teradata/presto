@@ -86,6 +86,12 @@ a:visited {
 .wy-nav-content {
   padding: 20px;
 }
+.wy-nav-content a {
+ color: #2980B9
+}
+.wy-nav-content a:hover {
+  text-decoration: underline;
+}
 .rst-content {
   background-color: #fff;
   padding: 20px;
