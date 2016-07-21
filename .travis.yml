@@ -55,6 +55,10 @@ script:
       presto-product-tests/bin/run_on_docker.sh \
         singlenode-kerberos-hdfs-impersonation -g storage_formats,cli,hdfs_impersonation,authorization
   - |
+    # Build presto-server-rpm for later artifact upload
+    test ! [[ -v DEPLOY_S3_SECRET_KEY_ID && -v PRODUCT_TESTS ]] ||
+       ./mvnw install -DskipTests=true $MAVEN_SKIP_CHECKS_AND_DOCS -B -q -T C1 -pl 'presto-server-rpm'
+  - |
     test ! -v INTEGRATION_TESTS ||
       presto-hive-hadoop2/bin/run_on_docker.sh
   - |
@@ -62,9 +66,31 @@ script:
       ./mvnw install -DskipTests=true -B
 
 before_cache:
-  #make the cache stable between builds by removing build output
+  # Make the cache stable between builds by removing build output
   - rm -rf $HOME/.m2/repository/com/facebook
 
 notifications:
   slack:
     secure: V5eyoGShxFoCcYJcp858vf/T6gC9KeMxL0C1EElcpZRcKBrIVZzvhek3HLHxZOxlghqnvNVsyDtU3u5orkEaAXeXj5c2dN+4XBsAB9oeN5MtQ0Z3VLAhZDqKIW1LzcXrq4DpzM0PkGhjfjum/P94/qFYk0UckPtB6a341AuYRo8=
+
+before_deploy:
+  - mkdir /tmp/artifacts
+  - cp -n presto-server/target/presto-server-*.tar.gz /tmp/artifacts
+  - cp -n presto-server-rpm/target/presto-server-rpm-*.x86_64.rpm /tmp/artifacts
+  - cp -n presto-product-tests/target/presto-product-tests-*-executable.jar /tmp/artifacts
+  - cp -n presto-jdbc/target/presto-jdbc-*.jar /tmp/artifacts
+  - cp -n presto-cli/target/presto-cli-*-executable.jar /tmp/artifacts
+  - ls -lah /tmp/artifacts
+
+deploy:
+  on:
+    all_branches: true
+    condition: -v DEPLOY_S3_SECRET_KEY_ID && -v PRODUCT_TESTS
+  provider: s3
+  access_key_id: ${DEPLOY_S3_SECRET_KEY_ID}
+  secret_access_key: ${DEPLOY_S3_SECRET_KEY}
+  bucket: ${DEPLOY_S3_BUCKET}
+  skip_cleanup: true
+  local-dir: /tmp/artifacts
+  upload-dir: travis_build_artifacts/${TRAVIS_REPO_SLUG}/${TRAVIS_BRANCH}/${TRAVIS_JOB_NUMBER}
+  acl: public_read
