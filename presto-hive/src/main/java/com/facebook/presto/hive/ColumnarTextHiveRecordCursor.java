@@ -72,6 +72,7 @@ import static com.facebook.presto.spi.type.Chars.trimSpacesAndTruncateToLength;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.Decimals.isLongDecimal;
 import static com.facebook.presto.spi.type.Decimals.isShortDecimal;
+import static com.facebook.presto.spi.type.Decimals.rescale;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.FloatType.FLOAT;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
@@ -89,7 +90,6 @@ import static java.lang.Float.floatToRawIntBits;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.String.format;
-import static java.math.BigDecimal.ROUND_HALF_UP;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
@@ -643,11 +643,7 @@ class ColumnarTextHiveRecordCursor<K>
         }
         else {
             DecimalType columnType = (DecimalType) types[column];
-            BigDecimal decimal = new BigDecimal(new String(bytes, start, length, UTF_8));
-
-            checkState(decimal.scale() <= columnType.getScale(), "Read decimal value scale larger than column scale");
-            decimal = decimal.setScale(columnType.getScale(), ROUND_HALF_UP);
-            checkState(decimal.precision() <= columnType.getPrecision(), "Read decimal precision larger than column precision");
+            BigDecimal decimal = rescale(new BigDecimal(new String(bytes, start, length, UTF_8)), columnType);
 
             if (columnType.isShort()) {
                 longs[column] = decimal.unscaledValue().longValue();

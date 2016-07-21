@@ -20,6 +20,7 @@ import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.spi.predicate.Range;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.predicate.ValueSet;
+import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.annotations.VisibleForTesting;
@@ -38,6 +39,7 @@ import static com.facebook.presto.spi.type.Chars.trimSpacesAndTruncateToLength;
 import static com.facebook.presto.spi.type.Decimals.encodeUnscaledValue;
 import static com.facebook.presto.spi.type.Decimals.isLongDecimal;
 import static com.facebook.presto.spi.type.Decimals.isShortDecimal;
+import static com.facebook.presto.spi.type.Decimals.rescale;
 import static com.facebook.presto.spi.type.FloatType.FLOAT;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Float.floatToRawIntBits;
@@ -111,10 +113,10 @@ public class TupleDomainOrcPredicate<C>
             }
         }
         else if (isShortDecimal(type)) {
-            return createDomain(type, hasNullValue, columnStatistics.getDecimalStatistics(), value -> value.unscaledValue().longValue());
+            return createDomain(type, hasNullValue, columnStatistics.getDecimalStatistics(), value -> rescale(value, (DecimalType) type).unscaledValue().longValue());
         }
         else if (isLongDecimal(type)) {
-            return createDomain(type, hasNullValue, columnStatistics.getDecimalStatistics(), value -> encodeUnscaledValue(value.unscaledValue()));
+            return createDomain(type, hasNullValue, columnStatistics.getDecimalStatistics(), value -> encodeUnscaledValue(rescale(value, (DecimalType) type).unscaledValue()));
         }
         else if (isCharType(type) && columnStatistics.getStringStatistics() != null) {
             return createDomain(type, hasNullValue, columnStatistics.getStringStatistics(), value -> trimSpacesAndTruncateToLength(value, type));
