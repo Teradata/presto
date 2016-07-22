@@ -32,6 +32,7 @@ import java.util.List;
 
 import static com.facebook.presto.tests.TestGroups.CLI;
 import static com.facebook.presto.tests.TestGroups.PREPARED_STATEMENTS;
+import static com.facebook.presto.tests.TestGroups.PROFILE_SPECIFIC_TESTS;
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Strings.repeat;
 import static com.google.common.io.Resources.getResource;
@@ -44,6 +45,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.testng.Assert.assertTrue;
 
 public class PrestoCliTests
         extends ProductTest
@@ -220,6 +222,42 @@ public class PrestoCliTests
                 "--execute",
                 format("prepare my_select2 from select * from hive.default.nation where n_name != '%s'; deallocate prepare my_select2;", repeat("a", 65536)));
         assertThat(trimLines(presto.readRemainingErrorLines())).containsExactly("PREPARE", "DEALLOCATE");
+    }
+
+    @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldPassQueryForLdapUserInMultipleGroups()
+            throws IOException, InterruptedException
+    {
+        ldapUserName = "FinanceHRUserInAsia";
+        launchPrestoCliWithServerArgument("--catalog", "hive", "--schema", "default", "--execute", "select * from nation;");
+        assertThat(trimLines(presto.readRemainingOutputLines())).containsAll(nationTableBatchLines);
+    }
+
+    @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailQueryForLdapUserInChildGroup()
+            throws IOException, InterruptedException
+    {
+        ldapUserName = "FinanceSubSubGroupUserInAsia";
+        launchPrestoCliWithServerArgument("--catalog", "hive", "--schema", "default", "--execute", "select * from nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Authentication failed: User " + ldapUserName + " not a member of the group")));
+    }
+
+    @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailQueryForLdapUserInParentGroup()
+            throws IOException, InterruptedException
+    {
+        ldapUserName = "FinanceUserInAsia";
+        launchPrestoCliWithServerArgument("--catalog", "hive", "--schema", "default", "--execute", "select * from nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Authentication failed: User " + ldapUserName + " not a member of the group")));
+    }
+
+    @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailQueryForOrphanLdapUser()
+            throws IOException, InterruptedException
+    {
+        ldapUserName = "OrphanUserInAsia";
+        launchPrestoCliWithServerArgument("--catalog", "hive", "--schema", "default", "--execute", "select * from nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Authentication failed: User " + ldapUserName + " not a member of the group")));
     }
 
     private void launchPrestoCliWithServerArgument(String... arguments)
