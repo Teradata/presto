@@ -50,7 +50,7 @@
         <dep.packaging.version>${dep.airlift.version}</dep.packaging.version>
         <dep.slice.version>0.27</dep.slice.version>
         <dep.aws-sdk.version>1.11.30</dep.aws-sdk.version>
-        <dep.tempto.version>1.14</dep.tempto.version>
+        <dep.tempto.version>1.15</dep.tempto.version>
 
         <!--
         Versions newer than 6.9 appear to have an issue where the @BeforeClass method in
@@ -775,6 +775,12 @@
             <dependency>
                 <groupId>com.teradata.tempto</groupId>
                 <artifactId>tempto-core</artifactId>
+                <version>${dep.tempto.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.teradata.tempto</groupId>
+                <artifactId>tempto-ldap</artifactId>
                 <version>${dep.tempto.version}</version>
             </dependency>
 
