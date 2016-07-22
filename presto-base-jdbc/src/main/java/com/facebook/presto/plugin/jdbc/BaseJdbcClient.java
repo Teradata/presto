@@ -54,6 +54,7 @@ import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.FloatType.FLOAT;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.TimeType.TIME;
@@ -84,6 +85,7 @@ public class BaseJdbcClient
             .put(SMALLINT, "smallint")
             .put(TINYINT, "tinyint")
             .put(DOUBLE, "double precision")
+            .put(FLOAT, "float")
             .put(VARBINARY, "varbinary")
             .put(DATE, "date")
             .put(TIME, "time")
@@ -440,6 +442,7 @@ public class BaseJdbcClient
                 return BIGINT;
             case Types.FLOAT:
             case Types.REAL:
+                return FLOAT;
             case Types.DOUBLE:
             case Types.NUMERIC:
             case Types.DECIMAL:

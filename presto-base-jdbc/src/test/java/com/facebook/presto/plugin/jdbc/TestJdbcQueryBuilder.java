@@ -41,11 +41,13 @@ import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.FloatType.FLOAT;
 import static com.facebook.presto.spi.type.TimeType.TIME;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.airlift.testing.Assertions.assertContains;
+import static java.lang.Float.floatToRawIntBits;
 import static java.lang.String.format;
 import static java.time.temporal.ChronoUnit.DAYS;
 import static org.testng.Assert.assertEquals;
@@ -72,7 +74,8 @@ public class TestJdbcQueryBuilder
                 new JdbcColumnHandle("test_id", "col_3", VARCHAR),
                 new JdbcColumnHandle("test_id", "col_4", DATE),
                 new JdbcColumnHandle("test_id", "col_5", TIME),
-                new JdbcColumnHandle("test_id", "col_6", TIMESTAMP));
+                new JdbcColumnHandle("test_id", "col_6", TIMESTAMP),
+                new JdbcColumnHandle("test_id", "col_7", FLOAT));
 
         Connection connection = database.getConnection();
         try (PreparedStatement preparedStatement = connection.prepareStatement("create table \"test_table\" (" + "" +
@@ -83,6 +86,7 @@ public class TestJdbcQueryBuilder
                 "\"col_4\" DATE, " +
                 "\"col_5\" TIME, " +
                 "\"col_6\" TIMESTAMP, " +
+                "\"col_7\" REAL " +
                 ")")) {
             preparedStatement.execute();
             StringBuilder stringBuilder = new StringBuilder("insert into \"test_table\" values ");
@@ -91,14 +95,15 @@ public class TestJdbcQueryBuilder
             for (int i = 0; i < len; i++) {
                 stringBuilder.append(format(
                         Locale.ENGLISH,
-                        "(%d, %f, %b, 'test_str_%d', '%s', '%s', '%s')",
+                        "(%d, %f, %b, 'test_str_%d', '%s', '%s', '%s', %f)",
                         i,
                         200000.0 + i / 2.0,
                         i % 2 == 0,
                         i,
                         Date.valueOf(dateTime.toLocalDate()),
                         Time.valueOf(dateTime.toLocalTime()),
-                        Timestamp.valueOf(dateTime)));
+                        Timestamp.valueOf(dateTime),
+                        100.0f + i));
                 dateTime = dateTime.plusHours(26);
                 if (i != len - 1) {
                     stringBuilder.append(",");
@@ -153,6 +158,33 @@ public class TestJdbcQueryBuilder
                 builder.add((Long) resultSet.getObject("col_0"));
             }
             assertEquals(builder.build(), ImmutableSet.of(22L, 66L, 68L, 70L, 72L, 96L, 128L, 180L, 194L, 196L, 198L));
+        }
+    }
+
+    @Test
+    public void testBuildSqlWithFloat()
+            throws SQLException
+    {
+        TupleDomain<ColumnHandle> tupleDomain = TupleDomain.withColumnDomains(ImmutableMap.of(
+                columns.get(7), Domain.create(SortedRangeSet.copyOf(FLOAT,
+                                ImmutableList.of(
+                                        Range.equal(FLOAT, (long) floatToRawIntBits(100.0f + 0)),
+                                        Range.equal(FLOAT, (long) floatToRawIntBits(100.008f + 0)),
+                                        Range.equal(FLOAT, (long) floatToRawIntBits(100.0f + 14)))),
+                        false)
+        ));
+
+        Connection connection = database.getConnection();
+        try (PreparedStatement preparedStatement = new QueryBuilder("\"").buildSql(jdbcClient, connection, "", "", "test_table", columns, tupleDomain);
+             ResultSet resultSet = preparedStatement.executeQuery()) {
+            ImmutableSet.Builder<Long> longBuilder = ImmutableSet.builder();
+            ImmutableSet.Builder<Float> floatBuilder = ImmutableSet.builder();
+            while (resultSet.next()) {
+                longBuilder.add((Long) resultSet.getObject("col_0"));
+                floatBuilder.add((Float) resultSet.getObject("col_7"));
+            }
+            assertEquals(longBuilder.build(), ImmutableSet.of(0L, 14L));
+            assertEquals(floatBuilder.build(), ImmutableSet.of(100.0f, 114.0f));
         }
     }
 
