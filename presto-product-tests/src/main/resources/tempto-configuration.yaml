@@ -73,3 +73,8 @@ tests:
   assert:
     float_tolerance: 0.000001
 
+ldap:
+   admin:
+       dn: cn=admin,dc=presto,dc=testldap,dc=com
+       password: admin
+   url: ldap://ldapserver
