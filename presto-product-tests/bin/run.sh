@@ -7,12 +7,6 @@ function absolutepath() {
     [[ $1 = /* ]] && echo "$1" || echo "$PWD/${1#./}"
 }
 
-# If profile is singlenode-ldap, import the root certificate of presto-coordinator
-if [ "$PROFILE" = "singlenode-ldap" ]
-then
-    keytool -import -v -alias caroot -file "$LDAP_FILES_PATH"/caroot.cer -keystore "$LDAP_FILES_PATH"/cacerts.jks -storepass testldap -noprompt
-fi
-
 SCRIPT_DIR=$(dirname $(absolutepath "$0"))
 PRODUCT_TESTS_ROOT="${SCRIPT_DIR}/.."
 REPORT_DIR="${PRODUCT_TESTS_ROOT}/target/test-reports"

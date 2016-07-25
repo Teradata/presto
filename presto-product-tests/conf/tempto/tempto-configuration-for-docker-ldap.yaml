@@ -5,10 +5,10 @@ databases:
     host: presto-master
     configured_hdfs_user: hive
     cli_ldap_authentication: true
-    cli_ldap_truststore_path: /etc/ldap/rootca/cacerts.jks
+    cli_ldap_truststore_path: /etc/ldap/cacerts.jks
     cli_ldap_truststore_password: testldap
     cli_ldap_user_name: financeuser1
-    cli_ldap_user_password: TCAMPass123
+    cli_ldap_user_password: password
     cli_ldap_server_address: https://${databases.presto.host}:8443
 
   mysql:
