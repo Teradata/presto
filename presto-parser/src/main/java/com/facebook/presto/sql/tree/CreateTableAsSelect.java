@@ -41,7 +41,7 @@ public class CreateTableAsSelect
         this(Optional.of(location), name, query, notExists, properties, withData);
     }
 
-    private CreateTableAsSelect(Optional<NodeLocation> location, QualifiedName name, Query query, boolean notExists, Map<String, Expression> properties, boolean withData)
+    protected CreateTableAsSelect(Optional<NodeLocation> location, QualifiedName name, Query query, boolean notExists, Map<String, Expression> properties, boolean withData)
     {
         super(location);
         this.name = requireNonNull(name, "name is null");

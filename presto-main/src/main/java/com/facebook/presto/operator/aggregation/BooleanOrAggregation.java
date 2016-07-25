@@ -29,7 +29,6 @@ public final class BooleanOrAggregation
     private BooleanOrAggregation() {}
 
     @InputFunction
-    @IntermediateInputFunction
     public static void booleanOr(TriStateBooleanState state, @SqlType(StandardTypes.BOOLEAN) boolean value)
     {
         // if value is true, the result is true
@@ -41,6 +40,18 @@ public final class BooleanOrAggregation
             if (state.getByte() == NULL_VALUE) {
                 state.setByte(FALSE_VALUE);
             }
+        }
+    }
+
+    @CombineFunction
+    public static void combine(TriStateBooleanState state, TriStateBooleanState otherState)
+    {
+        if (state.getByte() == NULL_VALUE) {
+            state.setByte(otherState.getByte());
+            return;
+        }
+        if (otherState.getByte() == TRUE_VALUE) {
+            state.setByte(otherState.getByte());
         }
     }
 

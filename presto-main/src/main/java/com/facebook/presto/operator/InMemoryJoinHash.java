@@ -25,6 +25,7 @@ import java.util.Arrays;
 
 import static com.facebook.presto.operator.SyntheticAddress.decodePosition;
 import static com.facebook.presto.operator.SyntheticAddress.decodeSliceIndex;
+import static com.facebook.presto.util.HashCollisionsEstimator.estimateNumberOfHashCollisions;
 import static io.airlift.slice.SizeOf.sizeOf;
 import static io.airlift.units.DataSize.Unit.KILOBYTE;
 import static java.util.Objects.requireNonNull;
@@ -48,6 +49,8 @@ public final class InMemoryJoinHash
     // to accessing values in blocks. We use bytes to reduce memory foot print
     // and there is no performance gain from storing full hashes
     private final byte[] positionToHashes;
+    private long hashCollisions;
+    private double expectedHashCollisions;
 
     public InMemoryJoinHash(LongArrayList addresses, PagesHashStrategy pagesHashStrategy)
     {
@@ -110,6 +113,7 @@ public final class InMemoryJoinHash
                     }
                     // increment position and mask to handler wrap around
                     pos = (pos + 1) & mask;
+                    hashCollisions++;
                 }
 
                 key[pos] = realPosition;
@@ -118,6 +122,7 @@ public final class InMemoryJoinHash
 
         size = sizeOf(addresses.elements()) + pagesHashStrategy.getSizeInBytes() +
                 sizeOf(key) + sizeOf(positionLinks) + sizeOf(positionToHashes);
+        expectedHashCollisions = estimateNumberOfHashCollisions(addresses.size(), hashSize);
     }
 
     @Override
@@ -136,6 +141,18 @@ public final class InMemoryJoinHash
     public long getInMemorySizeInBytes()
     {
         return size;
+    }
+
+    @Override
+    public long getHashCollisions()
+    {
+        return hashCollisions;
+    }
+
+    @Override
+    public double getExpectedHashCollisions()
+    {
+        return expectedHashCollisions;
     }
 
     @Override

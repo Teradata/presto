@@ -9,3 +9,5 @@ Administration
     admin/tuning
     admin/queue
     admin/resource-groups
+    aws/emr
+

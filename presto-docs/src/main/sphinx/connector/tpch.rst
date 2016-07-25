@@ -15,7 +15,7 @@ Configuration
 -------------
 
 To configure the TPCH connector, create a catalog properties file
-``etc/catalog/tpch.properties`` with the following contents:
+``/etc/presto/catalog/tpch.properties`` with the following contents:
 
 .. code-block:: none
 

@@ -39,7 +39,7 @@ public class Explain
         this(Optional.of(location), analyze, statement, options);
     }
 
-    private Explain(Optional<NodeLocation> location, boolean analyze, Statement statement, List<ExplainOption> options)
+    protected Explain(Optional<NodeLocation> location, boolean analyze, Statement statement, List<ExplainOption> options)
     {
         super(location);
         this.statement = requireNonNull(statement, "statement is null");

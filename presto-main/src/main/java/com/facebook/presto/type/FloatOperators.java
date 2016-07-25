@@ -17,6 +17,7 @@ import com.facebook.presto.operator.scalar.MathFunctions;
 import com.facebook.presto.operator.scalar.annotations.ScalarOperator;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.type.StandardTypes;
+import com.google.common.math.DoubleMath;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Shorts;
 import com.google.common.primitives.SignedBytes;
@@ -36,15 +37,26 @@ import static com.facebook.presto.metadata.OperatorType.MODULUS;
 import static com.facebook.presto.metadata.OperatorType.MULTIPLY;
 import static com.facebook.presto.metadata.OperatorType.NEGATION;
 import static com.facebook.presto.metadata.OperatorType.NOT_EQUAL;
+import static com.facebook.presto.metadata.OperatorType.SATURATED_FLOOR_CAST;
 import static com.facebook.presto.metadata.OperatorType.SUBTRACT;
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.Float.floatToRawIntBits;
 import static java.lang.Float.intBitsToFloat;
 import static java.lang.String.valueOf;
+import static java.math.RoundingMode.FLOOR;
 
 public final class FloatOperators
 {
+    private static final float MIN_LONG_AS_FLOAT = -0x1p63f;
+    private static final float MAX_LONG_PLUS_ONE_AS_FLOAT = 0x1p63f;
+    private static final float MIN_INTEGER_AS_FLOAT = -0x1p31f;
+    private static final float MAX_INTEGER_PLUS_ONE_AS_FLOAT = 0x1p31f;
+    private static final float MIN_SHORT_AS_FLOAT = -0x1p15f;
+    private static final float MAX_SHORT_PLUS_ONE_AS_FLOAT = 0x1p15f;
+    private static final float MIN_BYTE_AS_FLOAT = -0x1p7f;
+    private static final float MAX_BYTE_PLUS_ONE_AS_FLOAT = 0x1p7f;
+
     private FloatOperators()
     {
     }
@@ -210,5 +222,45 @@ public final class FloatOperators
     public static boolean castToBoolean(@SqlType(StandardTypes.FLOAT) long value)
     {
         return intBitsToFloat((int) value) != 0.0f;
+    }
+
+    @ScalarOperator(SATURATED_FLOOR_CAST)
+    @SqlType(StandardTypes.BIGINT)
+    public static long saturatedFloorCastToBigint(@SqlType(StandardTypes.FLOAT) long value)
+    {
+        return saturatedFloorCastToLong(value, Long.MIN_VALUE, MIN_LONG_AS_FLOAT, Long.MAX_VALUE, MAX_LONG_PLUS_ONE_AS_FLOAT);
+    }
+
+    @ScalarOperator(SATURATED_FLOOR_CAST)
+    @SqlType(StandardTypes.INTEGER)
+    public static long saturatedFloorCastToInteger(@SqlType(StandardTypes.FLOAT) long value)
+    {
+        return saturatedFloorCastToLong(value, Integer.MIN_VALUE, MIN_INTEGER_AS_FLOAT, Integer.MAX_VALUE, MAX_INTEGER_PLUS_ONE_AS_FLOAT);
+    }
+
+    @ScalarOperator(SATURATED_FLOOR_CAST)
+    @SqlType(StandardTypes.SMALLINT)
+    public static long saturatedFloorCastToSmallint(@SqlType(StandardTypes.FLOAT) long value)
+    {
+        return saturatedFloorCastToLong(value, Short.MIN_VALUE, MIN_SHORT_AS_FLOAT, Short.MAX_VALUE, MAX_SHORT_PLUS_ONE_AS_FLOAT);
+    }
+
+    @ScalarOperator(SATURATED_FLOOR_CAST)
+    @SqlType(StandardTypes.TINYINT)
+    public static long saturatedFloorCastToTinyint(@SqlType(StandardTypes.FLOAT) long value)
+    {
+        return saturatedFloorCastToLong(value, Byte.MIN_VALUE, MIN_BYTE_AS_FLOAT, Byte.MAX_VALUE, MAX_BYTE_PLUS_ONE_AS_FLOAT);
+    }
+
+    private static long saturatedFloorCastToLong(long valueBits, long minValue, float minValueAsDouble, long maxValue, float maxValuePlusOneAsDouble)
+    {
+        float value = intBitsToFloat((int) valueBits);
+        if (value <= minValueAsDouble) {
+            return minValue;
+        }
+        if (value + 1 >= maxValuePlusOneAsDouble) {
+            return maxValue;
+        }
+        return DoubleMath.roundToLong(value, FLOOR);
     }
 }

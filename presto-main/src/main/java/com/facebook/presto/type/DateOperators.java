@@ -34,8 +34,9 @@ import static com.facebook.presto.metadata.OperatorType.LESS_THAN_OR_EQUAL;
 import static com.facebook.presto.metadata.OperatorType.NOT_EQUAL;
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
 import static com.facebook.presto.spi.type.DateTimeEncoding.packDateTimeWithZone;
-import static com.facebook.presto.util.DateTimeUtils.parseDate;
+import static com.facebook.presto.util.DateTimeUtils.parseTimestampWithTimeZone;
 import static com.facebook.presto.util.DateTimeUtils.printDate;
+import static com.facebook.presto.util.DateTimeUtils.timestampWithTimeZoneToDate;
 import static com.facebook.presto.util.DateTimeZoneIndex.getChronology;
 import static io.airlift.slice.SliceUtf8.trim;
 import static io.airlift.slice.Slices.utf8Slice;
@@ -121,7 +122,8 @@ public final class DateOperators
     }
 
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
     public static Slice castToSlice(@SqlType(StandardTypes.DATE) long value)
     {
         return utf8Slice(printDate((int) value));
@@ -129,11 +131,28 @@ public final class DateOperators
 
     @ScalarFunction("date")
     @ScalarOperator(CAST)
+    @LiteralParameters("x")
     @SqlType(StandardTypes.DATE)
-    public static long castFromSlice(@SqlType(StandardTypes.VARCHAR) Slice value)
+    public static long castFromVarchar(ConnectorSession session, @SqlType("varchar(x)") Slice value)
     {
         try {
-            return parseDate(trim(value).toStringUtf8());
+            final long timestampValue = parseTimestampWithTimeZone(session.getTimeZoneKey(), trim(value).toStringUtf8());
+            return timestampWithTimeZoneToDate(timestampValue);
+        }
+        catch (IllegalArgumentException e) {
+            throw new PrestoException(INVALID_CAST_ARGUMENT, "Value cannot be cast to date: " + value.toStringUtf8(), e);
+        }
+    }
+
+    @ScalarFunction("date")
+    @ScalarOperator(CAST)
+    @LiteralParameters("x")
+    @SqlType(StandardTypes.DATE)
+    public static long castFromChar(ConnectorSession session, @SqlType("char(x)") Slice value)
+    {
+        try {
+            final long timestampValue = parseTimestampWithTimeZone(session.getTimeZoneKey(), trim(value).toStringUtf8());
+            return timestampWithTimeZoneToDate(timestampValue);
         }
         catch (IllegalArgumentException e) {
             throw new PrestoException(INVALID_CAST_ARGUMENT, "Value cannot be cast to date: " + value.toStringUtf8(), e);

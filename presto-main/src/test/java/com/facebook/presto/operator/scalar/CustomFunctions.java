@@ -15,6 +15,7 @@ package com.facebook.presto.operator.scalar;
 
 import com.facebook.presto.operator.scalar.annotations.ScalarFunction;
 import com.facebook.presto.spi.type.StandardTypes;
+import com.facebook.presto.type.LiteralParameters;
 import com.facebook.presto.type.SqlType;
 import io.airlift.slice.Slice;
 
@@ -32,8 +33,9 @@ public final class CustomFunctions
     }
 
     @ScalarFunction("custom_is_null")
+    @LiteralParameters("x")
     @SqlType(StandardTypes.BOOLEAN)
-    public static boolean customIsNullVarchar(@Nullable @SqlType(StandardTypes.VARCHAR) Slice slice)
+    public static boolean customIsNullVarchar(@Nullable @SqlType("varchar(x)") Slice slice)
     {
         return slice == null;
     }

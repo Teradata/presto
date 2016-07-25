@@ -32,6 +32,7 @@ import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.type.JsonType.JSON;
 import static java.lang.String.format;
 import static org.testng.Assert.assertEquals;
@@ -60,12 +61,13 @@ public class TestRowOperators
         assertFunction("CAST(CAST(ROW(1, 2) AS ROW(a BIGINT, b BIGINT)) AS JSON)", JSON, "[1,2]");
         assertFunction("CAST(ROW(1, NULL) AS JSON)", JSON, "[1,null]");
         assertFunction("CAST(ROW(1, CAST(NULL AS INTEGER)) AS JSON)", JSON, "[1,null]");
-        assertFunction("CAST(ROW(1, 2.0) AS JSON)", JSON, "[1,2.0]");
-        assertFunction("CAST(ROW(1.0, 2.5) AS JSON)", JSON, "[1.0,2.5]");
-        assertFunction("CAST(ROW(1.0, 'kittens') AS JSON)", JSON, "[1.0,\"kittens\"]");
+        assertFunction("CAST(ROW(1, CAST(2.0 as DOUBLE)) AS JSON)", JSON, "[1,2.0]");
+        assertFunction("CAST(ROW(CAST(1.0 as DOUBLE), CAST(2.5 as DOUBLE)) AS JSON)", JSON, "[1.0,2.5]");
+        assertFunction("CAST(ROW(CAST(1.0 as DOUBLE), 'kittens') AS JSON)", JSON, "[1.0,\"kittens\"]");
         assertFunction("CAST(ROW(TRUE, FALSE) AS JSON)", JSON, "[true,false]");
         assertFunction("CAST(ROW(from_unixtime(1)) AS JSON)", JSON, "[\"" + new SqlTimestamp(1000, TEST_SESSION.getTimeZoneKey()) + "\"]");
-        assertFunction("CAST(ROW(FALSE, ARRAY [1, 2], MAP(ARRAY[1, 3], ARRAY[2.0, 4.0])) AS JSON)", JSON, "[false,[1,2],{\"1\":2.0,\"3\":4.0}]");
+        assertFunction("CAST(ROW(FALSE, ARRAY [1, 2], MAP(ARRAY[1, 3], ARRAY[CAST(2.0 as DOUBLE), CAST(4.0 as DOUBLE)])) AS JSON)", JSON, "[false,[1,2],{\"1\":2.0,\"3\":4.0}]");
+        assertFunction("CAST(row(1.0, 123123123456.6549876543) AS JSON)", JSON, "[1.0,123123123456.6549876543]");
     }
 
     @Test
@@ -75,9 +77,9 @@ public class TestRowOperators
         assertFunction("CAST(row(1, CAST(NULL AS DOUBLE)) AS ROW(col0 integer, col1 double)).col1", DOUBLE, null);
         assertFunction("CAST(row(TRUE, CAST(NULL AS BOOLEAN)) AS ROW(col0 boolean, col1 boolean)).col1", BOOLEAN, null);
         assertFunction("CAST(row(TRUE, CAST(NULL AS ARRAY<INTEGER>)) AS ROW(col0 boolean, col1 array(integer))).col1", new ArrayType(INTEGER), null);
-        assertFunction("CAST(row(1.0, CAST(NULL AS VARCHAR)) AS ROW(col0 double, col1 varchar)).col1", VARCHAR, null);
+        assertFunction("CAST(row(1.0, CAST(NULL AS VARCHAR)) AS ROW(col0 double, col1 varchar)).col1", createUnboundedVarcharType(), null);
         assertFunction("CAST(row(1, 2) AS ROW(col0 integer, col1 integer)).col0", INTEGER, 1);
-        assertFunction("CAST(row(1, 'kittens') AS ROW(col0 integer, col1 varchar)).col1", VARCHAR, "kittens");
+        assertFunction("CAST(row(1, 'kittens') AS ROW(col0 integer, col1 varchar)).col1", createUnboundedVarcharType(), "kittens");
         assertFunction("CAST(row(1, 2) AS ROW(col0 integer, col1 integer)).\"col1\"", INTEGER, 2);
         assertFunction("CAST(array[row(1, 2)] AS array(row(col0 integer, col1 integer)))[1].col1", INTEGER, 2);
         assertFunction("CAST(row(FALSE, ARRAY [1, 2], MAP(ARRAY[1, 3], ARRAY[2.0, 4.0])) AS ROW(col0 boolean , col1 array(integer), col2 map(integer, double))).col1", new ArrayType(INTEGER), ImmutableList.of(1, 2));
@@ -87,12 +89,15 @@ public class TestRowOperators
         // Using ROW constructor
         assertFunction("CAST(ROW(1, 2) AS ROW(a BIGINT, b DOUBLE)).a", BIGINT, 1L);
         assertFunction("CAST(ROW(1, 2) AS ROW(a BIGINT, b DOUBLE)).b", DOUBLE, 2.0);
-        assertFunction("CAST(ROW(CAST(ROW('aa') AS ROW(a VARCHAR))) AS ROW(a ROW(a VARCHAR))).a.a", VARCHAR, "aa");
+        assertFunction("CAST(ROW(CAST(ROW('aa') AS ROW(a VARCHAR))) AS ROW(a ROW(a VARCHAR))).a.a", createUnboundedVarcharType(), "aa");
         assertFunction("CAST(ROW(ROW('ab')) AS ROW(a ROW(b VARCHAR))).a.b", VARCHAR, "ab");
         assertFunction("CAST(ROW(ARRAY[NULL]) AS ROW(a ARRAY(BIGINT))).a", new ArrayType(BIGINT), Arrays.asList((Integer) null));
 
         // Row type is not case sensitive
         assertFunction("CAST(ROW(1) AS ROW(A BIGINT)).A", BIGINT, 1L);
+
+        assertDecimalFunction("CAST(row(1.0, 123123123456.6549876543) AS ROW(col0 decimal(2,1), col1 decimal(22,10))).col0", decimal("1.0"));
+        assertDecimalFunction("CAST(row(1.0, 123123123456.6549876543) AS ROW(col0 decimal(2,1), col1 decimal(22,10))).col1", decimal("123123123456.6549876543"));
     }
 
     @Test
@@ -137,21 +142,21 @@ public class TestRowOperators
                 "row(TIMESTAMP '2001-01-02 03:04:05.321 +07:09', TIMESTAMP '2001-01-02 03:04:05.321 +07:10')", BOOLEAN, true);
         assertFunction("row(1.0, row(TIMESTAMP '2001-01-02 03:04:05.321 +07:09', TIMESTAMP '2001-01-02 03:04:05.321 +07:10')) =" +
                 "row(1.0, row(TIMESTAMP '2001-01-02 03:04:05.321 +07:09', TIMESTAMP '2001-01-02 03:04:05.321 +07:10'))", BOOLEAN, true);
-        assertFunction("row(1.0, 'kittens') = row(1.0, 'kittens')", BOOLEAN, true);
-        assertFunction("row(1, 2.0) = row(1, 2.0)", BOOLEAN, true);
+        assertFunction("row(CAST(1.0 as DOUBLE), 'kittens') = row(CAST(1.0 as DOUBLE), 'kittens')", BOOLEAN, true);
+        assertFunction("row(1, CAST(2.0 as DOUBLE)) = row(1, CAST(2.0 as DOUBLE))", BOOLEAN, true);
         assertFunction("row(TRUE, FALSE, TRUE, FALSE) = row(TRUE, FALSE, TRUE, FALSE)", BOOLEAN, true);
         assertFunction("row(TRUE, FALSE, TRUE, FALSE) = row(TRUE, TRUE, TRUE, FALSE)", BOOLEAN, false);
-        assertFunction("row(1, 2.0, TRUE, 'kittens', from_unixtime(1)) = row(1, 2.0, TRUE, 'kittens', from_unixtime(1))", BOOLEAN, true);
+        assertFunction("row(1, CAST(2.0 as DOUBLE), TRUE, 'kittens', from_unixtime(1)) = row(1, CAST(2.0 as DOUBLE), TRUE, 'kittens', from_unixtime(1))", BOOLEAN, true);
 
         assertFunction("row(1.0, row(TIMESTAMP '2001-01-02 03:04:05.321 +07:09', TIMESTAMP '2001-01-02 03:04:05.321 +07:10')) !=" +
                 "row(1.0, row(TIMESTAMP '2001-01-02 03:04:05.321 +07:09', TIMESTAMP '2001-01-02 03:04:05.321 +07:11'))", BOOLEAN, true);
         assertFunction("row(TIMESTAMP '2001-01-02 03:04:05.321 +07:09', TIMESTAMP '2001-01-02 03:04:05.321 +07:10') != " +
                 "row(TIMESTAMP '2001-01-02 03:04:05.321 +07:09', TIMESTAMP '2001-01-02 03:04:05.321 +07:11')", BOOLEAN, true);
-        assertFunction("row(1.0, 'kittens') != row(1.0, 'kittens')", BOOLEAN, false);
-        assertFunction("row(1, 2.0) != row(1, 2.0)", BOOLEAN, false);
+        assertFunction("row(CAST(1.0 as DOUBLE), 'kittens') != row(CAST(1.0 as DOUBLE), 'kittens')", BOOLEAN, false);
+        assertFunction("row(1, CAST(2.0 as DOUBLE)) != row(1, CAST(2.0 as DOUBLE))", BOOLEAN, false);
         assertFunction("row(TRUE, FALSE, TRUE, FALSE) != row(TRUE, FALSE, TRUE, FALSE)", BOOLEAN, false);
         assertFunction("row(TRUE, FALSE, TRUE, FALSE) != row(TRUE, TRUE, TRUE, FALSE)", BOOLEAN, true);
-        assertFunction("row(1, 2.0, TRUE, 'kittens', from_unixtime(1)) != row(1, 2.0, TRUE, 'puppies', from_unixtime(1))", BOOLEAN, true);
+        assertFunction("row(1, CAST(2.0 as DOUBLE), TRUE, 'kittens', from_unixtime(1)) != row(1, CAST(2.0 as DOUBLE), TRUE, 'puppies', from_unixtime(1))", BOOLEAN, true);
 
         try {
             assertFunction("cast(row(cast(cast ('' as varbinary) as hyperloglog)) as row(col0 hyperloglog)) = cast(row(cast(cast ('' as varbinary) as hyperloglog)) as row(col0 hyperloglog))", BOOLEAN, true);
@@ -164,8 +169,8 @@ public class TestRowOperators
             //Expected
         }
 
-        assertFunction("row(TRUE, ARRAY [1], MAP(ARRAY[1, 3], ARRAY[2.0, 4.0])) = row(TRUE, ARRAY [1, 2], MAP(ARRAY[1, 3], ARRAY[2.0, 4.0]))", BOOLEAN, false);
-        assertFunction("row(TRUE, ARRAY [1, 2], MAP(ARRAY[1, 3], ARRAY[2.0, 4.0])) = row(TRUE, ARRAY [1, 2], MAP(ARRAY[1, 3], ARRAY[2.0, 4.0]))", BOOLEAN, true);
+        assertFunction("row(TRUE, ARRAY [1], MAP(ARRAY[1, 3], ARRAY[CAST(2.0 as DOUBLE), CAST(4.0 as DOUBLE)])) = row(TRUE, ARRAY [1, 2], MAP(ARRAY[1, 3], ARRAY[CAST(2.0 as DOUBLE), CAST(4.0 as DOUBLE)]))", BOOLEAN, false);
+        assertFunction("row(TRUE, ARRAY [1, 2], MAP(ARRAY[1, 3], ARRAY[CAST(2.0 as DOUBLE), CAST(4.0 as DOUBLE)])) = row(TRUE, ARRAY [1, 2], MAP(ARRAY[1, 3], ARRAY[CAST(2.0 as DOUBLE), CAST(4.0 as DOUBLE)]))", BOOLEAN, true);
 
         try {
             assertFunction("row(1, CAST(NULL AS INTEGER)) = row(1, 2)", BOOLEAN, false);
@@ -177,13 +182,17 @@ public class TestRowOperators
 
         assertFunction("row(TRUE, ARRAY [1]) = row(TRUE, ARRAY [1])", BOOLEAN, true);
         assertFunction("row(TRUE, ARRAY [1]) = row(TRUE, ARRAY [1,2])", BOOLEAN, false);
-        assertFunction("row(1.0, ARRAY [1,2,3], row(2,2.0)) = row(1.0, ARRAY [1,2,3], row(2,2.0))", BOOLEAN, true);
+        assertFunction("row(CAST(1.0 as DOUBLE), ARRAY [1,2,3], row(2,CAST(2.0 as DOUBLE))) = row(CAST(1.0 as DOUBLE), ARRAY [1,2,3], row(2,CAST(2.0 as DOUBLE)))", BOOLEAN, true);
 
         assertFunction("row(TRUE, ARRAY [1]) != row(TRUE, ARRAY [1])", BOOLEAN, false);
         assertFunction("row(TRUE, ARRAY [1]) != row(TRUE, ARRAY [1,2])", BOOLEAN, true);
-        assertFunction("row(1.0, ARRAY [1,2,3], row(2,2.0)) != row(1.0, ARRAY [1,2,3], row(1,2.0))", BOOLEAN, true);
+        assertFunction("row(CAST(1.0 as DOUBLE), ARRAY [1,2,3], row(2,CAST(2.0 as DOUBLE))) != row(CAST(1.0 as DOUBLE), ARRAY [1,2,3], row(1,CAST(2.0 as DOUBLE)))", BOOLEAN, true);
 
         assertFunction("ROW(1, 2) = ROW(1, 2)", BOOLEAN, true);
         assertFunction("ROW(2, 1) != ROW(1, 2)", BOOLEAN, true);
+        assertFunction("ROW(1.0, 123123123456.6549876543) = ROW(1.0, 123123123456.6549876543)", BOOLEAN, true);
+        assertFunction("ROW(1.0, 123123123456.6549876543) = ROW(1.0, 123123123456.6549876542)", BOOLEAN, false);
+        assertFunction("ROW(1.0, 123123123456.6549876543) != ROW(1.0, 123123123456.6549876543)", BOOLEAN, false);
+        assertFunction("ROW(1.0, 123123123456.6549876543) != ROW(1.0, 123123123456.6549876542)", BOOLEAN, true);
     }
 }

@@ -22,6 +22,7 @@ import com.facebook.presto.spi.type.TypeManager;
 import com.google.common.base.Throwables;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
+import org.apache.hadoop.hive.common.type.HiveChar;
 import org.apache.hadoop.hive.common.type.HiveDecimal;
 import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde2.Deserializer;
@@ -46,8 +47,10 @@ import java.util.concurrent.TimeUnit;
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_CURSOR_ERROR;
 import static com.facebook.presto.hive.HiveUtil.bigintPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.booleanPartitionKey;
+import static com.facebook.presto.hive.HiveUtil.charParitionKey;
 import static com.facebook.presto.hive.HiveUtil.datePartitionKey;
 import static com.facebook.presto.hive.HiveUtil.doublePartitionKey;
+import static com.facebook.presto.hive.HiveUtil.floatPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.getDeserializer;
 import static com.facebook.presto.hive.HiveUtil.getTableObjectInspector;
 import static com.facebook.presto.hive.HiveUtil.integerPartitionKey;
@@ -62,11 +65,14 @@ import static com.facebook.presto.hive.util.SerDeUtils.getBlockObject;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
+import static com.facebook.presto.spi.type.Chars.isCharType;
+import static com.facebook.presto.spi.type.Chars.trimSpacesAndTruncateToLength;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.Decimals.isLongDecimal;
 import static com.facebook.presto.spi.type.Decimals.isShortDecimal;
 import static com.facebook.presto.spi.type.Decimals.rescale;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.FloatType.FLOAT;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
@@ -77,6 +83,7 @@ import static com.facebook.presto.spi.type.Varchars.truncateToLength;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Maps.uniqueIndex;
+import static java.lang.Float.floatToRawIntBits;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.String.format;
@@ -208,11 +215,17 @@ class GenericHiveRecordCursor<K, V extends Writable>
                 else if (TINYINT.equals(type)) {
                     longs[columnIndex] = tinyintPartitionKey(partitionKey.getValue(), name);
                 }
+                else if (FLOAT.equals(type)) {
+                    longs[columnIndex] = floatPartitionKey(partitionKey.getValue(), name);
+                }
                 else if (DOUBLE.equals(type)) {
                     doubles[columnIndex] = doublePartitionKey(partitionKey.getValue(), name);
                 }
                 else if (isVarcharType(type)) {
                     slices[columnIndex] = varcharPartitionKey(partitionKey.getValue(), name, type);
+                }
+                else if (isCharType(type)) {
+                    slices[columnIndex] = charParitionKey(partitionKey.getValue(), name, type);
                 }
                 else if (DATE.equals(type)) {
                     longs[columnIndex] = datePartitionKey(partitionKey.getValue(), name);
@@ -347,12 +360,12 @@ class GenericHiveRecordCursor<K, V extends Writable>
         else {
             Object fieldValue = ((PrimitiveObjectInspector) fieldInspectors[column]).getPrimitiveJavaObject(fieldData);
             checkState(fieldValue != null, "fieldValue should not be null");
-            longs[column] = getLongOrTimestamp(fieldValue, hiveStorageTimeZone);
+            longs[column] = getLongExpressedValue(fieldValue, hiveStorageTimeZone);
             nulls[column] = false;
         }
     }
 
-    private static long getLongOrTimestamp(Object value, DateTimeZone hiveTimeZone)
+    private static long getLongExpressedValue(Object value, DateTimeZone hiveTimeZone)
     {
         if (value instanceof Date) {
             long storageTime = ((Date) value).getTime();
@@ -376,6 +389,9 @@ class GenericHiveRecordCursor<K, V extends Writable>
             long utcMillis = hiveTimeZone.convertLocalToUTC(hiveMillis, false);
 
             return utcMillis;
+        }
+        if (value instanceof Float) {
+            return floatToRawIntBits(((Float) value));
         }
         return ((Number) value).longValue();
     }
@@ -449,12 +465,18 @@ class GenericHiveRecordCursor<K, V extends Writable>
             else if (fieldValue instanceof HiveVarchar) {
                 value = Slices.utf8Slice(((HiveVarchar) fieldValue).getValue());
             }
+            else if (fieldValue instanceof HiveChar) {
+                value = Slices.utf8Slice(((HiveChar) fieldValue).getValue());
+            }
             else {
                 throw new IllegalStateException("unsupported string field type: " + fieldValue.getClass().getName());
             }
             Type type = types[column];
             if (isVarcharType(type)) {
                 value = truncateToLength(value, type);
+            }
+            if (isCharType(type)) {
+                value = trimSpacesAndTruncateToLength(value, type);
             }
             slices[column] = value;
             nulls[column] = false;
@@ -553,7 +575,13 @@ class GenericHiveRecordCursor<K, V extends Writable>
         else if (DOUBLE.equals(type)) {
             parseDoubleColumn(column);
         }
+        else if (FLOAT.equals(type)) {
+            parseLongColumn(column);
+        }
         else if (isVarcharType(type) || VARBINARY.equals(type)) {
+            parseStringColumn(column);
+        }
+        else if (isCharType(type)) {
             parseStringColumn(column);
         }
         else if (isStructuralType(hiveTypes[column])) {

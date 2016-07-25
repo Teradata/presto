@@ -29,11 +29,27 @@ public final class DoubleSumAggregation
     private DoubleSumAggregation() {}
 
     @InputFunction
-    @IntermediateInputFunction
     public static void sum(NullableDoubleState state, @SqlType(StandardTypes.DOUBLE) double value)
     {
         state.setNull(false);
         state.setDouble(state.getDouble() + value);
+    }
+
+    @CombineFunction
+    public static void combine(NullableDoubleState state, NullableDoubleState otherState)
+    {
+        if (state.isNull()) {
+            if (otherState.isNull()) {
+                return;
+            }
+            state.setNull(false);
+            state.setDouble(otherState.getDouble());
+            return;
+        }
+
+        if (!otherState.isNull()) {
+            state.setDouble(state.getDouble() + otherState.getDouble());
+        }
     }
 
     @OutputFunction(StandardTypes.DOUBLE)

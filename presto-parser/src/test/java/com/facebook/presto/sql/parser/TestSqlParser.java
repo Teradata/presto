@@ -36,6 +36,8 @@ import com.facebook.presto.sql.tree.Deallocate;
 import com.facebook.presto.sql.tree.DecimalLiteral;
 import com.facebook.presto.sql.tree.Delete;
 import com.facebook.presto.sql.tree.DereferenceExpression;
+import com.facebook.presto.sql.tree.DescribeInput;
+import com.facebook.presto.sql.tree.DescribeOutput;
 import com.facebook.presto.sql.tree.DoubleLiteral;
 import com.facebook.presto.sql.tree.DropTable;
 import com.facebook.presto.sql.tree.DropView;
@@ -66,6 +68,7 @@ import com.facebook.presto.sql.tree.NaturalJoin;
 import com.facebook.presto.sql.tree.Node;
 import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.NullLiteral;
+import com.facebook.presto.sql.tree.Parameter;
 import com.facebook.presto.sql.tree.Prepare;
 import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.QualifiedNameReference;
@@ -120,6 +123,7 @@ import static com.facebook.presto.sql.parser.IdentifierSymbol.COLON;
 import static com.facebook.presto.sql.tree.ArithmeticUnaryExpression.negative;
 import static com.facebook.presto.sql.tree.ArithmeticUnaryExpression.positive;
 import static java.lang.String.format;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.nCopies;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -170,7 +174,6 @@ public class TestSqlParser
     {
         assertGenericLiteral("VARCHAR");
         assertGenericLiteral("BIGINT");
-        assertGenericLiteral("DOUBLE");
         assertGenericLiteral("BOOLEAN");
         assertGenericLiteral("DATE");
         assertGenericLiteral("foo");
@@ -213,7 +216,7 @@ public class TestSqlParser
     {
         assertExpression("ARRAY []", new ArrayConstructor(ImmutableList.<Expression>of()));
         assertExpression("ARRAY [1, 2]", new ArrayConstructor(ImmutableList.<Expression>of(new LongLiteral("1"), new LongLiteral("2"))));
-        assertExpression("ARRAY [1.0, 2.5]", new ArrayConstructor(ImmutableList.<Expression>of(new DoubleLiteral("1.0"), new DoubleLiteral("2.5"))));
+        assertExpression("ARRAY [1.0, 2.5]", new ArrayConstructor(ImmutableList.<Expression>of(new DecimalLiteral("1.0"), new DecimalLiteral("2.5"))));
         assertExpression("ARRAY ['hi']", new ArrayConstructor(ImmutableList.<Expression>of(new StringLiteral("hi"))));
         assertExpression("ARRAY ['hi', 'hello']", new ArrayConstructor(ImmutableList.<Expression>of(new StringLiteral("hi"), new StringLiteral("hello"))));
     }
@@ -239,11 +242,6 @@ public class TestSqlParser
     public void testDouble()
             throws Exception
     {
-        assertExpression("123.", new DoubleLiteral("123"));
-        assertExpression("123.0", new DoubleLiteral("123"));
-        assertExpression(".5", new DoubleLiteral(".5"));
-        assertExpression("123.5", new DoubleLiteral("123.5"));
-
         assertExpression("123E7", new DoubleLiteral("123E7"));
         assertExpression("123.E7", new DoubleLiteral("123E7"));
         assertExpression("123.0E7", new DoubleLiteral("123E7"));
@@ -257,6 +255,11 @@ public class TestSqlParser
         assertExpression(".4E42", new DoubleLiteral(".4E42"));
         assertExpression(".4E+42", new DoubleLiteral(".4E42"));
         assertExpression(".4E-42", new DoubleLiteral(".4E-42"));
+
+        assertExpression("DOUBLE '.4E42'", new DoubleLiteral(".4E42"));
+        assertExpression("DOUBLE '123E7'", new DoubleLiteral("123E7"));
+        assertExpression("DOUBLE '1.1'", new DoubleLiteral("1.1"));
+        assertExpression("DOUBLE '1'", new DoubleLiteral("1"));
     }
 
     @Test
@@ -434,8 +437,8 @@ public class TestSqlParser
     public void testValues()
     {
         Query valuesQuery = query(values(
-                row(new StringLiteral("a"), new LongLiteral("1"), new DoubleLiteral("2.2")),
-                row(new StringLiteral("b"), new LongLiteral("2"), new DoubleLiteral("3.3"))));
+                row(new StringLiteral("a"), new LongLiteral("1"), new DecimalLiteral("2.2")),
+                row(new StringLiteral("b"), new LongLiteral("2"), new DecimalLiteral("3.3"))));
 
         assertStatement("VALUES ('a', 1, 2.2), ('b', 2, 3.3)", valuesQuery);
 
@@ -683,6 +686,11 @@ public class TestSqlParser
         assertExpression("DECIMAL '-12'", new DecimalLiteral("-12"));
         assertExpression("DECIMAL '+.34'", new DecimalLiteral("+.34"));
         assertExpression("DECIMAL '-.34'", new DecimalLiteral("-.34"));
+
+        assertExpression("123.", new DecimalLiteral("123."));
+        assertExpression("123.0", new DecimalLiteral("123.0"));
+        assertExpression(".5", new DecimalLiteral(".5"));
+        assertExpression("123.5", new DecimalLiteral("123.5"));
     }
 
     @Test
@@ -1473,6 +1481,15 @@ public class TestSqlParser
     }
 
     @Test
+    public void testPrepareWithParameters()
+    {
+        assertStatement("PREPARE myquery FROM SELECT ?, ? FROM foo",
+                new Prepare("myquery", simpleQuery(
+                        selectList(new Parameter(0), new Parameter(1)),
+                        table(QualifiedName.of("foo")))));
+    }
+
+    @Test
     public void testDeallocatePrepare()
     {
         assertStatement("DEALLOCATE PREPARE myquery", new Deallocate("myquery"));
@@ -1481,7 +1498,14 @@ public class TestSqlParser
     @Test
     public void testExecute()
     {
-        assertStatement("EXECUTE myquery", new Execute("myquery"));
+        assertStatement("EXECUTE myquery", new Execute("myquery", emptyList()));
+    }
+
+    @Test
+    public void testExecuteWithUsing()
+    {
+        assertStatement("EXECUTE myquery USING 1, 'abc', ARRAY ['hello']",
+                new Execute("myquery", ImmutableList.of(new LongLiteral("1"), new StringLiteral("abc"), new ArrayConstructor(ImmutableList.of(new StringLiteral("hello"))))));
     }
 
     @Test
@@ -1515,6 +1539,18 @@ public class TestSqlParser
                                         ComparisonExpression.Type.EQUAL,
                                         new NotExpression(new ExistsPredicate(simpleQuery(selectList(new LongLiteral("1"))))),
                                         new ExistsPredicate(simpleQuery(selectList(new LongLiteral("2"))))))));
+    }
+
+    @Test
+    public void testDescribeOutput()
+    {
+        assertStatement("DESCRIBE OUTPUT myquery", new DescribeOutput("myquery"));
+    }
+
+    @Test
+    public void testDescribeInput()
+    {
+        assertStatement("DESCRIBE INPUT myquery", new DescribeInput("myquery"));
     }
 
     private static void assertCast(String type)

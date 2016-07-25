@@ -53,6 +53,7 @@ import com.facebook.presto.sql.tree.Node;
 import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.NullIfExpression;
 import com.facebook.presto.sql.tree.NullLiteral;
+import com.facebook.presto.sql.tree.Parameter;
 import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.QualifiedNameReference;
 import com.facebook.presto.sql.tree.Rollup;
@@ -172,6 +173,12 @@ public final class ExpressionFormatter
         }
 
         @Override
+        protected String visitParameter(Parameter node, Boolean unmangleNames)
+        {
+            return "?";
+        }
+
+        @Override
         protected String visitArrayConstructor(ArrayConstructor node, Boolean unmangleNames)
         {
             ImmutableList.Builder<String> valueStrings = ImmutableList.builder();
@@ -196,7 +203,7 @@ public final class ExpressionFormatter
         @Override
         protected String visitDoubleLiteral(DoubleLiteral node, Boolean unmangleNames)
         {
-            return Double.toString(node.getValue());
+            return "DOUBLE '" + Double.toString(node.getValue()) + "'";
         }
 
         @Override
@@ -254,7 +261,7 @@ public final class ExpressionFormatter
         @Override
         protected String visitExists(ExistsPredicate node, Boolean unmangleNames)
         {
-            return "EXISTS (" + formatSql(node.getSubquery(), unmangleNames) + ")";
+            return "(EXISTS (" + formatSql(node.getSubquery(), unmangleNames) + "))";
         }
 
         @Override

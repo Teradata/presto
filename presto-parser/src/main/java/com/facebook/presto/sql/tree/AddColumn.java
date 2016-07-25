@@ -20,7 +20,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 public class AddColumn
-        extends Statement
+        extends DataDefinitionStatement
 {
     private final QualifiedName name;
     private final TableElement column;
@@ -35,7 +35,7 @@ public class AddColumn
         this(Optional.of(location), name, column);
     }
 
-    private AddColumn(Optional<NodeLocation> location, QualifiedName name, TableElement column)
+    protected AddColumn(Optional<NodeLocation> location, QualifiedName name, TableElement column)
     {
         super(location);
         this.name = requireNonNull(name, "table is null");

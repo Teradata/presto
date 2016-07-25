@@ -40,6 +40,7 @@ import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMEN
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
+import static com.facebook.presto.spi.type.DecimalType.createDecimalType;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
@@ -91,7 +92,7 @@ public class TestArrayOperators
             throws Exception
     {
         assertFunction("ARRAY[7]", new ArrayType(INTEGER), ImmutableList.of(7));
-        assertFunction("ARRAY[12.34, 56.78]", new ArrayType(DOUBLE), ImmutableList.of(12.34, 56.78));
+        assertFunction("ARRAY[DOUBLE '12.34', DOUBLE '56.78']", new ArrayType(DOUBLE), ImmutableList.of(12.34, 56.78));
     }
 
     @Test
@@ -118,6 +119,13 @@ public class TestArrayOperators
 
         assertFunction("CAST(ARRAY [ARRAY[1], ARRAY[2, 3]] AS ARRAY<ARRAY<DOUBLE>>)", new ArrayType(new ArrayType(DOUBLE)), asList(asList(1.0), asList(2.0, 3.0)));
 
+        assertFunction("CAST(ARRAY [ARRAY[1.0], ARRAY[2.0, 3.0]] AS ARRAY<ARRAY<DOUBLE>>)", new ArrayType(new ArrayType(DOUBLE)), asList(asList(1.0), asList(2.0, 3.0)));
+        assertFunction("CAST(ARRAY [ARRAY[DOUBLE '1.0'], ARRAY[DOUBLE '2.0', DOUBLE '3.0']] AS ARRAY<ARRAY<DECIMAL(2,1)>>)",
+                new ArrayType(new ArrayType(createDecimalType(2, 1))), asList(asList(decimal("1.0")), asList(decimal("2.0"), decimal("3.0"))));
+        assertFunction("CAST(ARRAY [ARRAY[DOUBLE '1.0'], ARRAY[DOUBLE '2.0', DOUBLE '3.0']] AS ARRAY<ARRAY<DECIMAL(20,10)>>)",
+                new ArrayType(new ArrayType(createDecimalType(20, 10))),
+                asList(asList(decimal("0000000001.0000000000")), asList(decimal("0000000002.0000000000"), decimal("0000000003.0000000000"))));
+
         assertInvalidFunction("CAST(ARRAY [1, null, 3] AS ARRAY<TIMESTAMP>)", TYPE_MISMATCH);
         assertInvalidFunction("CAST(ARRAY [1, null, 3] AS ARRAY<ARRAY<TIMESTAMP>>)", TYPE_MISMATCH);
         assertInvalidFunction("CAST(ARRAY ['puppies', 'kittens'] AS ARRAY<BIGINT>)", INVALID_CAST_ARGUMENT);
@@ -129,12 +137,14 @@ public class TestArrayOperators
     {
         assertFunction("CAST(ARRAY [1, 2, 3] AS JSON)", JSON, "[1,2,3]");
         assertFunction("CAST(ARRAY [1, NULL, 3] AS JSON)", JSON, "[1,null,3]");
-        assertFunction("CAST(ARRAY [1, 2.0, 3] AS JSON)", JSON, "[1.0,2.0,3.0]");
-        assertFunction("CAST(ARRAY [1.0, 2.5, 3.0] AS JSON)", JSON, "[1.0,2.5,3.0]");
+        assertFunction("CAST(ARRAY [1, CAST(2.0 as DOUBLE), 3] AS JSON)", JSON, "[1.0,2.0,3.0]");
+        assertFunction("CAST(ARRAY [CAST(1.0 as DOUBLE), CAST(2.5 as DOUBLE), CAST(3.0 as DOUBLE)] AS JSON)", JSON, "[1.0,2.5,3.0]");
         assertFunction("CAST(ARRAY ['puppies', 'kittens'] AS JSON)", JSON, "[\"puppies\",\"kittens\"]");
         assertFunction("CAST(ARRAY [TRUE, FALSE] AS JSON)", JSON, "[true,false]");
         assertFunction("CAST(ARRAY [from_unixtime(1)] AS JSON)", JSON, "[\"" + sqlTimestamp(1000) + "\"]");
         assertFunction("CAST(ARRAY [ARRAY [1], ARRAY [2, 3]] AS JSON)", JSON, "[[1],[2,3]]");
+        assertFunction("CAST(ARRAY [12345.12345, 12345.12345, 3.0] AS JSON)", JSON, "[12345.12345,12345.12345,3.00000]");
+        assertFunction("CAST(ARRAY [123456789012345678901234567890.87654321, 123456789012345678901234567890.12345678] AS JSON)", JSON, "[123456789012345678901234567890.87654321,123456789012345678901234567890.12345678]");
     }
 
     @Test
@@ -154,6 +164,12 @@ public class TestArrayOperators
         assertInvalidCast("CAST(JSON '[1, null, 3]' AS ARRAY<ARRAY<TIMESTAMP>>)");
         assertInvalidCast("CAST(JSON '[1, 2, 3]' AS ARRAY<BOOLEAN>)");
         assertInvalidCast("CAST(JSON '[\"puppies\", \"kittens\"]' AS ARRAY<BIGINT>)");
+        assertFunction("CAST(JSON '[1, 2.0, 3]' AS ARRAY(DECIMAL(10,5)))", new ArrayType(createDecimalType(10, 5)), ImmutableList.of(decimal("1.00000"), decimal("2.00000"), decimal("3.00000")));
+        assertFunction("CAST(CAST(ARRAY [1, 2.0, 3] as JSON) AS ARRAY(DECIMAL(10,5)))", new ArrayType(createDecimalType(10, 5)), ImmutableList.of(decimal("1.00000"), decimal("2.00000"), decimal("3.00000")));
+        assertFunction("CAST(CAST(ARRAY [123456789012345678901234567890.12345678, 1.2] as JSON) AS ARRAY(DECIMAL(38,8)))", new ArrayType(createDecimalType(38, 8)),
+                ImmutableList.of(decimal("123456789012345678901234567890.12345678"), decimal("1.20000000")));
+        assertFunction("CAST(CAST(ARRAY [12345.87654] as JSON) AS ARRAY(DECIMAL(7,2)))", new ArrayType(createDecimalType(7, 2)), ImmutableList.of(decimal("12345.88")));
+        assertInvalidCast("CAST(CAST(ARRAY [12345.12345] as JSON) AS ARRAY(DECIMAL(6,2)))");
     }
 
     @Test
@@ -165,18 +181,18 @@ public class TestArrayOperators
         assertFunction("ARRAY [1, 2, 3]", new ArrayType(INTEGER), ImmutableList.of(1, 2, 3));
         assertFunction("ARRAY [1, NULL, 3]", new ArrayType(INTEGER), Lists.newArrayList(1, null, 3));
         assertFunction("ARRAY [NULL, 2, 3]", new ArrayType(INTEGER), Lists.newArrayList(null, 2, 3));
-        assertFunction("ARRAY [1, 2.0, 3]", new ArrayType(DOUBLE), ImmutableList.of(1.0, 2.0, 3.0));
+        assertFunction("ARRAY [1, CAST(2.0 as DOUBLE), 3]", new ArrayType(DOUBLE), ImmutableList.of(1.0, 2.0, 3.0));
         assertFunction("ARRAY [ARRAY[1, 2], ARRAY[3]]", new ArrayType(new ArrayType(INTEGER)), ImmutableList.of(ImmutableList.of(1, 2), ImmutableList.of(3)));
         assertFunction("ARRAY [ARRAY[1, 2], NULL, ARRAY[3]]", new ArrayType(new ArrayType(INTEGER)), Lists.newArrayList(ImmutableList.of(1, 2), null, ImmutableList.of(3)));
         assertFunction("ARRAY [BIGINT '1', 2, 3]", new ArrayType(BIGINT), ImmutableList.of(1L, 2L, 3L));
         assertFunction("ARRAY [1, CAST (NULL AS BIGINT), 3]", new ArrayType(BIGINT), Lists.newArrayList(1L, null, 3L));
         assertFunction("ARRAY [NULL, 20000000000, 30000000000]", new ArrayType(BIGINT), Lists.newArrayList(null, 20000000000L, 30000000000L));
-        assertFunction("ARRAY [1, 2.0, 3]", new ArrayType(DOUBLE), ImmutableList.of(1.0, 2.0, 3.0));
+        assertFunction("ARRAY [1, CAST(2.0 as DOUBLE), 3]", new ArrayType(DOUBLE), ImmutableList.of(1.0, 2.0, 3.0));
         assertFunction("ARRAY [ARRAY[1, 2], ARRAY[3]]", new ArrayType(new ArrayType(INTEGER)), ImmutableList.of(ImmutableList.of(1, 2), ImmutableList.of(3)));
         assertFunction("ARRAY [ARRAY[1, 2], NULL, ARRAY[3]]", new ArrayType(new ArrayType(INTEGER)), Lists.newArrayList(ImmutableList.of(1, 2), null, ImmutableList.of(3)));
         assertFunction("ARRAY [ARRAY[1, 2], NULL, ARRAY[BIGINT '3']]", new ArrayType(new ArrayType(BIGINT)), Lists.newArrayList(ImmutableList.of(1L, 2L), null, ImmutableList.of(3L)));
-        assertFunction("ARRAY [1.0, 2.5, 3.0]", new ArrayType(DOUBLE), ImmutableList.of(1.0, 2.5, 3.0));
-        assertFunction("ARRAY [1, 2.5, 3]", new ArrayType(DOUBLE), ImmutableList.of(1.0, 2.5, 3.0));
+        assertFunction("ARRAY [CAST(1.0 as DOUBLE), CAST(2.5 as DOUBLE), CAST(3.0 as DOUBLE)]", new ArrayType(DOUBLE), ImmutableList.of(1.0, 2.5, 3.0));
+        assertFunction("ARRAY [1, CAST(2.5 as DOUBLE), 3]", new ArrayType(DOUBLE), ImmutableList.of(1.0, 2.5, 3.0));
         assertFunction("ARRAY ['puppies', 'kittens']", new ArrayType(createVarcharType(7)), ImmutableList.of("puppies", "kittens"));
         assertFunction("ARRAY [TRUE, FALSE]", new ArrayType(BOOLEAN), ImmutableList.of(true, false));
         assertFunction("ARRAY [from_unixtime(1), from_unixtime(100)]", new ArrayType(TIMESTAMP), ImmutableList.of(
@@ -185,6 +201,15 @@ public class TestArrayOperators
         assertFunction("ARRAY [pow(infinity(), 2)]", new ArrayType(DOUBLE), ImmutableList.of(POSITIVE_INFINITY));
         assertFunction("ARRAY [pow(-infinity(), 1)]", new ArrayType(DOUBLE), ImmutableList.of(NEGATIVE_INFINITY));
         assertFunction("ARRAY [ARRAY [], NULL]", new ArrayType(new ArrayType(UNKNOWN)), asList(ImmutableList.of(), null));
+        assertFunction("ARRAY [ARRAY[1.0], ARRAY[2.0, 3.0]]",
+                new ArrayType(new ArrayType(createDecimalType(2, 1))), asList(asList(decimal("1.0")), asList(decimal("2.0"), decimal("3.0"))));
+        assertFunction("ARRAY[1.0, 2.0, 3.11]",
+                new ArrayType(createDecimalType(3, 2)), asList(decimal("1.00"), decimal("2.00"), decimal("3.11")));
+        assertFunction("ARRAY[1, 2.0, 3.11]",
+                new ArrayType(createDecimalType(12, 2)), asList(decimal("0000000001.00"), decimal("0000000002.00"), decimal("0000000003.11")));
+        assertFunction("ARRAY [ARRAY[1.0], ARRAY[2.0, 123456789123456.789]]",
+                new ArrayType(new ArrayType(createDecimalType(18, 3))),
+                asList(asList(decimal("000000000000001.000")), asList(decimal("000000000000002.000"), decimal("123456789123456.789"))));
     }
 
     @Test
@@ -207,8 +232,12 @@ public class TestArrayOperators
         assertFunction("ARRAY [] || ARRAY []", new ArrayType(UNKNOWN), ImmutableList.of());
         assertFunction("ARRAY [TRUE] || ARRAY [FALSE] || ARRAY [TRUE]", new ArrayType(BOOLEAN), ImmutableList.of(true, false, true));
         assertFunction("ARRAY [1] || ARRAY [2] || ARRAY [3] || ARRAY [4]", new ArrayType(INTEGER), ImmutableList.of(1, 2, 3, 4));
-        assertFunction("ARRAY [1] || ARRAY [2.0] || ARRAY [3] || ARRAY [4.0]", new ArrayType(DOUBLE), ImmutableList.of(1.0, 2.0, 3.0, 4.0));
+        assertFunction("ARRAY [1] || ARRAY [CAST(2.0 as DOUBLE)] || ARRAY [3] || ARRAY [CAST(4.0 as DOUBLE)]", new ArrayType(DOUBLE), ImmutableList.of(1.0, 2.0, 3.0, 4.0));
         assertFunction("ARRAY [ARRAY [1], ARRAY [2, 8]] || ARRAY [ARRAY [3, 6], ARRAY [4]]", new ArrayType(new ArrayType(INTEGER)), ImmutableList.of(ImmutableList.of(1), ImmutableList.of(2, 8), ImmutableList.of(3, 6), ImmutableList.of(4)));
+        assertFunction("ARRAY[1.0] || ARRAY [2.0, 3.11]",
+                new ArrayType(createDecimalType(3, 2)), asList(decimal("1.00"), decimal("2.00"), decimal("3.11")));
+        assertFunction("ARRAY[1.0] || ARRAY [2.0] || ARRAY [123456789123456.789]",
+                new ArrayType(createDecimalType(18, 3)), asList(decimal("000000000000001.000"), decimal("000000000000002.000"), decimal("123456789123456.789")));
 
         assertInvalidFunction("ARRAY [ARRAY[1]] || ARRAY[ARRAY[true], ARRAY[false]]", FUNCTION_NOT_FOUND);
 
@@ -235,8 +264,8 @@ public class TestArrayOperators
         assertFunction("ARRAY [2] || BIGINT '1'", new ArrayType(BIGINT), Lists.newArrayList(2L, 1L));
         assertFunction("TRUE || ARRAY [FALSE]", new ArrayType(BOOLEAN), Lists.newArrayList(true, false));
         assertFunction("ARRAY [FALSE] || TRUE", new ArrayType(BOOLEAN), Lists.newArrayList(false, true));
-        assertFunction("1.0 || ARRAY [2.0]", new ArrayType(DOUBLE), Lists.newArrayList(1.0, 2.0));
-        assertFunction("ARRAY [2.0] || 1.0", new ArrayType(DOUBLE), Lists.newArrayList(2.0, 1.0));
+        assertFunction("CAST(1.0 as DOUBLE) || ARRAY [CAST(2.0 as DOUBLE)]", new ArrayType(DOUBLE), Lists.newArrayList(1.0, 2.0));
+        assertFunction("ARRAY [CAST(2.0 as DOUBLE)] || CAST(1.0 as DOUBLE)", new ArrayType(DOUBLE), Lists.newArrayList(2.0, 1.0));
         assertFunction("'puppies' || ARRAY ['kittens']", new ArrayType(createVarcharType(7)), Lists.newArrayList("puppies", "kittens"));
         assertFunction("ARRAY ['kittens'] || 'puppies'", new ArrayType(createVarcharType(7)), Lists.newArrayList("kittens", "puppies"));
         assertFunction("ARRAY [from_unixtime(1)] || from_unixtime(100)", new ArrayType(TIMESTAMP), ImmutableList.of(
@@ -245,6 +274,10 @@ public class TestArrayOperators
                 sqlTimestamp(100_000), sqlTimestamp(1000)));
         assertFunction("ARRAY [2, 8] || ARRAY[ARRAY[3, 6], ARRAY[4]]", new ArrayType(new ArrayType(INTEGER)), ImmutableList.of(ImmutableList.of(2, 8), ImmutableList.of(3, 6), ImmutableList.of(4)));
         assertFunction("ARRAY [ARRAY [1], ARRAY [2, 8]] || ARRAY [3, 6]", new ArrayType(new ArrayType(INTEGER)), ImmutableList.of(ImmutableList.of(1), ImmutableList.of(2, 8), ImmutableList.of(3, 6)));
+        assertFunction("ARRAY [2.0, 3.11] || 1.0",
+                new ArrayType(createDecimalType(3, 2)), asList(decimal("2.00"), decimal("3.11"), decimal("1.00")));
+        assertFunction("ARRAY[1.0] || 2.0 || 123456789123456.789",
+                new ArrayType(createDecimalType(18, 3)), asList(decimal("000000000000001.000"), decimal("000000000000002.000"), decimal("123456789123456.789")));
 
         try {
             assertFunction("ARRAY [ARRAY[1]] || ARRAY ['x']", new ArrayType(new ArrayType(INTEGER)), null);
@@ -267,8 +300,8 @@ public class TestArrayOperators
         assertFunction("CONTAINS(ARRAY [1, NULL, 3], 1)", BOOLEAN, true);
         assertFunction("CONTAINS(ARRAY [NULL, 2, 3], 1)", BOOLEAN, null);
         assertFunction("CONTAINS(ARRAY [NULL, 2, 3], NULL)", BOOLEAN, null);
-        assertFunction("CONTAINS(ARRAY [1, 2.0, 3], 3.0)", BOOLEAN, true);
-        assertFunction("CONTAINS(ARRAY [1.0, 2.5, 3.0], 2.2)", BOOLEAN, false);
+        assertFunction("CONTAINS(ARRAY [1, CAST(2.0 as DOUBLE), 3], CAST(3.0 as DOUBLE))", BOOLEAN, true);
+        assertFunction("CONTAINS(ARRAY [CAST(1.0 as DOUBLE), CAST(2.5 as DOUBLE), CAST(3.0 as DOUBLE)], CAST(2.2 as DOUBLE))", BOOLEAN, false);
         assertFunction("CONTAINS(ARRAY ['puppies', 'dogs'], 'dogs')", BOOLEAN, true);
         assertFunction("CONTAINS(ARRAY ['puppies', 'dogs'], 'sharks')", BOOLEAN, false);
         assertFunction("CONTAINS(ARRAY [TRUE, FALSE], TRUE)", BOOLEAN, true);
@@ -279,6 +312,13 @@ public class TestArrayOperators
         assertFunction("CONTAINS(ARRAY [CAST (NULL AS BIGINT)], NULL)", BOOLEAN, null);
         assertFunction("CONTAINS(ARRAY [], NULL)", BOOLEAN, null);
         assertFunction("CONTAINS(ARRAY [], 1)", BOOLEAN, false);
+        assertFunction("CONTAINS(ARRAY [2.2, 1.1], 1.1)", BOOLEAN, true);
+        assertFunction("CONTAINS(ARRAY [2.2, 1.1], 1.1)", BOOLEAN, true);
+        assertFunction("CONTAINS(ARRAY [2.2, NULL], 1.1)", BOOLEAN, null);
+        assertFunction("CONTAINS(ARRAY [2.2, 1.1], 1.2)", BOOLEAN, false);
+        assertFunction("CONTAINS(ARRAY [2.2, 1.1], 0000000000001.100)", BOOLEAN, true);
+        assertFunction("CONTAINS(ARRAY [2.2, 001.20], 1.2)", BOOLEAN, true);
+        assertFunction("CONTAINS(ARRAY [ARRAY [1.1, 2.2], ARRAY [3.3, 4.3]], ARRAY [3.3, 4.300])", BOOLEAN, true);
     }
 
     @Test
@@ -303,6 +343,10 @@ public class TestArrayOperators
         assertFunction("ARRAY_JOIN(ARRAY [from_unixtime(1), from_unixtime(10)], '|')", VARCHAR, sqlTimestamp(1000).toString() + "|" + sqlTimestamp(10_000).toString());
         assertFunction("ARRAY_JOIN(ARRAY [null, from_unixtime(10)], '|')", VARCHAR, sqlTimestamp(10_000).toString());
         assertFunction("ARRAY_JOIN(ARRAY [null, from_unixtime(10)], '|', 'XYZ')", VARCHAR, "XYZ|" + sqlTimestamp(10_000).toString());
+        assertFunction("ARRAY_JOIN(ARRAY [1.0, 2.1, 3.3], 'x')", VARCHAR, "1.0x2.1x3.3");
+        assertFunction("ARRAY_JOIN(ARRAY [1.0, 2.100, 3.3], 'x')", VARCHAR, "1.000x2.100x3.300");
+        assertFunction("ARRAY_JOIN(ARRAY [1.0, 2.100, NULL], 'x', 'N/A')", VARCHAR, "1.000x2.100xN/A");
+        assertFunction("ARRAY_JOIN(ARRAY [1.0, DOUBLE '002.100', 3.3], 'x')", VARCHAR, "1.0x2.1x3.3");
 
         assertInvalidFunction("ARRAY_JOIN(ARRAY [ARRAY [1], ARRAY [2]], '-')", INVALID_FUNCTION_ARGUMENT);
         assertInvalidFunction("ARRAY_JOIN(ARRAY [MAP(ARRAY [1], ARRAY [2])], '-')", INVALID_FUNCTION_ARGUMENT);
@@ -317,11 +361,13 @@ public class TestArrayOperators
         assertFunction("CARDINALITY(ARRAY [NULL])", BIGINT, 1L);
         assertFunction("CARDINALITY(ARRAY [1, 2, 3])", BIGINT, 3L);
         assertFunction("CARDINALITY(ARRAY [1, NULL, 3])", BIGINT, 3L);
-        assertFunction("CARDINALITY(ARRAY [1, 2.0, 3])", BIGINT, 3L);
+        assertFunction("CARDINALITY(ARRAY [1, CAST(2.0 as DOUBLE), 3])", BIGINT, 3L);
         assertFunction("CARDINALITY(ARRAY [ARRAY[1, 2], ARRAY[3]])", BIGINT, 2L);
-        assertFunction("CARDINALITY(ARRAY [1.0, 2.5, 3.0])", BIGINT, 3L);
+        assertFunction("CARDINALITY(ARRAY [CAST(1.0 as DOUBLE), CAST(2.5 as DOUBLE), CAST(3.0 as DOUBLE)])", BIGINT, 3L);
         assertFunction("CARDINALITY(ARRAY ['puppies', 'kittens'])", BIGINT, 2L);
         assertFunction("CARDINALITY(ARRAY [TRUE, FALSE])", BIGINT, 2L);
+        assertFunction("CARDINALITY(ARRAY [1.1, 2.2, 3.3])", BIGINT, 3L);
+        assertFunction("CARDINALITY(ARRAY [1.1, 33832293522235.23522])", BIGINT, 2L);
     }
 
     @Test
@@ -332,17 +378,21 @@ public class TestArrayOperators
         assertFunction("ARRAY_MIN(ARRAY [NULL])", UNKNOWN, null);
         assertFunction("ARRAY_MIN(ARRAY [NULL, NULL, NULL])", UNKNOWN, null);
         assertFunction("ARRAY_MIN(ARRAY [NULL, 2, 3])", INTEGER, null);
-        assertFunction("ARRAY_MIN(ARRAY [1.0, NULL, 3])", DOUBLE, null);
+        assertFunction("ARRAY_MIN(ARRAY [CAST(1.0 as DOUBLE), NULL, 3])", DOUBLE, null);
         assertFunction("ARRAY_MIN(ARRAY ['1', '2', NULL])", createVarcharType(1), null);
         assertFunction("ARRAY_MIN(ARRAY [3, 2, 1])", INTEGER, 1);
         assertFunction("ARRAY_MIN(ARRAY [1, 2, 3])", INTEGER, 1);
         assertFunction("ARRAY_MIN(ARRAY [BIGINT '3', 2, 1])", BIGINT, 1L);
-        assertFunction("ARRAY_MIN(ARRAY [1, 2.0, 3])", DOUBLE, 1.0);
+        assertFunction("ARRAY_MIN(ARRAY [1, CAST(2.0 as DOUBLE), 3])", DOUBLE, 1.0);
         assertFunction("ARRAY_MIN(ARRAY [ARRAY[1, 2], ARRAY[3]])", new ArrayType(INTEGER), ImmutableList.of(1, 2));
-        assertFunction("ARRAY_MIN(ARRAY [1.0, 2.5, 3.0])", DOUBLE, 1.0);
+        assertFunction("ARRAY_MIN(ARRAY [CAST(1.0 as DOUBLE), CAST(2.5 as DOUBLE), CAST(3.0 as DOUBLE)])", DOUBLE, 1.0);
         assertFunction("ARRAY_MIN(ARRAY ['puppies', 'kittens'])", createVarcharType(7), "kittens");
         assertFunction("ARRAY_MIN(ARRAY [TRUE, FALSE])", BOOLEAN, false);
         assertFunction("ARRAY_MIN(ARRAY [NULL, FALSE])", BOOLEAN, null);
+        assertDecimalFunction("ARRAY_MIN(ARRAY [2.1, 2.2, 2.3])", decimal("2.1"));
+        assertDecimalFunction("ARRAY_MIN(ARRAY [2.111111222111111114111, 2.22222222222222222, 2.222222222222223])", decimal("2.111111222111111114111"));
+        assertDecimalFunction("ARRAY_MIN(ARRAY [1.9, 2, 2.3])", decimal("0000000001.9"));
+        assertDecimalFunction("ARRAY_MIN(ARRAY [2.22222222222222222, 2.3])", decimal("2.22222222222222222"));
     }
 
     @Test
@@ -353,17 +403,21 @@ public class TestArrayOperators
         assertFunction("ARRAY_MAX(ARRAY [NULL])", UNKNOWN, null);
         assertFunction("ARRAY_MAX(ARRAY [NULL, NULL, NULL])", UNKNOWN, null);
         assertFunction("ARRAY_MAX(ARRAY [NULL, 2, 3])", INTEGER, null);
-        assertFunction("ARRAY_MAX(ARRAY [1.0, NULL, 3])", DOUBLE, null);
+        assertFunction("ARRAY_MAX(ARRAY [CAST(1.0 as DOUBLE), NULL, 3])", DOUBLE, null);
         assertFunction("ARRAY_MAX(ARRAY ['1', '2', NULL])", createVarcharType(1), null);
         assertFunction("ARRAY_MAX(ARRAY [3, 2, 1])", INTEGER, 3);
         assertFunction("ARRAY_MAX(ARRAY [1, 2, 3])", INTEGER, 3);
         assertFunction("ARRAY_MAX(ARRAY [BIGINT '1', 2, 3])", BIGINT, 3L);
-        assertFunction("ARRAY_MAX(ARRAY [1, 2.0, 3])", DOUBLE, 3.0);
+        assertFunction("ARRAY_MAX(ARRAY [1, CAST(2.0 as DOUBLE), 3])", DOUBLE, 3.0);
         assertFunction("ARRAY_MAX(ARRAY [ARRAY[1, 2], ARRAY[3]])", new ArrayType(INTEGER), ImmutableList.of(3));
-        assertFunction("ARRAY_MAX(ARRAY [1.0, 2.5, 3.0])", DOUBLE, 3.0);
+        assertFunction("ARRAY_MAX(ARRAY [CAST(1.0 as DOUBLE), CAST(2.5 as DOUBLE), CAST(3.0 as DOUBLE)])", DOUBLE, 3.0);
         assertFunction("ARRAY_MAX(ARRAY ['puppies', 'kittens'])", createVarcharType(7), "puppies");
         assertFunction("ARRAY_MAX(ARRAY [TRUE, FALSE])", BOOLEAN, true);
         assertFunction("ARRAY_MAX(ARRAY [NULL, FALSE])", BOOLEAN, null);
+        assertDecimalFunction("ARRAY_MAX(ARRAY [2.1, 2.2, 2.3])", decimal("2.3"));
+        assertDecimalFunction("ARRAY_MAX(ARRAY [2.111111222111111114111, 2.22222222222222222, 2.222222222222223])", decimal("2.222222222222223000000"));
+        assertDecimalFunction("ARRAY_MAX(ARRAY [1.9, 2, 2.3])", decimal("0000000002.3"));
+        assertDecimalFunction("ARRAY_MAX(ARRAY [2.22222222222222222, 2.3])", decimal("2.30000000000000000"));
     }
 
     @Test
@@ -376,7 +430,7 @@ public class TestArrayOperators
         assertFunction("ARRAY_POSITION(ARRAY [cast(NULL as bigint), NULL, NULL], 30)", BIGINT, 0L);
         assertFunction("ARRAY_POSITION(ARRAY [NULL, NULL, 30, NULL], 30)", BIGINT, 3L);
 
-        assertFunction("ARRAY_POSITION(ARRAY [1.1, 2.1, 3.1, 4.1], 3.1)", BIGINT, 3L);
+        assertFunction("ARRAY_POSITION(ARRAY [CAST(1.1 as DOUBLE), CAST(2.1 as DOUBLE), CAST(3.1 as DOUBLE), CAST(4.1 as DOUBLE)], CAST(3.1 as DOUBLE))", BIGINT, 3L);
         assertFunction("ARRAY_POSITION(ARRAY [false, false, true, true], true)", BIGINT, 3L);
         assertFunction("ARRAY_POSITION(ARRAY ['10', '20', '30', '40'], '30')", BIGINT, 3L);
 
@@ -389,6 +443,11 @@ public class TestArrayOperators
         assertFunction("ARRAY_POSITION(ARRAY [1, CAST(NULL AS BIGINT), 2], CAST(NULL AS BIGINT))", BIGINT, null);
         assertFunction("ARRAY_POSITION(ARRAY [1, NULL, 2], CAST(NULL AS BIGINT))", BIGINT, null);
         assertFunction("ARRAY_POSITION(ARRAY [1, CAST(NULL AS BIGINT), 2], NULL)", BIGINT, null);
+        assertFunction("ARRAY_POSITION(ARRAY [1.0, 2.0, 3.0, 4.0], 3.0)", BIGINT, 3L);
+        assertFunction("ARRAY_POSITION(ARRAY [1.0, 2.0, 000000000000000000000003.000, 4.0], 3.0)", BIGINT, 3L);
+        assertFunction("ARRAY_POSITION(ARRAY [1.0, 2.0, 3.0, 4.0], 000000000000000000000003.000)", BIGINT, 3L);
+        assertFunction("ARRAY_POSITION(ARRAY [1.0, 2.0, 3.0, 4.0], 3)", BIGINT, 3L);
+        assertFunction("ARRAY_POSITION(ARRAY [1.0, 2.0, 3, 4.0], 4.0)", BIGINT, 4L);
     }
 
     @Test
@@ -405,7 +464,7 @@ public class TestArrayOperators
         assertInvalidFunction("ARRAY [1, 2, 3][4]", outOfBounds);
 
         try {
-            assertFunction("ARRAY [1, 2, 3][1.1]", BIGINT, null);
+            assertFunction("ARRAY [1, 2, 3][CAST(1.1 as DOUBLE)]", BIGINT, null);
             fail("Access to array with double subscript should fail");
         }
         catch (SemanticException e) {
@@ -417,7 +476,7 @@ public class TestArrayOperators
         assertFunction("1 + ARRAY [2, 1, 3][2]", INTEGER, 2);
         assertFunction("ARRAY [2, 1, 3][2]", INTEGER, 1);
         assertFunction("ARRAY [2, NULL, 3][2]", INTEGER, null);
-        assertFunction("ARRAY [1.0, 2.5, 3.5][3]", DOUBLE, 3.5);
+        assertFunction("ARRAY [CAST(1.0 as DOUBLE), CAST(2.5 as DOUBLE), CAST(3.5 as DOUBLE)][3]", DOUBLE, 3.5);
         assertFunction("ARRAY [ARRAY[1, 2], ARRAY[3]][2]", new ArrayType(INTEGER), ImmutableList.of(3));
         assertFunction("ARRAY [ARRAY[1, 2], NULL, ARRAY[3]][2]", new ArrayType(INTEGER), null);
         assertFunction("ARRAY [ARRAY[1, 2], ARRAY[3]][2][1]", INTEGER, 3);
@@ -428,6 +487,10 @@ public class TestArrayOperators
         assertFunction("ARRAY [infinity()][1]", DOUBLE, POSITIVE_INFINITY);
         assertFunction("ARRAY [-infinity()][1]", DOUBLE, NEGATIVE_INFINITY);
         assertFunction("ARRAY [sqrt(-1)][1]", DOUBLE, NaN);
+        assertDecimalFunction("ARRAY [2.1, 2.2, 2.3][3]", decimal("2.3"));
+        assertDecimalFunction("ARRAY [2.111111222111111114111, 2.22222222222222222, 2.222222222222223][3]", decimal("2.222222222222223000000"));
+        assertDecimalFunction("ARRAY [1.9, 2, 2.3][3]", decimal("0000000002.3"));
+        assertDecimalFunction("ARRAY [2.22222222222222222, 2.3][1]", decimal("2.22222222222222222"));
     }
 
     @Test
@@ -454,8 +517,8 @@ public class TestArrayOperators
         assertFunction("ELEMENT_AT(ARRAY [2, NULL, 3], -2)", INTEGER, null);
         assertFunction("ELEMENT_AT(ARRAY [BIGINT '2', 1, 3], -2)", BIGINT, 1L);
         assertFunction("ELEMENT_AT(ARRAY [2, NULL, BIGINT '3'], -2)", BIGINT, null);
-        assertFunction("ELEMENT_AT(ARRAY [1.0, 2.5, 3.5], 3)", DOUBLE, 3.5);
-        assertFunction("ELEMENT_AT(ARRAY [1.0, 2.5, 3.5], -1)", DOUBLE, 3.5);
+        assertFunction("ELEMENT_AT(ARRAY [CAST(1.0 as DOUBLE), CAST(2.5 as DOUBLE), CAST(3.5 as DOUBLE)], 3)", DOUBLE, 3.5);
+        assertFunction("ELEMENT_AT(ARRAY [CAST(1.0 as DOUBLE), CAST(2.5 as DOUBLE), CAST(3.5 as DOUBLE)], -1)", DOUBLE, 3.5);
         assertFunction("ELEMENT_AT(ARRAY [ARRAY [1, 2], ARRAY [3]], 2)", new ArrayType(INTEGER), ImmutableList.of(3));
         assertFunction("ELEMENT_AT(ARRAY [ARRAY [1, 2], ARRAY [3]], -1)", new ArrayType(INTEGER), ImmutableList.of(3));
         assertFunction("ELEMENT_AT(ARRAY [ARRAY [1, 2], NULL, ARRAY [3]], 2)", new ArrayType(INTEGER), null);
@@ -479,6 +542,10 @@ public class TestArrayOperators
         assertFunction("ELEMENT_AT(ARRAY [-infinity()], -1)", DOUBLE, NEGATIVE_INFINITY);
         assertFunction("ELEMENT_AT(ARRAY [sqrt(-1)], 1)", DOUBLE, NaN);
         assertFunction("ELEMENT_AT(ARRAY [sqrt(-1)], -1)", DOUBLE, NaN);
+        assertDecimalFunction("ELEMENT_AT(ARRAY [2.1, 2.2, 2.3], 3)", decimal("2.3"));
+        assertDecimalFunction("ELEMENT_AT(ARRAY [2.111111222111111114111, 2.22222222222222222, 2.222222222222223], 3)", decimal("2.222222222222223000000"));
+        assertDecimalFunction("ELEMENT_AT(ARRAY [1.9, 2, 2.3], -1)", decimal("0000000002.3"));
+        assertDecimalFunction("ELEMENT_AT(ARRAY [2.22222222222222222, 2.3], -2)", decimal("2.22222222222222222"));
     }
 
     @Test
@@ -487,9 +554,13 @@ public class TestArrayOperators
     {
         assertFunction("ARRAY_SORT(ARRAY[2, 3, 4, 1])", new ArrayType(INTEGER), ImmutableList.of(1, 2, 3, 4));
         assertFunction("ARRAY_SORT(ARRAY[2, BIGINT '3', 4, 1])", new ArrayType(BIGINT), ImmutableList.of(1L, 2L, 3L, 4L));
+        assertFunction("ARRAY_SORT(ARRAY [2.3, 2.1, 2.2])", new ArrayType(createDecimalType(2, 1)),
+                ImmutableList.of(decimal("2.1"), decimal("2.2"), decimal("2.3")));
+        assertFunction("ARRAY_SORT(ARRAY [2, 1.900, 2.330])", new ArrayType(createDecimalType(13, 3)),
+                ImmutableList.of(decimal("0000000001.900"), decimal("0000000002.000"), decimal("0000000002.330")));
         assertFunction("ARRAY_SORT(ARRAY['z', 'f', 's', 'd', 'g'])", new ArrayType(createVarcharType(1)), ImmutableList.of("d", "f", "g", "s", "z"));
         assertFunction("ARRAY_SORT(ARRAY[TRUE, FALSE])", new ArrayType(BOOLEAN), ImmutableList.of(false, true));
-        assertFunction("ARRAY_SORT(ARRAY[22.1, 11.1, 1.1, 44.1])", new ArrayType(DOUBLE), ImmutableList.of(1.1, 11.1, 22.1, 44.1));
+        assertFunction("ARRAY_SORT(ARRAY[CAST(22.1 as DOUBLE), CAST(11.1 as DOUBLE), CAST(1.1 as DOUBLE), CAST(44.1 as DOUBLE)])", new ArrayType(DOUBLE), ImmutableList.of(1.1, 11.1, 22.1, 44.1));
         assertFunction("ARRAY_SORT(ARRAY [from_unixtime(100), from_unixtime(1), from_unixtime(200)])",
                 new ArrayType(TIMESTAMP),
                 ImmutableList.of(sqlTimestamp(1000), sqlTimestamp(100 * 1000), sqlTimestamp(200 * 1000)));
@@ -508,7 +579,7 @@ public class TestArrayOperators
 
         // Order matters here. Result should be stable.
         assertFunction("ARRAY_DISTINCT(ARRAY [2, 3, 4, 3, 1, 2, 3])", new ArrayType(INTEGER), ImmutableList.of(2, 3, 4, 1));
-        assertFunction("ARRAY_DISTINCT(ARRAY [2.2, 3.3, 4.4, 3.3, 1, 2.2, 3.3])", new ArrayType(DOUBLE), ImmutableList.of(2.2, 3.3, 4.4, 1.0));
+        assertFunction("ARRAY_DISTINCT(ARRAY [CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE), CAST(3.3 as DOUBLE), 1, CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE)])", new ArrayType(DOUBLE), ImmutableList.of(2.2, 3.3, 4.4, 1.0));
         assertFunction("ARRAY_DISTINCT(ARRAY [TRUE, TRUE, TRUE])", new ArrayType(BOOLEAN), ImmutableList.of(true));
         assertFunction("ARRAY_DISTINCT(ARRAY [TRUE, FALSE, FALSE, TRUE])", new ArrayType(BOOLEAN), ImmutableList.of(true, false));
         assertFunction("ARRAY_DISTINCT(ARRAY [from_unixtime(100), from_unixtime(1), from_unixtime(100)])", new ArrayType(TIMESTAMP),
@@ -519,12 +590,16 @@ public class TestArrayOperators
                 "ARRAY_DISTINCT(ARRAY [ARRAY [1], ARRAY [1, 2], ARRAY [1, 2, 3], ARRAY [1, 2]])",
                 new ArrayType(new ArrayType(INTEGER)),
                 ImmutableList.of(ImmutableList.of(1), ImmutableList.of(1, 2), ImmutableList.of(1, 2, 3)));
-        assertFunction("ARRAY_DISTINCT(ARRAY [NULL, 2.2, 3.3, 4.4, 3.3, 1, 2.2, 3.3])", new ArrayType(DOUBLE), asList(null, 2.2, 3.3, 4.4, 1.0));
+        assertFunction("ARRAY_DISTINCT(ARRAY [NULL, CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE), CAST(3.3 as DOUBLE), 1, CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE)])", new ArrayType(DOUBLE), asList(null, 2.2, 3.3, 4.4, 1.0));
         assertFunction("ARRAY_DISTINCT(ARRAY [2, 3, NULL, 4, 3, 1, 2, 3])", new ArrayType(INTEGER), asList(2, 3, null, 4, 1));
         assertFunction("ARRAY_DISTINCT(ARRAY ['BB', 'CCC', 'BB', NULL])", new ArrayType(createVarcharType(3)), asList("BB", "CCC", null));
         assertFunction("ARRAY_DISTINCT(ARRAY [NULL])", new ArrayType(UNKNOWN), asList((Object) null));
         assertFunction("ARRAY_DISTINCT(ARRAY [NULL, NULL])", new ArrayType(UNKNOWN), asList((Object) null));
         assertFunction("ARRAY_DISTINCT(ARRAY [NULL, NULL, NULL])", new ArrayType(UNKNOWN), asList((Object) null));
+        assertFunction("ARRAY_DISTINCT(ARRAY [2.3, 2.3, 2.2])", new ArrayType(createDecimalType(2, 1)),
+                ImmutableList.of(decimal("2.3"), decimal("2.2")));
+        assertFunction("ARRAY_DISTINCT(ARRAY [2.330, 1.900, 2.330])", new ArrayType(createDecimalType(4, 3)),
+                ImmutableList.of(decimal("2.330"), decimal("1.900")));
     }
 
     @Test
@@ -541,6 +616,10 @@ public class TestArrayOperators
         assertFunction("SLICE(ARRAY [1, 2, 3, 4], 1, 0)", new ArrayType(INTEGER), ImmutableList.of());
         assertFunction("SLICE(ARRAY [1, 2, 3, 4], -2, 0)", new ArrayType(INTEGER), ImmutableList.of());
         assertFunction("SLICE(ARRAY [ARRAY [1], ARRAY [2, 3], ARRAY [4, 5, 6]], 1, 2)", new ArrayType(new ArrayType(INTEGER)), ImmutableList.of(ImmutableList.of(1), ImmutableList.of(2, 3)));
+        assertFunction("SLICE(ARRAY [2.3, 2.3, 2.2], 2, 3)", new ArrayType(createDecimalType(2, 1)),
+                ImmutableList.of(decimal("2.3"), decimal("2.2")));
+        assertFunction("SLICE(ARRAY [2.330, 1.900, 2.330], 1, 2)", new ArrayType(createDecimalType(4, 3)),
+                ImmutableList.of(decimal("2.330"), decimal("1.900")));
 
         assertInvalidFunction("SLICE(ARRAY [1, 2, 3, 4], 1, -1)", INVALID_FUNCTION_ARGUMENT);
         assertInvalidFunction("SLICE(ARRAY [1, 2, 3, 4], 0, 1)", INVALID_FUNCTION_ARGUMENT);
@@ -557,11 +636,17 @@ public class TestArrayOperators
         assertFunction("ARRAY_INTERSECT(ARRAY [1, 5], ARRAY [1])", new ArrayType(INTEGER), ImmutableList.of(1));
         assertFunction("ARRAY_INTERSECT(ARRAY [1, 1, 2, 4], ARRAY [1, 1, 4, 4])", new ArrayType(INTEGER), ImmutableList.of(1, 4));
         assertFunction("ARRAY_INTERSECT(ARRAY [2, 8], ARRAY [8, 3])", new ArrayType(INTEGER), ImmutableList.of(8));
-        assertFunction("ARRAY_INTERSECT(ARRAY [IF (RAND() < 1.0, 7, 1) , 2], ARRAY [7])", new ArrayType(INTEGER), ImmutableList.of(7));
-        assertFunction("ARRAY_INTERSECT(ARRAY [1, 5], ARRAY [1.0])", new ArrayType(DOUBLE), ImmutableList.of(1.0));
-        assertFunction("ARRAY_INTERSECT(ARRAY [8.3, 1.6, 4.1, 5.2], ARRAY [4.0, 5.2, 8.3, 9.7, 3.5])", new ArrayType(DOUBLE), ImmutableList.of(5.2, 8.3));
-        assertFunction("ARRAY_INTERSECT(ARRAY [5.1, 7, 3.0, 4.8, 10], ARRAY [6.5, 10.0, 1.9, 5.1, 3.9, 4.8])", new ArrayType(DOUBLE), ImmutableList.of(4.8, 5.1, 10.0));
+        assertFunction("ARRAY_INTERSECT(ARRAY [IF (RAND() < CAST(1.0 as DOUBLE), 7, 1) , 2], ARRAY [7])", new ArrayType(INTEGER), ImmutableList.of(7));
+        assertFunction("ARRAY_INTERSECT(ARRAY [1, 5], ARRAY [CAST(1.0 as DOUBLE)])", new ArrayType(DOUBLE), ImmutableList.of(1.0));
+        assertFunction("ARRAY_INTERSECT(ARRAY [CAST(8.3 as DOUBLE), CAST(1.6 as DOUBLE), CAST(4.1 as DOUBLE), CAST(5.2 as DOUBLE)], ARRAY [CAST(4.0 as DOUBLE), CAST(5.2 as DOUBLE), CAST(8.3 as DOUBLE), CAST(9.7 as DOUBLE), CAST(3.5 as DOUBLE)])", new ArrayType(DOUBLE), ImmutableList.of(5.2, 8.3));
+        assertFunction("ARRAY_INTERSECT(ARRAY [CAST(5.1 as DOUBLE), 7, CAST(3.0 as DOUBLE), CAST(4.8 as DOUBLE), 10], ARRAY [CAST(6.5 as DOUBLE), CAST(10.0 as DOUBLE), CAST(1.9 as DOUBLE), CAST(5.1 as DOUBLE), CAST(3.9 as DOUBLE), CAST(4.8 as DOUBLE)])", new ArrayType(DOUBLE), ImmutableList.of(4.8, 5.1, 10.0));
         assertFunction("ARRAY_INTERSECT(ARRAY [ARRAY [4, 5], ARRAY [6, 7]], ARRAY [ARRAY [4, 5], ARRAY [6, 8]])", new ArrayType(new ArrayType(INTEGER)), ImmutableList.of(ImmutableList.of(4, 5)));
+        assertFunction("ARRAY_INTERSECT(ARRAY [2.3, 2.3, 2.2], ARRAY[2.2, 2.3])", new ArrayType(createDecimalType(2, 1)),
+                ImmutableList.of(decimal("2.2"), decimal("2.3")));
+        assertFunction("ARRAY_INTERSECT(ARRAY [2.330, 1.900, 2.330], ARRAY [2.3300, 1.9000])", new ArrayType(createDecimalType(5, 4)),
+                ImmutableList.of(decimal("1.9000"), decimal("2.3300")));
+        assertFunction("ARRAY_INTERSECT(ARRAY [2, 3], ARRAY[2.0, 3.0])", new ArrayType(createDecimalType(11, 1)),
+                ImmutableList.of(decimal("00000000002.0"), decimal("00000000003.0")));
     }
 
     @Test
@@ -572,8 +657,8 @@ public class TestArrayOperators
         assertFunction("ARRAY [1, 2, 3] != ARRAY [1, 2, 3]", BOOLEAN, false);
         assertFunction("ARRAY [TRUE, FALSE] = ARRAY [TRUE, FALSE]", BOOLEAN, true);
         assertFunction("ARRAY [TRUE, FALSE] != ARRAY [TRUE, FALSE]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] = ARRAY [1.1, 2.2, 3.3, 4.4]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] != ARRAY [1.1, 2.2, 3.3, 4.4]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] = ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] != ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)]", BOOLEAN, false);
         assertFunction("ARRAY ['puppies', 'kittens'] = ARRAY ['puppies', 'kittens']", BOOLEAN, true);
         assertFunction("ARRAY ['puppies', 'kittens'] != ARRAY ['puppies', 'kittens']", BOOLEAN, false);
         assertFunction("ARRAY [TIME '01:02:03.456 America/Los_Angeles', TIME '10:20:30.456 America/Los_Angeles'] = ARRAY [TIME '01:02:03.456 America/Los_Angeles', TIME '10:20:30.456 America/Los_Angeles']", BOOLEAN, true);
@@ -582,6 +667,18 @@ public class TestArrayOperators
         assertFunction("ARRAY [timestamp '2012-10-31 08:00 UTC'] != ARRAY [timestamp '2012-10-31 01:00 America/Los_Angeles']", BOOLEAN, false);
         assertFunction("ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5]] = ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5]]", BOOLEAN, true);
         assertFunction("ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5]] != ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5]]", BOOLEAN, false);
+        assertFunction("ARRAY [1.0, 2.0, 3.0] = ARRAY [1.0, 2.0, 3.0]", BOOLEAN, true);
+        assertFunction("ARRAY [1.0, 2.0, 3.0] = ARRAY [1.0, 2.0, 3.1]", BOOLEAN, false);
+        assertFunction("ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543] " +
+                "= ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543]", BOOLEAN, true);
+        assertFunction("ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543] " +
+                "= ARRAY [1234567890.1234567890, 9876543210.9876543210, 0]", BOOLEAN, false);
+        assertFunction("ARRAY [1.0, 2.0, 3.0] != ARRAY [1.0, 2.0, 3.0]", BOOLEAN, false);
+        assertFunction("ARRAY [1.0, 2.0, 3.0] != ARRAY [1.0, 2.0, 3.1]", BOOLEAN, true);
+        assertFunction("ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543] " +
+                "!= ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543]", BOOLEAN, false);
+        assertFunction("ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543] " +
+                "!= ARRAY [1234567890.1234567890, 9876543210.9876543210, 0]", BOOLEAN, true);
 
         assertFunction("ARRAY [10, 20, 30] != ARRAY [5]", BOOLEAN, true);
         assertFunction("ARRAY [10, 20, 30] = ARRAY [5]", BOOLEAN, false);
@@ -591,10 +688,10 @@ public class TestArrayOperators
         assertFunction("ARRAY [TRUE, FALSE, TRUE] = ARRAY [TRUE]", BOOLEAN, false);
         assertFunction("ARRAY [TRUE, FALSE] != ARRAY [FALSE, FALSE]", BOOLEAN, true);
         assertFunction("ARRAY [TRUE, FALSE] = ARRAY [FALSE, FALSE]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] != ARRAY [1.1, 2.2]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] = ARRAY [1.1, 2.2]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2, 3.3] != ARRAY [11.1, 22.1, 1.1, 44.1]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2, 3.3] = ARRAY [11.1, 22.1, 1.1, 44.1]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] != ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] = ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE)]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE)] != ARRAY [CAST(11.1 as DOUBLE), CAST(22.1 as DOUBLE), CAST(1.1 as DOUBLE), CAST(44.1 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE)] = ARRAY [CAST(11.1 as DOUBLE), CAST(22.1 as DOUBLE), CAST(1.1 as DOUBLE), CAST(44.1 as DOUBLE)]", BOOLEAN, false);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] != ARRAY ['puppies', 'kittens']", BOOLEAN, true);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] = ARRAY ['puppies', 'kittens']", BOOLEAN, false);
         assertFunction("ARRAY ['puppies', 'kittens'] != ARRAY ['z', 'f', 's', 'd', 'g']", BOOLEAN, true);
@@ -607,6 +704,8 @@ public class TestArrayOperators
         assertFunction("ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5]] = ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5, 6]]", BOOLEAN, false);
         assertFunction("ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5]] != ARRAY [ARRAY [1, 2, 3], ARRAY [4, 5]]", BOOLEAN, true);
         assertFunction("ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5]] = ARRAY [ARRAY [1, 2, 3], ARRAY [4, 5]]", BOOLEAN, false);
+        assertFunction("ARRAY [1.0, 2.0, 3.0] = ARRAY [1.0, 2.0]", BOOLEAN, false);
+        assertFunction("ARRAY [1.0, 2.0, 3.0] != ARRAY [1.0, 2.0]", BOOLEAN, true);
 
         assertFunction("ARRAY [10, 20, 30] < ARRAY [10, 20, 40, 50]", BOOLEAN, true);
         assertFunction("ARRAY [10, 20, 30] >= ARRAY [10, 20, 40, 50]", BOOLEAN, false);
@@ -620,12 +719,12 @@ public class TestArrayOperators
         assertFunction("ARRAY [TRUE, FALSE, FALSE] >= ARRAY [TRUE, TRUE]", BOOLEAN, false);
         assertFunction("ARRAY [TRUE, FALSE] < ARRAY [TRUE, FALSE, FALSE]", BOOLEAN, true);
         assertFunction("ARRAY [TRUE, FALSE] >= ARRAY [TRUE, FALSE, FALSE]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] < ARRAY [1.1, 2.2, 4.4, 4.4]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] >= ARRAY [1.1, 2.2, 4.4, 4.4]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] < ARRAY [1.1, 2.2, 5.5]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] >= ARRAY [1.1, 2.2, 5.5]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2] < ARRAY [1.1, 2.2, 5.5]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2] >= ARRAY [1.1, 2.2, 5.5]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] < ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(4.4 as DOUBLE), CAST(4.4 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] >= ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(4.4 as DOUBLE), CAST(4.4 as DOUBLE)]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] < ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(5.5 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] >= ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(5.5 as DOUBLE)]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE)] < ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(5.5 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE)] >= ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(5.5 as DOUBLE)]", BOOLEAN, false);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] < ARRAY ['puppies', 'lizards', 'lizards']", BOOLEAN, true);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] >= ARRAY ['puppies', 'lizards', 'lizards']", BOOLEAN, false);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] < ARRAY ['puppies', 'lizards']", BOOLEAN, true);
@@ -642,6 +741,22 @@ public class TestArrayOperators
         assertFunction("ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5]] >= ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5, 6]]", BOOLEAN, false);
         assertFunction("ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5]] < ARRAY [ARRAY [1, 2], ARRAY [3, 5, 6]]", BOOLEAN, true);
         assertFunction("ARRAY [ARRAY [1, 2], ARRAY [3, 4, 5]] >= ARRAY [ARRAY [1, 2], ARRAY [3, 5, 6]]", BOOLEAN, false);
+        assertFunction("ARRAY [1.0, 2.0, 3.0] > ARRAY [1.0, 2.0, 3.0]", BOOLEAN, false);
+        assertFunction("ARRAY [1.0, 2.0, 3.0] >= ARRAY [1.0, 2.0, 3.0]", BOOLEAN, true);
+        assertFunction("ARRAY [1.0, 2.0, 3.0] < ARRAY [1.0, 2.0, 3.1]", BOOLEAN, true);
+        assertFunction("ARRAY [1.0, 2.0, 3.0] <= ARRAY [1.0, 2.0, 3.1]", BOOLEAN, true);
+        assertFunction("ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543] " +
+                "> ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543]", BOOLEAN, false);
+        assertFunction("ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543] " +
+                ">= ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543]", BOOLEAN, true);
+        assertFunction("ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543] " +
+                "< ARRAY [1234567890.1234567890, 9876543210.9876543210, 0]", BOOLEAN, false);
+        assertFunction("ARRAY [1234567890.1234567890, 9876543210.9876543210] " +
+                "< ARRAY [1234567890.1234567890, 9876543210.9876543210, 0]", BOOLEAN, true);
+        assertFunction("ARRAY [1234567890.1234567890, 0] " +
+                "< ARRAY [1234567890.1234567890, 9876543210.9876543210, 0]", BOOLEAN, true);
+        assertFunction("ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543] " +
+                "<= ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543]", BOOLEAN, true);
 
         assertFunction("ARRAY [10, 20, 30] > ARRAY [10, 20, 20]", BOOLEAN, true);
         assertFunction("ARRAY [10, 20, 30] <= ARRAY [10, 20, 20]", BOOLEAN, false);
@@ -651,10 +766,10 @@ public class TestArrayOperators
         assertFunction("ARRAY [TRUE, TRUE, TRUE] <= ARRAY [TRUE, TRUE, FALSE]", BOOLEAN, false);
         assertFunction("ARRAY [TRUE, TRUE, FALSE] > ARRAY [TRUE, TRUE]", BOOLEAN, true);
         assertFunction("ARRAY [TRUE, TRUE, FALSE] <= ARRAY [TRUE, TRUE]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] > ARRAY [1.1, 2.2, 2.2, 4.4]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] <= ARRAY [1.1, 2.2, 2.2, 4.4]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] > ARRAY [1.1, 2.2, 3.3]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] <= ARRAY [1.1, 2.2, 3.3]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] > ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(2.2 as DOUBLE), CAST(4.4 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] <= ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(2.2 as DOUBLE), CAST(4.4 as DOUBLE)]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] > ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] <= ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE)]", BOOLEAN, false);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] > ARRAY ['puppies', 'kittens', 'kittens']", BOOLEAN, true);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] <= ARRAY ['puppies', 'kittens', 'kittens']", BOOLEAN, false);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] > ARRAY ['puppies', 'kittens']", BOOLEAN, true);
@@ -676,10 +791,10 @@ public class TestArrayOperators
         assertFunction("ARRAY [TRUE, FALSE] > ARRAY [TRUE, FALSE, true]", BOOLEAN, false);
         assertFunction("ARRAY [TRUE, FALSE] <= ARRAY [TRUE, FALSE]", BOOLEAN, true);
         assertFunction("ARRAY [TRUE, FALSE] > ARRAY [TRUE, FALSE]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] <= ARRAY [2.2, 5.5]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] > ARRAY [2.2, 5.5]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] <= ARRAY [1.1, 2.2, 3.3, 4.4]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] > ARRAY [1.1, 2.2, 3.3, 4.4]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] <= ARRAY [CAST(2.2 as DOUBLE), CAST(5.5 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] > ARRAY [CAST(2.2 as DOUBLE), CAST(5.5 as DOUBLE)]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] <= ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] > ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)]", BOOLEAN, false);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] <= ARRAY ['puppies', 'lizards']", BOOLEAN, true);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] > ARRAY ['puppies', 'lizards']", BOOLEAN, false);
         assertFunction("ARRAY ['puppies', 'kittens'] <= ARRAY ['puppies', 'kittens']", BOOLEAN, true);
@@ -699,10 +814,10 @@ public class TestArrayOperators
         assertFunction("ARRAY [TRUE, FALSE, TRUE] < ARRAY [TRUE, FALSE, TRUE]", BOOLEAN, false);
         assertFunction("ARRAY [TRUE, FALSE, TRUE] >= ARRAY [TRUE]", BOOLEAN, true);
         assertFunction("ARRAY [TRUE, FALSE, TRUE] < ARRAY [TRUE]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] >= ARRAY [1.1, 2.2]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] < ARRAY [1.1, 2.2]", BOOLEAN, false);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] >= ARRAY [1.1, 2.2, 3.3, 4.4]", BOOLEAN, true);
-        assertFunction("ARRAY [1.1, 2.2, 3.3, 4.4] < ARRAY [1.1, 2.2, 3.3, 4.4]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] >= ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] < ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE)]", BOOLEAN, false);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] >= ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)]", BOOLEAN, true);
+        assertFunction("ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)] < ARRAY [CAST(1.1 as DOUBLE), CAST(2.2 as DOUBLE), CAST(3.3 as DOUBLE), CAST(4.4 as DOUBLE)]", BOOLEAN, false);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] >= ARRAY ['puppies', 'kittens', 'kittens']", BOOLEAN, true);
         assertFunction("ARRAY ['puppies', 'kittens', 'lizards'] < ARRAY ['puppies', 'kittens', 'kittens']", BOOLEAN, false);
         assertFunction("ARRAY ['puppies', 'kittens'] >= ARRAY ['puppies', 'kittens']", BOOLEAN, true);
@@ -735,18 +850,24 @@ public class TestArrayOperators
         assertFunction("ARRAY_REMOVE(ARRAY [1, 1, 1], 1)", new ArrayType(INTEGER), ImmutableList.of());
         assertFunction("ARRAY_REMOVE(ARRAY [NULL, 2, 3], 1)", new ArrayType(INTEGER), asList(null, 2, 3));
         assertFunction("ARRAY_REMOVE(ARRAY [1, NULL, 3], 1)", new ArrayType(INTEGER), asList(null, 3));
-        assertFunction("ARRAY_REMOVE(ARRAY [-1.23, 3.14], 3.14)", new ArrayType(DOUBLE), ImmutableList.of(-1.23));
-        assertFunction("ARRAY_REMOVE(ARRAY [3.14], 0.0)", new ArrayType(DOUBLE), ImmutableList.of(3.14));
-        assertFunction("ARRAY_REMOVE(ARRAY [sqrt(-1), 3.14], 3.14)", new ArrayType(DOUBLE), ImmutableList.of(NaN));
-        assertFunction("ARRAY_REMOVE(ARRAY [-1.23, sqrt(-1)], nan())", new ArrayType(DOUBLE), ImmutableList.of(-1.23, NaN));
-        assertFunction("ARRAY_REMOVE(ARRAY [-1.23, nan()], nan())", new ArrayType(DOUBLE), ImmutableList.of(-1.23, NaN));
-        assertFunction("ARRAY_REMOVE(ARRAY [-1.23, infinity()], -1.23)", new ArrayType(DOUBLE), ImmutableList.of(POSITIVE_INFINITY));
-        assertFunction("ARRAY_REMOVE(ARRAY [infinity(), 3.14], infinity())", new ArrayType(DOUBLE), ImmutableList.of(3.14));
-        assertFunction("ARRAY_REMOVE(ARRAY [-1.23, NULL, 3.14], 3.14)", new ArrayType(DOUBLE), asList(-1.23, null));
+        assertFunction("ARRAY_REMOVE(ARRAY [-CAST(1.23 as DOUBLE), CAST(3.14 as DOUBLE)], CAST(3.14 as DOUBLE))", new ArrayType(DOUBLE), ImmutableList.of(-1.23));
+        assertFunction("ARRAY_REMOVE(ARRAY [CAST(3.14 as DOUBLE)], CAST(0.0 as DOUBLE))", new ArrayType(DOUBLE), ImmutableList.of(3.14));
+        assertFunction("ARRAY_REMOVE(ARRAY [sqrt(-1), CAST(3.14 as DOUBLE)], CAST(3.14 as DOUBLE))", new ArrayType(DOUBLE), ImmutableList.of(NaN));
+        assertFunction("ARRAY_REMOVE(ARRAY [-CAST(1.23 as DOUBLE), sqrt(-1)], nan())", new ArrayType(DOUBLE), ImmutableList.of(-1.23, NaN));
+        assertFunction("ARRAY_REMOVE(ARRAY [-CAST(1.23 as DOUBLE), nan()], nan())", new ArrayType(DOUBLE), ImmutableList.of(-1.23, NaN));
+        assertFunction("ARRAY_REMOVE(ARRAY [-CAST(1.23 as DOUBLE), infinity()], -CAST(1.23 as DOUBLE))", new ArrayType(DOUBLE), ImmutableList.of(POSITIVE_INFINITY));
+        assertFunction("ARRAY_REMOVE(ARRAY [infinity(), CAST(3.14 as DOUBLE)], infinity())", new ArrayType(DOUBLE), ImmutableList.of(3.14));
+        assertFunction("ARRAY_REMOVE(ARRAY [-CAST(1.23 as DOUBLE), NULL, CAST(3.14 as DOUBLE)], CAST(3.14 as DOUBLE))", new ArrayType(DOUBLE), asList(-1.23, null));
         assertFunction("ARRAY_REMOVE(ARRAY [TRUE, FALSE, TRUE], TRUE)", new ArrayType(BOOLEAN), ImmutableList.of(false));
         assertFunction("ARRAY_REMOVE(ARRAY [TRUE, FALSE, TRUE], FALSE)", new ArrayType(BOOLEAN), ImmutableList.of(true, true));
         assertFunction("ARRAY_REMOVE(ARRAY [NULL, FALSE, TRUE], TRUE)", new ArrayType(BOOLEAN), asList(null, false));
         assertFunction("ARRAY_REMOVE(ARRAY [ARRAY ['foo'], ARRAY ['bar'], ARRAY ['baz']], ARRAY ['bar'])", new ArrayType(new ArrayType(createVarcharType(3))), ImmutableList.of(ImmutableList.of("foo"), ImmutableList.of("baz")));
+        assertFunction("ARRAY_REMOVE(ARRAY [1.0, 2.0, 3.0], 2.0)", new ArrayType(createDecimalType(2, 1)), ImmutableList.of(decimal("1.0"), decimal("3.0")));
+        assertFunction("ARRAY_REMOVE(ARRAY [1.0, 2.0, 3.0], 4.0)", new ArrayType(createDecimalType(2, 1)), ImmutableList.of(decimal("1.0"), decimal("2.0"), decimal("3.0")));
+        assertFunction("ARRAY_REMOVE(ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543], 1234567890.1234567890)",
+                new ArrayType(createDecimalType(22, 10)), ImmutableList.of(decimal("9876543210.9876543210"), decimal("123123123456.6549876543")));
+        assertFunction("ARRAY_REMOVE(ARRAY [1234567890.1234567890, 9876543210.9876543210, 123123123456.6549876543], 4.0)",
+                new ArrayType(createDecimalType(22, 10)), ImmutableList.of(decimal("1234567890.1234567890"), decimal("9876543210.9876543210"), decimal("123123123456.6549876543")));
     }
 
     @Test
@@ -857,11 +978,11 @@ public class TestArrayOperators
         assertFunction("flatten(ARRAY [NULL, ARRAY [0], NULL, ARRAY [1], ARRAY [2, 3]])", new ArrayType(INTEGER), ImmutableList.of(0, 1, 2, 3));
 
         // DOUBLE Tests
-        assertFunction("flatten(ARRAY [ARRAY [1.2, 2.2], ARRAY [3.2]])", new ArrayType(DOUBLE), ImmutableList.of(1.2, 2.2, 3.2));
-        assertFunction("flatten(ARRAY [ARRAY [1.2, 2.2], NULL])", new ArrayType(DOUBLE), ImmutableList.of(1.2, 2.2));
-        assertFunction("flatten(ARRAY [NULL, ARRAY [1.2, 2.2]])", new ArrayType(DOUBLE), ImmutableList.of(1.2, 2.2));
-        assertFunction("flatten(ARRAY [ARRAY[0.2], ARRAY [1.2], ARRAY [2.2, 3.2]])", new ArrayType(DOUBLE), ImmutableList.of(0.2, 1.2, 2.2, 3.2));
-        assertFunction("flatten(ARRAY [NULL, ARRAY [0.2], NULL, ARRAY [1.2], ARRAY [2.2, 3.2]])", new ArrayType(DOUBLE), ImmutableList.of(0.2, 1.2, 2.2, 3.2));
+        assertFunction("flatten(ARRAY [ARRAY [CAST(1.2 AS DOUBLE), CAST(2.2 AS DOUBLE)], ARRAY [3.2]])", new ArrayType(DOUBLE), ImmutableList.of(1.2, 2.2, 3.2));
+        assertFunction("flatten(ARRAY [ARRAY [CAST(1.2 AS DOUBLE), CAST(2.2 AS DOUBLE)], NULL])", new ArrayType(DOUBLE), ImmutableList.of(1.2, 2.2));
+        assertFunction("flatten(ARRAY [NULL, ARRAY [CAST(1.2 AS DOUBLE), CAST(2.2 AS DOUBLE)]])", new ArrayType(DOUBLE), ImmutableList.of(1.2, 2.2));
+        assertFunction("flatten(ARRAY [ARRAY[CAST(0.2 AS DOUBLE)], ARRAY [CAST(1.2 AS DOUBLE)], ARRAY [CAST(2.2 AS DOUBLE), CAST(3.2 AS DOUBLE)]])", new ArrayType(DOUBLE), ImmutableList.of(0.2, 1.2, 2.2, 3.2));
+        assertFunction("flatten(ARRAY [NULL, ARRAY [CAST(0.2 AS DOUBLE)], NULL, ARRAY [CAST(1.2 AS DOUBLE)], ARRAY [CAST(2.2 AS DOUBLE), CAST(3.2 AS DOUBLE)]])", new ArrayType(DOUBLE), ImmutableList.of(0.2, 1.2, 2.2, 3.2));
 
         // ARRAY<BIGINT> tests
         assertFunction("flatten(ARRAY [ARRAY [ARRAY [1, 2], ARRAY [3, 4]], ARRAY [ARRAY [5, 6], ARRAY [7, 8]]])", new ArrayType(new ArrayType(INTEGER)), ImmutableList.of(ImmutableList.of(1, 2), ImmutableList.of(3, 4), ImmutableList.of(5, 6), ImmutableList.of(7, 8)));

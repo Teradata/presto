@@ -12,7 +12,43 @@
  * limitations under the License.
  */
 
- var Query = React.createClass({
+ var QueryListItem = React.createClass({
+    formatQueryText: function(queryText)
+    {
+        var lines = queryText.split("\n");
+        var minLeadingWhitespace = -1;
+        for (var i = 0; i < lines.length; i++) {
+            if (minLeadingWhitespace == 0) {
+                break;
+            }
+
+            if (lines[i].trim().length == 0) {
+                continue;
+            }
+
+            var leadingWhitespace = lines[i].search(/\S/);
+
+            if (leadingWhitespace > -1 && ((leadingWhitespace < minLeadingWhitespace) || minLeadingWhitespace == -1)) {
+            	minLeadingWhitespace = leadingWhitespace;
+            }
+        }
+
+        var formattedQueryText = "";
+
+        for (i = 0; i < lines.length; i++) {
+            var trimmedLine = lines[i].substring(minLeadingWhitespace).replace(/\s+$/g, '');
+
+            if (trimmedLine.length > 0) {
+            	formattedQueryText += trimmedLine;
+
+                if (i < (lines.length -1)) {
+                    formattedQueryText += "\n";
+                }
+            }
+        }
+
+        return truncateString(formattedQueryText, 300);
+    },
     render: function()
     {
         var query = this.props.query;
@@ -106,11 +142,6 @@
             );
         }
 
-        var queryText = query.query;
-        if (queryText.length > 300) {
-            queryText = queryText.substring(0, 300) + "...";
-        }
-
         return (
             <div className="query">
                 <div className="row">
@@ -127,7 +158,7 @@
                             <div className="col-xs-12">
                                 <span data-toggle="tooltip" data-placement="right" title="User">
                                     <span className="glyphicon glyphicon-user" style={ GLYPHICON_DEFAULT }></span>&nbsp;&nbsp;
-                                    <span>{ user }</span>
+                                    <span>{ truncateString(user, 35) }</span>
                                 </span>
                             </div>
                         </div>
@@ -135,7 +166,7 @@
                             <div className="col-xs-12">
                                 <span data-toggle="tooltip" data-placement="right" title="Source">
                                     <span className="glyphicon glyphicon-log-in" style={ GLYPHICON_DEFAULT }></span>&nbsp;&nbsp;
-                                    <span>{ query.session.source }</span>
+                                    <span>{ truncateString(query.session.source, 35) }</span>
                                 </span>
                             </div>
                         </div>
@@ -161,7 +192,7 @@
                         </div>
                         <div className="row query-row-bottom">
                             <div className="col-xs-12">
-                                <pre className="query-snippet"><code className="sql">{ queryText }</code></pre>
+                                <pre className="query-snippet"><code className="sql">{ this.formatQueryText(query.query) }</code></pre>
                             </div>
                         </div>
                     </div>
@@ -171,12 +202,12 @@
     }
 });
 
-var DisplayedQueries = React.createClass({
+var DisplayedQueriesList = React.createClass({
     render: function()
     {
         var queryNodes = this.props.queries.map(function (query) {
             return (
-                    <Query key={ query.queryId } query={query} />
+                    <QueryListItem key={ query.queryId } query={query} />
             );
         }.bind(this));
         return (
@@ -267,6 +298,8 @@ var QueryList = React.createClass({
     },
     refreshLoop: function() {
         clearTimeout(this.timeoutId); // to stop multiple series of refreshLoop from going on simultaneously
+        clearTimeout(this.searchTimeoutId);
+
         $.get('/v1/query', function (queryList) {
             var queryMap = queryList.reduce(function(map, query) {
                 map[query.queryId] = query;
@@ -328,8 +361,22 @@ var QueryList = React.createClass({
     },
     handleSearchStringChange: function(event) {
         var newSearchString = event.target.value;
+        clearTimeout(this.searchTimeoutId);
+
         this.setState({
             searchString: newSearchString
+        });
+
+        this.searchTimeoutId = setTimeout(this.executeSearch, 200);
+    },
+    executeSearch: function() {
+        clearTimeout(this.searchTimeoutId);
+
+        var newDisplayedQueries = this.filterQueries(this.state.allQueries, this.state.filters, this.state.searchString);
+        this.sortAndLimitQueries(newDisplayedQueries, this.state.currentSortType, this.state.currentSortOrder, this.state.maxQueries);
+
+        this.setState({
+            displayedQueries: newDisplayedQueries
         });
     },
     renderMaxQueriesListItem: function(maxQueries, maxQueriesText) {
@@ -422,7 +469,7 @@ var QueryList = React.createClass({
         });
     },
     render: function() {
-        var queryList = <DisplayedQueries queries={ this.state.displayedQueries } />;
+        var queryList = <DisplayedQueriesList queries={ this.state.displayedQueries } />;
         if (this.state.displayedQueries == null || this.state.displayedQueries.length == 0) {
             var label = (<div className="loader">Loading...</div>);
             if (this.state.initialized) {

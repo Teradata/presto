@@ -40,6 +40,8 @@ import static org.testng.Assert.assertEquals;
 
 public class TestInterpretedProjectionFunction
 {
+    // todo add cases for decimal
+
     private static final SqlParser SQL_PARSER = new SqlParser();
     private static final Metadata METADATA = MetadataManager.createTestMetadataManager();
 
@@ -57,30 +59,30 @@ public class TestInterpretedProjectionFunction
     public void testArithmeticExpression()
     {
         assertProjection("42 + 87", 42 + 87);
-        assertProjection("42 + 22.2", 42 + 22.2);
-        assertProjection("11.1 + 22.2", 11.1 + 22.2);
+        assertProjection("42 + CAST(22.2 as DOUBLE)", 42 + 22.2);
+        assertProjection("CAST(11.1 as DOUBLE) + CAST(22.2 as DOUBLE)", 11.1 + 22.2);
 
         assertProjection("42 - 87", 42 - 87);
-        assertProjection("42 - 22.2", 42 - 22.2);
-        assertProjection("11.1 - 22.2", 11.1 - 22.2);
+        assertProjection("42 - CAST(22.2 as DOUBLE)", 42 - 22.2);
+        assertProjection("CAST(11.1 as DOUBLE) - CAST(22.2 as DOUBLE)", 11.1 - 22.2);
 
         assertProjection("42 * 87", 42 * 87);
-        assertProjection("42 * 22.2", 42 * 22.2);
-        assertProjection("11.1 * 22.2", 11.1 * 22.2);
+        assertProjection("42 * CAST(22.2 as DOUBLE)", 42 * 22.2);
+        assertProjection("CAST(11.1 as DOUBLE) * CAST(22.2 as DOUBLE)", 11.1 * 22.2);
 
         assertProjection("42 / 87", 42 / 87);
-        assertProjection("42 / 22.2", 42 / 22.2);
-        assertProjection("11.1 / 22.2", 11.1 / 22.2);
+        assertProjection("42 / CAST(22.2 as DOUBLE)", 42 / 22.2);
+        assertProjection("CAST(11.1 as DOUBLE) / CAST(22.2 as DOUBLE)", 11.1 / 22.2);
 
         assertProjection("42 % 87", 42 % 87);
-        assertProjection("42 % 22.2", 42 % 22.2);
-        assertProjection("11.1 % 22.2", 11.1 % 22.2);
+        assertProjection("42 % CAST(22.2 as DOUBLE)", 42 % 22.2);
+        assertProjection("CAST(11.1 as DOUBLE) % CAST(22.2 as DOUBLE)", 11.1 % 22.2);
 
         assertProjection("42 + BIGINT '87'", 42 + 87L);
-        assertProjection("BIGINT '42' - 22.2", 42L - 22.2);
+        assertProjection("BIGINT '42' - CAST(22.2 as DOUBLE)", 42L - 22.2);
         assertProjection("42 * BIGINT '87'", 42 * 87L);
-        assertProjection("BIGINT '11' / 22.2", 11L / 22.2);
-        assertProjection("11.1 % BIGINT '22'", 11.1 % 22L);
+        assertProjection("BIGINT '11' / CAST(22.2 as DOUBLE)", 11L / 22.2);
+        assertProjection("CAST(11.1 as DOUBLE) % BIGINT '22'", 11.1 % 22L);
     }
 
     @Test
@@ -107,10 +109,10 @@ public class TestInterpretedProjectionFunction
         assertProjection("COALESCE(NULL, NULL, 100)", 100);
         assertProjection("COALESCE(NULL, NULL, BIGINT '100')", 100L);
 
-        assertProjection("COALESCE(42.2, 87.2, 100.2)", 42.2);
-        assertProjection("COALESCE(NULL, 87.2, 100.2)", 87.2);
-        assertProjection("COALESCE(42.2, NULL, 100.2)", 42.2);
-        assertProjection("COALESCE(NULL, NULL, 100.2)", 100.2);
+        assertProjection("COALESCE(CAST(42.2 as DOUBLE), CAST(87.2 as DOUBLE), CAST(100.2 as DOUBLE))", 42.2);
+        assertProjection("COALESCE(NULL, CAST(87.2 as DOUBLE), CAST(100.2 as DOUBLE))", 87.2);
+        assertProjection("COALESCE(CAST(42.2 as DOUBLE), NULL, CAST(100.2 as DOUBLE))", 42.2);
+        assertProjection("COALESCE(NULL, NULL, CAST(100.2 as DOUBLE))", 100.2);
 
         assertProjection("COALESCE('foo', 'bar', 'zah')", "foo");
         assertProjection("COALESCE(NULL, 'bar', 'zah')", "bar");
@@ -124,15 +126,15 @@ public class TestInterpretedProjectionFunction
     public void testNullIf()
     {
         assertProjection("NULLIF(42, 42)", null);
-        assertProjection("NULLIF(42, 42.0)", null);
-        assertProjection("NULLIF(42.42, 42.42)", null);
+        assertProjection("NULLIF(42, CAST(42.0 as DOUBLE))", null);
+        assertProjection("NULLIF(CAST(42.42 as DOUBLE), CAST(42.42 as DOUBLE))", null);
         assertProjection("NULLIF('foo', 'foo')", null);
 
         assertProjection("NULLIF(42, 87)", 42);
-        assertProjection("NULLIF(42, 22.2)", 42);
+        assertProjection("NULLIF(42, CAST(22.2 as DOUBLE))", 42);
         assertProjection("NULLIF(42, BIGINT '87')", 42);
-        assertProjection("NULLIF(BIGINT '42', 22.2)", 42L);
-        assertProjection("NULLIF(42.42, 22.2)", 42.42);
+        assertProjection("NULLIF(BIGINT '42', CAST(22.2 as DOUBLE))", 42L);
+        assertProjection("NULLIF(CAST(42.42 as DOUBLE), CAST(22.2 as DOUBLE))", 42.42);
         assertProjection("NULLIF('foo', 'bar')", "foo");
 
         assertProjection("NULLIF(NULL, NULL)", null);
@@ -140,8 +142,8 @@ public class TestInterpretedProjectionFunction
         assertProjection("NULLIF(42, NULL)", 42);
         assertProjection("NULLIF(NULL, 42)", null);
 
-        assertProjection("NULLIF(11.1, NULL)", 11.1);
-        assertProjection("NULLIF(NULL, 11.1)", null);
+        assertProjection("NULLIF(CAST(11.1 as DOUBLE), NULL)", 11.1);
+        assertProjection("NULLIF(NULL, CAST(11.1 as DOUBLE))", null);
     }
 
     @Test

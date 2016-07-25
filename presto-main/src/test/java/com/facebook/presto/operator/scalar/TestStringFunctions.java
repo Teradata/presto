@@ -13,10 +13,14 @@
  */
 package com.facebook.presto.operator.scalar;
 
+import com.facebook.presto.operator.Description;
 import com.facebook.presto.operator.scalar.annotations.ScalarFunction;
 import com.facebook.presto.spi.type.SqlVarbinary;
 import com.facebook.presto.spi.type.StandardTypes;
+import com.facebook.presto.sql.analyzer.SemanticErrorCode;
 import com.facebook.presto.type.ArrayType;
+import com.facebook.presto.type.FromLiteralParameter;
+import com.facebook.presto.type.LiteralParameters;
 import com.facebook.presto.type.MapType;
 import com.facebook.presto.type.SqlType;
 import com.google.common.collect.ImmutableList;
@@ -28,6 +32,7 @@ import static com.facebook.presto.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMEN
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
 
 public class TestStringFunctions
@@ -36,6 +41,15 @@ public class TestStringFunctions
     private TestStringFunctions()
     {
         registerScalar(getClass());
+    }
+
+    @Description("varchar length")
+    @ScalarFunction(value = "vl", deterministic = true)
+    @LiteralParameters("x")
+    @SqlType(StandardTypes.BIGINT)
+    public static long varcharLength(@FromLiteralParameter("x") Long param, @SqlType("varchar(x)") Slice slice)
+    {
+        return param;
     }
 
     @ScalarFunction(value = "utf8", deterministic = false)
@@ -62,18 +76,32 @@ public class TestStringFunctions
     {
         assertInvalidFunction("CONCAT()", "There must be two or more concatenation arguments");
         assertInvalidFunction("CONCAT('')", "There must be two or more concatenation arguments");
-        assertFunction("CONCAT('hello', ' world')", VARCHAR, "hello world");
-        assertFunction("CONCAT('', '')", VARCHAR, "");
-        assertFunction("CONCAT('what', '')", VARCHAR, "what");
-        assertFunction("CONCAT('', 'what')", VARCHAR, "what");
-        assertFunction("CONCAT(CONCAT('this', ' is'), ' cool')", VARCHAR, "this is cool");
-        assertFunction("CONCAT('this', CONCAT(' is', ' cool'))", VARCHAR, "this is cool");
+        assertFunction("CONCAT('hello', ' world')", createVarcharType(11), "hello world");
+        assertFunction("CONCAT('', '')", createVarcharType(0), "");
+        assertFunction("CONCAT('what', '')", createVarcharType(4), "what");
+        assertFunction("CONCAT('', 'what')", createVarcharType(4), "what");
+        assertFunction("CONCAT(CONCAT('this', ' is'), ' cool')", createVarcharType(12), "this is cool");
+        assertFunction("CONCAT('this', CONCAT(' is', ' cool'))", createVarcharType(12), "this is cool");
         //
         // Test concat for non-ASCII
-        assertFunction("CONCAT('hello na\u00EFve', ' world')", VARCHAR, "hello na\u00EFve world");
-        assertFunction("CONCAT('\uD801\uDC2D', 'end')", VARCHAR, "\uD801\uDC2Dend");
-        assertFunction("CONCAT('\uD801\uDC2D', 'end', '\uD801\uDC2D')", VARCHAR, "\uD801\uDC2Dend\uD801\uDC2D");
-        assertFunction("CONCAT(CONCAT('\u4FE1\u5FF5', ',\u7231'), ',\u5E0C\u671B')", VARCHAR, "\u4FE1\u5FF5,\u7231,\u5E0C\u671B");
+        assertFunction("CONCAT('hello na\u00EFve', ' world')", createVarcharType(17), "hello na\u00EFve world");
+        assertFunction("CONCAT('\uD801\uDC2D', 'end')", createVarcharType(4), "\uD801\uDC2Dend");
+        assertFunction("CONCAT('\uD801\uDC2D', 'end', '\uD801\uDC2D')", createVarcharType(5), "\uD801\uDC2Dend\uD801\uDC2D");
+        assertFunction("CONCAT(CONCAT('\u4FE1\u5FF5', ',\u7231'), ',\u5E0C\u671B')", createVarcharType(7), "\u4FE1\u5FF5,\u7231,\u5E0C\u671B");
+
+        // Test variadic arguments concat
+        assertFunction("CONCAT('hello', ' ', 'world')", createVarcharType(11), "hello world");
+        assertFunction("CONCAT('Is ', 'this ', 'the ', 'real ', 'life?\n', 'Is ', 'this ', 'just ', 'fantasy?')", createVarcharType(44), "Is this the real life?\nIs this just fantasy?");
+
+        // Test concat with null arguments
+        assertInvalidFunction("CONCAT(NULL)", "There must be two or more concatenation arguments");
+        assertInvalidFunction("CONCAT(NULL, NULL)", SemanticErrorCode.AMBIGUOUS_FUNCTION_CALL);
+        assertFunction("CONCAT(NULL, NULL, NULL)", createVarcharType(0), null);
+
+        assertInvalidFunction("CONCAT(NULL, 'hello')", SemanticErrorCode.AMBIGUOUS_FUNCTION_CALL);
+        assertInvalidFunction("CONCAT('hello', NULL)", SemanticErrorCode.AMBIGUOUS_FUNCTION_CALL);
+        assertFunction("CONCAT('hello', ' ', 'world', NULL)", createVarcharType(11), null);
+        assertFunction("CONCAT(NULL, 'hello', ' ', 'world')", createVarcharType(11), null);
     }
 
     @Test
@@ -92,24 +120,24 @@ public class TestStringFunctions
     @Test
     public void testReplace()
     {
-        assertFunction("REPLACE('aaa', 'a', 'aa')", VARCHAR, "aaaaaa");
-        assertFunction("REPLACE('abcdefabcdef', 'cd', 'XX')", VARCHAR, "abXXefabXXef");
-        assertFunction("REPLACE('abcdefabcdef', 'cd')", VARCHAR, "abefabef");
-        assertFunction("REPLACE('123123tech', '123')", VARCHAR, "tech");
-        assertFunction("REPLACE('123tech123', '123')", VARCHAR, "tech");
-        assertFunction("REPLACE('222tech', '2', '3')", VARCHAR, "333tech");
-        assertFunction("REPLACE('0000123', '0')", VARCHAR, "123");
-        assertFunction("REPLACE('0000123', '0', ' ')", VARCHAR, "    123");
-        assertFunction("REPLACE('foo', '')", VARCHAR, "foo");
-        assertFunction("REPLACE('foo', '', '')", VARCHAR, "foo");
-        assertFunction("REPLACE('foo', 'foo', '')", VARCHAR, "");
-        assertFunction("REPLACE('abc', '', 'xx')", VARCHAR, "xxaxxbxxcxx");
-        assertFunction("REPLACE('', '', 'xx')", VARCHAR, "xx");
-        assertFunction("REPLACE('', '')", VARCHAR, "");
-        assertFunction("REPLACE('', '', '')", VARCHAR, "");
-        assertFunction("REPLACE('\u4FE1\u5FF5,\u7231,\u5E0C\u671B', ',', '\u2014')", VARCHAR, "\u4FE1\u5FF5\u2014\u7231\u2014\u5E0C\u671B");
-        assertFunction("REPLACE('::\uD801\uDC2D::', ':', '')", VARCHAR, "\uD801\uDC2D");
-        assertFunction("REPLACE('\u00D6sterreich', '\u00D6', 'Oe')", VARCHAR, "Oesterreich");
+        assertFunction("REPLACE('aaa', 'a', 'aa')", createVarcharType(11), "aaaaaa");
+        assertFunction("REPLACE('abcdefabcdef', 'cd', 'XX')", createVarcharType(38), "abXXefabXXef");
+        assertFunction("REPLACE('abcdefabcdef', 'cd')", createVarcharType(12), "abefabef");
+        assertFunction("REPLACE('123123tech', '123')", createVarcharType(10), "tech");
+        assertFunction("REPLACE('123tech123', '123')", createVarcharType(10), "tech");
+        assertFunction("REPLACE('222tech', '2', '3')", createVarcharType(15), "333tech");
+        assertFunction("REPLACE('0000123', '0')", createVarcharType(7), "123");
+        assertFunction("REPLACE('0000123', '0', ' ')", createVarcharType(15), "    123");
+        assertFunction("REPLACE('foo', '')", createVarcharType(3), "foo");
+        assertFunction("REPLACE('foo', '', '')", createVarcharType(3), "foo");
+        assertFunction("REPLACE('foo', 'foo', '')", createVarcharType(3), "");
+        assertFunction("REPLACE('abc', '', 'xx')", createVarcharType(11), "xxaxxbxxcxx");
+        assertFunction("REPLACE('', '', 'xx')", createVarcharType(2), "xx");
+        assertFunction("REPLACE('', '')", createVarcharType(0), "");
+        assertFunction("REPLACE('', '', '')", createVarcharType(0), "");
+        assertFunction("REPLACE('\u4FE1\u5FF5,\u7231,\u5E0C\u671B', ',', '\u2014')", createVarcharType(15), "\u4FE1\u5FF5\u2014\u7231\u2014\u5E0C\u671B");
+        assertFunction("REPLACE('::\uD801\uDC2D::', ':', '')", createVarcharType(5), "\uD801\uDC2D"); //\uD801\uDC2D is one character
+        assertFunction("REPLACE('\u00D6sterreich', '\u00D6', 'Oe')", createVarcharType(32), "Oesterreich");
 
         assertFunction("CAST(REPLACE(utf8(from_hex('CE')), '', 'X') AS VARBINARY)", VARBINARY, new SqlVarbinary(new byte[] {'X', (byte) 0xCE, 'X'}));
 
@@ -478,7 +506,7 @@ public class TestStringFunctions
     @Test
     public void testVarcharToVarcharX()
     {
-        assertFunction("LOWER(CAST('HELLO' AS VARCHAR))", createVarcharType(Integer.MAX_VALUE), "hello");
+        assertFunction("LOWER(CAST('HELLO' AS VARCHAR))", createUnboundedVarcharType(), "hello");
     }
 
     @Test
@@ -583,6 +611,14 @@ public class TestStringFunctions
         assertFunction("normalize('sch\u00f6n', NFKC)", VARCHAR, "sch\u00f6n");
         assertFunction("normalize('\u3231\u3327\u3326\u2162', NFKC)", VARCHAR, "(\u682a)\u30c8\u30f3\u30c9\u30ebIII");
         assertFunction("normalize('\uff8a\uff9d\uff76\uff78\uff76\uff85', NFKC)", VARCHAR, "\u30cf\u30f3\u30ab\u30af\u30ab\u30ca");
+    }
+
+    @Test
+    public void testFromLiteralParameter()
+    {
+        assertFunction("vl(cast('aaa' as varchar(3)))", BIGINT, 3L);
+        assertFunction("vl(cast('aaa' as varchar(7)))", BIGINT, 7L);
+        assertFunction("vl('aaaa')", BIGINT, 4L);
     }
 
     // We do not use String toLowerCase or toUpperCase here because they can do multi character transforms

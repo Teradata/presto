@@ -82,17 +82,32 @@ public abstract class AstVisitor<R, C>
         return visitNode(node, context);
     }
 
-    protected R visitPrepare(Prepare node, C context)
+    protected R visitDataDefinitionStatement(DataDefinitionStatement node, C context)
     {
         return visitStatement(node, context);
+    }
+
+    protected R visitPrepare(Prepare node, C context)
+    {
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitDeallocate(Deallocate node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitExecute(Execute node, C context)
+    {
+        return visitStatement(node, context);
+    }
+
+    protected R visitDescribeOutput(DescribeOutput node, C context)
+    {
+        return visitStatement(node, context);
+    }
+
+    protected R visitDescribeInput(DescribeInput node, C context)
     {
         return visitStatement(node, context);
     }
@@ -154,12 +169,12 @@ public abstract class AstVisitor<R, C>
 
     protected R visitSetSession(SetSession node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     public R visitResetSession(ResetSession node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitGenericLiteral(GenericLiteral node, C context)
@@ -372,6 +387,11 @@ public abstract class AstVisitor<R, C>
         return visitLiteral(node, context);
     }
 
+    protected R visitParameter(Parameter node, C context)
+    {
+        return visitExpression(node, context);
+    }
+
     protected R visitLogicalBinaryExpression(LogicalBinaryExpression node, C context)
     {
         return visitExpression(node, context);
@@ -474,7 +494,7 @@ public abstract class AstVisitor<R, C>
 
     protected R visitCreateTable(CreateTable node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitCreateTableAsSelect(CreateTableAsSelect node, C context)
@@ -484,57 +504,57 @@ public abstract class AstVisitor<R, C>
 
     protected R visitDropTable(DropTable node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitRenameTable(RenameTable node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitRenameColumn(RenameColumn node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitAddColumn(AddColumn node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitCreateView(CreateView node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitDropView(DropView node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitInsert(Insert node, C context)
     {
-        return visitNode(node, context);
+        return visitStatement(node, context);
     }
 
     protected R visitCall(Call node, C context)
     {
-        return visitNode(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitDelete(Delete node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitStartTransaction(StartTransaction node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitGrant(Grant node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitRevoke(Revoke node, C context)
@@ -559,12 +579,12 @@ public abstract class AstVisitor<R, C>
 
     protected R visitCommit(Commit node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitRollback(Rollback node, C context)
     {
-        return visitStatement(node, context);
+        return visitDataDefinitionStatement(node, context);
     }
 
     protected R visitAtTimeZone(AtTimeZone node, C context)

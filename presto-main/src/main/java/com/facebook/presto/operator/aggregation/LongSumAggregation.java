@@ -30,11 +30,27 @@ public final class LongSumAggregation
     private LongSumAggregation() {}
 
     @InputFunction
-    @IntermediateInputFunction
     public static void sum(NullableLongState state, @SqlType(StandardTypes.BIGINT) long value)
     {
         state.setNull(false);
         state.setLong(BigintOperators.add(state.getLong(), value));
+    }
+
+    @CombineFunction
+    public static void combine(NullableLongState state, NullableLongState otherState)
+    {
+        if (state.isNull()) {
+            if (otherState.isNull()) {
+                return;
+            }
+            state.setNull(false);
+            state.setLong(otherState.getLong());
+            return;
+        }
+
+        if (!otherState.isNull()) {
+            state.setLong(BigintOperators.add(state.getLong(), otherState.getLong()));
+        }
     }
 
     @OutputFunction(StandardTypes.BIGINT)

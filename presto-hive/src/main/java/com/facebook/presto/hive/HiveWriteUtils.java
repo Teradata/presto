@@ -21,10 +21,12 @@ import com.facebook.presto.spi.StandardErrorCode;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.BigintType;
 import com.facebook.presto.spi.type.BooleanType;
+import com.facebook.presto.spi.type.CharType;
 import com.facebook.presto.spi.type.DateType;
 import com.facebook.presto.spi.type.DecimalType;
 import com.facebook.presto.spi.type.Decimals;
 import com.facebook.presto.spi.type.DoubleType;
+import com.facebook.presto.spi.type.FloatType;
 import com.facebook.presto.spi.type.IntegerType;
 import com.facebook.presto.spi.type.SmallintType;
 import com.facebook.presto.spi.type.TimestampType;
@@ -68,6 +70,7 @@ import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.ByteWritable;
 import org.apache.hadoop.io.BytesWritable;
+import org.apache.hadoop.io.FloatWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -100,7 +103,9 @@ import static com.facebook.presto.hive.HiveUtil.isMapType;
 import static com.facebook.presto.hive.HiveUtil.isRowType;
 import static com.facebook.presto.hive.util.Types.checkType;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
+import static com.facebook.presto.spi.type.Chars.isCharType;
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.lang.Float.intBitsToFloat;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.UUID.randomUUID;
@@ -113,6 +118,7 @@ import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveO
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaByteObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaDateObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaDoubleObjectInspector;
+import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaFloatObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaIntObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaLongObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaShortObjectInspector;
@@ -122,11 +128,14 @@ import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveO
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.writableByteObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.writableDateObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.writableDoubleObjectInspector;
+import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.writableFloatObjectInspector;
+import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.writableHiveCharObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.writableIntObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.writableLongObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.writableShortObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.writableStringObjectInspector;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.writableTimestampObjectInspector;
+import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getCharTypeInfo;
 import static org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory.getVarcharTypeInfo;
 import static org.joda.time.DateTimeZone.UTC;
 
@@ -170,8 +179,14 @@ public final class HiveWriteUtils
         else if (type.equals(DoubleType.DOUBLE)) {
             return javaDoubleObjectInspector;
         }
+        else if (type.equals(FloatType.FLOAT)) {
+            return javaFloatObjectInspector;
+        }
         else if (type instanceof VarcharType) {
             return writableStringObjectInspector;
+        }
+        else if (type instanceof CharType) {
+            return writableHiveCharObjectInspector;
         }
         else if (type.equals(VarbinaryType.VARBINARY)) {
             return javaByteArrayObjectInspector;
@@ -229,7 +244,13 @@ public final class HiveWriteUtils
         if (DoubleType.DOUBLE.equals(type)) {
             return type.getDouble(block, position);
         }
+        if (FloatType.FLOAT.equals(type)) {
+            return intBitsToFloat((int) type.getLong(block, position));
+        }
         if (type instanceof VarcharType) {
+            return new Text(type.getSlice(block, position).getBytes());
+        }
+        if (type instanceof CharType) {
             return new Text(type.getSlice(block, position).getBytes());
         }
         if (VarbinaryType.VARBINARY.equals(type)) {
@@ -499,12 +520,14 @@ public final class HiveWriteUtils
             case SHORT:
             case BYTE:
             case DOUBLE:
+            case FLOAT:
             case STRING:
             case DATE:
             case TIMESTAMP:
             case BINARY:
             case DECIMAL:
             case VARCHAR:
+            case CHAR:
                 return true;
         }
         return false;
@@ -543,6 +566,10 @@ public final class HiveWriteUtils
             return writableDoubleObjectInspector;
         }
 
+        if (type.equals(FloatType.FLOAT)) {
+            return writableFloatObjectInspector;
+        }
+
         if (type instanceof VarcharType) {
             VarcharType varcharType = (VarcharType) type;
             int varcharLength = varcharType.getLength();
@@ -552,9 +579,15 @@ public final class HiveWriteUtils
             }
             // Unbounded VARCHAR is not supported by Hive.
             // Values for such columns must be stored as STRING in Hive
-            else if (varcharLength == VarcharType.MAX_LENGTH) {
+            else if (varcharLength == VarcharType.UNBOUNDED_LENGTH) {
                 return writableStringObjectInspector;
             }
+        }
+
+        if (isCharType(type)) {
+            CharType charType = (CharType) type;
+            int charLength = charType.getLength();
+            return getPrimitiveWritableObjectInspector(getCharTypeInfo(charLength));
         }
 
         if (type.equals(VarbinaryType.VARBINARY)) {
@@ -607,8 +640,16 @@ public final class HiveWriteUtils
             return new DoubleFieldSetter(rowInspector, row, field);
         }
 
+        if (type.equals(FloatType.FLOAT)) {
+            return new FloatFieldSetter(rowInspector, row, field);
+        }
+
         if (type instanceof VarcharType) {
             return new VarcharFieldSetter(rowInspector, row, field, type);
+        }
+
+        if (type instanceof CharType) {
+            return new CharFieldSetter(rowInspector, row, field, type);
         }
 
         if (type.equals(VarbinaryType.VARBINARY)) {
@@ -767,6 +808,24 @@ public final class HiveWriteUtils
         }
     }
 
+    private static class FloatFieldSetter
+            extends FieldSetter
+    {
+        private final FloatWritable value = new FloatWritable();
+
+        public FloatFieldSetter(SettableStructObjectInspector rowInspector, Object row, StructField field)
+        {
+            super(rowInspector, row, field);
+        }
+
+        @Override
+        public void setField(Block block, int position)
+        {
+            value.set(intBitsToFloat((int) FloatType.FLOAT.getLong(block, position)));
+            rowInspector.setStructFieldData(row, field, value);
+        }
+    }
+
     private static class VarcharFieldSetter
             extends FieldSetter
     {
@@ -774,6 +833,26 @@ public final class HiveWriteUtils
         private final Type type;
 
         public VarcharFieldSetter(SettableStructObjectInspector rowInspector, Object row, StructField field, Type type)
+        {
+            super(rowInspector, row, field);
+            this.type = type;
+        }
+
+        @Override
+        public void setField(Block block, int position)
+        {
+            value.set(type.getSlice(block, position).getBytes());
+            rowInspector.setStructFieldData(row, field, value);
+        }
+    }
+
+    private static class CharFieldSetter
+            extends FieldSetter
+    {
+        private final Text value = new Text();
+        private final Type type;
+
+        public CharFieldSetter(SettableStructObjectInspector rowInspector, Object row, StructField field, Type type)
         {
             super(rowInspector, row, field);
             this.type = type;

@@ -38,7 +38,7 @@ public class Except
         this(Optional.of(location), left, right, distinct);
     }
 
-    private Except(Optional<NodeLocation> location, Relation left, Relation right, boolean distinct)
+    protected Except(Optional<NodeLocation> location, Relation left, Relation right, boolean distinct)
     {
         super(location, distinct);
         requireNonNull(left, "left is null");

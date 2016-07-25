@@ -137,8 +137,10 @@ import static com.facebook.presto.hive.util.Types.checkType;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
+import static com.facebook.presto.spi.type.Chars.isCharType;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.FloatType.FLOAT;
 import static com.facebook.presto.spi.type.HyperLogLogType.HYPER_LOG_LOG;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
@@ -164,6 +166,7 @@ import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.slice.Slices.utf8Slice;
 import static io.airlift.testing.Assertions.assertEqualsIgnoreOrder;
 import static io.airlift.testing.Assertions.assertInstanceOf;
+import static java.lang.Float.floatToRawIntBits;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Locale.ENGLISH;
 import static java.util.concurrent.Executors.newCachedThreadPool;
@@ -200,6 +203,7 @@ public abstract class AbstractTestHiveClient
             .add(new ColumnMetadata("t_smallint", SMALLINT))
             .add(new ColumnMetadata("t_integer", INTEGER))
             .add(new ColumnMetadata("t_bigint", BIGINT))
+            .add(new ColumnMetadata("t_float", FLOAT))
             .add(new ColumnMetadata("t_double", DOUBLE))
             .add(new ColumnMetadata("t_boolean", BOOLEAN))
             .add(new ColumnMetadata("t_array", ARRAY_TYPE))
@@ -208,10 +212,10 @@ public abstract class AbstractTestHiveClient
             .build();
 
     private static final MaterializedResult CREATE_TABLE_DATA =
-            MaterializedResult.resultBuilder(SESSION, BIGINT, createUnboundedVarcharType(), TINYINT, SMALLINT, INTEGER, BIGINT, DOUBLE, BOOLEAN, ARRAY_TYPE, MAP_TYPE, ROW_TYPE)
-                    .row(1L, "hello", (byte) 45, (short) 345, 234, 123L, 43.5, true, ImmutableList.of("apple", "banana"), ImmutableMap.of("one", 1L, "two", 2L), ImmutableList.of("true", 1L, true))
-                    .row(2L, null, null, null, null, null, null, null, null, null, null)
-                    .row(3L, "bye", (byte) 46, (short) 346, 345, 456L, 98.1, false, ImmutableList.of("ape", "bear"), ImmutableMap.of("three", 3L, "four", 4L), ImmutableList.of("false", 0L, false))
+            MaterializedResult.resultBuilder(SESSION, BIGINT, createUnboundedVarcharType(), TINYINT, SMALLINT, INTEGER, BIGINT, FLOAT, DOUBLE, BOOLEAN, ARRAY_TYPE, MAP_TYPE, ROW_TYPE)
+                    .row(1L, "hello", (byte) 45, (short) 345, 234, 123L, -754.1985f, 43.5, true, ImmutableList.of("apple", "banana"), ImmutableMap.of("one", 1L, "two", 2L), ImmutableList.of("true", 1L, true))
+                    .row(2L, null, null, null, null, null, null, null, null, null, null, null)
+                    .row(3L, "bye", (byte) 46, (short) 346, 345, 456L, 754.2008f, 98.1, false, ImmutableList.of("ape", "bear"), ImmutableMap.of("three", 3L, "four", 4L), ImmutableList.of("false", 0L, false))
                     .build();
 
     private static final List<ColumnMetadata> CREATE_TABLE_COLUMNS_PARTITIONED = ImmutableList.<ColumnMetadata>builder()
@@ -229,10 +233,10 @@ public abstract class AbstractTestHiveClient
                     .build());
 
     private static final MaterializedResult CREATE_TABLE_PARTITIONED_DATA_2ND =
-            MaterializedResult.resultBuilder(SESSION, BIGINT, createUnboundedVarcharType(), TINYINT, SMALLINT, INTEGER, BIGINT, DOUBLE, BOOLEAN, ARRAY_TYPE, MAP_TYPE, ROW_TYPE, createUnboundedVarcharType())
-                    .row(4L, "hello", (byte) 45, (short) 345, 234, 123L, 43.5, true, ImmutableList.of("apple", "banana"), ImmutableMap.of("one", 1L, "two", 2L), ImmutableList.of("true", 1L, true), "2015-07-04")
-                    .row(5L, null, null, null, null, null, null, null, null, null, null, "2015-07-04")
-                    .row(6L, "bye", (byte) 46, (short) 346, 345, 456L, 98.1, false, ImmutableList.of("ape", "bear"), ImmutableMap.of("three", 3L, "four", 4L), ImmutableList.of("false", 0L, false), "2015-07-04")
+            MaterializedResult.resultBuilder(SESSION, BIGINT, createUnboundedVarcharType(), TINYINT, SMALLINT, INTEGER, BIGINT, FLOAT, DOUBLE, BOOLEAN, ARRAY_TYPE, MAP_TYPE, ROW_TYPE, createUnboundedVarcharType())
+                    .row(4L, "hello", (byte) 45, (short) 345, 234, 123L, 754.1985f, 43.5, true, ImmutableList.of("apple", "banana"), ImmutableMap.of("one", 1L, "two", 2L), ImmutableList.of("true", 1L, true), "2015-07-04")
+                    .row(5L, null, null, null, null, null, null, null, null, null, null, null, "2015-07-04")
+                    .row(6L, "bye", (byte) 46, (short) 346, 345, 456L, -754.2008f, 98.1, false, ImmutableList.of("ape", "bear"), ImmutableMap.of("three", 3L, "four", 4L), ImmutableList.of("false", 0L, false), "2015-07-04")
                     .build();
 
     protected Set<HiveStorageFormat> createTableFormats = ImmutableSet.copyOf(HiveStorageFormat.values());
@@ -674,7 +678,7 @@ public abstract class AbstractTestHiveClient
         assertPrimitiveField(map, "t_smallint", SMALLINT, false);
         assertPrimitiveField(map, "t_int", INTEGER, false);
         assertPrimitiveField(map, "t_bigint", BIGINT, false);
-        assertPrimitiveField(map, "t_float", DOUBLE, false);
+        assertPrimitiveField(map, "t_float", FLOAT, false);
         assertPrimitiveField(map, "t_double", DOUBLE, false);
         assertPrimitiveField(map, "t_boolean", BOOLEAN, false);
         assertPrimitiveField(map, "ds", createUnboundedVarcharType(), true);
@@ -900,7 +904,7 @@ public abstract class AbstractTestHiveClient
         assertTableIsBucketed(tableHandle);
 
         ImmutableMap<ColumnHandle, NullableValue> bindings = ImmutableMap.<ColumnHandle, NullableValue>builder()
-                .put(columnHandles.get(columnIndex.get("t_float")), NullableValue.of(DOUBLE, 87.1))
+                .put(columnHandles.get(columnIndex.get("t_float")), NullableValue.of(FLOAT, (long) floatToRawIntBits(87.1f)))
                 .put(columnHandles.get(columnIndex.get("t_double")), NullableValue.of(DOUBLE, 88.2))
                 .build();
 
@@ -986,7 +990,7 @@ public abstract class AbstractTestHiveClient
                         assertEquals(row.getField(columnIndex.get("t_bigint")), 4 + rowNumber);
                     }
 
-                    assertEquals((Double) row.getField(columnIndex.get("t_float")), 5.1 + rowNumber, 0.001);
+                    assertEquals((Float) row.getField(columnIndex.get("t_float")), 5.1f + rowNumber, 0.001);
                     assertEquals(row.getField(columnIndex.get("t_double")), 6.2 + rowNumber);
 
                     if (rowNumber % 3 == 2) {
@@ -2195,7 +2199,7 @@ public abstract class AbstractTestHiveClient
                     assertEquals(row.getField(index), 4 + rowNumber);
                 }
 
-                assertEquals((Double) row.getField(columnIndex.get("t_float")), 5.1 + rowNumber, 0.001);
+                assertEquals((Float) row.getField(columnIndex.get("t_float")), 5.1f + rowNumber, 0.001);
                 assertEquals(row.getField(columnIndex.get("t_double")), 6.2 + rowNumber);
 
                 // BOOLEAN
@@ -2264,19 +2268,17 @@ public abstract class AbstractTestHiveClient
                     }
                 }
 
-                /* TODO: enable this test when the CHAR type is supported
-                // CHAR(25)
+                //CHAR(25)
                 index = columnIndex.get("t_char");
                 if (index != null) {
+                    value = row.getField(index);
                     if ((rowNumber % 41) == 0) {
-                        assertTrue(cursor.isNull(index));
+                        assertNull(value);
                     }
                     else {
-                        String stringValue = cursor.getSlice(index).toStringUtf8();
-                        assertEquals(stringValue, ((rowNumber % 41) == 1) ? "" : "test char");
+                        assertEquals(value, (rowNumber % 41) == 1 ? "" : "test char");
                     }
                 }
-                */
 
                 // MAP<STRING, STRING>
                 index = columnIndex.get("t_map");
@@ -2516,7 +2518,13 @@ public abstract class AbstractTestHiveClient
                 else if (DOUBLE.equals(column.getType())) {
                     assertInstanceOf(value, Double.class);
                 }
+                else if (FLOAT.equals(column.getType())) {
+                    assertInstanceOf(value, Float.class);
+                }
                 else if (isVarcharType(column.getType())) {
+                    assertInstanceOf(value, String.class);
+                }
+                else if (isCharType(column.getType())) {
                     assertInstanceOf(value, String.class);
                 }
                 else if (VARBINARY.equals(column.getType())) {

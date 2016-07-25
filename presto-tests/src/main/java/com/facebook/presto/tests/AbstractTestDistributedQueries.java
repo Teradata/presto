@@ -331,7 +331,7 @@ public abstract class AbstractTestDistributedQueries
     {
         assertUpdate("CREATE TABLE test_add_column AS SELECT 123 x", 1);
         assertUpdate("CREATE TABLE test_add_column_a AS SELECT 234 x, 111 a", 1);
-        assertUpdate("CREATE TABLE test_add_column_ab AS SELECT 345 x, 222 a, 33.3 b", 1);
+        assertUpdate("CREATE TABLE test_add_column_ab AS SELECT 345 x, 222 a, DOUBLE '33.3' b", 1);
 
         assertQueryFails("ALTER TABLE test_add_column ADD COLUMN x bigint", ".* Column 'x' already exists");
         assertQueryFails("ALTER TABLE test_add_column ADD COLUMN X bigint", ".* Column 'X' already exists");
@@ -515,12 +515,12 @@ public abstract class AbstractTestDistributedQueries
 
         assertUpdate("DROP TABLE test_delete");
 
-        // delete using a scalar subquery
-
+        // delete using a scalar and EXISTS subquery
         assertUpdate("CREATE TABLE test_delete AS SELECT * FROM orders", "SELECT count(*) FROM orders");
         assertUpdate("DELETE FROM test_delete WHERE orderkey = (SELECT orderkey FROM orders ORDER BY orderkey LIMIT 1)", 1);
         assertUpdate("DELETE FROM test_delete WHERE orderkey = (SELECT orderkey FROM orders WHERE false)", 0);
-        assertUpdate("DELETE FROM test_delete WHERE (SELECT true)", "SELECT count(*) - 1 FROM orders");
+        assertUpdate("DELETE FROM test_delete WHERE EXISTS(SELECT 1 WHERE false)", 0);
+        assertUpdate("DELETE FROM test_delete WHERE EXISTS(SELECT 1)", "SELECT count(*) - 1 FROM orders");
         assertUpdate("DROP TABLE test_delete");
 
         // test EXPLAIN ANALYZE with CTAS

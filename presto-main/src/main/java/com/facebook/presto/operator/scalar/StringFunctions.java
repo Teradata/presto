@@ -22,8 +22,8 @@ import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.type.StandardTypes;
-import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.type.CodePointsType;
+import com.facebook.presto.type.Constraint;
 import com.facebook.presto.type.LiteralParameters;
 import com.facebook.presto.type.SqlType;
 import com.google.common.primitives.Ints;
@@ -89,7 +89,7 @@ public final class StringFunctions
     @Description("greedily removes occurrences of a pattern in a string")
     @ScalarFunction
     @LiteralParameters({"x", "y"})
-    @SqlType(StandardTypes.VARCHAR)
+    @SqlType("varchar(x)")
     public static Slice replace(@SqlType("varchar(x)") Slice str, @SqlType("varchar(y)") Slice search)
     {
         return replace(str, search, Slices.EMPTY_SLICE);
@@ -97,9 +97,10 @@ public final class StringFunctions
 
     @Description("greedily replaces occurrences of a pattern with a string")
     @ScalarFunction
-    @LiteralParameters({"x", "y"})
-    @SqlType(StandardTypes.VARCHAR)
-    public static Slice replace(@SqlType("varchar(x)") Slice str, @SqlType("varchar(y)") Slice search, @SqlType(StandardTypes.VARCHAR) Slice replace)
+    @LiteralParameters({"x", "y", "z", "u"})
+    @Constraint(variable = "u", expression = "min(2147483647, x + z * (x + 1))")
+    @SqlType("varchar(u)")
+    public static Slice replace(@SqlType("varchar(x)") Slice str, @SqlType("varchar(y)") Slice search, @SqlType("varchar(z)") Slice replace)
     {
         // Empty search?
         if (search.length() == 0) {
@@ -172,8 +173,9 @@ public final class StringFunctions
 
     @Description("returns index of first occurrence of a substring (or 0 if not found)")
     @ScalarFunction("strpos")
+    @LiteralParameters({"x", "y"})
     @SqlType(StandardTypes.BIGINT)
-    public static long stringPosition(@SqlType(StandardTypes.VARCHAR) Slice string, @SqlType(StandardTypes.VARCHAR) Slice substring)
+    public static long stringPosition(@SqlType("varchar(x)") Slice string, @SqlType("varchar(y)") Slice substring)
     {
         if (substring.length() == 0) {
             return 1;
@@ -274,17 +276,17 @@ public final class StringFunctions
     }
 
     @ScalarFunction
-    @LiteralParameters("x")
+    @LiteralParameters({"x", "y"})
     @SqlType("array(varchar(x))")
-    public static Block split(@SqlType("varchar(x)") Slice string, @SqlType(StandardTypes.VARCHAR) Slice delimiter)
+    public static Block split(@SqlType("varchar(x)") Slice string, @SqlType("varchar(y)") Slice delimiter)
     {
         return split(string, delimiter, string.length() + 1);
     }
 
     @ScalarFunction
-    @LiteralParameters("x")
+    @LiteralParameters({"x", "y"})
     @SqlType("array(varchar(x))")
-    public static Block split(@SqlType("varchar(x)") Slice string, @SqlType(StandardTypes.VARCHAR) Slice delimiter, @SqlType(StandardTypes.BIGINT) long limit)
+    public static Block split(@SqlType("varchar(x)") Slice string, @SqlType("varchar(y)") Slice delimiter, @SqlType(StandardTypes.BIGINT) long limit)
     {
         checkCondition(limit > 0, INVALID_FUNCTION_ARGUMENT, "Limit must be positive");
         checkCondition(limit <= Integer.MAX_VALUE, INVALID_FUNCTION_ARGUMENT, "Limit is too large");
@@ -321,9 +323,9 @@ public final class StringFunctions
     @Nullable
     @Description("splits a string by a delimiter and returns the specified field (counting from one)")
     @ScalarFunction
-    @LiteralParameters("x")
+    @LiteralParameters({"x", "y"})
     @SqlType("varchar(x)")
-    public static Slice splitPart(@SqlType("varchar(x)") Slice string, @SqlType(StandardTypes.VARCHAR) Slice delimiter, @SqlType(StandardTypes.BIGINT) long index)
+    public static Slice splitPart(@SqlType("varchar(x)") Slice string, @SqlType("varchar(y)") Slice delimiter, @SqlType(StandardTypes.BIGINT) long index)
     {
         checkCondition(index > 0, INVALID_FUNCTION_ARGUMENT, "Index must be greater than zero");
         // Empty delimiter? Then every character will be a split
@@ -483,8 +485,22 @@ public final class StringFunctions
     }
 
     @ScalarOperator(OperatorType.CAST)
+    @LiteralParameters("x")
     @SqlType(CodePointsType.NAME)
-    public static int[] castToCodePoints(@SqlType(StandardTypes.VARCHAR) Slice slice)
+    public static int[] castVarcharToCodePoints(@SqlType("varchar(x)") Slice slice)
+    {
+        return castToCodePoints(slice);
+    }
+
+    @LiteralParameters("x")
+    @ScalarOperator(OperatorType.CAST)
+    @SqlType(CodePointsType.NAME)
+    public static int[] castCharToCodePoints(@SqlType("char(x)") Slice slice)
+    {
+        return castToCodePoints(slice);
+    }
+
+    private static int[] castToCodePoints(Slice slice)
     {
         int[] codePoints = new int[safeCountCodePoints(slice)];
         int position = 0;
@@ -602,7 +618,7 @@ public final class StringFunctions
     @Description("transforms the string to normalized form")
     @ScalarFunction
     @LiteralParameters({"x", "y"})
-    @SqlType(VarcharType.VARCHAR_MAX_LENGTH)
+    @SqlType(StandardTypes.VARCHAR)
     public static Slice normalize(@SqlType("varchar(x)") Slice slice, @SqlType("varchar(y)") Slice form)
     {
         Normalizer.Form targetForm;
@@ -625,8 +641,9 @@ public final class StringFunctions
 
     @Description("decodes the UTF-8 encoded string")
     @ScalarFunction
+    @LiteralParameters("x")
     @SqlType(StandardTypes.VARCHAR)
-    public static Slice fromUtf8(@SqlType(StandardTypes.VARBINARY) Slice slice, @SqlType(StandardTypes.VARCHAR) Slice replacementCharacter)
+    public static Slice fromUtf8(@SqlType(StandardTypes.VARBINARY) Slice slice, @SqlType("varchar(x)") Slice replacementCharacter)
     {
         int count = countCodePoints(replacementCharacter);
         if (count > 1) {
@@ -661,8 +678,9 @@ public final class StringFunctions
 
     @Description("encodes the string to UTF-8")
     @ScalarFunction
+    @LiteralParameters("x")
     @SqlType(StandardTypes.VARBINARY)
-    public static Slice toUtf8(@SqlType(StandardTypes.VARCHAR) Slice slice)
+    public static Slice toUtf8(@SqlType("varchar(x)") Slice slice)
     {
         return slice;
     }

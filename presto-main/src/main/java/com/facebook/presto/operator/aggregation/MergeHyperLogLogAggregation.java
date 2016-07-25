@@ -30,11 +30,20 @@ public final class MergeHyperLogLogAggregation
     private MergeHyperLogLogAggregation() {}
 
     @InputFunction
-    @IntermediateInputFunction
-    public static void merge(HyperLogLogState state, @SqlType(StandardTypes.HYPER_LOG_LOG) Slice value)
+    public static void input(HyperLogLogState state, @SqlType(StandardTypes.HYPER_LOG_LOG) Slice value)
     {
         HyperLogLog input = HyperLogLog.newInstance(value);
+        merge(state, input);
+    }
 
+    @CombineFunction
+    public static void combine(HyperLogLogState state, HyperLogLogState otherState)
+    {
+        merge(state, otherState.getHyperLogLog());
+    }
+
+    private static void merge(HyperLogLogState state, HyperLogLog input)
+    {
         HyperLogLog previous = state.getHyperLogLog();
         if (previous == null) {
             state.setHyperLogLog(input);

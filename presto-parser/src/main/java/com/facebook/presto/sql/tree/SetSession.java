@@ -19,7 +19,7 @@ import java.util.Optional;
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 public class SetSession
-        extends Statement
+        extends DataDefinitionStatement
 {
     private final QualifiedName name;
     private final Expression value;
@@ -34,7 +34,7 @@ public class SetSession
         this(Optional.of(location), name, value);
     }
 
-    private SetSession(Optional<NodeLocation> location, QualifiedName name, Expression value)
+    protected SetSession(Optional<NodeLocation> location, QualifiedName name, Expression value)
     {
         super(location);
         this.name = name;

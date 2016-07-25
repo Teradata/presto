@@ -29,12 +29,12 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.facebook.presto.metadata.DefaultSignatureBinder.bindVariables;
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
 import static com.facebook.presto.metadata.Signature.comparableTypeParameter;
 import static com.facebook.presto.metadata.Signature.longVariableExpression;
 import static com.facebook.presto.metadata.Signature.typeVariable;
 import static com.facebook.presto.metadata.Signature.withVariadicBound;
-import static com.facebook.presto.metadata.SignatureBinder.bindVariables;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static java.util.stream.Collectors.toList;
 import static org.testng.Assert.assertEquals;
@@ -361,7 +361,7 @@ public class TestSignatureBinder
     }
 
     @Test
-    public void testBindToUnparametrizedVarchar()
+    public void testBindToUnparametrizedVarcharIsImpossible()
             throws Exception
     {
         Signature function = functionSignature()
@@ -371,12 +371,7 @@ public class TestSignatureBinder
 
         assertThat(function)
                 .boundTo("varchar(3)")
-                .succeeds();
-
-        assertThat(function)
-                .boundTo("unknown")
-                .withCoercion()
-                .succeeds();
+                .fails();
     }
 
     @Test
@@ -782,6 +777,7 @@ public class TestSignatureBinder
         assertThat("map<T1,T2>", boundVariables, "map(double,bigint)");
         assertThat("bla(T1,42,T2)", boundVariables, "bla(double,42,bigint)");
         assertThat("varchar(p)", boundVariables, "varchar(1)");
+        assertThat("char(p)", boundVariables, "char(1)");
         assertThat("decimal(p,s)", boundVariables, "decimal(1,2)");
         assertThat("array(decimal(p,s))", boundVariables, "array(decimal(1,2))");
 
@@ -887,12 +883,12 @@ public class TestSignatureBinder
         private Optional<BoundVariables> bindVariables()
         {
             assertNotNull(argumentTypes);
-            SignatureBinder signatureBinder = new SignatureBinder(typeRegistry, function, allowCoercion);
+            DefaultSignatureBinder defaultSignatureBinder = new DefaultSignatureBinder(typeRegistry, function, allowCoercion);
             if (returnType == null) {
-                return signatureBinder.bindVariables(argumentTypes);
+                return defaultSignatureBinder.bindVariables(argumentTypes);
             }
             else {
-                return signatureBinder.bindVariables(argumentTypes, returnType);
+                return defaultSignatureBinder.bindVariables(argumentTypes, returnType);
             }
         }
     }

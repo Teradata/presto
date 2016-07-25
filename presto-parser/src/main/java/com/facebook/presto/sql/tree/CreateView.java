@@ -20,7 +20,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 public class CreateView
-        extends Statement
+        extends DataDefinitionStatement
 {
     private final QualifiedName name;
     private final Query query;
@@ -36,7 +36,7 @@ public class CreateView
         this(Optional.of(location), name, query, replace);
     }
 
-    private CreateView(Optional<NodeLocation> location, QualifiedName name, Query query, boolean replace)
+    protected CreateView(Optional<NodeLocation> location, QualifiedName name, Query query, boolean replace)
     {
         super(location);
         this.name = requireNonNull(name, "name is null");

@@ -200,6 +200,20 @@ public final class BigintOperators
         return Ints.saturatedCast(value);
     }
 
+    @ScalarOperator(SATURATED_FLOOR_CAST)
+    @SqlType(StandardTypes.SMALLINT)
+    public static long saturatedFloorCastToSmallint(@SqlType(StandardTypes.BIGINT) long value)
+    {
+        return Shorts.saturatedCast(value);
+    }
+
+    @ScalarOperator(SATURATED_FLOOR_CAST)
+    @SqlType(StandardTypes.TINYINT)
+    public static long saturatedFloorCastToTinyint(@SqlType(StandardTypes.BIGINT) long value)
+    {
+        return SignedBytes.saturatedCast(value);
+    }
+
     @ScalarOperator(CAST)
     @SqlType(StandardTypes.SMALLINT)
     public static long castToSmallint(@SqlType(StandardTypes.BIGINT) long value)
@@ -239,7 +253,8 @@ public final class BigintOperators
     }
 
     @ScalarOperator(CAST)
-    @SqlType(StandardTypes.VARCHAR)
+    @LiteralParameters("x")
+    @SqlType("varchar(x)")
     public static Slice castToVarchar(@SqlType(StandardTypes.BIGINT) long value)
     {
         // todo optimize me

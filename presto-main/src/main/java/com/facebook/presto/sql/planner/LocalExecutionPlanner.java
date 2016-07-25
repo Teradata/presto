@@ -1146,7 +1146,8 @@ public class LocalExecutionPlanner
                         metadata,
                         sqlParser,
                         ImmutableMap.<Symbol, Type>of(),
-                        ImmutableList.copyOf(row));
+                        ImmutableList.copyOf(row),
+                        false /*is describe*/);
                 for (int i = 0; i < row.size(); i++) {
                     // evaluate the literal value
                     Object result = ExpressionInterpreter.expressionInterpreter(row.get(i), metadata, context.getSession(), expressionTypes).evaluate(0);
@@ -1698,10 +1699,11 @@ public class LocalExecutionPlanner
         {
             PhysicalOperation source = node.getSource().accept(this, context);
 
-            Symbol symbol = getOnlyElement(node.getOutputSymbols());
-            Type type = requireNonNull(context.getTypes().get(symbol), format("No type for symbol %s", symbol));
+            List<Type> types = node.getOutputSymbols().stream()
+                    .map(symbol -> requireNonNull(context.getTypes().get(symbol), format("No type for symbol %s", symbol)))
+                    .collect(toImmutableList());
 
-            OperatorFactory operatorFactory = new EnforceSingleRowOperator.EnforceSingleRowOperatorFactory(context.getNextOperatorId(), node.getId(), type);
+            OperatorFactory operatorFactory = new EnforceSingleRowOperator.EnforceSingleRowOperatorFactory(context.getNextOperatorId(), node.getId(), types);
             return new PhysicalOperation(operatorFactory, makeLayout(node), source);
         }
 

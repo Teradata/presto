@@ -35,7 +35,7 @@ public class AtTimeZone
         this(Optional.of(location), value, timeZone);
     }
 
-    private AtTimeZone(Optional<NodeLocation> location, Expression value, Expression timeZone)
+    protected AtTimeZone(Optional<NodeLocation> location, Expression value, Expression timeZone)
     {
         super(location);
         checkArgument(timeZone instanceof IntervalLiteral || timeZone instanceof StringLiteral, "timeZone must be IntervalLiteral or StringLiteral");

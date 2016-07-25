@@ -25,7 +25,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 public class CreateTable
-        extends Statement
+        extends DataDefinitionStatement
 {
     private final QualifiedName name;
     private final List<TableElement> elements;
@@ -42,7 +42,7 @@ public class CreateTable
         this(Optional.of(location), name, elements, notExists, properties);
     }
 
-    private CreateTable(Optional<NodeLocation> location, QualifiedName name, List<TableElement> elements, boolean notExists, Map<String, Expression> properties)
+    protected CreateTable(Optional<NodeLocation> location, QualifiedName name, List<TableElement> elements, boolean notExists, Map<String, Expression> properties)
     {
         super(location);
         this.name = requireNonNull(name, "table is null");

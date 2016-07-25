@@ -37,7 +37,7 @@ public class Intersect
         this(Optional.of(location), relations, distinct);
     }
 
-    private Intersect(Optional<NodeLocation> location, List<Relation> relations, boolean distinct)
+    protected Intersect(Optional<NodeLocation> location, List<Relation> relations, boolean distinct)
     {
         super(location, distinct);
         requireNonNull(relations, "relations is null");

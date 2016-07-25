@@ -37,7 +37,7 @@ def maven_download(group, artifact, version, packaging, classifier):
     group_path = group.replace('.', '/')
     filename = maven_filename(artifact, version, packaging, classifier)
     return base + '/'.join((group_path, artifact, version, filename))
-
+    return 'http://www.teradata.com/presto'
 
 def setup(app):
     # noinspection PyDefaultArgument,PyUnusedLocal
@@ -56,5 +56,4 @@ def setup(app):
         node = nodes.reference(title, title, internal=False, refuri=uri)
 
         return [node], []
-
-    app.add_role('download', download_link_role)
+    app.add_role('maven_download', download_link_role)

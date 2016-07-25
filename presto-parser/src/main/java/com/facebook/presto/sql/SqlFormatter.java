@@ -25,6 +25,8 @@ import com.facebook.presto.sql.tree.CreateTableAsSelect;
 import com.facebook.presto.sql.tree.CreateView;
 import com.facebook.presto.sql.tree.Deallocate;
 import com.facebook.presto.sql.tree.Delete;
+import com.facebook.presto.sql.tree.DescribeInput;
+import com.facebook.presto.sql.tree.DescribeOutput;
 import com.facebook.presto.sql.tree.DropTable;
 import com.facebook.presto.sql.tree.DropView;
 import com.facebook.presto.sql.tree.Except;
@@ -173,6 +175,27 @@ public final class SqlFormatter
         protected Void visitExecute(Execute node, Integer indent)
         {
             append(indent, "EXECUTE ");
+            builder.append(node.getName());
+            List<Expression> parameters = node.getParameters();
+            if (!parameters.isEmpty()) {
+                builder.append(" USING ");
+                Joiner.on(", ").appendTo(builder, parameters);
+            }
+            return null;
+        }
+
+        @Override
+        protected Void visitDescribeOutput(DescribeOutput node, Integer indent)
+        {
+            append(indent, "DESCRIBE OUTPUT ");
+            builder.append(node.getName());
+            return null;
+        }
+
+        @Override
+        protected Void visitDescribeInput(DescribeInput node, Integer indent)
+        {
+            append(indent, "DESCRIBE INPUT ");
             builder.append(node.getName());
             return null;
         }

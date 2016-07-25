@@ -14,6 +14,7 @@
 package com.facebook.presto.type;
 
 import com.facebook.presto.operator.scalar.AbstractTestFunctions;
+import com.facebook.presto.sql.analyzer.SemanticErrorCode;
 import org.testng.annotations.Test;
 
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
@@ -42,26 +43,17 @@ public class TestVarcharOperators
     }
 
     @Test
-    public void testCast()
-            throws Exception
-    {
-        assertFunction("cast('bar' as varchar(20))", createVarcharType(20), "bar");
-        assertFunction("cast(cast('bar' as varchar(20)) as varchar(30))", createVarcharType(30), "bar");
-        assertFunction("cast(cast('bar' as varchar(20)) as varchar)", VARCHAR, "bar");
-
-        assertFunction("cast('banana' as varchar(3))", createVarcharType(3), "ban");
-        assertFunction("cast(cast('banana' as varchar(20)) as varchar(3))", createVarcharType(3), "ban");
-    }
-
-    @Test
     public void testAdd()
             throws Exception
     {
-        // TODO change expected return type to createVarcharType(6) when function resolving is fixed
-        assertFunction("'foo' || 'foo'", VARCHAR, "foo" + "foo");
-        assertFunction("'foo' || 'bar'", VARCHAR, "foo" + "bar");
-        assertFunction("'bar' || 'foo'", VARCHAR, "bar" + "foo");
-        assertFunction("'bar' || 'bar'", VARCHAR, "bar" + "bar");
+        assertFunction("'foo' || 'foo'", createVarcharType(6), "foo" + "foo");
+        assertFunction("'foo' || 'bar'", createVarcharType(6), "foo" + "bar");
+        assertFunction("'bar' || 'foo'", createVarcharType(6), "bar" + "foo");
+        assertFunction("'bar' || 'bar'", createVarcharType(6), "bar" + "bar");
+        assertFunction("'bar' || 'barbaz'", createVarcharType(9), "bar" + "barbaz");
+        assertInvalidFunction("'bar' || NULL", SemanticErrorCode.AMBIGUOUS_FUNCTION_CALL);
+        assertInvalidFunction("NULL || NULL", SemanticErrorCode.AMBIGUOUS_FUNCTION_CALL);
+        assertInvalidFunction("NULL || 'bar'", SemanticErrorCode.AMBIGUOUS_FUNCTION_CALL);
     }
 
     @Test

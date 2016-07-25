@@ -20,7 +20,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 public class Delete
-        extends Statement
+        extends DataDefinitionStatement
 {
     private final Table table;
     private final Optional<Expression> where;
@@ -35,7 +35,7 @@ public class Delete
         this(Optional.of(location), table, where);
     }
 
-    private Delete(Optional<NodeLocation> location, Table table, Optional<Expression> where)
+    protected Delete(Optional<NodeLocation> location, Table table, Optional<Expression> where)
     {
         super(location);
         this.table = requireNonNull(table, "table is null");

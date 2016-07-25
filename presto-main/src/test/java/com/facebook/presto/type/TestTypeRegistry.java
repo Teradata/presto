@@ -13,8 +13,13 @@
  */
 package com.facebook.presto.type;
 
+import com.facebook.presto.block.BlockEncodingManager;
+import com.facebook.presto.metadata.FunctionRegistry;
+import com.facebook.presto.metadata.OperatorType;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeSignature;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
@@ -22,9 +27,11 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
+import static com.facebook.presto.spi.type.CharType.createCharType;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DecimalType.createDecimalType;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.FloatType.FLOAT;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.TimeType.TIME;
@@ -61,6 +68,12 @@ public class TestTypeRegistry
         assertTrue(isTypeOnlyCoercion("array(varchar(42))", "array(varchar(44))"));
         assertFalse(isTypeOnlyCoercion("array(varchar(44))", "array(varchar(42))"));
 
+        assertTrue(isTypeOnlyCoercion("char(42)", "char(44)"));
+        assertFalse(isTypeOnlyCoercion("char(44)", "char(42)"));
+
+        assertTrue(isTypeOnlyCoercion("array(char(42))", "array(char(44))"));
+        assertFalse(isTypeOnlyCoercion("array(char(44))", "array(char(42))"));
+
         assertTrue(isTypeOnlyCoercion("decimal(22,1)", "decimal(23,1)"));
         assertTrue(isTypeOnlyCoercion("decimal(2,1)", "decimal(3,1)"));
         assertFalse(isTypeOnlyCoercion("decimal(23,1)", "decimal(22,1)"));
@@ -96,10 +109,20 @@ public class TestTypeRegistry
         assertTrue(typeRegistry.canCoerce(VARCHAR, LIKE_PATTERN));
         assertTrue(typeRegistry.canCoerce(VARCHAR, JSON_PATH));
 
+        assertTrue(typeRegistry.canCoerce(FLOAT, DOUBLE));
+        assertTrue(typeRegistry.canCoerce(TINYINT, FLOAT));
+        assertTrue(typeRegistry.canCoerce(SMALLINT, FLOAT));
+        assertTrue(typeRegistry.canCoerce(INTEGER, FLOAT));
+        assertTrue(typeRegistry.canCoerce(BIGINT, FLOAT));
+
         assertFalse(typeRegistry.canCoerce(DOUBLE, BIGINT));
         assertFalse(typeRegistry.canCoerce(TIMESTAMP, TIME_WITH_TIME_ZONE));
         assertFalse(typeRegistry.canCoerce(TIMESTAMP_WITH_TIME_ZONE, TIMESTAMP));
         assertFalse(typeRegistry.canCoerce(VARBINARY, VARCHAR));
+        assertFalse(canCoerce("float", "decimal(37,1)"));
+        assertFalse(canCoerce("float", "decimal(37,37)"));
+        assertFalse(canCoerce("double", "decimal(37,1)"));
+        assertFalse(canCoerce("double", "decimal(37,37)"));
 
         assertTrue(canCoerce("unknown", "array(bigint)"));
         assertFalse(canCoerce("array(bigint)", "unknown"));
@@ -123,6 +146,8 @@ public class TestTypeRegistry
 
         assertTrue(canCoerce("decimal(3,2)", "double"));
         assertTrue(canCoerce("decimal(22,1)", "double"));
+        assertTrue(canCoerce("decimal(3,2)", "float"));
+        assertTrue(canCoerce("decimal(22,1)", "float"));
 
         assertFalse(canCoerce("integer", "decimal(9,0)"));
         assertTrue(canCoerce("integer", "decimal(10,0)"));
@@ -154,6 +179,12 @@ public class TestTypeRegistry
         assertCommonSuperType(VARCHAR, LIKE_PATTERN, LIKE_PATTERN);
         assertCommonSuperType(VARCHAR, JSON_PATH, JSON_PATH);
 
+        assertCommonSuperType(FLOAT, DOUBLE, DOUBLE);
+        assertCommonSuperType(FLOAT, TINYINT, FLOAT);
+        assertCommonSuperType(FLOAT, SMALLINT, FLOAT);
+        assertCommonSuperType(FLOAT, INTEGER, FLOAT);
+        assertCommonSuperType(FLOAT, BIGINT, FLOAT);
+
         assertCommonSuperType(TIMESTAMP, TIME_WITH_TIME_ZONE, null);
         assertCommonSuperType(VARBINARY, VARCHAR, null);
 
@@ -169,6 +200,7 @@ public class TestTypeRegistry
         assertCommonSuperType("bigint", "decimal(18,0)", "decimal(19,0)");
         assertCommonSuperType("bigint", "decimal(19,0)", "decimal(19,0)");
         assertCommonSuperType("bigint", "decimal(37,1)", "decimal(37,1)");
+        assertCommonSuperType("float", "decimal(37,1)", "float");
         assertCommonSuperType("array(decimal(23,1))", "array(decimal(22,1))", "array(decimal(23,1))");
         assertCommonSuperType("array(bigint)", "array(decimal(2,1))", "array(decimal(20,1))");
 
@@ -205,15 +237,33 @@ public class TestTypeRegistry
             throws Exception
     {
         Set<Type> types = getStandardPrimitiveTypes();
-        for (Type sourceType : types) {
+        for (Type transitiveType : types) {
             for (Type resultType : types) {
-                if (typeRegistry.canCoerce(sourceType, resultType)) {
-                    for (Type transitiveType : types) {
-                        if (typeRegistry.canCoerce(transitiveType, sourceType) && !typeRegistry.canCoerce(transitiveType, resultType)) {
-                            fail(format("'%s' -> '%s' coercion is missing when transitive coercion is possible: '%s' -> '%s' -> '%s'",
-                                    transitiveType, resultType, transitiveType, sourceType, resultType));
+                if (typeRegistry.canCoerce(transitiveType, resultType)) {
+                    for (Type sourceType : types) {
+                        if (typeRegistry.canCoerce(sourceType, transitiveType)) {
+                            if (!typeRegistry.canCoerce(sourceType, resultType)) {
+                                fail(format("'%s' -> '%s' coercion is missing when transitive coercion is possible: '%s' -> '%s' -> '%s'",
+                                        sourceType, resultType, sourceType, transitiveType, resultType));
+                            }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    @Test
+    public void testCastOperatorsExistForCoercions()
+    {
+        FunctionRegistry functionRegistry = new FunctionRegistry(typeRegistry, new BlockEncodingManager(typeRegistry), new FeaturesConfig().setExperimentalSyntaxEnabled(true));
+
+        Set<Type> types = getStandardPrimitiveTypes();
+        for (Type sourceType : types) {
+            for (Type resultType : types) {
+                if (typeRegistry.canCoerce(sourceType, resultType) && sourceType != UNKNOWN && resultType != UNKNOWN) {
+                    assertTrue(functionRegistry.canResolveOperator(OperatorType.CAST, resultType, ImmutableList.of(sourceType)),
+                            format("'%s' -> '%s' coercion exists but there is no cast operator", sourceType, resultType));
                 }
             }
         }
@@ -232,6 +282,8 @@ public class TestTypeRegistry
         builder.add(createDecimalType(38, 38));
         builder.add(createVarcharType(0));
         builder.add(createUnboundedVarcharType());
+        builder.add(createCharType(1));
+        builder.add(createCharType(42));
         return builder.build();
     }
 

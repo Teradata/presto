@@ -45,8 +45,10 @@ import static com.facebook.presto.hive.HiveErrorCode.HIVE_CURSOR_ERROR;
 import static com.facebook.presto.hive.HiveUtil.base64Decode;
 import static com.facebook.presto.hive.HiveUtil.bigintPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.booleanPartitionKey;
+import static com.facebook.presto.hive.HiveUtil.charParitionKey;
 import static com.facebook.presto.hive.HiveUtil.datePartitionKey;
 import static com.facebook.presto.hive.HiveUtil.doublePartitionKey;
+import static com.facebook.presto.hive.HiveUtil.floatPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.getTableObjectInspector;
 import static com.facebook.presto.hive.HiveUtil.integerPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.isStructuralType;
@@ -59,15 +61,20 @@ import static com.facebook.presto.hive.HiveUtil.timestampPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.tinyintPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.varcharPartitionKey;
 import static com.facebook.presto.hive.NumberParser.parseDouble;
+import static com.facebook.presto.hive.NumberParser.parseFloat;
 import static com.facebook.presto.hive.NumberParser.parseLong;
 import static com.facebook.presto.hive.util.SerDeUtils.getBlockObject;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
+import static com.facebook.presto.spi.type.Chars.isCharType;
+import static com.facebook.presto.spi.type.Chars.trimSpacesAndTruncateToLength;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.Decimals.isLongDecimal;
 import static com.facebook.presto.spi.type.Decimals.isShortDecimal;
+import static com.facebook.presto.spi.type.Decimals.rescale;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.FloatType.FLOAT;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.StandardTypes.DECIMAL;
@@ -79,10 +86,10 @@ import static com.facebook.presto.spi.type.Varchars.truncateToLength;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Maps.uniqueIndex;
+import static java.lang.Float.floatToRawIntBits;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.String.format;
-import static java.math.BigDecimal.ROUND_HALF_UP;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
@@ -208,11 +215,17 @@ class ColumnarTextHiveRecordCursor<K>
                 else if (BIGINT.equals(type)) {
                     longs[columnIndex] = bigintPartitionKey(partitionKey.getValue(), name);
                 }
+                else if (FLOAT.equals(type)) {
+                    longs[columnIndex] = floatPartitionKey(partitionKey.getValue(), name);
+                }
                 else if (DOUBLE.equals(type)) {
                     doubles[columnIndex] = doublePartitionKey(partitionKey.getValue(), name);
                 }
                 else if (isVarcharType(type)) {
                     slices[columnIndex] = varcharPartitionKey(partitionKey.getValue(), name, type);
+                }
+                else if (isCharType(type)) {
+                    slices[columnIndex] = charParitionKey(partitionKey.getValue(), name, type);
                 }
                 else if (DATE.equals(type)) {
                     longs[columnIndex] = datePartitionKey(partitionKey.getValue(), name);
@@ -355,10 +368,11 @@ class ColumnarTextHiveRecordCursor<K>
                 !types[fieldId].equals(TINYINT) &&
                 !types[fieldId].equals(DATE) &&
                 !types[fieldId].equals(TIMESTAMP) &&
-                !isShortDecimal(types[fieldId])) {
+                !isShortDecimal(types[fieldId]) &&
+                !types[fieldId].equals(FLOAT)) {
             // we don't use Preconditions.checkArgument because it requires boxing fieldId, which affects inner loop performance
             throw new IllegalArgumentException(
-                    format("Expected field to be %s, %s, %s, %s, %s or %s , actual %s (field %s)", TINYINT, SMALLINT, INTEGER, BIGINT, DECIMAL, DATE, TIMESTAMP, types[fieldId], fieldId));
+                    format("Expected field to be %s, %s, %s, %s, %s, %s or %s , actual %s (field %s)", TINYINT, SMALLINT, INTEGER, BIGINT, DECIMAL, DATE, TIMESTAMP, FLOAT, types[fieldId], fieldId));
         }
 
         if (!loaded[fieldId]) {
@@ -411,6 +425,10 @@ class ColumnarTextHiveRecordCursor<K>
         else if (hiveTypes[column].equals(HiveType.HIVE_TIMESTAMP)) {
             String value = new String(bytes, start, length);
             longs[column] = parseHiveTimestamp(value, hiveStorageTimeZone);
+            wasNull = false;
+        }
+        else if (hiveTypes[column].equals(HiveType.HIVE_FLOAT)) {
+            longs[column] = floatToRawIntBits(parseFloat(bytes, start, length));
             wasNull = false;
         }
         else {
@@ -542,6 +560,51 @@ class ColumnarTextHiveRecordCursor<K>
         nulls[column] = wasNull;
     }
 
+    private void parseCharColumn(int column)
+    {
+        // don't include column number in message because it causes boxing which is expensive here
+        checkArgument(!isPartitionColumn[column], "Column is a partition key");
+
+        loaded[column] = true;
+
+        if (hiveColumnIndexes[column] >= value.size()) {
+            // this partition may contain fewer fields than what's declared in the schema
+            // this happens when additional columns are added to the hive table after a partition has been created
+            nulls[column] = true;
+        }
+        else {
+            BytesRefWritable fieldData = value.unCheckedGet(hiveColumnIndexes[column]);
+
+            byte[] bytes;
+            try {
+                bytes = fieldData.getData();
+            }
+            catch (IOException e) {
+                throw Throwables.propagate(e);
+            }
+
+            int start = fieldData.getStart();
+            int length = fieldData.getLength();
+
+            parseCharColumn(column, bytes, start, length);
+        }
+    }
+
+    private void parseCharColumn(int column, byte[] bytes, int start, int length)
+    {
+        boolean wasNull;
+        if (length == "\\N".length() && bytes[start] == '\\' && bytes[start + 1] == 'N') {
+            wasNull = true;
+        }
+        else {
+            Type type = types[column];
+            Slice value = Slices.wrappedBuffer(Arrays.copyOfRange(bytes, start, start + length));
+            slices[column] = trimSpacesAndTruncateToLength(value, type);
+            wasNull = false;
+        }
+        nulls[column] = wasNull;
+    }
+
     private void parseDecimalColumn(int column)
     {
         // don't include column number in message because it causes boxing which is expensive here
@@ -580,11 +643,7 @@ class ColumnarTextHiveRecordCursor<K>
         }
         else {
             DecimalType columnType = (DecimalType) types[column];
-            BigDecimal decimal = new BigDecimal(new String(bytes, start, length, UTF_8));
-
-            checkState(decimal.scale() <= columnType.getScale(), "Read decimal value scale larger than column scale");
-            decimal = decimal.setScale(columnType.getScale(), ROUND_HALF_UP);
-            checkState(decimal.precision() <= columnType.getPrecision(), "Read decimal precision larger than column precision");
+            BigDecimal decimal = rescale(new BigDecimal(new String(bytes, start, length, UTF_8)), columnType);
 
             if (columnType.isShort()) {
                 longs[column] = decimal.unscaledValue().longValue();
@@ -656,6 +715,7 @@ class ColumnarTextHiveRecordCursor<K>
         }
         nulls[column] = wasNull;
     }
+
     @Override
     public boolean isNull(int fieldId)
     {
@@ -688,8 +748,14 @@ class ColumnarTextHiveRecordCursor<K>
         else if (type.equals(DOUBLE)) {
             parseDoubleColumn(column);
         }
+        else if (type.equals(FLOAT)) {
+            parseLongColumn(column);
+        }
         else if (isVarcharType(type) || VARBINARY.equals(type)) {
             parseStringColumn(column);
+        }
+        else if (isCharType(type)) {
+            parseCharColumn(column);
         }
         else if (isStructuralType(hiveTypes[column])) {
             parseObjectColumn(column);

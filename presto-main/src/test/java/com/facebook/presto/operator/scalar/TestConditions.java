@@ -249,8 +249,33 @@ public class TestConditions
                 33L);
 
         assertFunction("case " +
-                        "when false then 1.0 " +
+                        "when false then CAST(1.0 as DOUBLE) " +
                         "when true then 33 " +
+                        "end",
+                DOUBLE,
+                33.0);
+
+        assertDecimalFunction("case " +
+                        "when false then 2.2 " +
+                        "when true then 2.2 " +
+                        "end",
+                decimal("2.2"));
+
+        assertDecimalFunction("case " +
+                        "when false then 1234567890.0987654321 " +
+                        "when true then 3.3 " +
+                        "end",
+                decimal("0000000003.3000000000"));
+
+        assertDecimalFunction("case " +
+                        "when false then 1 " +
+                        "when true then 2.2 " +
+                        "end",
+                decimal("0000000002.2"));
+
+        assertFunction("case " +
+                        "when false then 1.1 " +
+                        "when true then DOUBLE '33.0' " +
                         "end",
                 DOUBLE,
                 33.0);
@@ -336,8 +361,33 @@ public class TestConditions
                 33);
 
         assertFunction("case true " +
-                        "when false then 1.0 " +
+                        "when false then CAST(1.0 as DOUBLE) " +
                         "when true then 33 " +
+                        "end",
+                DOUBLE,
+                33.0);
+
+        assertDecimalFunction("case true " +
+                        "when false then 2.2 " +
+                        "when true then 2.2 " +
+                        "end",
+                decimal("2.2"));
+
+        assertDecimalFunction("case true " +
+                        "when false then 1234567890.0987654321 " +
+                        "when true then 3.3 " +
+                        "end",
+                decimal("0000000003.3000000000"));
+
+        assertDecimalFunction("case true " +
+                        "when false then 1 " +
+                        "when true then 2.2 " +
+                        "end",
+                decimal("0000000002.2"));
+
+        assertFunction("case true " +
+                        "when false then 1.1 " +
+                        "when true then DOUBLE '33.0' " +
                         "end",
                 DOUBLE,
                 33.0);

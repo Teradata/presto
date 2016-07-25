@@ -40,7 +40,7 @@ public class ShowPartitions
         this(Optional.of(location), table, where, orderBy, limit);
     }
 
-    private ShowPartitions(Optional<NodeLocation> location, QualifiedName table, Optional<Expression> where, List<SortItem> orderBy, Optional<String> limit)
+    protected ShowPartitions(Optional<NodeLocation> location, QualifiedName table, Optional<Expression> where, List<SortItem> orderBy, Optional<String> limit)
     {
         super(location);
         this.table = requireNonNull(table, "table is null");

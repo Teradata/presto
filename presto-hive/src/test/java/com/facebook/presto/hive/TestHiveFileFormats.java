@@ -202,7 +202,7 @@ public class TestHiveFileFormats
                 .filter(column -> column.getObjectInspector().getCategory() == Category.PRIMITIVE)
                 .collect(toList());
         TestingConnectorSession session = new TestingConnectorSession(
-                new HiveSessionProperties(new HiveClientConfig().setParquetOptimizedReaderEnabled(true)).getSessionProperties());
+                new HiveSessionProperties(new HiveClientConfig().setParquetOptimizedReaderEnabled(true).setParquetPredicatePushdownEnabled(true)).getSessionProperties());
         assertThatFileFormat(PARQUET)
                 .withColumns(testColumns)
                 .withSession(session)
@@ -294,7 +294,7 @@ public class TestHiveFileFormats
             throws Exception
     {
         List<TestColumn> testColumns = TEST_COLUMNS.stream()
-                .filter(testColumn -> !hasType(testColumn.getObjectInspector(), PrimitiveCategory.DATE, PrimitiveCategory.VARCHAR, PrimitiveCategory.DECIMAL))
+                .filter(testColumn -> !hasType(testColumn.getObjectInspector(), PrimitiveCategory.DATE, PrimitiveCategory.VARCHAR, PrimitiveCategory.CHAR, PrimitiveCategory.DECIMAL))
                 .collect(Collectors.toList());
         assertThatFileFormat(DWRF)
                 .withColumns(testColumns)

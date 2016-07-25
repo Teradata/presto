@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.jdbc;
 
+import com.facebook.presto.execution.QueryState;
 import com.facebook.presto.plugin.blackhole.BlackHolePlugin;
 import com.facebook.presto.server.testing.TestingPrestoServer;
 import com.facebook.presto.tpch.TpchMetadata;
@@ -20,6 +21,8 @@ import com.facebook.presto.tpch.TpchPlugin;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logging;
+import io.airlift.testing.Assertions;
+import io.airlift.units.Duration;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.testng.annotations.AfterClass;
@@ -43,11 +46,23 @@ import java.util.ArrayList;
 import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicReference;
 
+import static com.facebook.presto.execution.QueryState.FAILED;
+import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.testing.Assertions.assertInstanceOf;
+import static io.airlift.units.Duration.nanosSince;
+import static java.lang.Float.POSITIVE_INFINITY;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
+import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.Executors.newCachedThreadPool;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -63,6 +78,7 @@ public class TestDriver
     private static final String TEST_CATALOG = "test_catalog";
 
     private TestingPrestoServer server;
+    private ExecutorService executorService;
 
     @BeforeClass
     public void setup()
@@ -74,8 +90,18 @@ public class TestDriver
         server.createCatalog(TEST_CATALOG, "tpch");
         server.installPlugin(new BlackHolePlugin());
         server.createCatalog("blackhole", "blackhole");
-
+        waitForNodeRefresh(server);
         setupTestTables();
+    }
+
+    private static void waitForNodeRefresh(TestingPrestoServer server)
+            throws InterruptedException
+    {
+        long start = System.nanoTime();
+        while (server.refreshNodes().getActiveNodes().size() < 1) {
+            Assertions.assertLessThan(nanosSince(start), new Duration(10, SECONDS));
+            MILLISECONDS.sleep(10);
+        }
     }
 
     private void setupTestTables()
@@ -85,12 +111,15 @@ public class TestDriver
                 Statement statement = connection.createStatement()) {
             assertEquals(statement.executeUpdate("CREATE TABLE test_table (x bigint)"), 0);
         }
+        executorService = newCachedThreadPool(daemonThreadsNamed("test-%s"));
     }
 
     @AfterClass
     public void teardown()
+            throws Exception
     {
         closeQuietly(server);
+        executorService.shutdownNow();
     }
 
     @Test
@@ -104,15 +133,16 @@ public class TestDriver
                         "  123 _integer" +
                         ",  12300000000 _bigint" +
                         ", 'foo' _varchar" +
-                        ", 0.1 _double" +
+                        ", DOUBLE '0.1' _double" +
                         ", true _boolean" +
                         ", cast('hello' as varbinary) _varbinary" +
                         ", DECIMAL '1234567890.1234567' _decimal_short" +
                         ", DECIMAL '.12345678901234567890123456789012345678' _decimal_long" +
-                        ", approx_set(42) _hll")) {
+                        ", approx_set(42) _hll" +
+                        ", cast('foo' as char(5)) _char")) {
                     ResultSetMetaData metadata = rs.getMetaData();
 
-                    assertEquals(metadata.getColumnCount(), 9);
+                    assertEquals(metadata.getColumnCount(), 10);
 
                     assertEquals(metadata.getColumnLabel(1), "_integer");
                     assertEquals(metadata.getColumnType(1), Types.INTEGER);
@@ -140,6 +170,9 @@ public class TestDriver
 
                     assertEquals(metadata.getColumnLabel(9), "_hll");
                     assertEquals(metadata.getColumnType(9), Types.JAVA_OBJECT);
+
+                    assertEquals(metadata.getColumnLabel(10), "_char");
+                    assertEquals(metadata.getColumnType(10), Types.CHAR);
 
                     assertTrue(rs.next());
 
@@ -200,6 +233,11 @@ public class TestDriver
                     assertInstanceOf(rs.getBytes(9), byte[].class);
                     assertInstanceOf(rs.getBytes("_hll"), byte[].class);
 
+                    assertEquals(rs.getObject(10), "foo  ");
+                    assertEquals(rs.getObject("_char"), "foo  ");
+                    assertEquals(rs.getString(10), "foo  ");
+                    assertEquals(rs.getString("_char"), "foo  ");
+
                     assertFalse(rs.next());
                 }
             }
@@ -222,6 +260,8 @@ public class TestDriver
                         ", DATE '2013-03-22' as g" +
                         ", INTERVAL '123-11' YEAR TO MONTH as h" +
                         ", INTERVAL '11 22:33:44.555' DAY TO SECOND as i" +
+                        ", FLOAT '123.45' as j" +
+                        ", FLOAT 'Infinity' as k" +
                         "")) {
                     assertTrue(rs.next());
 
@@ -279,6 +319,15 @@ public class TestDriver
                     assertEquals(rs.getObject(9), new PrestoIntervalDayTime(11, 22, 33, 44, 555));
                     assertEquals(rs.getObject("i"), new PrestoIntervalDayTime(11, 22, 33, 44, 555));
 
+                    assertEquals(rs.getFloat(10), 123.45f);
+                    assertEquals(rs.getObject(10), 123.45f);
+                    assertEquals(rs.getFloat("j"), 123.45f);
+                    assertEquals(rs.getObject("j"), 123.45f);
+
+                    assertEquals(rs.getFloat(11), POSITIVE_INFINITY);
+                    assertEquals(rs.getObject(11), POSITIVE_INFINITY);
+                    assertEquals(rs.getFloat("k"), POSITIVE_INFINITY);
+                    assertEquals(rs.getObject("k"), POSITIVE_INFINITY);
                     assertFalse(rs.next());
                 }
             }
@@ -326,7 +375,7 @@ public class TestDriver
 
         List<List<String>> test = new ArrayList<>();
         test.add(list(TEST_CATALOG, "information_schema"));
-        for (String schema : TpchMetadata.SCHEMA_NAMES) {
+        for (String schema : TpchMetadata.listSchemaNames()) {
             test.add(list(TEST_CATALOG, schema));
         }
 
@@ -1233,6 +1282,71 @@ public class TestDriver
         String url = format("jdbc:presto://%s/a//", server.getAddress());
         try (Connection ignored = DriverManager.getConnection(url, "test", null)) {
             fail("expected exception");
+        }
+    }
+
+    @Test(timeOut = 10000)
+    public void testQueryCancellation()
+            throws Exception
+    {
+        try (Connection connection = createConnection("blackhole", "blackhole");
+                Statement statement = connection.createStatement()) {
+            statement.executeUpdate("CREATE TABLE test_cancellation (key BIGINT) " +
+                    "WITH (" +
+                    "   split_count = 1, " +
+                    "   pages_per_split = 1, " +
+                    "   rows_per_page = 1, " +
+                    "   page_processing_delay = '10s'" +
+                    ")");
+        }
+
+        CountDownLatch queryStarted = new CountDownLatch(1);
+        CountDownLatch queryFinished = new CountDownLatch(1);
+        AtomicReference<String> queryId = new AtomicReference<>();
+        AtomicReference<Throwable> queryFailure = new AtomicReference<>();
+
+        Future<?> queryFuture = executorService.submit(() -> {
+            try (Connection connection = createConnection("blackhole", "default");
+                    Statement statement = connection.createStatement();
+                    ResultSet resultSet = statement.executeQuery("SELECT * FROM test_cancellation")) {
+                queryId.set(resultSet.unwrap(PrestoResultSet.class).getQueryId());
+                queryStarted.countDown();
+                try {
+                    resultSet.next();
+                }
+                catch (SQLException t) {
+                    queryFailure.set(t);
+                }
+                finally {
+                    queryFinished.countDown();
+                }
+            }
+            return null;
+        });
+
+        queryStarted.await(10, SECONDS);
+        assertNotNull(queryId.get());
+        assertFalse(getQueryState(queryId.get()).isDone());
+        queryFuture.cancel(true);
+        queryFinished.await(10, SECONDS);
+        assertNotNull(queryFailure.get());
+        assertEquals(getQueryState(queryId.get()), FAILED);
+
+        try (Connection connection = createConnection("blackhole", "blackhole");
+                Statement statement = connection.createStatement()) {
+            statement.executeUpdate("DROP TABLE test_cancellation");
+        }
+    }
+
+    private QueryState getQueryState(String queryId)
+            throws SQLException
+    {
+        String sql = format("SELECT state FROM system.runtime.queries WHERE query_id = '%s'", queryId);
+        try (Connection connection = createConnection();
+                Statement statement = connection.createStatement();
+                ResultSet resultSet = statement.executeQuery(sql)) {
+            assertTrue(resultSet.next(), "Query was not found");
+            return QueryState.valueOf(requireNonNull(resultSet.getString(1)));
         }
     }
 

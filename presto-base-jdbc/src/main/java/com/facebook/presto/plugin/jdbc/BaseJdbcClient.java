@@ -62,12 +62,12 @@ import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static com.facebook.presto.spi.type.TinyintType.TINYINT;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
+import static com.facebook.presto.spi.type.VarcharType.createUnboundedVarcharType;
 import static com.facebook.presto.spi.type.VarcharType.createVarcharType;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Maps.fromProperties;
-import static java.lang.Math.min;
 import static java.util.Collections.nCopies;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
@@ -450,7 +450,10 @@ public class BaseJdbcClient
             case Types.NVARCHAR:
             case Types.LONGVARCHAR:
             case Types.LONGNVARCHAR:
-                return createVarcharType(min(columnSize, VarcharType.MAX_LENGTH));
+                if (columnSize > VarcharType.MAX_LENGTH) {
+                    return createUnboundedVarcharType();
+                }
+                return createVarcharType(columnSize);
             case Types.BINARY:
             case Types.VARBINARY:
             case Types.LONGVARBINARY:
@@ -468,7 +471,7 @@ public class BaseJdbcClient
     protected String toSqlType(Type type)
     {
         if (type instanceof VarcharType) {
-            if (((VarcharType) type).getLength() == VarcharType.MAX_LENGTH) {
+            if (((VarcharType) type).isUnbounded()) {
                 return "varchar";
             }
             return "varchar(" + ((VarcharType) type).getLength() + ")";

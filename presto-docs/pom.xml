@@ -5,7 +5,7 @@
     <parent>
         <groupId>com.facebook.presto</groupId>
         <artifactId>presto-root</artifactId>
-        <version>0.150-SNAPSHOT</version>
+        <version>0.150-t-SNAPSHOT</version>
     </parent>
 
     <artifactId>presto-docs</artifactId>
@@ -37,6 +37,8 @@
                         <excludes combine.children="append">
                             <exclude>**/*.conf</exclude>
                             <exclude>**/*.css_t</exclude>
+			    <exclude>**/*.css</exclude>
+			    <exclude>**/*.js</exclude>
                         </excludes>
                     </configuration>
                 </plugin>
@@ -45,12 +47,12 @@
 
         <plugins>
             <plugin>
-                <groupId>org.tomdz.maven</groupId>
+                <groupId>kr.motd.maven</groupId>
                 <artifactId>sphinx-maven-plugin</artifactId>
                 <configuration>
                     <fork>true</fork>
                     <force>true</force>
-                    <warningsAsErrors>true</warningsAsErrors>
+                    <warningsAsErrors>false</warningsAsErrors>
                     <sourceDirectory>${project.basedir}/src/main/sphinx</sourceDirectory>
                     <outputDirectory>${project.build.directory}/html</outputDirectory>
                 </configuration>

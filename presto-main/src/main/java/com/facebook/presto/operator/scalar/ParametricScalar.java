@@ -14,9 +14,9 @@
 package com.facebook.presto.operator.scalar;
 
 import com.facebook.presto.metadata.BoundVariables;
+import com.facebook.presto.metadata.DefaultSignatureBinder;
 import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.Signature;
-import com.facebook.presto.metadata.SignatureBinder;
 import com.facebook.presto.metadata.SqlScalarFunction;
 import com.facebook.presto.operator.scalar.annotations.ScalarImplementation;
 import com.facebook.presto.operator.scalar.annotations.ScalarImplementation.MethodHandleAndConstructor;
@@ -70,7 +70,7 @@ public class ParametricScalar
     @Override
     public ScalarFunctionImplementation specialize(BoundVariables boundVariables, int arity, TypeManager typeManager, FunctionRegistry functionRegistry)
     {
-        Signature boundSignature = SignatureBinder.bindVariables(getSignature(), boundVariables, arity);
+        Signature boundSignature = DefaultSignatureBinder.bindVariables(getSignature(), boundVariables, arity);
         if (implementations.getExactImplementations().containsKey(boundSignature)) {
             ScalarImplementation implementation = implementations.getExactImplementations().get(boundSignature);
             Optional<MethodHandleAndConstructor> methodHandleAndConstructor = implementation.specialize(boundSignature, boundVariables, typeManager, functionRegistry);

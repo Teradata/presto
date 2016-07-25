@@ -7,14 +7,25 @@ Presto Documentation
     :numbered: 2
 
     overview
-    installation
+    system-requirements
+    getting-started
+    sandbox-vms
+    server-installation-cluster-automated
+    server-installation-cluster-manual
+    server-installation-aws-emr-manual
+    Presto Admin <installation/presto-admin/user-guide>
     admin
     connector
+    security
     functions
     language
     sql
     migration
-    develop
     release
 
+.. toctree::
+   :hidden:
+
+   hidden
+    
 .. Note: If "release" is not the last item, the CSS must be updated.

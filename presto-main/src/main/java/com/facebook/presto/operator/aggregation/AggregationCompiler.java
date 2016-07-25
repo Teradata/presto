@@ -143,16 +143,6 @@ public class AggregationCompiler
         }
     }
 
-    public static Method getIntermediateInputFunction(Class<?> clazz, Class<?> stateClass)
-    {
-        for (Method method : findPublicStaticMethodsWithAnnotation(clazz, IntermediateInputFunction.class)) {
-            if (method.getParameterTypes()[0] == stateClass) {
-                return method;
-            }
-        }
-        return null;
-    }
-
     public static Method getCombineFunction(Class<?> clazz, Class<?> stateClass)
     {
         for (Method method : findPublicStaticMethodsWithAnnotation(clazz, CombineFunction.class)) {
@@ -160,7 +150,7 @@ public class AggregationCompiler
                 return method;
             }
         }
-        return null;
+        throw new IllegalArgumentException(String.format("No method with @CombineFunction annotation found in class %s for %s", clazz.toGenericString(), stateClass.toGenericString()));
     }
 
     private static List<Method> getOutputFunctions(Class<?> clazz, Class<?> stateClass)
