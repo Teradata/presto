@@ -28,6 +28,7 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.SQLException;
 
+import static com.facebook.presto.tests.TestGroups.HIVE_1_1_0;
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
 import static com.facebook.presto.tests.TestGroups.QUARANTINE;
 import static com.facebook.presto.tests.TestGroups.SMOKE;
@@ -226,7 +227,7 @@ public class TestAllDatatypesFromHiveConnector
     }
 
     @Requires(ParquetRequirements.class)
-    @Test(groups = {HIVE_CONNECTOR, QUARANTINE})
+    @Test(groups = {HIVE_CONNECTOR, QUARANTINE, HIVE_1_1_0})
     public void testSelectAllDatatypesParquetFile()
             throws SQLException
     {

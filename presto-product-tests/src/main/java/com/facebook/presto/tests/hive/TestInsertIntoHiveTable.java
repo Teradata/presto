@@ -24,8 +24,8 @@ import org.testng.annotations.Test;
 import java.math.BigDecimal;
 import java.sql.Date;
 
+import static com.facebook.presto.tests.TestGroups.HIVE_1_1_0;
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
-import static com.facebook.presto.tests.TestGroups.QUARANTINE;
 import static com.facebook.presto.tests.TestGroups.SMOKE;
 import static com.facebook.presto.tests.hive.AllSimpleTypesTableDefinitions.ALL_HIVE_SIMPLE_TYPES_TEXTFILE;
 import static com.teradata.tempto.Requirements.compose;
@@ -55,7 +55,7 @@ public class TestInsertIntoHiveTable
         }
     }
 
-    @Test(groups = {HIVE_CONNECTOR, QUARANTINE, SMOKE})
+    @Test(groups = {HIVE_CONNECTOR, SMOKE, HIVE_1_1_0})
     @Requires(AllSimpleTypesTables.class)
     public void testInsertIntoValuesToHiveTableAllHiveSimpleTypes()
     {
@@ -96,7 +96,7 @@ public class TestInsertIntoHiveTable
                         "kot binarny".getBytes()));
     }
 
-    @Test(groups = {HIVE_CONNECTOR, QUARANTINE, SMOKE})
+    @Test(groups = {HIVE_CONNECTOR, SMOKE, HIVE_1_1_0})
     @Requires(AllSimpleTypesTables.class)
     public void testInsertIntoSelectToHiveTableAllHiveSimpleTypes()
     {
