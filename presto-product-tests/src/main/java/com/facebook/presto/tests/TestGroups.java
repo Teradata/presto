@@ -50,6 +50,7 @@ public final class TestGroups
     public static final String HDFS_NO_IMPERSONATION = "hdfs_no_impersonation";
     public static final String BASIC_SQL = "basic_sql";
     public static final String AUTHORIZATION = "authorization";
+    public static final String HIVE_1_1_0 = "hive_1_1_0";
 
     private TestGroups() {}
 }

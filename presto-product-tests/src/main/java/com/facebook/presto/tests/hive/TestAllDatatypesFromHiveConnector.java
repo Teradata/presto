@@ -28,7 +28,9 @@ import java.sql.Connection;
 import java.sql.Date;
 import java.sql.SQLException;
 
+import static com.facebook.presto.tests.TestGroups.HIVE_1_1_0;
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
+import static com.facebook.presto.tests.TestGroups.QUARANTINE;
 import static com.facebook.presto.tests.TestGroups.SMOKE;
 import static com.facebook.presto.tests.hive.AllSimpleTypesTableDefinitions.ALL_HIVE_SIMPLE_TYPES_ORC;
 import static com.facebook.presto.tests.hive.AllSimpleTypesTableDefinitions.ALL_HIVE_SIMPLE_TYPES_PARQUET;
@@ -121,7 +123,6 @@ public class TestAllDatatypesFromHiveConnector
                         Date.valueOf("2015-05-10"),
                         "ala ma kota",
                         "ala ma kot",
-                        "ala ma    ",
                         true,
                         "kot binarny".getBytes()
                 )
@@ -152,7 +153,6 @@ public class TestAllDatatypesFromHiveConnector
                         Date.valueOf("2015-05-10"),
                         "ala ma kota",
                         "ala ma kot",
-                        "ala ma    ",
                         true,
                         "kot binarny".getBytes()));
     }
@@ -181,7 +181,6 @@ public class TestAllDatatypesFromHiveConnector
                         Date.valueOf("2015-05-10"),
                         "ala ma kota",
                         "ala ma kot",
-                        "ala ma    ",
                         true,
                         "kot binarny".getBytes()));
     }
@@ -201,7 +200,6 @@ public class TestAllDatatypesFromHiveConnector
                 row("c_date", "date"),
                 row("c_string", "varchar"),
                 row("c_varchar", "varchar(10)"),
-                row("c_char", "char(10)"),
                 row("c_boolean", "boolean"),
                 row("c_binary", "varbinary")
         );
@@ -223,14 +221,13 @@ public class TestAllDatatypesFromHiveConnector
                 DATE,
                 LONGNVARCHAR,
                 LONGNVARCHAR,
-                CHAR,
                 BOOLEAN,
                 LONGVARBINARY
         );
     }
 
     @Requires(ParquetRequirements.class)
-    @Test(groups = {HIVE_CONNECTOR})
+    @Test(groups = {HIVE_CONNECTOR, QUARANTINE, HIVE_1_1_0})
     public void testSelectAllDatatypesParquetFile()
             throws SQLException
     {
@@ -246,7 +243,6 @@ public class TestAllDatatypesFromHiveConnector
                 row("c_timestamp", "timestamp"),
                 row("c_string", "varchar"),
                 row("c_varchar", "varchar(10)"),
-                row("c_char", "char(10)"),
                 row("c_boolean", "boolean"),
                 row("c_binary", "varbinary")
         );
@@ -264,7 +260,6 @@ public class TestAllDatatypesFromHiveConnector
                 TIMESTAMP,
                 LONGNVARCHAR,
                 LONGNVARCHAR,
-                CHAR,
                 BOOLEAN,
                 LONGVARBINARY
         );
@@ -282,7 +277,6 @@ public class TestAllDatatypesFromHiveConnector
                         parseTimestampInUTC("2015-05-10 12:15:35.123"),
                         "ala ma kota",
                         "ala ma kot",
-                        "ala ma    ",
                         true,
                         "kot binarny".getBytes()));
     }

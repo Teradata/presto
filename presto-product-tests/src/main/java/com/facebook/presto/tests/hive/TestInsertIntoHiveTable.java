@@ -24,6 +24,7 @@ import org.testng.annotations.Test;
 import java.math.BigDecimal;
 import java.sql.Date;
 
+import static com.facebook.presto.tests.TestGroups.HIVE_1_1_0;
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
 import static com.facebook.presto.tests.TestGroups.SMOKE;
 import static com.facebook.presto.tests.hive.AllSimpleTypesTableDefinitions.ALL_HIVE_SIMPLE_TYPES_TEXTFILE;
@@ -54,7 +55,7 @@ public class TestInsertIntoHiveTable
         }
     }
 
-    @Test(groups = {HIVE_CONNECTOR, SMOKE})
+    @Test(groups = {HIVE_CONNECTOR, SMOKE, HIVE_1_1_0})
     @Requires(AllSimpleTypesTables.class)
     public void testInsertIntoValuesToHiveTableAllHiveSimpleTypes()
     {
@@ -73,7 +74,6 @@ public class TestInsertIntoHiveTable
                 "date '2015-05-10', " +
                 "'ala ma kota', " +
                 "cast ('ala ma kota' as VARCHAR(10)), " +
-                "cast ('ala ma' as CHAR(10))," +
                 "true, " +
                 "from_base64('a290IGJpbmFybnk=')" +
                 ")");
@@ -92,12 +92,11 @@ public class TestInsertIntoHiveTable
                         Date.valueOf("2015-05-10"),
                         "ala ma kota",
                         "ala ma kot",
-                        "ala ma    ",
                         true,
                         "kot binarny".getBytes()));
     }
 
-    @Test(groups = {HIVE_CONNECTOR, SMOKE})
+    @Test(groups = {HIVE_CONNECTOR, SMOKE, HIVE_1_1_0})
     @Requires(AllSimpleTypesTables.class)
     public void testInsertIntoSelectToHiveTableAllHiveSimpleTypes()
     {
@@ -118,7 +117,6 @@ public class TestInsertIntoHiveTable
                         Date.valueOf("2015-05-10"),
                         "ala ma kota",
                         "ala ma kot",
-                        "ala ma    ",
                         true,
                         "kot binarny".getBytes()));
     }
