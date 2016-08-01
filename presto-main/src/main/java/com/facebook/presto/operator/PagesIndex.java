@@ -315,8 +315,8 @@ public class PagesIndex
     public PagesHashStrategy createPagesHashStrategy(List<Integer> joinChannels, Optional<Integer> hashChannel, Optional<JoinFilterFunction> joinFilterFunction)
     {
         try {
-            return joinCompiler.compilePagesHashStrategyFactory(types, joinChannels)
-                    .createPagesHashStrategy(ImmutableList.copyOf(channels), hashChannel);
+            return joinCompiler.compilePagesHashStrategyFactory(types, joinChannels, joinFilterFunction.map(f -> f.getClass()))
+                    .createPagesHashStrategy(ImmutableList.copyOf(channels), hashChannel, joinFilterFunction);
         }
         catch (Exception e) {
             log.error(e, "Lookup source compile failed for types=%s error=%s", types, e);
@@ -338,12 +338,13 @@ public class PagesIndex
             //        OUTER joins into NestedLoopsJoin and remove "type == INNER" condition in LocalExecutionPlanner.visitJoin()
 
             try {
-                LookupSourceFactory lookupSourceFactory = joinCompiler.compileLookupSourceFactory(types, joinChannels);
+                LookupSourceFactory lookupSourceFactory = joinCompiler.compileLookupSourceFactory(types, joinChannels, filterFunction.map(f -> f.getClass()));
 
                 LookupSource lookupSource = lookupSourceFactory.createLookupSource(
                         valueAddresses,
                         ImmutableList.<List<Block>>copyOf(channels),
-                        hashChannel);
+                        hashChannel,
+                        filterFunction);
 
                 return lookupSource;
             }
