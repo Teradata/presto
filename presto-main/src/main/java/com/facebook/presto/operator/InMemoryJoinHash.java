@@ -54,7 +54,7 @@ public final class InMemoryJoinHash
         this.addresses = requireNonNull(addresses, "addresses is null");
         this.pagesHashStrategy = requireNonNull(pagesHashStrategy, "pagesHashStrategy is null");
         this.channelCount = pagesHashStrategy.getChannelCount();
-        this.filterFunctionPresent = pagesHashStrategy.getFilterFunction().isPresent();
+        this.filterFunctionPresent = pagesHashStrategy.hasFilterFunction();
 
         // reserve memory for the arrays
         int hashSize = HashCommon.arraySize(addresses.size(), 0.75f);
