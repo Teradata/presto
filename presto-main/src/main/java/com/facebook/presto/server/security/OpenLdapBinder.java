@@ -13,8 +13,9 @@
  */
 package com.facebook.presto.server.security;
 
+import io.airlift.log.Logger;
+
 import javax.inject.Inject;
-import javax.naming.directory.DirContext;
 
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -22,12 +23,16 @@ import static java.util.Objects.requireNonNull;
 public class OpenLdapBinder
         implements LdapBinder
 {
+    private static final Logger LOG = Logger.get(ActiveDirectoryBinder.class);
+    private final String userObjectClass;
     private final String baseDistinguishedName;
+    private final String searchInput = "uid";
 
     @Inject
     public OpenLdapBinder(LdapServerConfig config)
     {
-        baseDistinguishedName = requireNonNull(config.getBaseDistinguishedName(), "baseDistinguishedName is null");
+        userObjectClass = requireNonNull(config.getUserObjectClass(), "userObjectClass is null");
+        baseDistinguishedName = requireNonNull(config.getBaseDistinguishedName());
     }
 
     @Override
@@ -37,8 +42,8 @@ public class OpenLdapBinder
     }
 
     @Override
-    public boolean checkForGroupMembership(String user, String groupDistinguishedName, DirContext context)
+    public String getSearchFilter(String user, String groupDistinguishedName)
     {
-        throw new UnsupportedOperationException("Group membership based authorization not yet supported");
+            return format("(&(objectClass=%s)(%s=%s)(memberof=%s))", userObjectClass, searchInput, user, groupDistinguishedName);
     }
 }

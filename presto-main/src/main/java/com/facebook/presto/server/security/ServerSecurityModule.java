@@ -48,7 +48,6 @@ public class ServerSecurityModule
                     .in(Scopes.SINGLETON);
             if (ldapServerConfig.getServerType().equalsIgnoreCase(OPENLDAP.name())) {
                 checkState(ldapServerConfig.getBaseDistinguishedName() != null, "Missing property 'authentication.ldap.base-dn'");
-                checkState(ldapServerConfig.getGroupDistinguishedName() == null, "Group membership based authorization not yet supported");
 
                 binder.bind(LdapBinder.class).to(OpenLdapBinder.class).in(Scopes.SINGLETON);
             }

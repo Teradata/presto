@@ -20,9 +20,12 @@ import io.airlift.log.Logger;
 
 import javax.inject.Inject;
 import javax.naming.AuthenticationException;
+import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
+import javax.naming.directory.SearchControls;
+import javax.naming.directory.SearchResult;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -53,12 +56,13 @@ import static javax.naming.Context.SECURITY_PRINCIPAL;
 public class LdapFilter
         implements Filter
 {
-    private static final Logger LOG = Logger.get(LdapFilter.class);
     public static final String AUTHENTICATION_TYPE = "basic";
     public static final String LDAP_CONTEXT_FACTORY = "com.sun.jndi.ldap.LdapCtxFactory";
+    private static final Logger LOG = Logger.get(LdapFilter.class);
     private final String ldapUrl;
     private final LdapBinder ldapBinder;
     private final Optional<String> groupDistinguishedName;
+    private final Optional<String> baseDistinguishedName;
 
     @Inject
     public LdapFilter(LdapServerConfig config, LdapBinder ldapBinder)
@@ -66,6 +70,7 @@ public class LdapFilter
         this.ldapUrl = requireNonNull(config.getLdapUrl(), "ldapUrl is null");
         this.ldapBinder = requireNonNull(ldapBinder, "ldapBinder is null");
         this.groupDistinguishedName = Optional.ofNullable(config.getGroupDistinguishedName());
+        this.baseDistinguishedName = Optional.ofNullable(config.getBaseDistinguishedName());
 
         try {
             authenticate(getBasicEnvironment());
@@ -73,6 +78,12 @@ public class LdapFilter
         catch (NamingException e) {
             throw Throwables.propagate(e);
         }
+    }
+
+    private static void sendChallenge(HttpServletResponse response)
+    {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, format("%s realm=\"presto\"", AUTHENTICATION_TYPE));
     }
 
     private InitialDirContext authenticate(Hashtable<String, String> environment)
@@ -119,7 +130,7 @@ public class LdapFilter
                 context = authenticate(environment);
 
                 if (groupDistinguishedName.isPresent()) {
-                    if (!ldapBinder.checkForGroupMembership(user, groupDistinguishedName.get(), context)) {
+                    if (!checkForGroupMembership(user, groupDistinguishedName.get(), context)) {
                         throw new AuthenticationException(format("Authentication failed: User %s not a member of the group %s", user, groupDistinguishedName.get()));
                     }
                 }
@@ -167,12 +178,6 @@ public class LdapFilter
         return environment;
     }
 
-    private static void sendChallenge(HttpServletResponse response)
-    {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-        response.setHeader(HttpHeaders.WWW_AUTHENTICATE, format("%s realm=\"presto\"", AUTHENTICATION_TYPE));
-    }
-
     @Override
     public void init(FilterConfig filterConfig)
             throws ServletException
@@ -182,6 +187,26 @@ public class LdapFilter
     @Override
     public void destroy()
     {
+    }
+
+    private boolean checkForGroupMembership(String user, String groupDistinguishedName, DirContext context)
+    {
+        checkState(baseDistinguishedName.isPresent(), "Base distinguished name (DN) for user %s is missing", user);
+        SearchControls searchControls = new SearchControls();
+        searchControls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+        String searchBase = baseDistinguishedName.get();
+        try {
+            String searchFilter = ldapBinder.getSearchFilter(user, groupDistinguishedName);
+            LOG.debug("Group membership check for user '%s' using query: %s and base distinguished name: %s", user, searchFilter, searchBase);
+            NamingEnumeration<SearchResult> results = context.search(searchBase, searchFilter, searchControls);
+            if (results.hasMoreElements()) {
+                return true;
+            }
+        }
+        catch (NamingException e) {
+            throw Throwables.propagate(e);
+        }
+        return false;
     }
 
     private static class LdapPrincipal
