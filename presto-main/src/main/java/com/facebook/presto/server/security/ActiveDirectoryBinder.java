@@ -13,36 +13,20 @@
  */
 package com.facebook.presto.server.security;
 
-import com.google.common.base.Throwables;
-import io.airlift.log.Logger;
-
 import javax.inject.Inject;
-import javax.naming.NamingEnumeration;
-import javax.naming.NamingException;
-import javax.naming.directory.DirContext;
-import javax.naming.directory.SearchControls;
-import javax.naming.directory.SearchResult;
 
-import java.util.Optional;
-
-import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 public class ActiveDirectoryBinder
         implements LdapBinder
 {
-    private static final Logger LOG = Logger.get(ActiveDirectoryBinder.class);
     private final String activeDirectoryDomain;
-    private final String userObjectClass;
-    private final Optional<String> baseDistinguishedName;
 
     @Inject
     public ActiveDirectoryBinder(LdapServerConfig config)
     {
         activeDirectoryDomain = requireNonNull(config.getActiveDirectoryDomain(), "activeDirectoryDomain is null");
-        userObjectClass = requireNonNull(config.getUserObjectClass(), "userObjectClass is null");
-        baseDistinguishedName = Optional.ofNullable(config.getBaseDistinguishedName());
     }
 
     @Override
@@ -52,26 +36,8 @@ public class ActiveDirectoryBinder
     }
 
     @Override
-    public boolean checkForGroupMembership(String user, String groupDistinguishedName, DirContext context)
+    public String getUserSearchInput()
     {
-        checkState(baseDistinguishedName.isPresent(), "Base distinguished name (DN) for user %s is missing", user);
-
-        SearchControls searchControls = new SearchControls();
-        searchControls.setSearchScope(SearchControls.SUBTREE_SCOPE);
-        String searchBase = baseDistinguishedName.get();
-        try {
-            String searchFilter = format("(&(objectClass=%s)(sAMAccountName=%s)(memberof=%s))", userObjectClass, user, groupDistinguishedName);
-
-            LOG.debug("Group membership check for user '%s' using query: %s and base distinguished name: %s", user, searchFilter, searchBase);
-            NamingEnumeration<SearchResult> results = context.search(searchBase, searchFilter, searchControls);
-
-            if (results.hasMoreElements()) {
-                return true;
-            }
-        }
-        catch (NamingException e) {
-            throw Throwables.propagate(e);
-        }
-        return false;
+        return "sAMAccountName";
     }
 }

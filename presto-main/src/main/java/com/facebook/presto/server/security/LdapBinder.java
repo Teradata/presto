@@ -13,11 +13,9 @@
  */
 package com.facebook.presto.server.security;
 
-import javax.naming.directory.DirContext;
-
 public interface LdapBinder
 {
     String getBindDistinguishedName(String user);
 
-    boolean checkForGroupMembership(String user, String groupDistinguishedName, DirContext context);
+    String getUserSearchInput();
 }

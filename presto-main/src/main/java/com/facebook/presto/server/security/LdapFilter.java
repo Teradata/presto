@@ -20,9 +20,12 @@ import io.airlift.log.Logger;
 
 import javax.inject.Inject;
 import javax.naming.AuthenticationException;
+import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
 import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
+import javax.naming.directory.SearchControls;
+import javax.naming.directory.SearchResult;
 import javax.servlet.Filter;
 import javax.servlet.FilterChain;
 import javax.servlet.FilterConfig;
@@ -59,6 +62,8 @@ public class LdapFilter
     private final String ldapUrl;
     private final LdapBinder ldapBinder;
     private final Optional<String> groupDistinguishedName;
+    private final Optional<String> baseDistinguishedName;
+    private final Optional<String> userObjectClass;
 
     @Inject
     public LdapFilter(LdapServerConfig config, LdapBinder ldapBinder)
@@ -66,6 +71,8 @@ public class LdapFilter
         this.ldapUrl = requireNonNull(config.getLdapUrl(), "ldapUrl is null");
         this.ldapBinder = requireNonNull(ldapBinder, "ldapBinder is null");
         this.groupDistinguishedName = Optional.ofNullable(config.getGroupDistinguishedName());
+        this.baseDistinguishedName = Optional.ofNullable(config.getBaseDistinguishedName());
+        this.userObjectClass = Optional.ofNullable(config.getUserObjectClass());
 
         try {
             authenticate(getBasicEnvironment());
@@ -119,9 +126,7 @@ public class LdapFilter
                 context = authenticate(environment);
 
                 if (groupDistinguishedName.isPresent()) {
-                    if (!ldapBinder.checkForGroupMembership(user, groupDistinguishedName.get(), context)) {
-                        throw new AuthenticationException(format("Authentication failed: User %s not a member of the group %s", user, groupDistinguishedName.get()));
-                    }
+                    checkForGroupMembership(user, groupDistinguishedName.get(), context);
                 }
 
                 // ldap authentication ok, continue
@@ -182,6 +187,24 @@ public class LdapFilter
     @Override
     public void destroy()
     {
+    }
+
+    private void checkForGroupMembership(String user, String groupDistinguishedName, DirContext context)
+    {
+        SearchControls searchControls = new SearchControls();
+        searchControls.setSearchScope(SearchControls.SUBTREE_SCOPE);
+        String searchBase = baseDistinguishedName.get();
+        try {
+            String searchFilter = format("(&(objectClass=%s)(%s=%s)(memberof=%s))", userObjectClass.get(), ldapBinder.getUserSearchInput(), user, groupDistinguishedName);
+            LOG.debug("Group membership check for user '%s' using query: %s and base distinguished name: %s", user, searchFilter, searchBase);
+            NamingEnumeration<SearchResult> results = context.search(searchBase, searchFilter, searchControls);
+            if (!results.hasMoreElements()) {
+                throw new AuthenticationException(format("Authentication failed: User %s not a member of the group %s", user, groupDistinguishedName));
+            }
+        }
+        catch (NamingException e) {
+            throw Throwables.propagate(e);
+        }
     }
 
     private static class LdapPrincipal

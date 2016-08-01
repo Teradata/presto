@@ -20,10 +20,10 @@ public class LdapServerConfig
     private String ldapUrl;
     private String baseDistinguishedName;
     private boolean authenticationEnabled;
-    private String serverType = ServerType.ACTIVE_DIRECTORY.name();
+    private String serverType;
     private String activeDirectoryDomain;
     private String groupDistinguishedName;
-    private String userObjectClass = "person";
+    private String userObjectClass;
 
     public static enum ServerType
     {

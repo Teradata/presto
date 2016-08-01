@@ -46,23 +46,7 @@ public class ServerSecurityModule
                     .addBinding()
                     .to(LdapFilter.class)
                     .in(Scopes.SINGLETON);
-            if (ldapServerConfig.getServerType().equalsIgnoreCase(OPENLDAP.name())) {
-                checkState(ldapServerConfig.getBaseDistinguishedName() != null, "Missing property 'authentication.ldap.base-dn'");
-                checkState(ldapServerConfig.getGroupDistinguishedName() == null, "Group membership based authorization not yet supported");
-
-                binder.bind(LdapBinder.class).to(OpenLdapBinder.class).in(Scopes.SINGLETON);
-            }
-            else if (ldapServerConfig.getServerType().equalsIgnoreCase(ACTIVE_DIRECTORY.name())) {
-                checkState(ldapServerConfig.getActiveDirectoryDomain() != null, "Missing property 'authentication.ldap.ad-domain'");
-                if (ldapServerConfig.getGroupDistinguishedName() != null) {
-                    checkState(ldapServerConfig.getBaseDistinguishedName() != null, "Missing property 'authentication.ldap.base-dn'");
-                }
-
-                binder.bind(LdapBinder.class).to(ActiveDirectoryBinder.class).in(Scopes.SINGLETON);
-            }
-            else {
-                throw new IllegalStateException(format("Invalid value '%s' for the property 'authentication.ldap.server-type'", ldapServerConfig.getServerType()));
-            }
+            setupLdap(ldapServerConfig, binder);
         }
 
         if (config.getAuthenticationEnabled()) {
@@ -70,6 +54,30 @@ public class ServerSecurityModule
                     .addBinding()
                     .to(SpnegoFilter.class)
                     .in(Scopes.SINGLETON);
+        }
+    }
+
+    private void setupLdap(LdapServerConfig ldapServerConfig, Binder binder)
+    {
+        checkState(ldapServerConfig.getServerType() != null, "Missing property 'authentication.ldap.server-type'");
+
+        if (ldapServerConfig.getGroupDistinguishedName() != null) {
+            checkState(ldapServerConfig.getBaseDistinguishedName() != null, "Missing property 'authentication.ldap.base-dn'");
+            checkState(ldapServerConfig.getUserObjectClass() != null, "Missing property 'authentication.ldap.user-object-class'");
+        }
+
+        if (ldapServerConfig.getServerType().equalsIgnoreCase(OPENLDAP.name())) {
+            checkState(ldapServerConfig.getBaseDistinguishedName() != null, "Missing property 'authentication.ldap.base-dn'");
+
+            binder.bind(LdapBinder.class).to(OpenLdapBinder.class).in(Scopes.SINGLETON);
+        }
+        else if (ldapServerConfig.getServerType().equalsIgnoreCase(ACTIVE_DIRECTORY.name())) {
+            checkState(ldapServerConfig.getActiveDirectoryDomain() != null, "Missing property 'authentication.ldap.ad-domain'");
+
+            binder.bind(LdapBinder.class).to(ActiveDirectoryBinder.class).in(Scopes.SINGLETON);
+        }
+        else {
+            throw new IllegalStateException(format("Invalid value '%s' for the property 'authentication.ldap.server-type'", ldapServerConfig.getServerType()));
         }
     }
 }

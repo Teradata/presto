@@ -32,8 +32,8 @@ public class TestLdapServerConfig
                 .setBaseDistinguishedName(null)
                 .setActiveDirectoryDomain(null)
                 .setAuthenticationEnabled(false)
-                .setServerType("ACTIVE_DIRECTORY")
-                .setUserObjectClass("person")
+                .setServerType(null)
+                .setUserObjectClass(null)
                 .setGroupDistinguishedName(null));
     }
 

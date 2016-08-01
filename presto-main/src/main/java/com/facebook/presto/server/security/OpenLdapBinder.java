@@ -14,7 +14,6 @@
 package com.facebook.presto.server.security;
 
 import javax.inject.Inject;
-import javax.naming.directory.DirContext;
 
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
@@ -37,8 +36,8 @@ public class OpenLdapBinder
     }
 
     @Override
-    public boolean checkForGroupMembership(String user, String groupDistinguishedName, DirContext context)
+    public String getUserSearchInput()
     {
-        throw new UnsupportedOperationException("Group membership based authorization not yet supported");
+        return "uid";
     }
 }
