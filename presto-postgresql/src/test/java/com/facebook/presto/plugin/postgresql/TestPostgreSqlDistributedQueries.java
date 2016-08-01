@@ -16,6 +16,7 @@ package com.facebook.presto.plugin.postgresql;
 import com.facebook.presto.tests.AbstractTestQueries;
 import com.facebook.presto.tests.datatype.CreateAndInsertDataSetup;
 import com.facebook.presto.tests.datatype.CreateAsSelectDataSetup;
+import com.facebook.presto.tests.datatype.DataSetup;
 import com.facebook.presto.tests.datatype.DataTypeTest;
 import com.facebook.presto.tests.sql.JdbcSqlExecutor;
 import com.facebook.presto.tests.sql.PrestoSqlExecutor;
@@ -88,21 +89,17 @@ public class TestPostgreSqlDistributedQueries
     public void testPrestoCreatedParametrizedVarchar()
             throws Exception
     {
-        PrestoSqlExecutor presto = new PrestoSqlExecutor(queryRunner);
-        createVarcharDataTypeTest()
-                .execute(queryRunner, new CreateAsSelectDataSetup(presto, "presto_test_parameterized_varchar"));
+        varcharDataTypeTest().execute(queryRunner, prestoCreateAsSelect("presto_test_parameterized_varchar"));
     }
 
     @Test
     public void testPostgreSqlCreatedParametrizedVarchar()
             throws Exception
     {
-        JdbcSqlExecutor postgres = new JdbcSqlExecutor(postgreSqlServer.getJdbcUrl());
-        createVarcharDataTypeTest()
-                .execute(queryRunner, new CreateAndInsertDataSetup(postgres, "tpch.postgresql_test_parameterized_varchar"));
+        varcharDataTypeTest().execute(queryRunner, postgresCreateAndInsert("tpch.postgresql_test_parameterized_varchar"));
     }
 
-    private DataTypeTest createVarcharDataTypeTest()
+    private DataTypeTest varcharDataTypeTest()
     {
         return DataTypeTest.create()
                 .addRoundtrip(varcharDataType(10), "text_a")
@@ -110,6 +107,43 @@ public class TestPostgreSqlDistributedQueries
                 .addRoundtrip(varcharDataType(65535), "text_d")
                 .addRoundtrip(varcharDataType(10485760), "text_f")
                 .addRoundtrip(varcharDataType(), "unbounded");
+    }
+
+    @Test
+    public void testPrestoCreatedParametrizedVarcharUnicode()
+            throws Exception
+    {
+        unicodeVarcharDateTypeTest().execute(queryRunner, prestoCreateAsSelect("postgresql_test_parameterized_varchar_unicode"));
+    }
+
+    @Test
+    public void testPostgreSqlCreatedParametrizedVarcharUnicode()
+            throws Exception
+    {
+        unicodeVarcharDateTypeTest().execute(queryRunner, postgresCreateAndInsert("tpch.postgresql_test_parameterized_varchar_unicode"));
+    }
+
+    private DataTypeTest unicodeVarcharDateTypeTest()
+    {
+        String sampleUnicodeText = "攻殻機動隊";
+        String sampleFourByteUnicodeCharacter = "\uD83D\uDE02";
+
+        return DataTypeTest.create()
+                .addRoundtrip(varcharDataType(sampleUnicodeText.length()), sampleUnicodeText)
+                .addRoundtrip(varcharDataType(32), sampleUnicodeText)
+                .addRoundtrip(varcharDataType(20000), sampleUnicodeText)
+                .addRoundtrip(varcharDataType(), sampleUnicodeText)
+                .addRoundtrip(varcharDataType(1), sampleFourByteUnicodeCharacter);
+    }
+
+    private DataSetup prestoCreateAsSelect(String tableNamePrefix)
+    {
+        return new CreateAsSelectDataSetup(new PrestoSqlExecutor(queryRunner), tableNamePrefix);
+    }
+
+    private DataSetup postgresCreateAndInsert(String tableNamePrefix)
+    {
+        return new CreateAndInsertDataSetup(new JdbcSqlExecutor(postgreSqlServer.getJdbcUrl()), tableNamePrefix);
     }
 
     private void execute(String sql)
