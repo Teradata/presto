@@ -189,6 +189,9 @@ public final class UnscaledDecimal128Arithmetic
         return negative ? -lo : lo;
     }
 
+    /*
+     * Rescale allows values exceeding 10^38 that fits in 127 bits
+     */
     public static Slice rescale(Slice decimal, int rescaleFactor)
     {
         if (rescaleFactor == 0) {
@@ -201,6 +204,9 @@ public final class UnscaledDecimal128Arithmetic
         }
     }
 
+    /*
+     * Rescale allows values exceeding 10^38 that fits in 127 bits
+     */
     public static void rescale(Slice decimal, int rescaleFactor, Slice result)
     {
         if (rescaleFactor == 0) {
@@ -210,7 +216,7 @@ public final class UnscaledDecimal128Arithmetic
             if (rescaleFactor >= POWERS_OF_TEN.length) {
                 throwOverflowException();
             }
-            multiply(decimal, POWERS_OF_TEN[rescaleFactor], result);
+            multiply(decimal, POWERS_OF_TEN[rescaleFactor], result, false);
         }
         else {
             scaleDownRoundUp(decimal, -rescaleFactor, result);
@@ -242,6 +248,8 @@ public final class UnscaledDecimal128Arithmetic
                 clearDecimal(result);
             }
         }
+
+        throwIfOverflows(result);
     }
 
     public static Slice subtract(Slice left, Slice right)
@@ -269,10 +277,12 @@ public final class UnscaledDecimal128Arithmetic
                 clearDecimal(result);
             }
         }
+        throwIfOverflows(result);
     }
 
     /**
-     * This method ignores signs of the left and right
+     * This method ignores signs of the left and right.
+     * It does not throw if result fits in 127 bits and exceeds 10^38
      */
     private static void addUnsigned(Slice left, Slice right, Slice result, boolean resultNegative)
     {
@@ -303,8 +313,6 @@ public final class UnscaledDecimal128Arithmetic
 
         int z3 = (int) product;
 
-        throwIfOverflows(z0, z1, z2, z3);
-
         pack(result, z0, z1, z2, z3, resultNegative);
 
         if (product >> 32 != 0) {
@@ -314,6 +322,7 @@ public final class UnscaledDecimal128Arithmetic
 
     /**
      * This method ignores signs of the left and right and assumes that left is greater then right
+     * It does not throw if result fits in 127 bits and exceeds 10^38
      */
     private static void subtractUnsigned(Slice left, Slice right, Slice result, boolean resultNegative)
     {
@@ -344,8 +353,6 @@ public final class UnscaledDecimal128Arithmetic
 
         int z3 = (int) product;
 
-        throwIfOverflows(z0, z1, z2, z3);
-
         pack(result, z0, z1, z2, z3, resultNegative);
 
         if ((product >> 32) != 0) {
@@ -356,11 +363,11 @@ public final class UnscaledDecimal128Arithmetic
     public static Slice multiply(Slice left, Slice right)
     {
         Slice result = unscaledDecimal();
-        multiply(left, right, result);
+        multiply(left, right, result, true);
         return result;
     }
 
-    public static void multiply(Slice left, Slice right, Slice result)
+    public static void multiply(Slice left, Slice right, Slice result, boolean check10To38)
     {
         int l0 = getInt(left, 0);
         int l1 = getInt(left, 1);
@@ -408,7 +415,9 @@ public final class UnscaledDecimal128Arithmetic
         boolean negative = isNegative(left) ^ isNegative(right);
         pack(result, z0, z1, z2, z3, negative);
 
-        throwIfOverflows(z0, z1, z2, z3);
+        if (check10To38) {
+            throwIfOverflows(z0, z1, z2, z3);
+        }
     }
 
     public static int compare(Slice left, Slice right)
@@ -698,6 +707,9 @@ public final class UnscaledDecimal128Arithmetic
 
     private static void setNegativeInt(Slice decimal, int v3, boolean negative)
     {
+        if (v3 < 0) {
+            throwOverflowException();
+        }
         setRawInt(decimal, SIGN_INT_INDEX, v3 | (negative ? SIGN_INT_MASK : 0));
     }
 
