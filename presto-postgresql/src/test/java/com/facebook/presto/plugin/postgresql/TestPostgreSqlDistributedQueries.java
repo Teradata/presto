@@ -17,6 +17,7 @@ import com.facebook.presto.tests.AbstractTestQueries;
 import com.facebook.presto.tests.datatype.CreateAndInsertDataSetup;
 import com.facebook.presto.tests.datatype.CreateAsSelectDataSetup;
 import com.facebook.presto.tests.datatype.DataSetup;
+import com.facebook.presto.tests.datatype.DataType;
 import com.facebook.presto.tests.datatype.DataTypeTest;
 import com.facebook.presto.tests.sql.JdbcSqlExecutor;
 import com.facebook.presto.tests.sql.PrestoSqlExecutor;
@@ -30,6 +31,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.function.Function;
 
 import static com.facebook.presto.plugin.postgresql.PostgreSqlQueryRunner.createPostgreSqlQueryRunner;
 import static com.facebook.presto.tests.datatype.DataType.varcharDataType;
@@ -123,17 +125,35 @@ public class TestPostgreSqlDistributedQueries
         unicodeVarcharDateTypeTest().execute(queryRunner, postgresCreateAndInsert("tpch.postgresql_test_parameterized_varchar_unicode"));
     }
 
+    @Test
+    public void testPrestoCreatedParametrizedCharUnicode()
+            throws Exception
+    {
+        unicodeDataTypeTest(DataType::charDataType).execute(queryRunner, prestoCreateAsSelect("postgresql_test_parameterized_char_unicode"));
+    }
+
+    @Test
+    public void testPostgreSqlCreatedParametrizedCharUnicode()
+            throws Exception
+    {
+        unicodeDataTypeTest(DataType::charDataType).execute(queryRunner, postgresCreateAndInsert("tpch.postgresql_test_parameterized_char_unicode"));
+    }
+
     private DataTypeTest unicodeVarcharDateTypeTest()
+    {
+        return unicodeDataTypeTest(DataType::varcharDataType).addRoundtrip(varcharDataType(), "Ну, погоди!");
+    }
+
+    private DataTypeTest unicodeDataTypeTest(Function<Integer, DataType<String>> dataTypeFactory)
     {
         String sampleUnicodeText = "攻殻機動隊";
         String sampleFourByteUnicodeCharacter = "\uD83D\uDE02";
 
         return DataTypeTest.create()
-                .addRoundtrip(varcharDataType(sampleUnicodeText.length()), sampleUnicodeText)
-                .addRoundtrip(varcharDataType(32), sampleUnicodeText)
-                .addRoundtrip(varcharDataType(20000), sampleUnicodeText)
-                .addRoundtrip(varcharDataType(), sampleUnicodeText)
-                .addRoundtrip(varcharDataType(1), sampleFourByteUnicodeCharacter);
+                .addRoundtrip(dataTypeFactory.apply(sampleUnicodeText.length()), sampleUnicodeText)
+                .addRoundtrip(dataTypeFactory.apply(32), sampleUnicodeText)
+                .addRoundtrip(dataTypeFactory.apply(20000), sampleUnicodeText)
+                .addRoundtrip(dataTypeFactory.apply(1), sampleFourByteUnicodeCharacter);
     }
 
     private DataSetup prestoCreateAsSelect(String tableNamePrefix)
