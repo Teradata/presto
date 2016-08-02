@@ -26,6 +26,7 @@ import com.facebook.presto.bytecode.Variable;
 import com.facebook.presto.bytecode.control.ForLoop;
 import com.facebook.presto.bytecode.control.IfStatement;
 import com.facebook.presto.bytecode.expression.BytecodeExpression;
+import com.facebook.presto.bytecode.expression.BytecodeExpressions;
 import com.facebook.presto.bytecode.instruction.LabelNode;
 import com.facebook.presto.operator.InMemoryJoinHash;
 import com.facebook.presto.operator.JoinFilterFunction;
@@ -57,6 +58,7 @@ import java.util.concurrent.ExecutionException;
 import static com.facebook.presto.bytecode.Access.FINAL;
 import static com.facebook.presto.bytecode.Access.PRIVATE;
 import static com.facebook.presto.bytecode.Access.PUBLIC;
+import static com.facebook.presto.bytecode.Access.STATIC;
 import static com.facebook.presto.bytecode.Access.a;
 import static com.facebook.presto.bytecode.CompilerUtils.defineClass;
 import static com.facebook.presto.bytecode.CompilerUtils.makeClassName;
@@ -69,6 +71,7 @@ import static com.facebook.presto.bytecode.expression.BytecodeExpressions.consta
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.constantNull;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.constantString;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.constantTrue;
+import static com.facebook.presto.bytecode.expression.BytecodeExpressions.getStatic;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.invokeStatic;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.newArray;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.newInstance;
@@ -146,6 +149,12 @@ public class JoinCompiler
                 type(Object.class),
                 type(PagesHashStrategy.class));
 
+        FieldDefinition emptyBlockArrayField = classDefinition.declareField(a(PRIVATE, FINAL, STATIC), "EMPTY_BLOCK_ARRAY", Block[].class);
+        classDefinition.getClassInitializer().getBody()
+                .comment("EMPTY_BLOCK_ARRAY = new Block[0]")
+                .append(BytecodeExpressions.newArray(type(Block[].class), 0))
+                .putStaticField(emptyBlockArrayField);
+
         FieldDefinition sizeField = classDefinition.declareField(a(PRIVATE, FINAL), "size", type(long.class));
         List<FieldDefinition> channelFields = new ArrayList<>();
         for (int i = 0; i < types.size(); i++) {
@@ -178,6 +187,8 @@ public class JoinCompiler
         generatePositionEqualsPositionMethod(classDefinition, callSiteBinder, joinChannelTypes, joinChannelFields, true);
         generatePositionEqualsPositionMethod(classDefinition, callSiteBinder, joinChannelTypes, joinChannelFields, false);
         generateHasFilterFunctionMethod(classDefinition, joinFilterFunctionField);
+        generateApplyFilterFunctionMethod(classDefinition, joinFilterFunctionField);
+        generateGetLeftBlocksMethod(classDefinition, channelArraysField, emptyBlockArrayField);
         generateIsPositionNull(classDefinition, joinChannelFields);
 
         return defineClass(classDefinition, PagesHashStrategy.class, callSiteBinder.getBindings(), getClass().getClassLoader());
@@ -710,6 +721,56 @@ public class JoinCompiler
         getFilterFunctionMethod.getBody()
                 .append(constantBoolean(joinFilterFunctionField.isPresent()))
                 .ret(boolean.class);
+    }
+
+    private void generateApplyFilterFunctionMethod(ClassDefinition classDefinition, Optional<FieldDefinition> joinFilterFunctionFieldOptional)
+    {
+        Parameter leftBlockIndex = arg("leftBlockIndex", int.class);
+        Parameter leftPosition = arg("leftPosition", int.class);
+        Parameter rightPosition = arg("rightPosition", int.class);
+        Parameter allRightBlocks = arg("allRightBlocks", Block[].class);
+
+        MethodDefinition applyFilterFunctionMethod = classDefinition.declareMethod(
+                a(PUBLIC),
+                "applyFilterFunction",
+                type(boolean.class),
+                leftBlockIndex,
+                leftPosition,
+                rightPosition,
+                allRightBlocks);
+
+        if (joinFilterFunctionFieldOptional.isPresent()) {
+            Variable thisVariable = applyFilterFunctionMethod.getThis();
+            applyFilterFunctionMethod.getBody()
+                    .append(thisVariable
+                            .getField(joinFilterFunctionFieldOptional.get())
+                            .invoke("filter", boolean.class, leftPosition, thisVariable.invoke("getLeftBlocks", Block[].class, leftBlockIndex), rightPosition, allRightBlocks));
+        }
+        else {
+            applyFilterFunctionMethod.getBody().append(constantBoolean(true));
+        }
+        applyFilterFunctionMethod.getBody().retBoolean();
+    }
+
+    private void generateGetLeftBlocksMethod(ClassDefinition classDefinition, FieldDefinition channelArraysField, FieldDefinition emptyBlockArrayField)
+    {
+        Parameter leftBlockIndex = arg("leftBlockIndex", int.class);
+        MethodDefinition getLeftBlocksMethod = classDefinition.declareMethod(
+                a(PUBLIC),
+                "getLeftBlocks",
+                type(Block[].class),
+                leftBlockIndex);
+
+        Variable thisVariable = getLeftBlocksMethod.getThis();
+        getLeftBlocksMethod.getBody()
+                .append(new IfStatement()
+                        .condition(thisVariable.getField(channelArraysField).invoke("isEmpty", boolean.class))
+                        .ifTrue(getStatic(emptyBlockArrayField))
+                        .ifFalse(thisVariable
+                                .getField(channelArraysField)
+                                .invoke("get", Object.class, leftBlockIndex)
+                                .cast(Block[].class)))
+                .ret(Block[].class);
     }
 
     private static BytecodeNode typeEquals(
