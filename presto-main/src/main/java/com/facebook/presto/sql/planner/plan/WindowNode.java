@@ -33,6 +33,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
+import static com.facebook.presto.util.ImmutableCollectors.toImmutableMap;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.concat;
 import static java.util.Objects.requireNonNull;
@@ -45,40 +47,57 @@ public class WindowNode
     private final Set<Symbol> prePartitionedInputs;
     private final Specification specification;
     private final int preSortedOrderPrefix;
-    private final Map<Symbol, FunctionCall> windowFunctions;
-    private final Map<Symbol, Signature> functionHandles;
+    private final Map<Symbol, Function> windowFunctions;
+    private final Map<Function, Frame> frames;
     private final Optional<Symbol> hashSymbol;
 
-    @JsonCreator
     public WindowNode(
-            @JsonProperty("id") PlanNodeId id,
-            @JsonProperty("source") PlanNode source,
-            @JsonProperty("specification") Specification specification,
-            @JsonProperty("windowFunctions") Map<Symbol, FunctionCall> windowFunctions,
-            @JsonProperty("signatures") Map<Symbol, Signature> signatures,
-            @JsonProperty("hashSymbol") Optional<Symbol> hashSymbol,
-            @JsonProperty("prePartitionedInputs") Set<Symbol> prePartitionedInputs,
-            @JsonProperty("preSortedOrderPrefix") int preSortedOrderPrefix)
+            PlanNodeId id,
+            PlanNode source,
+            Specification specification,
+            Map<Symbol, Function> windowFunctions,
+            Map<Function, Frame> frames,
+            Optional<Symbol> hashSymbol,
+            Set<Symbol> prePartitionedInputs,
+            int preSortedOrderPrefix)
     {
         super(id);
 
         requireNonNull(source, "source is null");
         requireNonNull(specification, "specification is null");
         requireNonNull(windowFunctions, "windowFunctions is null");
-        requireNonNull(signatures, "signatures is null");
-        checkArgument(windowFunctions.keySet().equals(signatures.keySet()), "windowFunctions does not match signatures");
         requireNonNull(hashSymbol, "hashSymbol is null");
         checkArgument(specification.getPartitionBy().containsAll(prePartitionedInputs), "prePartitionedInputs must be contained in partitionBy");
         checkArgument(preSortedOrderPrefix <= specification.getOrderBy().size(), "Cannot have sorted more symbols than those requested");
         checkArgument(preSortedOrderPrefix == 0 || ImmutableSet.copyOf(prePartitionedInputs).equals(ImmutableSet.copyOf(specification.getPartitionBy())), "preSortedOrderPrefix can only be greater than zero if all partition symbols are pre-partitioned");
+        checkArgument(allFunctionsHaveFrames(windowFunctions, frames), "not all functions have frames assigned");
 
         this.source = source;
         this.prePartitionedInputs = ImmutableSet.copyOf(prePartitionedInputs);
         this.specification = specification;
         this.windowFunctions = ImmutableMap.copyOf(windowFunctions);
-        this.functionHandles = ImmutableMap.copyOf(signatures);
+        this.frames = ImmutableMap.copyOf(frames);
         this.hashSymbol = hashSymbol;
         this.preSortedOrderPrefix = preSortedOrderPrefix;
+    }
+
+    @JsonCreator
+    public WindowNode(
+            @JsonProperty("id") PlanNodeId id,
+            @JsonProperty("source") PlanNode source,
+            @JsonProperty("specification") Specification specification,
+            @JsonProperty("windowFunctions") Map<Symbol, Function> windowFunctions,
+            @JsonProperty("frames") List<FunctionWithFrame> frames,
+            @JsonProperty("hashSymbol") Optional<Symbol> hashSymbol,
+            @JsonProperty("prePartitionedInputs") Set<Symbol> prePartitionedInputs,
+            @JsonProperty("preSortedOrderPrefix") int preSortedOrderPrefix)
+    {
+        this(id, source, specification, windowFunctions, frames.stream().collect(toImmutableMap(f -> f.getFunction(), f -> f.getFrame())), hashSymbol, prePartitionedInputs, preSortedOrderPrefix);
+    }
+
+    private static boolean allFunctionsHaveFrames(Map<Symbol, Function> windowFunctions, Map<Function, Frame> frames)
+    {
+        return windowFunctions.values().stream().filter(f -> frames.containsKey(f)).count() == windowFunctions.size();
     }
 
     @Override
@@ -120,21 +139,21 @@ public class WindowNode
         return specification.getOrderings();
     }
 
-    public Frame getFrame()
-    {
-        return specification.getFrame();
-    }
-
     @JsonProperty
-    public Map<Symbol, FunctionCall> getWindowFunctions()
+    public Map<Symbol, Function> getWindowFunctions()
     {
         return windowFunctions;
     }
 
-    @JsonProperty
-    public Map<Symbol, Signature> getSignatures()
+    @JsonProperty("frames")
+    public List<FunctionWithFrame> getFunctionWithFrame()
     {
-        return functionHandles;
+        return frames.entrySet().stream().map(e -> new FunctionWithFrame(e.getKey(), e.getValue())).collect(toImmutableList());
+    }
+
+    public Map<Function, Frame> getFrames()
+    {
+        return frames;
     }
 
     @JsonProperty
@@ -167,25 +186,21 @@ public class WindowNode
         private final List<Symbol> partitionBy;
         private final List<Symbol> orderBy;
         private final Map<Symbol, SortOrder> orderings;
-        private final Frame frame;
 
         @JsonCreator
         public Specification(
                 @JsonProperty("partitionBy") List<Symbol> partitionBy,
                 @JsonProperty("orderBy") List<Symbol> orderBy,
-                @JsonProperty("orderings") Map<Symbol, SortOrder> orderings,
-                @JsonProperty("frame") Frame frame)
+                @JsonProperty("orderings") Map<Symbol, SortOrder> orderings)
         {
             requireNonNull(partitionBy, "partitionBy is null");
             requireNonNull(orderBy, "orderBy is null");
             checkArgument(orderings.size() == orderBy.size(), "orderBy and orderings sizes don't match");
             checkArgument(orderings.keySet().containsAll(orderBy), "Every orderBy symbol must have an ordering direction");
-            requireNonNull(frame, "frame is null");
 
             this.partitionBy = ImmutableList.copyOf(partitionBy);
             this.orderBy = ImmutableList.copyOf(orderBy);
             this.orderings = ImmutableMap.copyOf(orderings);
-            this.frame = frame;
         }
 
         @JsonProperty
@@ -206,16 +221,10 @@ public class WindowNode
             return orderings;
         }
 
-        @JsonProperty
-        public Frame getFrame()
-        {
-            return frame;
-        }
-
         @Override
         public int hashCode()
         {
-            return Objects.hash(partitionBy, orderBy, orderings, frame);
+            return Objects.hash(partitionBy, orderBy, orderings);
         }
 
         @Override
@@ -233,8 +242,7 @@ public class WindowNode
 
             return Objects.equals(this.partitionBy, other.partitionBy) &&
                     Objects.equals(this.orderBy, other.orderBy) &&
-                    Objects.equals(this.orderings, other.orderings) &&
-                    Objects.equals(this.frame, other.frame);
+                    Objects.equals(this.orderings, other.orderings);
         }
     }
 
@@ -313,6 +321,102 @@ public class WindowNode
                     Objects.equals(this.startValue, other.startValue) &&
                     Objects.equals(this.endType, other.endType) &&
                     Objects.equals(this.endValue, other.endValue);
+        }
+    }
+
+    @Immutable
+    public static class Function
+    {
+        private final FunctionCall functionCall;
+        private final Signature signature;
+
+        @JsonCreator
+        public Function(
+                @JsonProperty("functionCall") FunctionCall functionCall,
+                @JsonProperty("signature") Signature signature)
+        {
+            this.functionCall = requireNonNull(functionCall, "functionCall is null");
+            this.signature = requireNonNull(signature, "Signature is null');");
+        }
+
+        @JsonProperty
+        public FunctionCall getFunctionCall()
+        {
+            return functionCall;
+        }
+
+        @JsonProperty
+        public Signature getSignature()
+        {
+            return signature;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(functionCall, signature);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            Function other = (Function) obj;
+            return Objects.equals(this.functionCall, other.functionCall) &&
+                    Objects.equals(this.signature, other.signature);
+        }
+    }
+
+    @Immutable
+    public static class FunctionWithFrame
+    {
+        private final Function function;
+        private final Frame frame;
+
+        @JsonCreator
+        public FunctionWithFrame(
+                @JsonProperty("function") Function function,
+                @JsonProperty("frame") Frame frame)
+        {
+            this.function = function;
+            this.frame = frame;
+        }
+
+        @JsonProperty
+        public Function getFunction()
+        {
+            return function;
+        }
+
+        @JsonProperty
+        public Frame getFrame()
+        {
+            return frame;
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(function, frame);
+        }
+
+        @Override
+        public boolean equals(Object obj)
+        {
+            if (this == obj) {
+                return true;
+            }
+            if (obj == null || getClass() != obj.getClass()) {
+                return false;
+            }
+            FunctionWithFrame other = (FunctionWithFrame) obj;
+            return Objects.equals(this.function, other.function) &&
+                    Objects.equals(this.frame, other.frame);
         }
     }
 }

@@ -418,7 +418,7 @@ public class HashGenerationOptimizer
                             child.getNode(),
                             node.getSpecification(),
                             node.getWindowFunctions(),
-                            node.getSignatures(),
+                            node.getFrames(),
                             Optional.of(hashSymbol),
                             node.getPrePartitionedInputs(),
                             node.getPreSortedOrderPrefix()),

@@ -191,7 +191,7 @@ public class ChildReplacer
                 Iterables.getOnlyElement(newChildren),
                 node.getSpecification(),
                 node.getWindowFunctions(),
-                node.getSignatures(),
+                node.getFrames(),
                 node.getHashSymbol(),
                 node.getPrePartitionedInputs(),
                 node.getPreSortedOrderPrefix());

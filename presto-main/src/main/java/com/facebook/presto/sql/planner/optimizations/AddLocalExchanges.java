@@ -385,7 +385,7 @@ public class AddLocalExchanges
                     child.getNode(),
                     node.getSpecification(),
                     node.getWindowFunctions(),
-                    node.getSignatures(),
+                    node.getFrames(),
                     node.getHashSymbol(),
                     prePartitionedInputs,
                     preSortedOrderPrefix);
