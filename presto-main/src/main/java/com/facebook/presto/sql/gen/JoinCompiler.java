@@ -70,6 +70,8 @@ import static com.facebook.presto.bytecode.expression.BytecodeExpressions.consta
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.constantString;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.constantTrue;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.invokeStatic;
+import static com.facebook.presto.bytecode.expression.BytecodeExpressions.newArray;
+import static com.facebook.presto.bytecode.expression.BytecodeExpressions.newInstance;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.not;
 import static com.facebook.presto.bytecode.expression.BytecodeExpressions.notEqual;
 import static com.facebook.presto.sql.gen.SqlTypeBytecodeExpression.constantType;
@@ -150,6 +152,7 @@ public class JoinCompiler
             FieldDefinition channelField = classDefinition.declareField(a(PRIVATE, FINAL), "channel_" + i, type(List.class, Block.class));
             channelFields.add(channelField);
         }
+        FieldDefinition channelArraysField = classDefinition.declareField(a(PRIVATE, FINAL), "channelArrays", type(List.class, Block[].class));
         List<Type> joinChannelTypes = new ArrayList<>();
         List<FieldDefinition> joinChannelFields = new ArrayList<>();
         for (int i = 0; i < joinChannels.size(); i++) {
@@ -162,7 +165,7 @@ public class JoinCompiler
                 joinFilterFunctionClass -> classDefinition.declareField(a(PRIVATE, FINAL), "joinFilterFunction", JoinFilterFunction.class)
         );
 
-        generateConstructor(classDefinition, joinChannels, sizeField, channelFields, joinChannelFields, hashChannelField, joinFilterFunctionField);
+        generateConstructor(classDefinition, joinChannels, sizeField, channelFields, channelArraysField, joinChannelFields, hashChannelField, joinFilterFunctionField);
         generateGetChannelCountMethod(classDefinition, channelFields);
         generateGetSizeInBytesMethod(classDefinition, sizeField);
         generateAppendToMethod(classDefinition, callSiteBinder, types, channelFields);
@@ -184,6 +187,7 @@ public class JoinCompiler
             List<Integer> joinChannels,
             FieldDefinition sizeField,
             List<FieldDefinition> channelFields,
+            FieldDefinition channelArraysField,
             List<FieldDefinition> joinChannelFields,
             FieldDefinition hashChannelField,
             Optional<FieldDefinition> joinFilterFunctionFieldOptional)
@@ -235,6 +239,41 @@ public class JoinCompiler
                             .cast(long.class))
                     .longAdd()
                     .putField(sizeField);
+        }
+
+        constructor.comment("Set channelArrays field");
+
+        constructor.append(thisVariable.setField(
+                channelArraysField,
+                newInstance(ArrayList.class)));
+
+        if (!channelFields.isEmpty()) {
+            Variable blocksVariable = constructorDefinition.getScope().declareVariable(Block[].class, "blocks");
+            BytecodeExpression firstChannel = thisVariable.getField(channelFields.get(0));
+            BytecodeBlock loopBody = new BytecodeBlock();
+            constructor.append(
+                    new ForLoop()
+                            .initialize(blockIndex.set(constantInt(0)))
+                            .condition(new BytecodeBlock()
+                                    .append(blockIndex)
+                                    .append(firstChannel.invoke("size", int.class))
+                                    .invokeStatic(CompilerOperations.class, "lessThan", boolean.class, int.class, int.class))
+                            .update(new BytecodeBlock().incrementVariable(blockIndex, (byte) 1))
+                            .body(loopBody)
+            );
+            loopBody.append(blocksVariable.set(newArray(type(Block[].class), channelFields.size())));
+            for (int channelIndex = 0; channelIndex < channelFields.size(); ++channelIndex) {
+                loopBody.append(
+                        blocksVariable.setElement(
+                                constantInt(channelIndex),
+                                thisVariable
+                                        .getField(channelFields.get(channelIndex))
+                                        .invoke("get", Object.class, blockIndex)
+                                        .cast(Block.class)
+                        )
+                );
+            }
+            loopBody.append(thisVariable.getField(channelArraysField).invoke("add", boolean.class, ImmutableList.of(Object.class), blocksVariable)).pop();
         }
 
         constructor.comment("Set join channel fields");
