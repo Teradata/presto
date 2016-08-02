@@ -1491,9 +1491,23 @@ public class LocalExecutionPlanner
             Optional<Integer> buildHashChannel = buildHashSymbol.map(channelGetter(buildSource));
 
             OperatorFactory operatorFactory;
-            Optional<JoinFilterFunction> filterFunction = node.getFilter().map(filter -> {
+
+            Optional<JoinFilterFunction> filterFunction = node.getFilter().map(filterExpression -> {
                 Map<Symbol, Integer> joinSourcesLayout = createJoinSourcesLayout(buildSource.getLayout(), probeLayout);
-                return new InterpretedFilterFunction(filter, context.getTypes(), joinSourcesLayout, metadata, sqlParser, context.getSession());
+                Map<Integer, Type> sourceTypes = new HashMap<>();
+                joinSourcesLayout.forEach((symbol, field) -> sourceTypes.put(field, context.getTypes().get(symbol)));
+                SymbolToInputRewriter symbolToInputRewriter = new SymbolToInputRewriter(joinSourcesLayout);
+                Expression rewrittenFilter = ExpressionTreeRewriter.rewriteWith(symbolToInputRewriter, filterExpression);
+
+                IdentityHashMap<Expression, Type> expressionTypes = getExpressionTypesFromInput(
+                        context.getSession(),
+                        metadata,
+                        sqlParser,
+                        sourceTypes,
+                        rewrittenFilter);
+
+                RowExpression translatedFilter = toRowExpression(rewrittenFilter, expressionTypes);
+                return compiler.compileJoinFilterFunction(translatedFilter, buildSource.getLayout().size()).get();
             });
 
             LookupSourceSupplier lookupSourceSupplier;

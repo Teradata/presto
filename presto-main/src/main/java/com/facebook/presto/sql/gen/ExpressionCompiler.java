@@ -17,6 +17,7 @@ import com.facebook.presto.bytecode.ClassDefinition;
 import com.facebook.presto.bytecode.CompilationException;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.operator.CursorProcessor;
+import com.facebook.presto.operator.JoinFilterFunction;
 import com.facebook.presto.operator.PageProcessor;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.sql.relational.RowExpression;
@@ -47,25 +48,57 @@ public class ExpressionCompiler
 {
     private final Metadata metadata;
 
-    private final LoadingCache<CacheKey, Class<? extends PageProcessor>> pageProcessors = CacheBuilder.newBuilder().maximumSize(1000).build(
-            new CacheLoader<CacheKey, Class<? extends PageProcessor>>()
+    private final LoadingCache<ProcessorCacheKey, Class<? extends PageProcessor>> pageProcessors = CacheBuilder.newBuilder().maximumSize(1000).build(
+            new CacheLoader<ProcessorCacheKey, Class<? extends PageProcessor>>()
             {
                 @Override
-                public Class<? extends PageProcessor> load(CacheKey key)
+                public Class<? extends PageProcessor> load(ProcessorCacheKey key)
                         throws Exception
                 {
                     return compile(key.getFilter(), key.getProjections(), new PageProcessorCompiler(metadata), PageProcessor.class);
                 }
             });
 
-    private final LoadingCache<CacheKey, Class<? extends CursorProcessor>> cursorProcessors = CacheBuilder.newBuilder().maximumSize(1000).build(
-            new CacheLoader<CacheKey, Class<? extends CursorProcessor>>()
+    private final LoadingCache<ProcessorCacheKey, Class<? extends CursorProcessor>> cursorProcessors = CacheBuilder.newBuilder().maximumSize(1000).build(
+            new CacheLoader<ProcessorCacheKey, Class<? extends CursorProcessor>>()
             {
                 @Override
-                public Class<? extends CursorProcessor> load(CacheKey key)
+                public Class<? extends CursorProcessor> load(ProcessorCacheKey key)
                         throws Exception
                 {
                     return compile(key.getFilter(), key.getProjections(), new CursorProcessorCompiler(metadata), CursorProcessor.class);
+                }
+            });
+
+    private final LoadingCache<JoinFilterCacheKey, Class<? extends JoinFilterFunction>> joinFilterFunctions = CacheBuilder.newBuilder().maximumSize(1000).build(
+            new CacheLoader<JoinFilterCacheKey, Class<? extends JoinFilterFunction>>()
+            {
+                @Override
+                public Class<? extends JoinFilterFunction> load(JoinFilterCacheKey key)
+                        throws Exception
+                {
+                    ClassDefinition classDefinition = new ClassDefinition(
+                            a(PUBLIC, FINAL),
+                            makeClassName("JoinFilterFunction"),
+                            type(Object.class),
+                            type(JoinFilterFunction.class));
+
+                    CallSiteBinder callSiteBinder = new CallSiteBinder();
+
+                    new JoinFilterFunctionCompiler(metadata).generateMethods(classDefinition, callSiteBinder, key.getFilter(), key.getLeftBlocksSize());
+
+                    //
+                    // toString method
+                    //
+                    generateToString(
+                            classDefinition,
+                            callSiteBinder,
+                            toStringHelper(classDefinition.getType().getJavaClassName())
+                                    .add("filter", key.getFilter())
+                                    .add("leftBlocksSize", key.getLeftBlocksSize())
+                                    .toString());
+
+                    return defineClass(classDefinition, JoinFilterFunction.class, callSiteBinder.getBindings(), getClass().getClassLoader());
                 }
             });
 
@@ -83,7 +116,7 @@ public class ExpressionCompiler
 
     public Supplier<CursorProcessor> compileCursorProcessor(RowExpression filter, List<RowExpression> projections, Object uniqueKey)
     {
-        Class<? extends CursorProcessor> cursorProcessor = cursorProcessors.getUnchecked(new CacheKey(filter, projections, uniqueKey));
+        Class<? extends CursorProcessor> cursorProcessor = cursorProcessors.getUnchecked(new ProcessorCacheKey(filter, projections, uniqueKey));
         return () -> {
             try {
                 return cursorProcessor.newInstance();
@@ -96,10 +129,23 @@ public class ExpressionCompiler
 
     public Supplier<PageProcessor> compilePageProcessor(RowExpression filter, List<RowExpression> projections)
     {
-        Class<? extends PageProcessor> pageProcessor = pageProcessors.getUnchecked(new CacheKey(filter, projections, null));
+        Class<? extends PageProcessor> pageProcessor = pageProcessors.getUnchecked(new ProcessorCacheKey(filter, projections, null));
         return () -> {
             try {
                 return pageProcessor.newInstance();
+            }
+            catch (ReflectiveOperationException e) {
+                throw Throwables.propagate(e);
+            }
+        };
+    }
+
+    public Supplier<JoinFilterFunction> compileJoinFilterFunction(RowExpression filter, int leftBlocksSize)
+    {
+        Class<? extends JoinFilterFunction> joinFilterFunction = joinFilterFunctions.getUnchecked(new JoinFilterCacheKey(filter, leftBlocksSize));
+        return () -> {
+            try {
+                return joinFilterFunction.newInstance();
             }
             catch (ReflectiveOperationException e) {
                 throw Throwables.propagate(e);
@@ -156,13 +202,13 @@ public class ExpressionCompiler
                 .retObject();
     }
 
-    private static final class CacheKey
+    private static final class ProcessorCacheKey
     {
         private final RowExpression filter;
         private final List<RowExpression> projections;
         private final Object uniqueKey;
 
-        private CacheKey(RowExpression filter, List<RowExpression> projections, Object uniqueKey)
+        private ProcessorCacheKey(RowExpression filter, List<RowExpression> projections, Object uniqueKey)
         {
             this.filter = filter;
             this.uniqueKey = uniqueKey;
@@ -194,7 +240,7 @@ public class ExpressionCompiler
             if (obj == null || getClass() != obj.getClass()) {
                 return false;
             }
-            CacheKey other = (CacheKey) obj;
+            ProcessorCacheKey other = (ProcessorCacheKey) obj;
             return Objects.equals(this.filter, other.filter) &&
                     Objects.equals(this.projections, other.projections) &&
                     Objects.equals(this.uniqueKey, other.uniqueKey);
@@ -207,6 +253,57 @@ public class ExpressionCompiler
                     .add("filter", filter)
                     .add("projections", projections)
                     .add("uniqueKey", uniqueKey)
+                    .toString();
+        }
+    }
+
+    private static final class JoinFilterCacheKey
+    {
+        private final RowExpression filter;
+        private final int leftBlocksSize;
+
+        public JoinFilterCacheKey(RowExpression filter, int leftBlocksSize)
+        {
+            this.filter = filter;
+            this.leftBlocksSize = leftBlocksSize;
+        }
+
+        public RowExpression getFilter()
+        {
+            return filter;
+        }
+
+        public int getLeftBlocksSize()
+        {
+            return leftBlocksSize;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            JoinFilterCacheKey that = (JoinFilterCacheKey) o;
+            return leftBlocksSize == that.leftBlocksSize &&
+                    Objects.equals(filter, that.filter);
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(filter, leftBlocksSize);
+        }
+
+        @Override
+        public String toString()
+        {
+            return toStringHelper(this)
+                    .add("filter", filter)
+                    .add("leftBlocksSize", leftBlocksSize)
                     .toString();
         }
     }
