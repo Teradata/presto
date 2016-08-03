@@ -13,8 +13,6 @@
  */
 package com.facebook.presto.server.security;
 
-import io.airlift.log.Logger;
-
 import javax.inject.Inject;
 
 import static java.lang.String.format;
@@ -23,16 +21,14 @@ import static java.util.Objects.requireNonNull;
 public class OpenLdapBinder
         implements LdapBinder
 {
-    private static final Logger LOG = Logger.get(ActiveDirectoryBinder.class);
     private final String userObjectClass;
     private final String baseDistinguishedName;
-    private final String searchInput = "uid";
 
     @Inject
     public OpenLdapBinder(LdapServerConfig config)
     {
         userObjectClass = requireNonNull(config.getUserObjectClass(), "userObjectClass is null");
-        baseDistinguishedName = requireNonNull(config.getBaseDistinguishedName());
+        baseDistinguishedName = requireNonNull(config.getBaseDistinguishedName(), "baseDistinguishedName is null");
     }
 
     @Override
@@ -42,8 +38,9 @@ public class OpenLdapBinder
     }
 
     @Override
-    public String getSearchFilter(String user, String groupDistinguishedName)
+    public String getGroupSearchFilter(String user, String groupDistinguishedName)
     {
-            return format("(&(objectClass=%s)(%s=%s)(memberof=%s))", userObjectClass, searchInput, user, groupDistinguishedName);
+        String searchInput = "uid";
+        return format("(&(objectClass=%s)(%s=%s)(memberof=%s))", userObjectClass, searchInput, user, groupDistinguishedName);
     }
 }

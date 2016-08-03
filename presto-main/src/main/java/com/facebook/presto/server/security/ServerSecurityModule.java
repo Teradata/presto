@@ -46,6 +46,8 @@ public class ServerSecurityModule
                     .addBinding()
                     .to(LdapFilter.class)
                     .in(Scopes.SINGLETON);
+            checkState(ldapServerConfig.getServerType() != null, "Missing property 'authentication.ldap.server-type'");
+            checkState(ldapServerConfig.getUserObjectClass() != null, "Missing property 'authentication.ldap.user-object-class'");
             if (ldapServerConfig.getServerType().equalsIgnoreCase(OPENLDAP.name())) {
                 checkState(ldapServerConfig.getBaseDistinguishedName() != null, "Missing property 'authentication.ldap.base-dn'");
 

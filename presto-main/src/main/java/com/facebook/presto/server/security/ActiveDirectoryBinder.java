@@ -13,8 +13,6 @@
  */
 package com.facebook.presto.server.security;
 
-import io.airlift.log.Logger;
-
 import javax.inject.Inject;
 
 import static java.lang.String.format;
@@ -23,10 +21,8 @@ import static java.util.Objects.requireNonNull;
 public class ActiveDirectoryBinder
         implements LdapBinder
 {
-    private static final Logger LOG = Logger.get(ActiveDirectoryBinder.class);
     private final String activeDirectoryDomain;
     private final String userObjectClass;
-    private final String searchInput = "sAMAccountName";
 
     @Inject
     public ActiveDirectoryBinder(LdapServerConfig config)
@@ -42,8 +38,9 @@ public class ActiveDirectoryBinder
     }
 
     @Override
-    public String getSearchFilter(String user, String groupDistinguishedName)
+    public String getGroupSearchFilter(String user, String groupDistinguishedName)
     {
+        String searchInput = "sAMAccountName";
         return format("(&(objectClass=%s)(%s=%s)(memberof=%s))", userObjectClass, searchInput, user, groupDistinguishedName);
     }
 }
