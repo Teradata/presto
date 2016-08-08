@@ -222,9 +222,9 @@ public class SimplePagesHashStrategy
     }
 
     @Override
-    public Optional<JoinFilterFunction> getFilterFunction()
+    public boolean hasFilterFunction()
     {
-        return filterFunction;
+        return filterFunction.isPresent();
     }
 
     @Override

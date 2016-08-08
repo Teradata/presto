@@ -82,7 +82,7 @@ public class TestJoinProbeCompiler
         DriverContext driverContext = taskContext.addPipelineContext(true, true).addDriverContext();
 
         ImmutableList<Type> types = ImmutableList.<Type>of(VARCHAR);
-        LookupSourceFactory lookupSourceFactoryFactory = joinCompiler.compileLookupSourceFactory(types, Ints.asList(0));
+        LookupSourceFactory lookupSourceFactoryFactory = joinCompiler.compileLookupSourceFactory(types, Ints.asList(0), Optional.empty());
 
         // crate hash strategy with a single channel blocks -- make sure there is some overlap in values
         List<Block> channel = ImmutableList.of(
@@ -109,7 +109,7 @@ public class TestJoinProbeCompiler
             hashChannel = Optional.of(1);
             channels = ImmutableList.of(channel, hashChannelBuilder.build());
         }
-        LookupSource lookupSource = lookupSourceFactoryFactory.createLookupSource(addresses, channels, hashChannel);
+        LookupSource lookupSource = lookupSourceFactoryFactory.createLookupSource(addresses, channels, hashChannel, Optional.empty());
 
         JoinProbeCompiler joinProbeCompiler = new JoinProbeCompiler();
         JoinProbeFactory probeFactory = joinProbeCompiler.internalCompileJoinProbe(types, Ints.asList(0), hashChannel);

@@ -111,8 +111,8 @@ public class MultiChannelGroupByHash
             this.precomputedHashChannel = Optional.empty();
         }
         this.channelBuilders = channelBuilders.build();
-        PagesHashStrategyFactory pagesHashStrategyFactory = JOIN_COMPILER.compilePagesHashStrategyFactory(this.types, outputChannels.build());
-        hashStrategy = pagesHashStrategyFactory.createPagesHashStrategy(this.channelBuilders, this.precomputedHashChannel);
+        PagesHashStrategyFactory pagesHashStrategyFactory = JOIN_COMPILER.compilePagesHashStrategyFactory(this.types, outputChannels.build(), Optional.empty());
+        hashStrategy = pagesHashStrategyFactory.createPagesHashStrategy(this.channelBuilders, this.precomputedHashChannel, Optional.empty());
 
         startNewPage();
 

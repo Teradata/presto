@@ -17,8 +17,6 @@ import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.block.Block;
 
-import java.util.Optional;
-
 public interface PagesHashStrategy
 {
     /**
@@ -93,9 +91,9 @@ public interface PagesHashStrategy
     boolean positionEqualsPositionIgnoreNulls(int leftBlockIndex, int leftPosition, int rightBlockIndex, int rightPosition);
 
     /**
-     * Returns filter function assigned to this PagesHashStrategy.
+     * Returns if PagesHashStrategy has filter function assigned.
      */
-    Optional<JoinFilterFunction> getFilterFunction();
+    boolean hasFilterFunction();
 
     /**
      * Checks result of filter function for given row.

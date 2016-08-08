@@ -59,7 +59,7 @@ public class TestJoinCompiler
         List<Integer> joinChannels = Ints.asList(0);
 
         // compile a single channel hash strategy
-        PagesHashStrategyFactory pagesHashStrategyFactory = joinCompiler.compilePagesHashStrategyFactory(joinTypes, joinChannels);
+        PagesHashStrategyFactory pagesHashStrategyFactory = joinCompiler.compilePagesHashStrategyFactory(joinTypes, joinChannels, Optional.empty());
 
         // create hash strategy with a single channel blocks -- make sure there is some overlap in values
         List<Block> channel = ImmutableList.of(
@@ -77,7 +77,7 @@ public class TestJoinCompiler
             hashChannel = Optional.of(1);
             channels = ImmutableList.of(channel, hashChannelBuilder.build());
         }
-        PagesHashStrategy hashStrategy = pagesHashStrategyFactory.createPagesHashStrategy(channels, hashChannel);
+        PagesHashStrategy hashStrategy = pagesHashStrategyFactory.createPagesHashStrategy(channels, hashChannel, Optional.empty());
 
         // verify channel count
         assertEquals(hashStrategy.getChannelCount(), 1);
@@ -177,8 +177,8 @@ public class TestJoinCompiler
             types = ImmutableList.<Type>of(VARCHAR, VARCHAR, BIGINT, DOUBLE, BOOLEAN, BIGINT);
         }
 
-        PagesHashStrategyFactory pagesHashStrategyFactory = joinCompiler.compilePagesHashStrategyFactory(types, joinChannels);
-        PagesHashStrategy hashStrategy = pagesHashStrategyFactory.createPagesHashStrategy(channels, hashChannel);
+        PagesHashStrategyFactory pagesHashStrategyFactory = joinCompiler.compilePagesHashStrategyFactory(types, joinChannels, Optional.empty());
+        PagesHashStrategy hashStrategy = pagesHashStrategyFactory.createPagesHashStrategy(channels, hashChannel, Optional.empty());
         // todo add tests for filter function
         PagesHashStrategy expectedHashStrategy = new SimplePagesHashStrategy(types, channels, joinChannels, hashChannel, Optional.empty());
 
