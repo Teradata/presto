@@ -63,6 +63,7 @@ public class LdapFilter
     private final LdapBinder ldapBinder;
     private final Optional<String> groupDistinguishedName;
     private final Optional<String> baseDistinguishedName;
+    private final Optional<String> userObjectClass;
 
     @Inject
     public LdapFilter(LdapServerConfig config, LdapBinder ldapBinder)
@@ -71,6 +72,7 @@ public class LdapFilter
         this.ldapBinder = requireNonNull(ldapBinder, "ldapBinder is null");
         this.groupDistinguishedName = Optional.ofNullable(config.getGroupDistinguishedName());
         this.baseDistinguishedName = Optional.ofNullable(config.getBaseDistinguishedName());
+        this.userObjectClass = Optional.ofNullable(config.getUserObjectClass());
 
         try {
             authenticate(getBasicEnvironment());
@@ -189,12 +191,11 @@ public class LdapFilter
 
     private void checkForGroupMembership(String user, String groupDistinguishedName, DirContext context)
     {
-        checkState(baseDistinguishedName.isPresent(), "Base distinguished name (DN) for user %s is missing", user);
         SearchControls searchControls = new SearchControls();
         searchControls.setSearchScope(SearchControls.SUBTREE_SCOPE);
         String searchBase = baseDistinguishedName.get();
         try {
-            String searchFilter = ldapBinder.getGroupSearchFilter(user, groupDistinguishedName);
+            String searchFilter = format("(&(objectClass=%s)(%s=%s)(memberof=%s))", userObjectClass.get(), ldapBinder.getUserSearchInput(), user, groupDistinguishedName);
             LOG.debug("Group membership check for user '%s' using query: %s and base distinguished name: %s", user, searchFilter, searchBase);
             NamingEnumeration<SearchResult> results = context.search(searchBase, searchFilter, searchControls);
             if (!results.hasMoreElements()) {

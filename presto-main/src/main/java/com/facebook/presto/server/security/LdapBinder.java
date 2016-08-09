@@ -17,5 +17,5 @@ public interface LdapBinder
 {
     String getBindDistinguishedName(String user);
 
-    String getGroupSearchFilter(String user, String groupDistinguishedName);
+    String getUserSearchInput();
 }

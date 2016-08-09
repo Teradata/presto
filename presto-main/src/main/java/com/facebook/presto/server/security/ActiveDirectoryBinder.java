@@ -22,13 +22,11 @@ public class ActiveDirectoryBinder
         implements LdapBinder
 {
     private final String activeDirectoryDomain;
-    private final String userObjectClass;
 
     @Inject
     public ActiveDirectoryBinder(LdapServerConfig config)
     {
         activeDirectoryDomain = requireNonNull(config.getActiveDirectoryDomain(), "activeDirectoryDomain is null");
-        userObjectClass = requireNonNull(config.getUserObjectClass(), "userObjectClass is null");
     }
 
     @Override
@@ -38,9 +36,8 @@ public class ActiveDirectoryBinder
     }
 
     @Override
-    public String getGroupSearchFilter(String user, String groupDistinguishedName)
+    public String getUserSearchInput()
     {
-        String searchInput = "sAMAccountName";
-        return format("(&(objectClass=%s)(%s=%s)(memberof=%s))", userObjectClass, searchInput, user, groupDistinguishedName);
+        return "sAMAccountName";
     }
 }

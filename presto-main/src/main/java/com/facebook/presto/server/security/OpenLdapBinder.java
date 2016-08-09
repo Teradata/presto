@@ -21,13 +21,11 @@ import static java.util.Objects.requireNonNull;
 public class OpenLdapBinder
         implements LdapBinder
 {
-    private final String userObjectClass;
     private final String baseDistinguishedName;
 
     @Inject
     public OpenLdapBinder(LdapServerConfig config)
     {
-        userObjectClass = requireNonNull(config.getUserObjectClass(), "userObjectClass is null");
         baseDistinguishedName = requireNonNull(config.getBaseDistinguishedName(), "baseDistinguishedName is null");
     }
 
@@ -38,9 +36,8 @@ public class OpenLdapBinder
     }
 
     @Override
-    public String getGroupSearchFilter(String user, String groupDistinguishedName)
+    public String getUserSearchInput()
     {
-        String searchInput = "uid";
-        return format("(&(objectClass=%s)(%s=%s)(memberof=%s))", userObjectClass, searchInput, user, groupDistinguishedName);
+        return "uid";
     }
 }
