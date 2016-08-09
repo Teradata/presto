@@ -1,2 +1,2 @@
--- delimiter: |; ignoreOrder: false; types: LONGNVARCHAR
+-- delimiter: |; ignoreOrder: false; types: DECIMAL 
 3083843.0578|
