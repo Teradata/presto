@@ -25,6 +25,7 @@ import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
 
 import java.util.ArrayList;
@@ -55,6 +56,26 @@ public class InMemoryHashAggregationBuilder
             Optional<Integer> hashChannel,
             OperatorContext operatorContext)
     {
+        this(accumulatorFactories,
+                step,
+                expectedGroups,
+                groupByTypes,
+                groupByChannels,
+                hashChannel,
+                operatorContext,
+                Optional.empty());
+    }
+
+    public InMemoryHashAggregationBuilder(
+            List<AccumulatorFactory> accumulatorFactories,
+            AggregationNode.Step step,
+            int expectedGroups,
+            List<Type> groupByTypes,
+            List<Integer> groupByChannels,
+            Optional<Integer> hashChannel,
+            OperatorContext operatorContext,
+            Optional<Integer> overwriteIntermediateChannelOffset)
+    {
         this.groupByHash = createGroupByHash(operatorContext.getSession(), groupByTypes, Ints.toArray(groupByChannels), hashChannel, expectedGroups);
         this.operatorContext = operatorContext;
         this.partial = step.isOutputPartial();
@@ -64,7 +85,11 @@ public class InMemoryHashAggregationBuilder
         requireNonNull(accumulatorFactories, "accumulatorFactories is null");
         for (int i = 0; i < accumulatorFactories.size(); i++) {
             AccumulatorFactory accumulatorFactory = accumulatorFactories.get(i);
-            builder.add(new Aggregator(accumulatorFactory, step));
+            Optional<Integer> overwriteIntermediateChannel = Optional.empty();
+            if (overwriteIntermediateChannelOffset.isPresent()) {
+                overwriteIntermediateChannel = Optional.of(overwriteIntermediateChannelOffset.get() + i);
+            }
+            builder.add(new Aggregator(accumulatorFactory, step, overwriteIntermediateChannel));
         }
         aggregators = builder.build();
     }
@@ -102,6 +127,12 @@ public class InMemoryHashAggregationBuilder
         }
     }
 
+    @Override
+    public boolean isBusy()
+    {
+        return false;
+    }
+
     public long getSizeInMemory()
     {
         long sizeInMemory = groupByHash.getEstimatedSize();
@@ -115,6 +146,18 @@ public class InMemoryHashAggregationBuilder
         return sizeInMemory;
     }
 
+    public void setOutputPartial()
+    {
+        for (Aggregator aggregator : aggregators) {
+            aggregator.setOutputPartial();
+        }
+    }
+
+    public int getKeyChannels()
+    {
+        return groupByHash.getTypes().size();
+    }
+
     public long getGroupCount()
     {
         return groupByHash.getGroupCount();
@@ -124,6 +167,20 @@ public class InMemoryHashAggregationBuilder
     public Iterator<Page> buildResult()
     {
         return buildResult(consecutiveGroupIds());
+    }
+
+    public Iterator<Page> buildResultSorted()
+    {
+        return buildResult(sortedGroupIds());
+    }
+
+    public List<Type> buildIntermediateTypes()
+    {
+        ArrayList<Type> types = new ArrayList<>(groupByHash.getTypes());
+        for (InMemoryHashAggregationBuilder.Aggregator aggregator : aggregators) {
+            types.add(aggregator.getIntermediateType());
+        }
+        return types;
     }
 
     private Iterator<Page> buildResult(Iterator<Integer> groupIds)
@@ -159,7 +216,7 @@ public class InMemoryHashAggregationBuilder
         };
     }
 
-    private List<Type> buildTypes()
+    public List<Type> buildTypes()
     {
         ArrayList<Type> types = new ArrayList<>(groupByHash.getTypes());
         for (Aggregator aggregator : aggregators) {
@@ -173,17 +230,28 @@ public class InMemoryHashAggregationBuilder
         return IntStream.range(0, groupByHash.getGroupCount()).iterator();
     }
 
+    private Iterator<Integer> sortedGroupIds()
+    {
+        List<Integer> groupIds = Lists.newArrayList(consecutiveGroupIds());
+        groupIds.sort(groupByHash::compare);
+        return groupIds.iterator();
+    }
+
     private static class Aggregator
     {
         private final GroupedAccumulator aggregation;
-        private final AggregationNode.Step step;
+        private AggregationNode.Step step;
         private final int intermediateChannel;
 
-        private Aggregator(AccumulatorFactory accumulatorFactory, AggregationNode.Step step)
+        private Aggregator(AccumulatorFactory accumulatorFactory, AggregationNode.Step step, Optional<Integer> overwriteIntermediateChannel)
         {
             if (step.isInputRaw()) {
                 this.intermediateChannel = -1;
                 this.aggregation = accumulatorFactory.createGroupedAccumulator();
+            }
+            else if (overwriteIntermediateChannel.isPresent()) {
+                this.intermediateChannel = overwriteIntermediateChannel.get();
+                this.aggregation = accumulatorFactory.createGroupedIntermediateAccumulator();
             }
             else {
                 checkArgument(accumulatorFactory.getInputChannels().size() == 1, "expected 1 input channel for intermediate aggregation");
@@ -227,6 +295,16 @@ public class InMemoryHashAggregationBuilder
                 aggregation.evaluateFinal(groupId, output);
             }
         }
+
+        public void setOutputPartial()
+        {
+            step = AggregationNode.Step.partialOutput(step);
+        }
+
+        public Type getIntermediateType()
+        {
+            return aggregation.getIntermediateType();
+        }
     }
 
     public static List<Type> toTypes(List<? extends Type> groupByType, AggregationNode.Step step, List<AccumulatorFactory> factories, Optional<Integer> hashChannel)
@@ -237,7 +315,7 @@ public class InMemoryHashAggregationBuilder
             types.add(BIGINT);
         }
         for (AccumulatorFactory factory : factories) {
-            types.add(new Aggregator(factory, step).getType());
+            types.add(new Aggregator(factory, step, Optional.empty()).getType());
         }
         return types.build();
     }

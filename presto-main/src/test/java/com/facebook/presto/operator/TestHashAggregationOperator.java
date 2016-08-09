@@ -25,6 +25,8 @@ import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.PageBuilderStatus;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spiller.Spiller;
+import com.facebook.presto.spiller.SpillerFactory;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Step;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.facebook.presto.testing.MaterializedResult;
@@ -42,6 +44,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
 import static com.facebook.presto.RowPagesBuilder.rowPagesBuilder;
@@ -65,6 +68,7 @@ import static io.airlift.slice.SizeOf.SIZE_OF_DOUBLE;
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
 import static io.airlift.testing.Assertions.assertEqualsIgnoreOrder;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
+import static io.airlift.units.DataSize.succinctBytes;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -83,6 +87,7 @@ public class TestHashAggregationOperator
 
     private ExecutorService executor;
     private DriverContext driverContext;
+    private Optional<SpillerFactory> spillerFactory = Optional.of(new DummySpillerFactory());
 
     @BeforeMethod
     public void setUp()
@@ -94,10 +99,20 @@ public class TestHashAggregationOperator
                 .addDriverContext();
     }
 
-    @DataProvider(name = "hashEnabledValues")
-    public static Object[][] hashEnabledValuesProvider()
+    @DataProvider(name = "hashEnabled")
+    public static Object[][] hashEnabled()
     {
-        return new Object[][] { { true }, { false } };
+        return new Object[][] {{ true }, { false }};
+    }
+
+    @DataProvider(name = "hashEnabledAndMemoryLimitBeforeSpillValues")
+    public static Object[][] hashEnabledAndMemoryLimitBeforeSpillValuesProvider()
+    {
+        return new Object[][] {
+                { true, 0 },
+                { true, 8 },
+                { false, 0 },
+                { false, 8 }};
     }
 
     @AfterMethod
@@ -106,8 +121,8 @@ public class TestHashAggregationOperator
         executor.shutdownNow();
     }
 
-    @Test(dataProvider = "hashEnabledValues")
-    public void testHashAggregation(boolean hashEnabled)
+    @Test(dataProvider = "hashEnabledAndMemoryLimitBeforeSpillValues")
+    public void testHashAggregation(boolean hashEnabled, long memoryLimitBeforeSpill)
             throws Exception
     {
         MetadataManager metadata = MetadataManager.createTestMetadataManager();
@@ -139,7 +154,9 @@ public class TestHashAggregationOperator
                         countBooleanColumn.bind(ImmutableList.of(4), Optional.empty(), Optional.empty(), 1.0)),
                 rowPagesBuilder.getHashChannel(),
                 100_000,
-                new DataSize(16, MEGABYTE));
+                new DataSize(16, MEGABYTE),
+                succinctBytes(memoryLimitBeforeSpill),
+                spillerFactory);
 
         MaterializedResult expected = resultBuilder(driverContext.getSession(), VARCHAR, BIGINT, BIGINT, DOUBLE, VARCHAR, BIGINT, BIGINT)
                 .row("0", 3L, 0L, 0.0, "300", 3L, 3L)
@@ -157,7 +174,7 @@ public class TestHashAggregationOperator
         assertOperatorEqualsIgnoreOrder(operatorFactory, driverContext, input, expected, hashEnabled, Optional.of(hashChannels.size()));
     }
 
-    @Test(dataProvider = "hashEnabledValues", expectedExceptions = ExceededMemoryLimitException.class, expectedExceptionsMessageRegExp = "Query exceeded local memory limit of 10B")
+    @Test(dataProvider = "hashEnabled", expectedExceptions = ExceededMemoryLimitException.class, expectedExceptionsMessageRegExp = "Query exceeded local memory limit of 10B")
     public void testMemoryLimit(boolean hashEnabled)
     {
         MetadataManager metadata = MetadataManager.createTestMetadataManager();
@@ -165,7 +182,7 @@ public class TestHashAggregationOperator
                 new Signature("max", AGGREGATE, parseTypeSignature(StandardTypes.VARCHAR), parseTypeSignature(StandardTypes.VARCHAR)));
 
         List<Integer> hashChannels = Ints.asList(1);
-        RowPagesBuilder rowPagesBuilder = rowPagesBuilder(hashEnabled, hashChannels, VARCHAR, VARCHAR, VARCHAR, BIGINT);
+        RowPagesBuilder rowPagesBuilder = rowPagesBuilder(hashEnabled, hashChannels, VARCHAR, BIGINT, VARCHAR, BIGINT);
         List<Page> input = rowPagesBuilder
                 .addSequencePage(10, 100, 0, 100, 0)
                 .addSequencePage(10, 100, 0, 200, 0)
@@ -179,7 +196,7 @@ public class TestHashAggregationOperator
         HashAggregationOperatorFactory operatorFactory = new HashAggregationOperatorFactory(
                 0,
                 new PlanNodeId("test"),
-                ImmutableList.of(VARCHAR),
+                ImmutableList.of(BIGINT),
                 hashChannels,
                 Step.SINGLE,
                 ImmutableList.of(COUNT.bind(ImmutableList.of(0), Optional.empty(), Optional.empty(), 1.0),
@@ -193,8 +210,8 @@ public class TestHashAggregationOperator
         toPages(operatorFactory, driverContext, input);
     }
 
-    @Test(dataProvider = "hashEnabledValues")
-    public void testHashBuilderResize(boolean hashEnabled)
+    @Test(dataProvider = "hashEnabledAndMemoryLimitBeforeSpillValues")
+    public void testHashBuilderResize(boolean hashEnabled, long memoryLimitBeforeSpill)
     {
         BlockBuilder builder = VARCHAR.createBlockBuilder(new BlockBuilderStatus(), 1, DEFAULT_MAX_BLOCK_SIZE_IN_BYTES);
         VARCHAR.writeSlice(builder, Slices.allocate(200_000)); // this must be larger than DEFAULT_MAX_BLOCK_SIZE, 64K
@@ -221,12 +238,14 @@ public class TestHashAggregationOperator
                 ImmutableList.of(COUNT.bind(ImmutableList.of(0), Optional.empty(), Optional.empty(), 1.0)),
                 rowPagesBuilder.getHashChannel(),
                 100_000,
-                new DataSize(16, MEGABYTE));
+                new DataSize(16, MEGABYTE),
+                succinctBytes(memoryLimitBeforeSpill),
+                spillerFactory);
 
         toPages(operatorFactory, driverContext, input);
     }
 
-    @Test(dataProvider = "hashEnabledValues", expectedExceptions = ExceededMemoryLimitException.class, expectedExceptionsMessageRegExp = "Query exceeded local memory limit of 3MB")
+    @Test(dataProvider = "hashEnabled", expectedExceptions = ExceededMemoryLimitException.class, expectedExceptionsMessageRegExp = "Query exceeded local memory limit of 3MB")
     public void testHashBuilderResizeLimit(boolean hashEnabled)
     {
         BlockBuilder builder = VARCHAR.createBlockBuilder(new BlockBuilderStatus(), 1, DEFAULT_MAX_BLOCK_SIZE_IN_BYTES);
@@ -259,7 +278,7 @@ public class TestHashAggregationOperator
         toPages(operatorFactory, driverContext, input);
     }
 
-    @Test(dataProvider = "hashEnabledValues")
+    @Test(dataProvider = "hashEnabled")
     public void testMultiSliceAggregationOutput(boolean hashEnabled)
     {
         // estimate the number of entries required to create 1.5 pages of results
@@ -283,13 +302,15 @@ public class TestHashAggregationOperator
                         LONG_AVERAGE.bind(ImmutableList.of(1), Optional.empty(), Optional.empty(), 1.0)),
                 rowPagesBuilder.getHashChannel(),
                 100_000,
-                new DataSize(16, MEGABYTE));
+                new DataSize(16, MEGABYTE),
+                new DataSize(0, MEGABYTE),
+                spillerFactory);
 
         assertEquals(toPages(operatorFactory, driverContext, input).size(), 2);
     }
 
-    @Test(dataProvider = "hashEnabledValues")
-    public void testMultiplePartialFlushes(boolean hashEnabled)
+    @Test(dataProvider = "hashEnabledAndMemoryLimitBeforeSpillValues")
+    public void testMultiplePartialFlushes(boolean hashEnabled, long memoryLimitBeforeSpill)
             throws Exception
     {
         List<Integer> hashChannels = Ints.asList(0);
@@ -310,58 +331,91 @@ public class TestHashAggregationOperator
                 ImmutableList.of(LONG_SUM.bind(ImmutableList.of(0), Optional.empty(), Optional.empty(), 1.0)),
                 rowPagesBuilder.getHashChannel(),
                 100_000,
-                new DataSize(16, MEGABYTE));
+                new DataSize(16, MEGABYTE),
+                succinctBytes(memoryLimitBeforeSpill),
+                spillerFactory);
 
         DriverContext driverContext = createTaskContext(executor, TEST_SESSION, new DataSize(1, Unit.KILOBYTE))
                 .addPipelineContext(true, true)
                 .addDriverContext();
-        Operator operator = operatorFactory.createOperator(driverContext);
 
-        List<Page> expectedPages = rowPagesBuilder(BIGINT, BIGINT)
-                .addSequencePage(2000, 0, 0)
-                .build();
-        MaterializedResult expected = resultBuilder(driverContext.getSession(), BIGINT, BIGINT)
-                .pages(expectedPages)
-                .build();
+        try (Operator operator = operatorFactory.createOperator(driverContext)) {
+            List<Page> expectedPages = rowPagesBuilder(BIGINT, BIGINT)
+                    .addSequencePage(2000, 0, 0)
+                    .build();
+            MaterializedResult expected = resultBuilder(driverContext.getSession(), BIGINT, BIGINT)
+                    .pages(expectedPages)
+                    .build();
 
-        Iterator<Page> inputIterator = input.iterator();
+            Iterator<Page> inputIterator = input.iterator();
 
-        // Fill up the aggregation
-        while (operator.needsInput() && inputIterator.hasNext()) {
-            operator.addInput(inputIterator.next());
-        }
-
-        // Drain the output (partial flush)
-        List<Page> outputPages = new ArrayList<>();
-        while (true) {
-            Page output = operator.getOutput();
-            if (output == null) {
-                break;
+            // Fill up the aggregation
+            while (operator.needsInput() && inputIterator.hasNext()) {
+                operator.addInput(inputIterator.next());
             }
-            outputPages.add(output);
+
+            // Drain the output (partial flush)
+            List<Page> outputPages = new ArrayList<>();
+            while (true) {
+                Page output = operator.getOutput();
+                if (output == null) {
+                    break;
+                }
+                outputPages.add(output);
+            }
+
+            // There should be some pages that were drained
+            assertTrue(!outputPages.isEmpty());
+
+            // The operator need input again since this was a partial flush
+            assertTrue(operator.needsInput());
+
+            // Now, drive the operator to completion
+            outputPages.addAll(toPages(operator, inputIterator));
+
+            MaterializedResult actual;
+            if (hashEnabled) {
+                // Drop the hashChannel for all pages
+                List<Page> actualPages = dropChannel(outputPages, hashChannels);
+                List<Type> expectedTypes = without(operator.getTypes(), hashChannels);
+                actual = toMaterializedResult(operator.getOperatorContext().getSession(), expectedTypes, actualPages);
+            }
+            else {
+                actual = toMaterializedResult(operator.getOperatorContext().getSession(), operator.getTypes(), outputPages);
+            }
+
+            assertEquals(actual.getTypes(), expected.getTypes());
+            assertEqualsIgnoreOrder(actual.getMaterializedRows(), expected.getMaterializedRows());
         }
+    }
 
-        // There should be some pages that were drained
-        assertTrue(!outputPages.isEmpty());
+    private static class DummySpillerFactory implements SpillerFactory
+    {
+        @Override
+        public Spiller create(List<Type> types)
+        {
+            return new Spiller()
+            {
+                private final List<Iterator<Page>> spills = new ArrayList<>();
 
-        // The operator need input again since this was a partial flush
-        assertTrue(operator.needsInput());
+                @Override
+                public CompletableFuture<?> spill(Iterator<Page> pageIterator)
+                {
+                    spills.add(pageIterator);
+                    return CompletableFuture.completedFuture(null);
+                }
 
-        // Now, drive the operator to completion
-        outputPages.addAll(toPages(operator, inputIterator));
+                @Override
+                public List<Iterator<Page>> getSpills()
+                {
+                    return spills;
+                }
 
-        MaterializedResult actual;
-        if (hashEnabled) {
-            // Drop the hashChannel for all pages
-            List<Page> actualPages = dropChannel(outputPages, hashChannels);
-            List<Type> expectedTypes = without(operator.getTypes(), hashChannels);
-            actual = toMaterializedResult(operator.getOperatorContext().getSession(), expectedTypes, actualPages);
+                @Override
+                public void close()
+                {
+                }
+            };
         }
-        else {
-            actual = toMaterializedResult(operator.getOperatorContext().getSession(), operator.getTypes(), outputPages);
-        }
-
-        assertEquals(actual.getTypes(), expected.getTypes());
-        assertEqualsIgnoreOrder(actual.getMaterializedRows(), expected.getMaterializedRows());
     }
 }

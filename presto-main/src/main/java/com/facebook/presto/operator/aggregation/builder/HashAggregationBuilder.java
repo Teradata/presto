@@ -29,4 +29,6 @@ public interface HashAggregationBuilder
 
     @Override
     void close();
+
+    boolean isBusy();
 }
