@@ -116,6 +116,9 @@ public class LdapFilter
             try {
                 String user = credentials.get(0);
                 String password = credentials.get(1);
+                if (user.isEmpty() || password.isEmpty()) {
+                    throw new AuthenticationException("Authentication failed. Username or Password is empty");
+                }
 
                 Hashtable<String, String> environment = getBasicEnvironment();
                 String principal = ldapBinder.getBindDistinguishedName(user);
