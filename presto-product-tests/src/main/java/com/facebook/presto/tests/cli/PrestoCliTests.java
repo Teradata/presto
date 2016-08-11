@@ -273,6 +273,15 @@ public class PrestoCliTests
         assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("statusMessage=Unauthorized")));
     }
 
+   @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailQueryForEmptyUser()
+            throws IOException, InterruptedException
+    {
+        ldapUserName = "";
+        launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Authentication failed. Username or Password is empty")));
+    }
+
     @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
     public void shouldFailQueryForLdapWithoutHttps()
             throws IOException, InterruptedException
