@@ -334,7 +334,7 @@ public class PruneUnreferencedOutputs
                     .addAll(node.getPartitionBy())
                     .addAll(node.getOrderBy());
 
-            for (WindowNode.Frame frame : node.getFrames().values()) {
+            for (WindowNode.Frame frame : node.getFrames()) {
                 if (frame.getStartValue().isPresent()) {
                     expectedInputs.add(frame.getStartValue().get());
                 }
@@ -347,10 +347,10 @@ public class PruneUnreferencedOutputs
                 expectedInputs.add(node.getHashSymbol().get());
             }
 
-            ImmutableMap.Builder<Symbol, WindowNode.FunctionWithFrame> functionsBuilder = ImmutableMap.builder();
-            for (Map.Entry<Symbol, WindowNode.FunctionWithFrame> entry : node.getWindowFunctions().entrySet()) {
+            ImmutableMap.Builder<Symbol, WindowNode.Function> functionsBuilder = ImmutableMap.builder();
+            for (Map.Entry<Symbol, WindowNode.Function> entry : node.getWindowFunctions().entrySet()) {
                 Symbol symbol = entry.getKey();
-                WindowNode.Function function = entry.getValue().getFunction();
+                WindowNode.Function function = entry.getValue();
 
                 if (context.get().contains(symbol)) {
                     FunctionCall call = function.getFunctionCall();
@@ -362,7 +362,7 @@ public class PruneUnreferencedOutputs
 
             PlanNode source = context.rewrite(node.getSource(), expectedInputs.build());
 
-            Map<Symbol, WindowNode.FunctionWithFrame> functions = functionsBuilder.build();
+            Map<Symbol, WindowNode.Function> functions = functionsBuilder.build();
 
             if (functions.size() == 0) {
                 return source;

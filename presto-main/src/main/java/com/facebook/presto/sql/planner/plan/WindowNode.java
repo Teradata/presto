@@ -19,6 +19,7 @@ import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.tree.FrameBound;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.WindowFrame;
+import com.facebook.presto.util.ImmutableCollectors;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
@@ -45,7 +46,7 @@ public class WindowNode
     private final Set<Symbol> prePartitionedInputs;
     private final Specification specification;
     private final int preSortedOrderPrefix;
-    private final Map<Symbol, FunctionWithFrame> windowFunctions;
+    private final Map<Symbol, Function> windowFunctions;
     private final Optional<Symbol> hashSymbol;
 
     @JsonCreator
@@ -53,7 +54,7 @@ public class WindowNode
             @JsonProperty("id") PlanNodeId id,
             @JsonProperty("source") PlanNode source,
             @JsonProperty("specification") Specification specification,
-            @JsonProperty("windowFunctions") Map<Symbol, FunctionWithFrame> windowFunctions,
+            @JsonProperty("windowFunctions") Map<Symbol, Function> windowFunctions,
             @JsonProperty("hashSymbol") Optional<Symbol> hashSymbol,
             @JsonProperty("prePartitionedInputs") Set<Symbol> prePartitionedInputs,
             @JsonProperty("preSortedOrderPrefix") int preSortedOrderPrefix)
@@ -116,18 +117,16 @@ public class WindowNode
     }
 
     @JsonProperty
-    public Map<Symbol, FunctionWithFrame> getWindowFunctions()
+    public Map<Symbol, Function> getWindowFunctions()
     {
         return windowFunctions;
     }
 
-    public Map<Function, Frame> getFrames()
+    public List<Frame> getFrames()
     {
-        ImmutableMap.Builder<Function, Frame> builder = ImmutableMap.builder();
-        for (FunctionWithFrame functionWithFrame : windowFunctions.values()) {
-            builder.put(functionWithFrame.getFunction(), functionWithFrame.getFrame());
-        }
-        return builder.build();
+        return windowFunctions.values().stream()
+                .map(WindowNode.Function::getFrame)
+                .collect(ImmutableCollectors.toImmutableList());
     }
 
     @JsonProperty
@@ -303,14 +302,17 @@ public class WindowNode
     {
         private final FunctionCall functionCall;
         private final Signature signature;
+        private final Frame frame;
 
         @JsonCreator
         public Function(
                 @JsonProperty("functionCall") FunctionCall functionCall,
-                @JsonProperty("signature") Signature signature)
+                @JsonProperty("signature") Signature signature,
+                @JsonProperty("frame") Frame frame)
         {
             this.functionCall = requireNonNull(functionCall, "functionCall is null");
             this.signature = requireNonNull(signature, "Signature is null');");
+            this.frame = requireNonNull(frame, "Frame is null');");
         }
 
         @JsonProperty
@@ -323,6 +325,12 @@ public class WindowNode
         public Signature getSignature()
         {
             return signature;
+        }
+
+        @JsonProperty
+        public Frame getFrame()
+        {
+            return frame;
         }
 
         @Override
@@ -343,54 +351,6 @@ public class WindowNode
             Function other = (Function) obj;
             return Objects.equals(this.functionCall, other.functionCall) &&
                     Objects.equals(this.signature, other.signature);
-        }
-    }
-
-    @Immutable
-    public static class FunctionWithFrame
-    {
-        private final Function function;
-        private final Frame frame;
-
-        @JsonCreator
-        public FunctionWithFrame(
-                @JsonProperty("function") Function function,
-                @JsonProperty("frame") Frame frame)
-        {
-            this.function = requireNonNull(function, "function is null");
-            this.frame = requireNonNull(frame, "frame is null");
-        }
-
-        @JsonProperty
-        public Function getFunction()
-        {
-            return function;
-        }
-
-        @JsonProperty
-        public Frame getFrame()
-        {
-            return frame;
-        }
-
-        @Override
-        public int hashCode()
-        {
-            return Objects.hash(function, frame);
-        }
-
-        @Override
-        public boolean equals(Object obj)
-        {
-            if (this == obj) {
-                return true;
-            }
-            if (obj == null || getClass() != obj.getClass()) {
-                return false;
-            }
-            FunctionWithFrame other = (FunctionWithFrame) obj;
-            return Objects.equals(this.function, other.function) &&
-                    Objects.equals(this.frame, other.frame);
         }
     }
 }

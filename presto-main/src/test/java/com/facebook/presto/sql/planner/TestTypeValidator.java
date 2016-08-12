@@ -158,7 +158,7 @@ public class TestTypeValidator
                 FrameBound.Type.UNBOUNDED_FOLLOWING,
                 Optional.empty());
 
-        WindowNode.FunctionWithFrame function = new WindowNode.FunctionWithFrame(new WindowNode.Function(functionCall, signature), frame);
+        WindowNode.Function function = new WindowNode.Function(functionCall, signature, frame);
 
         WindowNode.Specification specification = new WindowNode.Specification(ImmutableList.of(), ImmutableList.of(), ImmutableMap.of());
 
@@ -324,7 +324,7 @@ public class TestTypeValidator
                 FrameBound.Type.UNBOUNDED_FOLLOWING,
                 Optional.empty());
 
-        WindowNode.FunctionWithFrame function = new WindowNode.FunctionWithFrame(new WindowNode.Function(functionCall, signature), frame);
+        WindowNode.Function function = new WindowNode.Function(functionCall, signature, frame);
 
         WindowNode.Specification specification = new WindowNode.Specification(ImmutableList.of(), ImmutableList.of(), ImmutableMap.of());
 
@@ -362,7 +362,7 @@ public class TestTypeValidator
                 FrameBound.Type.UNBOUNDED_FOLLOWING,
                 Optional.empty());
 
-        WindowNode.FunctionWithFrame function = new WindowNode.FunctionWithFrame(new WindowNode.Function(functionCall, signature), frame);
+        WindowNode.Function function = new WindowNode.Function(functionCall, signature, frame);
 
         WindowNode.Specification specification = new WindowNode.Specification(ImmutableList.of(), ImmutableList.of(), ImmutableMap.of());
 
