@@ -317,7 +317,7 @@ public class IndexJoinOptimizer
         public PlanNode visitWindow(WindowNode node, RewriteContext<Context> context)
         {
             if (!node.getWindowFunctions().values().stream()
-                    .map(f -> f.getFunction().getFunctionCall().getName())
+                    .map(f -> f.getFunctionCall().getName())
                     .allMatch(metadata.getFunctionRegistry()::isAggregationFunction)) {
                 return node;
             }

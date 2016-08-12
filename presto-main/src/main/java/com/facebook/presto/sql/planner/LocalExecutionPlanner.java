@@ -675,7 +675,7 @@ public class LocalExecutionPlanner
 
             ImmutableList.Builder<WindowFunctionDefinition> windowFunctionsBuilder = ImmutableList.builder();
             ImmutableList.Builder<Symbol> windowFunctionOutputSymbolsBuilder = ImmutableList.builder();
-            for (Map.Entry<Symbol, WindowNode.FunctionWithFrame> entry : node.getWindowFunctions().entrySet()) {
+            for (Map.Entry<Symbol, WindowNode.Function> entry : node.getWindowFunctions().entrySet()) {
                 Optional<Integer> frameStartChannel = Optional.empty();
                 Optional<Integer> frameEndChannel = Optional.empty();
 
@@ -689,8 +689,8 @@ public class LocalExecutionPlanner
 
                 FrameInfo frameInfo = new FrameInfo(frame.getType(), frame.getStartType(), frameStartChannel, frame.getEndType(), frameEndChannel);
 
-                FunctionCall functionCall = entry.getValue().getFunction().getFunctionCall();
-                Signature signature = entry.getValue().getFunction().getSignature();
+                FunctionCall functionCall = entry.getValue().getFunctionCall();
+                Signature signature = entry.getValue().getSignature();
                 ImmutableList.Builder<Integer> arguments = ImmutableList.builder();
                 for (Expression argument : functionCall.getArguments()) {
                     Symbol argumentSymbol = Symbol.from(argument);
