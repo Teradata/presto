@@ -33,8 +33,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
-import static com.facebook.presto.util.ImmutableCollectors.toImmutableMap;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.concat;
 import static java.util.Objects.requireNonNull;
@@ -47,19 +45,18 @@ public class WindowNode
     private final Set<Symbol> prePartitionedInputs;
     private final Specification specification;
     private final int preSortedOrderPrefix;
-    private final Map<Symbol, Function> windowFunctions;
-    private final Map<Function, Frame> frames;
+    private final Map<Symbol, FunctionWithFrame> windowFunctions;
     private final Optional<Symbol> hashSymbol;
 
+    @JsonCreator
     public WindowNode(
-            PlanNodeId id,
-            PlanNode source,
-            Specification specification,
-            Map<Symbol, Function> windowFunctions,
-            Map<Function, Frame> frames,
-            Optional<Symbol> hashSymbol,
-            Set<Symbol> prePartitionedInputs,
-            int preSortedOrderPrefix)
+            @JsonProperty("id") PlanNodeId id,
+            @JsonProperty("source") PlanNode source,
+            @JsonProperty("specification") Specification specification,
+            @JsonProperty("windowFunctions") Map<Symbol, FunctionWithFrame> windowFunctions,
+            @JsonProperty("hashSymbol") Optional<Symbol> hashSymbol,
+            @JsonProperty("prePartitionedInputs") Set<Symbol> prePartitionedInputs,
+            @JsonProperty("preSortedOrderPrefix") int preSortedOrderPrefix)
     {
         super(id);
 
@@ -70,34 +67,13 @@ public class WindowNode
         checkArgument(specification.getPartitionBy().containsAll(prePartitionedInputs), "prePartitionedInputs must be contained in partitionBy");
         checkArgument(preSortedOrderPrefix <= specification.getOrderBy().size(), "Cannot have sorted more symbols than those requested");
         checkArgument(preSortedOrderPrefix == 0 || ImmutableSet.copyOf(prePartitionedInputs).equals(ImmutableSet.copyOf(specification.getPartitionBy())), "preSortedOrderPrefix can only be greater than zero if all partition symbols are pre-partitioned");
-        checkArgument(allFunctionsHaveFrames(windowFunctions, frames), "not all functions have frames assigned");
 
         this.source = source;
         this.prePartitionedInputs = ImmutableSet.copyOf(prePartitionedInputs);
         this.specification = specification;
         this.windowFunctions = ImmutableMap.copyOf(windowFunctions);
-        this.frames = ImmutableMap.copyOf(frames);
         this.hashSymbol = hashSymbol;
         this.preSortedOrderPrefix = preSortedOrderPrefix;
-    }
-
-    @JsonCreator
-    public WindowNode(
-            @JsonProperty("id") PlanNodeId id,
-            @JsonProperty("source") PlanNode source,
-            @JsonProperty("specification") Specification specification,
-            @JsonProperty("windowFunctions") Map<Symbol, Function> windowFunctions,
-            @JsonProperty("frames") List<FunctionWithFrame> frames,
-            @JsonProperty("hashSymbol") Optional<Symbol> hashSymbol,
-            @JsonProperty("prePartitionedInputs") Set<Symbol> prePartitionedInputs,
-            @JsonProperty("preSortedOrderPrefix") int preSortedOrderPrefix)
-    {
-        this(id, source, specification, windowFunctions, frames.stream().collect(toImmutableMap(f -> f.getFunction(), f -> f.getFrame())), hashSymbol, prePartitionedInputs, preSortedOrderPrefix);
-    }
-
-    private static boolean allFunctionsHaveFrames(Map<Symbol, Function> windowFunctions, Map<Function, Frame> frames)
-    {
-        return windowFunctions.values().stream().filter(f -> frames.containsKey(f)).count() == windowFunctions.size();
     }
 
     @Override
@@ -140,20 +116,18 @@ public class WindowNode
     }
 
     @JsonProperty
-    public Map<Symbol, Function> getWindowFunctions()
+    public Map<Symbol, FunctionWithFrame> getWindowFunctions()
     {
         return windowFunctions;
     }
 
-    @JsonProperty("frames")
-    public List<FunctionWithFrame> getFunctionWithFrame()
-    {
-        return frames.entrySet().stream().map(e -> new FunctionWithFrame(e.getKey(), e.getValue())).collect(toImmutableList());
-    }
-
     public Map<Function, Frame> getFrames()
     {
-        return frames;
+        ImmutableMap.Builder<Function, Frame> builder = ImmutableMap.builder();
+        for (FunctionWithFrame functionWithFrame : windowFunctions.values()) {
+            builder.put(functionWithFrame.getFunction(), functionWithFrame.getFrame());
+        }
+        return builder.build();
     }
 
     @JsonProperty
@@ -383,8 +357,8 @@ public class WindowNode
                 @JsonProperty("function") Function function,
                 @JsonProperty("frame") Frame frame)
         {
-            this.function = function;
-            this.frame = frame;
+            this.function = requireNonNull(function, "function is null");
+            this.frame = requireNonNull(frame, "frame is null");
         }
 
         @JsonProperty
