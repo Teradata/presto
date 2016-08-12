@@ -19,6 +19,7 @@ import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.tree.FrameBound;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.WindowFrame;
+import com.facebook.presto.util.ImmutableCollectors;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableList;
@@ -123,11 +124,9 @@ public class WindowNode
 
     public List<Frame> getFrames()
     {
-        ImmutableList.Builder<Frame> builder = ImmutableList.builder();
-        for (Function function : windowFunctions.values()) {
-            builder.add(function.getFrame());
-        }
-        return builder.build();
+        return windowFunctions.values().stream()
+                .map(WindowNode.Function::getFrame)
+                .collect(ImmutableCollectors.toImmutableList());
     }
 
     @JsonProperty
