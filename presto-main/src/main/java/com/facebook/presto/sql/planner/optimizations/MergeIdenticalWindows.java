@@ -97,7 +97,7 @@ public class MergeIdenticalWindows
         {
             checkState(!node.getHashSymbol().isPresent(), "MergeIdenticalWindows should be run before HashGenerationOptimizer");
             checkState(node.getPrePartitionedInputs().isEmpty() && node.getPreSortedOrderPrefix() == 0, "MergeIdenticalWindows should be run before AddExchanges");
-            checkState(node.getFrames().values().size() == 1, "More than one frame per WindowNode is not yet supported");
+            checkState(node.getWindowFunctions().values().size() == 1, "More than one frame per WindowNode is not yet supported");
 
             return context.rewrite(
                     node.getSource(),
@@ -110,7 +110,6 @@ public class MergeIdenticalWindows
         private static WindowNode collapseWindows(PlanNode source, SpecificationAndFrame specification, Collection<WindowNode> windows)
         {
             WindowNode canonical = windows.iterator().next();
-            WindowNode.Frame frame = canonical.getFrames().values().iterator().next(); // asserted in #visitWindow already
             return new WindowNode(
                     canonical.getId(),
                     source,
@@ -119,10 +118,6 @@ public class MergeIdenticalWindows
                             .map(WindowNode::getWindowFunctions)
                             .flatMap(map -> map.entrySet().stream())
                             .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)),
-                    windows.stream()
-                            .map(WindowNode::getWindowFunctions)
-                            .flatMap(map -> map.entrySet().stream())
-                            .collect(Collectors.toMap(Map.Entry::getValue, ignore -> frame)),
                     canonical.getHashSymbol(),
                     canonical.getPrePartitionedInputs(),
                     canonical.getPreSortedOrderPrefix());
@@ -142,7 +137,7 @@ public class MergeIdenticalWindows
             SpecificationAndFrame(WindowNode node)
             {
                 this(node.getSpecification(),
-                        node.getFrames().values().iterator().next()); // asserted in #visitWindow already
+                        node.getWindowFunctions().values().iterator().next().getFrame()); // asserted in #visitWindow already
             }
 
             @Override

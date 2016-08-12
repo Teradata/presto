@@ -330,7 +330,7 @@ public class IndexJoinOptimizer
             // Only RANGE frame type currently supported for aggregation functions because it guarantees the
             // same value for each peer group.
             // ROWS frame type requires the ordering to be fully deterministic (e.g. deterministically sorted on all columns)
-            if (node.getFrames().values().stream().anyMatch(f -> f.getType() != WindowFrame.Type.RANGE)) { // TODO: extract frames of type RANGE and allow optimization on them
+            if (node.getWindowFunctions().values().stream().anyMatch(f -> f.getFrame().getType() != WindowFrame.Type.RANGE)) { // TODO: extract frames of type RANGE and allow optimization on them
                 return node;
             }
 
