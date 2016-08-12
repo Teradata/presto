@@ -202,21 +202,22 @@ public class UnaliasSymbolReferences
         {
             PlanNode source = context.rewrite(node.getSource());
 
-            ImmutableMap.Builder<Symbol, WindowNode.Function> functions = ImmutableMap.builder();
+            ImmutableMap.Builder<Symbol, WindowNode.FunctionWithFrame> functions = ImmutableMap.builder();
             ImmutableMap.Builder<WindowNode.Function, WindowNode.Frame> frames = ImmutableMap.builder();
-            for (Map.Entry<Symbol, WindowNode.Function> entry : node.getWindowFunctions().entrySet()) {
+            for (Map.Entry<Symbol, WindowNode.FunctionWithFrame> entry : node.getWindowFunctions().entrySet()) {
                 Symbol symbol = entry.getKey();
                 Symbol canonical = canonicalize(symbol);
 
-                FunctionCall functionCall = entry.getValue().getFunctionCall();
-                Signature signature = entry.getValue().getSignature();
-                WindowNode.Function function = new WindowNode.Function((FunctionCall) canonicalize(functionCall), signature);
-                functions.put(canonical, function);
+                FunctionCall functionCall = entry.getValue().getFunction().getFunctionCall();
+                Signature signature = entry.getValue().getFunction().getSignature();
+                WindowNode.Function canonicalFunction = new WindowNode.Function((FunctionCall) canonicalize(functionCall), signature);
 
-                WindowNode.Frame frame = node.getFrames().get(entry.getValue());
-                frames.put(function, new WindowNode.Frame(frame.getType(),
+                WindowNode.Frame frame = entry.getValue().getFrame();
+                WindowNode.Frame canonicalFrame = new WindowNode.Frame(frame.getType(),
                         frame.getStartType(), canonicalize(frame.getStartValue()),
-                        frame.getEndType(), canonicalize(frame.getEndValue())));
+                        frame.getEndType(), canonicalize(frame.getEndValue()));
+
+                functions.put(canonical, new WindowNode.FunctionWithFrame(canonicalFunction, canonicalFrame));
             }
 
             ImmutableMap.Builder<Symbol, SortOrder> orderings = ImmutableMap.builder();
@@ -232,7 +233,6 @@ public class UnaliasSymbolReferences
                             canonicalizeAndDistinct(node.getOrderBy()),
                             orderings.build()),
                     functions.build(),
-                    frames.build(),
                     canonicalize(node.getHashSymbol()),
                     canonicalize(node.getPrePartitionedInputs()),
                     node.getPreSortedOrderPrefix());

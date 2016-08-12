@@ -136,11 +136,11 @@ public final class TypeValidator
             return null;
         }
 
-        private void checkSignatureAndCall(Map<Symbol, WindowNode.Function> functions)
+        private void checkSignatureAndCall(Map<Symbol, WindowNode.FunctionWithFrame> functions)
         {
-            for (Map.Entry<Symbol, WindowNode.Function> entry : functions.entrySet()) {
-                Signature signature = entry.getValue().getSignature();
-                FunctionCall call = entry.getValue().getFunctionCall();
+            for (Map.Entry<Symbol, WindowNode.FunctionWithFrame> entry : functions.entrySet()) {
+                Signature signature = entry.getValue().getFunction().getSignature();
+                FunctionCall call = entry.getValue().getFunction().getFunctionCall();
 
                 checkSignature(entry.getKey(), signature);
                 checkCall(entry.getKey(), call);

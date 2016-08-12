@@ -46,7 +46,7 @@ final class WindowMatcher
         }
 
         WindowNode windowNode = (WindowNode) node;
-        List<FunctionCall> actualCalls = windowNode.getWindowFunctions().values().stream().map(f -> f.getFunctionCall()).collect(Collectors.toList());
+        List<FunctionCall> actualCalls = windowNode.getWindowFunctions().values().stream().map(f -> f.getFunction().getFunctionCall()).collect(Collectors.toList());
 
         if (actualCalls.size() != functionCalls.size()) {
             return false;
