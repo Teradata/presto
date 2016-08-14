@@ -48,11 +48,11 @@ public class TestUnscaledDecimal128Arithmetic
     @Test
     public void testUnscaledBigIntegerToDecimal()
     {
-        assertconvertsUnscaledBigIntegerToDecimal(MAX_DECIMAL_UNSCALED_VALUE);
-        assertconvertsUnscaledBigIntegerToDecimal(MIN_DECIMAL_UNSCALED_VALUE);
-        assertconvertsUnscaledBigIntegerToDecimal(BigInteger.ZERO);
-        assertconvertsUnscaledBigIntegerToDecimal(BigInteger.ONE);
-        assertconvertsUnscaledBigIntegerToDecimal(BigInteger.ONE.negate());
+        assertConvertsUnscaledBigIntegerToDecimal(MAX_DECIMAL_UNSCALED_VALUE);
+        assertConvertsUnscaledBigIntegerToDecimal(MIN_DECIMAL_UNSCALED_VALUE);
+        assertConvertsUnscaledBigIntegerToDecimal(BigInteger.ZERO);
+        assertConvertsUnscaledBigIntegerToDecimal(BigInteger.ONE);
+        assertConvertsUnscaledBigIntegerToDecimal(BigInteger.ONE.negate());
     }
 
     @Test
@@ -293,7 +293,7 @@ public class TestUnscaledDecimal128Arithmetic
         assertEquals(compare(left.getLong(0), left.getLong(SIZE_OF_LONG), right.getLong(0), right.getLong(SIZE_OF_LONG)), expectedResult);
     }
 
-    private static void assertconvertsUnscaledBigIntegerToDecimal(BigInteger value)
+    private static void assertConvertsUnscaledBigIntegerToDecimal(BigInteger value)
     {
         assertEquals(unscaledDecimalToBigInteger(unscaledDecimal(value)), value);
     }
