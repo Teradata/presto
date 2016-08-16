@@ -53,6 +53,7 @@ public final class TestGroups
     public static final String AUTHORIZATION = "authorization";
     public static final String HIVE_1_1_0 = "hive_1_1_0";
     public static final String PREPARED_STATEMENTS = "prepared_statements";
+    public static final String LDAP = "ldap";
 
     private TestGroups() {}
 }
