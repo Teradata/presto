@@ -15,6 +15,7 @@ package com.facebook.presto.operator.aggregation;
 
 import com.facebook.presto.operator.aggregation.state.LongDecimalWithOverflowState;
 import com.facebook.presto.operator.aggregation.state.LongDecimalWithOverflowStateFactory;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.VariableWidthBlockBuilder;
@@ -25,9 +26,11 @@ import org.testng.annotations.Test;
 
 import java.math.BigInteger;
 
+import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.type.DecimalType.createDecimalType;
 import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.unscaledDecimal;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 public class TestDecimalSumAggregation
 {
@@ -120,14 +123,20 @@ public class TestDecimalSumAggregation
         assertEquals(state.getLongDecimal(), unscaledDecimal(TWO.pow(126).negate()));
     }
 
-    @Test(expectedExceptions = ArithmeticException.class)
+    @Test
     public void testOverflowOnOutput()
     {
         addToState(state, TWO.pow(126));
         addToState(state, TWO.pow(126));
 
         assertEquals(state.getOverflow(), 1);
-        DecimalSumAggregation.outputLongDecimal(TYPE, state, new VariableWidthBlockBuilder(new BlockBuilderStatus(), 10, 10));
+        try {
+            DecimalSumAggregation.outputLongDecimal(TYPE, state, new VariableWidthBlockBuilder(new BlockBuilderStatus(), 10, 10));
+            fail("failure expected");
+        }
+        catch (PrestoException e) {
+            assertEquals(e.getErrorCode(), NUMERIC_VALUE_OUT_OF_RANGE.toErrorCode());
+        }
     }
 
     private static void addToState(LongDecimalWithOverflowState state, BigInteger value)

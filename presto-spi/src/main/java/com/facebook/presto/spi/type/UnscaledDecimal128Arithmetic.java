@@ -24,6 +24,7 @@ import java.math.BigInteger;
 import java.nio.ByteOrder;
 
 import static com.facebook.presto.spi.StandardErrorCode.DIVISION_BY_ZERO;
+import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.type.Decimals.MAX_PRECISION;
 import static com.facebook.presto.spi.type.Decimals.longTenToNth;
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
@@ -779,7 +780,7 @@ public final class UnscaledDecimal128Arithmetic
 
     public static void throwOverflowException()
     {
-        throw new ArithmeticException("Decimal overflow");
+        throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, "Decimal overflow");
     }
 
     private static boolean exceedsOrEqualTenToThirtyEight(int v0, int v1, int v2, int v3)
