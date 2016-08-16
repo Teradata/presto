@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.spi.type;
 
+import com.facebook.presto.spi.PrestoException;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.slice.XxHash64;
@@ -22,6 +23,7 @@ import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.nio.ByteOrder;
 
+import static com.facebook.presto.spi.StandardErrorCode.DIVISION_BY_ZERO;
 import static com.facebook.presto.spi.type.Decimals.MAX_PRECISION;
 import static com.facebook.presto.spi.type.Decimals.longTenToNth;
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
@@ -680,6 +682,11 @@ public final class UnscaledDecimal128Arithmetic
     // visible for testing
     static int divide(Slice decimal, int divisor, Slice result)
     {
+        if (divisor == 0) {
+            throwDivisionByZeroException();
+        }
+        checkArgument(divisor > 0);
+
         long remainder = getLong(decimal, 1);
         long hi = remainder / divisor;
         remainder %= divisor;
@@ -693,6 +700,11 @@ public final class UnscaledDecimal128Arithmetic
 
         pack(result, z0, z1, hi, isNegative(decimal));
         return (int) (remainder % divisor);
+    }
+
+    private static void throwDivisionByZeroException()
+    {
+        throw new PrestoException(DIVISION_BY_ZERO, "Division by zero");
     }
 
     private static void incrementUnsafe(Slice decimal)
@@ -868,6 +880,13 @@ public final class UnscaledDecimal128Arithmetic
     private static void setRawLong(Slice decimal, int index, long value)
     {
         unsafe.putLong(decimal.getBase(), decimal.getAddress() + SIZE_OF_LONG * index, value);
+    }
+
+    private static void checkArgument(boolean condition)
+    {
+        if (!condition) {
+            throw new IllegalArgumentException();
+        }
     }
 
     private UnscaledDecimal128Arithmetic() {}
