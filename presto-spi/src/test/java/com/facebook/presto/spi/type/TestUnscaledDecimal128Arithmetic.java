@@ -33,6 +33,7 @@ import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.multiply
 import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.negate;
 import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.overflows;
 import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.rescale;
+import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.shiftLeft;
 import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.shiftRight;
 import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.unscaledDecimal;
 import static com.facebook.presto.spi.type.UnscaledDecimal128Arithmetic.unscaledDecimalToBigInteger;
@@ -365,6 +366,21 @@ public class TestUnscaledDecimal128Arithmetic
     {
         assertEquals(hash(unscaledDecimal(0)), hash(negateConstructive(unscaledDecimal(0))));
         assertNotEquals(hash(unscaledDecimal(0)), unscaledDecimal(1));
+    }
+
+    @Test
+    public void testShiftLeft()
+            throws Exception
+    {
+        assertEquals(shiftLeft(wrappedLongArray(0x1234567890ABCDEFL, 0xEFDCBA0987654321L), 0), wrappedLongArray(0x1234567890ABCDEFL, 0xEFDCBA0987654321L));
+        assertEquals(shiftLeft(wrappedLongArray(0x1234567890ABCDEFL, 0xEFDCBA0987654321L), 1), wrappedLongArray(0x2468ACF121579BDEL, 0xDFB974130ECA8642L));
+        assertEquals(shiftLeft(wrappedLongArray(0x1234567890ABCDEFL, 0xEFDCBA0987654321L), 8), wrappedLongArray(0x34567890ABCDEF00L, 0xDCBA098765432112L));
+        assertEquals(shiftLeft(wrappedLongArray(0x1234567890ABCDEFL, 0xEFDCBA0987654321L), 16), wrappedLongArray(0x567890ABCDEF0000L, 0xBA09876543211234L));
+        assertEquals(shiftLeft(wrappedLongArray(0x1234567890ABCDEFL, 0xEFDCBA0987654321L), 32), wrappedLongArray(0x90ABCDEF00000000L, 0x8765432112345678L));
+        assertEquals(shiftLeft(wrappedLongArray(0x1234567890ABCDEFL, 0xEFDCBA0987654321L), 64), wrappedLongArray(0x0000000000000000L, 0x1234567890ABCDEFL));
+        assertEquals(shiftLeft(wrappedLongArray(0x1234567890ABCDEFL, 0xEFDCBA0987654321L), 64 + 8), wrappedLongArray(0x0000000000000000L, 0x34567890ABCDEF00L));
+        assertEquals(shiftLeft(wrappedLongArray(0x1234567890ABCDEFL, 0xEFDCBA0987654321L), 64 + 48), wrappedLongArray(0x0000000000000000L, 0xCDEF000000000000L));
+        assertEquals(shiftLeft(wrappedLongArray(0x1234567890ABCDEFL, 0xEFDCBA0987654321L), 64 + 63), wrappedLongArray(0x0000000000000000L, 0x8000000000000000L));
     }
 
     private static void assertUnscaledBigIntegerToDecimalOverflows(BigInteger value)
