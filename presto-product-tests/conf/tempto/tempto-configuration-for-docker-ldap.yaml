@@ -7,6 +7,6 @@ databases:
     cli_ldap_authentication: true
     cli_ldap_truststore_path: /etc/ldap/cacerts.jks
     cli_ldap_truststore_password: testldap
-    cli_ldap_user_name: ParentGroupUser
+    cli_ldap_user_name: DefaultGroupUser
     cli_ldap_user_password: LDAPPass123
     cli_ldap_server_address: https://${databases.presto.host}:8443
