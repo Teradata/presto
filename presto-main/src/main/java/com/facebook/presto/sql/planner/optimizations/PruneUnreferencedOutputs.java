@@ -334,7 +334,7 @@ public class PruneUnreferencedOutputs
                     .addAll(node.getPartitionBy())
                     .addAll(node.getOrderBy());
 
-            for (WindowNode.Frame frame : node.getFrames().values()) {
+            for (WindowNode.Frame frame : node.getFrames()) {
                 if (frame.getStartValue().isPresent()) {
                     expectedInputs.add(frame.getStartValue().get());
                 }
@@ -350,12 +350,13 @@ public class PruneUnreferencedOutputs
             ImmutableMap.Builder<Symbol, WindowNode.Function> functionsBuilder = ImmutableMap.builder();
             for (Map.Entry<Symbol, WindowNode.Function> entry : node.getWindowFunctions().entrySet()) {
                 Symbol symbol = entry.getKey();
+                WindowNode.Function function = entry.getValue();
 
                 if (context.get().contains(symbol)) {
-                    FunctionCall call = entry.getValue().getFunctionCall();
+                    FunctionCall call = function.getFunctionCall();
                     expectedInputs.addAll(DependencyExtractor.extractUnique(call));
 
-                    functionsBuilder.put(symbol, new WindowNode.Function(call, entry.getValue().getSignature()));
+                    functionsBuilder.put(symbol, entry.getValue());
                 }
             }
 
@@ -372,7 +373,6 @@ public class PruneUnreferencedOutputs
                     source,
                     node.getSpecification(),
                     functions,
-                    node.getFrames(),
                     node.getHashSymbol(),
                     node.getPrePartitionedInputs(),
                     node.getPreSortedOrderPrefix());
