@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
 import io.airlift.units.DataSize.Unit;
 
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -219,7 +220,7 @@ public class HashAggregationOperator
     @Override
     public Page getOutput()
     {
-        if (outputIterator == null || !outputIterator.hasNext()) {
+        if (outputIterator == null) {
             // current output iterator is done
             outputIterator = null;
 
@@ -234,15 +235,34 @@ public class HashAggregationOperator
             }
 
             outputIterator = aggregationBuilder.buildResult();
-            aggregationBuilder = null;
 
             if (!outputIterator.hasNext()) {
                 // current output iterator is done
-                outputIterator = null;
+                closeAggregationBuilder();
                 return null;
             }
         }
 
-        return outputIterator.next();
+        Page output = outputIterator.next();
+        if (!outputIterator.hasNext()) {
+            closeAggregationBuilder();
+        }
+        return output;
+    }
+
+    @Override
+    public void close()
+            throws IOException
+    {
+        closeAggregationBuilder();
+    }
+
+    private void closeAggregationBuilder()
+    {
+        outputIterator = null;
+        if (aggregationBuilder != null) {
+            aggregationBuilder.close();
+            aggregationBuilder = null;
+        }
     }
 }
