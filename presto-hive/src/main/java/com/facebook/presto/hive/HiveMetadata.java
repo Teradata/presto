@@ -1456,7 +1456,8 @@ public class HiveMetadata
                 nodePartitioning,
                 Optional.empty(),
                 discretePredicates,
-                ImmutableList.of());
+                ImmutableList.of()
+        );
     }
 
     @Override

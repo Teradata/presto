@@ -147,7 +147,8 @@ public class TpchMetadata
                 nodePartition,
                 partitioningColumns,
                 Optional.empty(),
-                localProperties);
+                localProperties
+        );
 
         return ImmutableList.of(new ConnectorTableLayoutResult(layout, constraint.getSummary()));
     }

@@ -187,7 +187,8 @@ public class MongoMetadata
                 Optional.empty(),
                 partitioningColumns,
                 Optional.empty(),
-                localProperties.build());
+                localProperties.build()
+        );
 
         return ImmutableList.of(new ConnectorTableLayoutResult(layout, constraint.getSummary()));
     }

@@ -301,7 +301,8 @@ public class RaptorMetadata
                         ImmutableList.copyOf(bucketColumnHandles))),
                 oneSplitPerBucket ? Optional.of(ImmutableSet.copyOf(bucketColumnHandles)) : Optional.empty(),
                 Optional.empty(),
-                ImmutableList.of());
+                ImmutableList.of()
+        );
     }
 
     @Override
