@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.spi.type;
 
+import com.facebook.presto.spi.PrestoException;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.slice.XxHash64;
@@ -21,7 +22,10 @@ import sun.misc.Unsafe;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.nio.ByteOrder;
+import java.util.Arrays;
 
+import static com.facebook.presto.spi.StandardErrorCode.DIVISION_BY_ZERO;
+import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
 import static com.facebook.presto.spi.type.Decimals.MAX_PRECISION;
 import static com.facebook.presto.spi.type.Decimals.longTenToNth;
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
@@ -46,7 +50,9 @@ public final class UnscaledDecimal128Arithmetic
     private static final int SIGN_INT_MASK = 1 << 31;
     private static final int SIGN_BYTE_MASK = 1 << 7;
     private static final int NUMBER_OF_LONGS = 2;
+    private static final int NUMBER_OF_INTS = 2 * NUMBER_OF_LONGS;
     private static final long ALL_BITS_SET_64 = 0xFFFFFFFFFFFFFFFFL;
+    private static final long INT_BASE = 1L << 32;
     /**
      * Mask to convert signed integer to unsigned long.
      */
@@ -377,6 +383,10 @@ public final class UnscaledDecimal128Arithmetic
 
     public static void multiply(Slice left, Slice right, Slice result)
     {
+        boolean fourIntsResultExpected = result.length() == NUMBER_OF_LONGS * Long.BYTES;
+        boolean eightIntsResultExpected = result.length() >= NUMBER_OF_LONGS * Long.BYTES * 2;
+        checkArgument(fourIntsResultExpected || eightIntsResultExpected);
+
         int l0 = getInt(left, 0);
         int l1 = getInt(left, 1);
         int l2 = getInt(left, 2);
@@ -388,48 +398,97 @@ public final class UnscaledDecimal128Arithmetic
         int r3 = getInt(right, 3);
 
         // the combinations below definitely result in an overflow
-        if ((r3 != 0 && (l3 | l2 | l1) != 0)
-                || (r2 != 0 && (l3 | l2) != 0)
-                || (r1 != 0 && l3 != 0)) {
+        if (fourIntsResultExpected && ((r3 != 0 && (l3 | l2 | l1) != 0) || (r2 != 0 && (l3 | l2) != 0) || (r1 != 0 && l3 != 0))) {
             throwOverflowException();
         }
 
-        long product;
+        int z0 = 0;
+        int z1 = 0;
+        int z2 = 0;
+        int z3 = 0;
+        int z4 = 0;
+        int z5 = 0;
+        int z6 = 0;
+        int z7 = 0;
 
-        product = (r0 & LONG_MASK) * (l0 & LONG_MASK);
-        int z0 = (int) product;
-
-        product = (r0 & LONG_MASK) * (l1 & LONG_MASK)
-                + (r1 & LONG_MASK) * (l0 & LONG_MASK)
-                + (product >> 32);
-        int z1 = (int) product;
-
-        product = (r0 & LONG_MASK) * (l2 & LONG_MASK)
-                + (r1 & LONG_MASK) * (l1 & LONG_MASK)
-                + (r2 & LONG_MASK) * (l0 & LONG_MASK)
-                + (product >> 32);
-        int z2 = (int) product;
-
-        product = (r0 & LONG_MASK) * (l3 & LONG_MASK)
-                + (r1 & LONG_MASK) * (l2 & LONG_MASK)
-                + (r2 & LONG_MASK) * (l1 & LONG_MASK)
-                + (r3 & LONG_MASK) * (l0 & LONG_MASK)
-                + (product >> 32);
-        int z3 = (int) product;
-        if ((product >>> 32) != 0) {
-            throwOverflowException();
+        if (l0 != 0) {
+            long accumulator = 0;
+            accumulator = (r0 & LONG_MASK) * (l0 & LONG_MASK) + (z0 & LONG_MASK) + (accumulator >>> 32);
+            z0 = (int) accumulator;
+            accumulator = (r1 & LONG_MASK) * (l0 & LONG_MASK) + (z1 & LONG_MASK) + (accumulator >>> 32);
+            z1 = (int) accumulator;
+            accumulator = (r2 & LONG_MASK) * (l0 & LONG_MASK) + (z2 & LONG_MASK) + (accumulator >>> 32);
+            z2 = (int) accumulator;
+            accumulator = (r3 & LONG_MASK) * (l0 & LONG_MASK) + (z3 & LONG_MASK) + (accumulator >>> 32);
+            z3 = (int) accumulator;
+            z4 = (int) (accumulator >>> 32);
         }
 
-        boolean negative = isNegative(left) ^ isNegative(right);
-        pack(result, z0, z1, z2, z3, negative);
+        if (l1 != 0) {
+            long accumulator = 0;
+            accumulator = (r0 & LONG_MASK) * (l1 & LONG_MASK) + (z1 & LONG_MASK) + (accumulator >>> 32);
+            z1 = (int) accumulator;
+            accumulator = (r1 & LONG_MASK) * (l1 & LONG_MASK) + (z2 & LONG_MASK) + (accumulator >>> 32);
+            z2 = (int) accumulator;
+            accumulator = (r2 & LONG_MASK) * (l1 & LONG_MASK) + (z3 & LONG_MASK) + (accumulator >>> 32);
+            z3 = (int) accumulator;
+            accumulator = (r3 & LONG_MASK) * (l1 & LONG_MASK) + (z4 & LONG_MASK) + (accumulator >>> 32);
+            z4 = (int) accumulator;
+            z5 = (int) (accumulator >>> 32);
+        }
+
+        if (l2 != 0) {
+            long accumulator = 0;
+            accumulator = (r0 & LONG_MASK) * (l2 & LONG_MASK) + (z2 & LONG_MASK) + (accumulator >>> 32);
+            z2 = (int) accumulator;
+            accumulator = (r1 & LONG_MASK) * (l2 & LONG_MASK) + (z3 & LONG_MASK) + (accumulator >>> 32);
+            z3 = (int) accumulator;
+            accumulator = (r2 & LONG_MASK) * (l2 & LONG_MASK) + (z4 & LONG_MASK) + (accumulator >>> 32);
+            z4 = (int) accumulator;
+            accumulator = (r3 & LONG_MASK) * (l2 & LONG_MASK) + (z5 & LONG_MASK) + (accumulator >>> 32);
+            z5 = (int) accumulator;
+            z6 = (int) (accumulator >>> 32);
+        }
+
+        if (l3 != 0) {
+            long accumulator = 0;
+            accumulator = (r0 & LONG_MASK) * (l3 & LONG_MASK) + (z3 & LONG_MASK) + (accumulator >>> 32);
+            z3 = (int) accumulator;
+            accumulator = (r1 & LONG_MASK) * (l3 & LONG_MASK) + (z4 & LONG_MASK) + (accumulator >>> 32);
+            z4 = (int) accumulator;
+            accumulator = (r2 & LONG_MASK) * (l3 & LONG_MASK) + (z5 & LONG_MASK) + (accumulator >>> 32);
+            z5 = (int) accumulator;
+            accumulator = (r3 & LONG_MASK) * (l3 & LONG_MASK) + (z6 & LONG_MASK) + (accumulator >>> 32);
+            z6 = (int) accumulator;
+            z7 = (int) (accumulator >>> 32);
+        }
+
+        if (fourIntsResultExpected) {
+            if (z7 == 0 && z6 == 0 && z5 == 0 && z4 == 0) {
+                pack(result, z0, z1, z2, z3, isNegative(left) ^ isNegative(right));
+                return;
+            }
+            else {
+                throwOverflowException();
+            }
+        }
+
+        setRawInt(result, 0, z0);
+        setRawInt(result, 1, z1);
+        setRawInt(result, 2, z2);
+        setRawInt(result, 3, z3);
+        setRawInt(result, 4, z4);
+        setRawInt(result, 5, z5);
+        setRawInt(result, 6, z6);
+        setRawInt(result, 7, z7);
     }
 
     public static int compare(Slice left, Slice right)
     {
         boolean leftStrictlyNegative = isStrictlyNegative(left);
-        boolean rightNegative = isNegative(right);
+        boolean rightStrictlyNegative = isStrictlyNegative(right);
 
-        if (leftStrictlyNegative != rightNegative) {
+        if (leftStrictlyNegative != rightStrictlyNegative) {
             return leftStrictlyNegative ? -1 : 1;
         }
         else {
@@ -440,9 +499,9 @@ public final class UnscaledDecimal128Arithmetic
     public static int compare(long leftRawLo, long leftRawHi, long rightRawLo, long rightRawHi)
     {
         boolean leftStrictlyNegative = isStrictlyNegative(leftRawLo, leftRawHi);
-        boolean rightNegative = isNegative(rightRawLo, rightRawHi);
+        boolean rightStrictlyNegative = isStrictlyNegative(rightRawLo, rightRawHi);
 
-        if (leftStrictlyNegative != rightNegative) {
+        if (leftStrictlyNegative != rightStrictlyNegative) {
             return leftStrictlyNegative ? -1 : 1;
         }
         else {
@@ -671,6 +730,376 @@ public final class UnscaledDecimal128Arithmetic
         pack(result, lo, hi, negative);
     }
 
+    public static Slice divideRoundUp(long dividend, int dividendScaleFactor, long divisor)
+    {
+        return divideRoundUp(
+                Math.abs(dividend), dividend < 0 ? SIGN_LONG_MASK : 0, dividendScaleFactor,
+                Math.abs(divisor), divisor < 0 ? SIGN_LONG_MASK : 0);
+    }
+
+    public static Slice divideRoundUp(long dividend, int dividendScaleFactor, Slice divisor)
+    {
+        return divideRoundUp(
+                Math.abs(dividend), dividend < 0 ? SIGN_LONG_MASK : 0, dividendScaleFactor,
+                getRawLong(divisor, 0), getRawLong(divisor, 1));
+    }
+
+    public static Slice divideRoundUp(Slice dividend, int dividendScaleFactor, long divisor)
+    {
+        return divideRoundUp(
+                getRawLong(dividend, 0), getRawLong(dividend, 1), dividendScaleFactor,
+                Math.abs(divisor), divisor < 0 ? SIGN_LONG_MASK : 0);
+    }
+
+    public static Slice divideRoundUp(Slice dividend, int dividendScaleFactor, Slice divisor)
+    {
+        return divideRoundUp(
+                getRawLong(dividend, 0), getRawLong(dividend, 1), dividendScaleFactor,
+                getRawLong(divisor, 0), getRawLong(divisor, 1));
+    }
+
+    private static Slice divideRoundUp(long dividendLow, long dividendHi, int dividendScaleFactor, long divisorLow, long divisorHi)
+    {
+        Slice quotient = unscaledDecimal();
+        Slice remainder = unscaledDecimal();
+        divide(dividendLow, dividendHi, dividendScaleFactor, divisorLow, divisorHi, 0, quotient, remainder);
+
+        // round
+        boolean quotientIsNegative = isNegative(quotient);
+        setNegative(quotient, false);
+        setNegative(remainder, false);
+        // if (2 * remainder >= divisor) - increment quotient by one
+        shiftLeft(remainder, 1);
+        long remainderLow = getRawInt(remainder, 0);
+        long remainderHi = getRawInt(remainder, 1);
+        long divisorHiUnsigned = (divisorHi & (~SIGN_LONG_INDEX));
+        if (compareUnsigned(remainderLow, remainderHi, divisorLow, divisorHiUnsigned) >= 0) {
+            incrementUnsafe(quotient);
+            throwIfOverflows(quotient);
+        }
+        setNegative(quotient, quotientIsNegative);
+        return quotient;
+    }
+
+    static Slice shiftLeft(Slice slice, int count)
+    {
+        checkArgument(slice.length() == NUMBER_OF_LONGS * Long.BYTES);
+        checkArgument(count < Long.SIZE * 2);
+        if (count == 0) {
+            return slice;
+        }
+        long low = getRawLong(slice, 0);
+        long hi = getRawLong(slice, 1);
+        if (count >= Long.SIZE) {
+            hi = low;
+            low = 0L;
+            hi = hi << (count - Long.SIZE);
+        }
+        else {
+            long remainder = low >>> (Long.SIZE - count);
+            low = low << count;
+            hi = (hi << count) | remainder;
+        }
+        setRawLong(slice, 0, low);
+        setRawLong(slice, 1, hi);
+        return slice;
+    }
+
+    public static Slice remainder(long dividend, int dividendScaleFactor, long divisor, int divisorScaleFactor)
+    {
+        return remainder(
+                Math.abs(dividend), dividend < 0 ? SIGN_LONG_MASK : 0, dividendScaleFactor,
+                Math.abs(divisor), divisor < 0 ? SIGN_LONG_MASK : 0, divisorScaleFactor);
+    }
+
+    public static Slice remainder(long dividend, int dividendScaleFactor, Slice divisor, int divisorScaleFactor)
+    {
+        return remainder(
+                Math.abs(dividend), dividend < 0 ? SIGN_LONG_MASK : 0, dividendScaleFactor,
+                getRawLong(divisor, 0), getRawLong(divisor, 1), divisorScaleFactor);
+    }
+
+    public static Slice remainder(Slice dividend, int dividendScaleFactor, long divisor, int divisorScaleFactor)
+    {
+        return remainder(
+                getRawLong(dividend, 0), getRawLong(dividend, 1), dividendScaleFactor,
+                Math.abs(divisor), divisor < 0 ? SIGN_LONG_MASK : 0, divisorScaleFactor);
+    }
+
+    public static Slice remainder(Slice dividend, int dividendScaleFactor, Slice divisor, int divisorScaleFactor)
+    {
+        return remainder(
+                getRawLong(dividend, 0), getRawLong(dividend, 1), dividendScaleFactor,
+                getRawLong(divisor, 0), getRawLong(divisor, 1), divisorScaleFactor);
+    }
+
+    private static Slice remainder(long dividendLow, long dividendHi, int dividendScaleFactor, long divisorLow, long divisorHi, int divisorScaleFactor)
+    {
+        Slice quotient = unscaledDecimal();
+        Slice remainder = unscaledDecimal();
+        divide(dividendLow, dividendHi, dividendScaleFactor, divisorLow, divisorHi, divisorScaleFactor, quotient, remainder);
+        return remainder;
+    }
+
+    // visible for testing
+    static void divide(Slice dividend, int dividendScaleFactor, Slice divisor, int divisorScaleFactor, Slice quotient, Slice remainder)
+    {
+        divide(getRawLong(dividend, 0), getRawLong(dividend, 1), dividendScaleFactor, getRawLong(divisor, 0), getRawLong(divisor, 1), divisorScaleFactor, quotient, remainder);
+    }
+
+    private static void divide(long dividendLow, long dividendHi, int dividendScaleFactor, long divisorLow, long divisorHi, int divisorScaleFactor, Slice quotient, Slice remainder)
+    {
+        if (compare(divisorLow, divisorHi, 0, 0) == 0) {
+            throwDivisionByZeroException();
+        }
+
+        if (dividendScaleFactor >= MAX_PRECISION) {
+            throwOverflowException();
+        }
+
+        if (divisorScaleFactor >= MAX_PRECISION) {
+            throwOverflowException();
+        }
+
+        boolean dividendIsNegative = isNegative(dividendLow, dividendHi);
+        boolean divisorIsNegative = isNegative(divisorLow, divisorHi);
+        boolean quotientIsNegative = dividendIsNegative ^ divisorIsNegative;
+
+        // to fit 128b * 128b * 32b unsigned multiplication
+        int[] dividend = new int[NUMBER_OF_INTS * 2 + 1];
+        dividend[0] = lowInt(dividendLow);
+        dividend[1] = highInt(dividendLow);
+        dividend[2] = lowInt(dividendHi);
+        dividend[3] = (highInt(dividendHi) & ~SIGN_INT_MASK);
+
+        if (dividendScaleFactor > 0) {
+            Slice sliceDividend = Slices.wrappedIntArray(dividend);
+            multiply(sliceDividend, POWERS_OF_TEN[dividendScaleFactor], sliceDividend);
+        }
+
+        int[] divisor = new int[NUMBER_OF_INTS * 2];
+        divisor[0] = lowInt(divisorLow);
+        divisor[1] = highInt(divisorLow);
+        divisor[2] = lowInt(divisorHi);
+        divisor[3] = (highInt(divisorHi) & ~SIGN_INT_MASK);
+
+        if (divisorScaleFactor > 0) {
+            Slice sliceDivisor = Slices.wrappedIntArray(divisor);
+            multiply(sliceDivisor, POWERS_OF_TEN[divisorScaleFactor], sliceDivisor);
+        }
+
+        int[] multiPrecisionQuotient = new int[NUMBER_OF_INTS * 2];
+        divideUnsignedMultiPrecision(dividend, divisor, multiPrecisionQuotient);
+
+        packUnsigned(multiPrecisionQuotient, quotient);
+        packUnsigned(dividend, remainder);
+        setNegative(quotient, quotientIsNegative);
+        setNegative(remainder, dividendIsNegative);
+        throwIfOverflows(quotient);
+        throwIfOverflows(remainder);
+    }
+
+    /**
+     * Divides mutableDividend / mutable divisor
+     * Places quotient in first argument and reminder in first argument
+     */
+    private static void divideUnsignedMultiPrecision(int[] dividend, int[] divisor, int[] quotient)
+    {
+        checkArgument(dividend.length == NUMBER_OF_INTS * 2 + 1);
+        checkArgument(divisor.length == NUMBER_OF_INTS * 2);
+        checkArgument(quotient.length == NUMBER_OF_INTS * 2);
+
+        int divisorLength = digitsInIntegerBase(divisor);
+        int dividendLength = digitsInIntegerBase(dividend);
+
+        if (dividendLength < divisorLength) {
+            return;
+        }
+
+        if (divisorLength == 1) {
+            int remainder = divideUnsignedMultiPrecision(dividend, divisor[0]);
+            checkState(dividend[dividend.length - 1] == 0);
+            System.arraycopy(dividend, 0, quotient, 0, quotient.length);
+            Arrays.fill(dividend, 0);
+            dividend[0] = remainder;
+            return;
+        }
+
+        long normalizationScale = (INT_BASE / ((divisor[divisorLength - 1] & LONG_MASK) + 1L));
+        if (normalizationScale > 1) {
+            multiplyUnsignedMultiPrecision(dividend, (int) normalizationScale);
+            multiplyUnsignedMultiPrecision(divisor, (int) normalizationScale);
+        }
+
+        divideKnuthNormalized(dividend, divisor, divisorLength, quotient);
+        if (normalizationScale > 1) {
+            divideUnsignedMultiPrecision(dividend, (int) normalizationScale);
+        }
+    }
+
+    private static void divideKnuthNormalized(int[] remainder, int[] divisor, int divisorLength, int[] quotient)
+    {
+        long v1 = (divisor[divisorLength - 1] & LONG_MASK);
+        long v0 = (divisor[divisorLength - 2] & LONG_MASK);
+        for (int reminderIndex = remainder.length - 1; reminderIndex >= divisorLength; reminderIndex--) {
+            int qHat = estimateQuotient(remainder[reminderIndex], remainder[reminderIndex - 1], remainder[reminderIndex - 2], v1, v0);
+            if (qHat != 0) {
+                boolean overflow = multiplyAndSubtractUnsignedMultiPrecision(remainder, reminderIndex, divisor, divisorLength, qHat);
+                // Add back - probability is 2**(-31). R += D. Q[digit] -= 1
+                if (overflow) {
+                    qHat--;
+                    addUnsignedMultiPrecision(remainder, reminderIndex, divisor, divisorLength);
+                }
+            }
+            quotient[reminderIndex - divisorLength] = qHat;
+        }
+    }
+
+    /**
+     * Use the Knuth notation
+     * <p>
+     * u{x} - dividend
+     * v{v} - divisor
+     */
+    private static int estimateQuotient(int u2, int u1, int u0, long v1, long v0)
+    {
+        // estimate qhat based on the first 2 digits of divisor divided by the first digit of a dividend
+        long u21 = combineInts(u2, u1);
+        long qhat;
+        if ((u2 & LONG_MASK) == v1) {
+            qhat = INT_BASE - 1;
+        }
+        else {
+            qhat = Long.divideUnsigned(u21, v1);
+        }
+
+        if (qhat == 0) {
+            return 0;
+        }
+
+        // Check if qhat is greater than expected considering only first 3 digits of a dividend
+        // This step help to eliminate all the cases when the estimation is greater than q by 2
+        // and eliminates most of the cases when qhat is greater than q by 1
+        //
+        // u2 * b * b + u1 * b + u0 >= (v1 * b + v0) * qhat
+        // u2 * b * b + u1 * b + u0 >= v1 * b * qhat + v0 * qhat
+        // u2 * b * b + u1 * b - v1 * b * qhat >=  v0 * qhat - u0
+        // (u21 - v1 * qhat) * b >=  v0 * qhat - u0
+        // (u21 - v1 * qhat) * b + u0 >=  v0 * qhat
+        // When ((u21 - v1 * qhat) * b + u0) is less than (v0 * qhat) decrease qhat by one
+
+        int iterations = 0;
+        long rhat = u21 - v1 * qhat;
+        while (Long.compareUnsigned(rhat, INT_BASE) < 0 && Long.compareUnsigned(v0 * qhat, combineInts(lowInt(rhat), u0)) > 0) {
+            iterations++;
+            qhat--;
+            rhat += v1;
+        }
+
+        if (iterations > 2) {
+            throw new IllegalStateException("qhat is greater than q by more than 2: " + iterations);
+        }
+
+        return (int) qhat;
+    }
+
+    /**
+     * Calculate multi-precision [left - right * multiplier] with given left offset and length.
+     * Return true when overflow occurred
+     */
+    private static boolean multiplyAndSubtractUnsignedMultiPrecision(int[] left, int leftOffset, int[] right, int length, int multiplier)
+    {
+        long unsignedMultiplier = multiplier & LONG_MASK;
+        int leftIndex = leftOffset - length;
+        long multiplyAccumulator = 0;
+        long subtractAccumulator = INT_BASE;
+        for (int rightIndex = 0; rightIndex < length; rightIndex++, leftIndex++) {
+            multiplyAccumulator = (right[rightIndex] & LONG_MASK) * unsignedMultiplier + multiplyAccumulator;
+            subtractAccumulator = (subtractAccumulator + (left[leftIndex] & LONG_MASK)) - (lowInt(multiplyAccumulator) & LONG_MASK);
+            multiplyAccumulator = (multiplyAccumulator >>> 32);
+            left[leftIndex] = lowInt(subtractAccumulator);
+            subtractAccumulator = (subtractAccumulator >>> 32) + INT_BASE - 1;
+        }
+        subtractAccumulator += (left[leftIndex] & LONG_MASK) - multiplyAccumulator;
+        left[leftIndex] = lowInt(subtractAccumulator);
+        return highInt(subtractAccumulator) == 0;
+    }
+
+    private static void addUnsignedMultiPrecision(int[] left, int leftOffset, int[] right, int length)
+    {
+        int leftIndex = leftOffset - length;
+        int carry = 0;
+        for (int rightIndex = 0; rightIndex < length; rightIndex++, leftIndex++) {
+            long accumulator = (left[leftIndex] & LONG_MASK) + (right[rightIndex] & LONG_MASK) + (carry & LONG_MASK);
+            left[leftIndex] = lowInt(accumulator);
+            carry = highInt(accumulator);
+        }
+        left[leftIndex] += carry;
+    }
+
+    private static void multiplyUnsignedMultiPrecision(int[] mutableNumber, int multiplier)
+    {
+        long multiplierUnsigned = multiplier & LONG_MASK;
+        long product = 0L;
+        for (int i = 0; i < mutableNumber.length; ++i) {
+            product = (mutableNumber[i] & LONG_MASK) * multiplierUnsigned + (product >>> 32);
+            mutableNumber[i] = (int) product;
+        }
+        if ((product >>> 32) != 0) {
+            throwOverflowException();
+        }
+    }
+
+    private static int divideUnsignedMultiPrecision(int[] dividend, int divisor)
+    {
+        if (divisor == 0) {
+            throwDivisionByZeroException();
+        }
+        long divisorUnsigned = divisor & LONG_MASK;
+        long remainder = 0;
+        for (int dividendIndex = dividend.length - 1; dividendIndex >= 0; dividendIndex--) {
+            remainder = (remainder << 32) + (dividend[dividendIndex] & LONG_MASK);
+            dividend[dividendIndex] = (int) (remainder / divisorUnsigned);
+            remainder = remainder % divisorUnsigned;
+        }
+        return (int) remainder;
+    }
+
+    private static int digitsInIntegerBase(int[] digits)
+    {
+        int length = digits.length;
+        while (length > 0 && digits[length - 1] == 0) {
+            length--;
+        }
+        return length;
+    }
+
+    private static long combineInts(int high, int low)
+    {
+        return ((high & LONG_MASK) << 32L) | (low & LONG_MASK);
+    }
+
+    private static int highInt(long val)
+    {
+        return (int) (val >>> 32);
+    }
+
+    private static int lowInt(long val)
+    {
+        return (int) val;
+    }
+
+    private static void packUnsigned(int[] digits, Slice decimal)
+    {
+        if (digitsInIntegerBase(digits) > NUMBER_OF_INTS) {
+            throwOverflowException();
+        }
+        if ((digits[3] & SIGN_INT_MASK) != 0) {
+            throwOverflowException();
+        }
+        pack(decimal, digits[0], digits[1], digits[2], digits[3], false);
+    }
+
     private static boolean divideCheckRound(Slice decimal, int divisor, Slice result)
     {
         int remainder = divide(decimal, divisor, result);
@@ -680,6 +1109,11 @@ public final class UnscaledDecimal128Arithmetic
     // visible for testing
     static int divide(Slice decimal, int divisor, Slice result)
     {
+        if (divisor == 0) {
+            throwDivisionByZeroException();
+        }
+        checkArgument(divisor > 0);
+
         long remainder = getLong(decimal, 1);
         long hi = remainder / divisor;
         remainder %= divisor;
@@ -693,6 +1127,11 @@ public final class UnscaledDecimal128Arithmetic
 
         pack(result, z0, z1, hi, isNegative(decimal));
         return (int) (remainder % divisor);
+    }
+
+    private static void throwDivisionByZeroException()
+    {
+        throw new PrestoException(DIVISION_BY_ZERO, "Division by zero");
     }
 
     private static void incrementUnsafe(Slice decimal)
@@ -767,7 +1206,7 @@ public final class UnscaledDecimal128Arithmetic
 
     public static void throwOverflowException()
     {
-        throw new ArithmeticException("Decimal overflow");
+        throw new PrestoException(NUMERIC_VALUE_OUT_OF_RANGE, "Decimal overflow");
     }
 
     private static boolean exceedsOrEqualTenToThirtyEight(int v0, int v1, int v2, int v3)
@@ -868,6 +1307,20 @@ public final class UnscaledDecimal128Arithmetic
     private static void setRawLong(Slice decimal, int index, long value)
     {
         unsafe.putLong(decimal.getBase(), decimal.getAddress() + SIZE_OF_LONG * index, value);
+    }
+
+    private static void checkArgument(boolean condition)
+    {
+        if (!condition) {
+            throw new IllegalArgumentException();
+        }
+    }
+
+    private static void checkState(boolean condition)
+    {
+        if (!condition) {
+            throw new IllegalStateException();
+        }
     }
 
     private UnscaledDecimal128Arithmetic() {}

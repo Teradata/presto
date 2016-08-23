@@ -779,7 +779,7 @@ public final class MathFunctions
                 .signature(signature)
                 .description("round to given number of decimal places")
                 .implementation(b -> b
-                    .methods("roundNShortDecimal", "roundNLongDecimal")
+                        .methods("roundNShortShort", "roundNShortLong", "roundNLongLong")
                     .withExtraParameters(MathFunctions::decimalRoundNExtraParameters)
                 )
                 .build();
@@ -790,7 +790,7 @@ public final class MathFunctions
         return ImmutableList.of(context.getLiteral("num_precision"), context.getLiteral("num_scale"));
     }
 
-    public static long roundNShortDecimal(long num, long roundScale, long inputPrecision, long inputScale)
+    public static long roundNShortShort(long num, long roundScale, long inputPrecision, long inputScale)
     {
         if (num == 0 || inputPrecision - inputScale + roundScale <= 0) {
             return 0;
@@ -799,7 +799,7 @@ public final class MathFunctions
             return num;
         }
         if (num < 0) {
-            return -roundNShortDecimal(-num, roundScale, inputPrecision, inputScale);
+            return -roundNShortShort(-num, roundScale, inputPrecision, inputScale);
         }
 
         long rescaleFactor = longTenToNth((int) (inputScale - roundScale));
@@ -808,7 +808,12 @@ public final class MathFunctions
         return (num / rescaleFactor + roundUp) * rescaleFactor;
     }
 
-    public static Slice roundNLongDecimal(Slice num, long roundScale, long inputPrecision, long inputScale)
+    public static Slice roundNShortLong(long num, long roundScale, long inputPrecision, long inputScale)
+    {
+        return roundNLongLong(encodeUnscaledValue(num), roundScale, inputPrecision, inputScale);
+    }
+
+    public static Slice roundNLongLong(Slice num, long roundScale, long inputPrecision, long inputScale)
     {
         BigInteger unscaledVal = decodeUnscaledValue(num);
         if (unscaledVal.signum() == 0 || inputPrecision - inputScale + roundScale <= 0) {
@@ -819,12 +824,12 @@ public final class MathFunctions
         }
         BigInteger rescaleFactor = bigIntegerTenToNth((int) (inputScale - roundScale));
         if (unscaledVal.signum() < 0) {
-            return encodeUnscaledValue(roundNLongDecimal(unscaledVal.negate(), rescaleFactor).negate());
+            return encodeUnscaledValue(roundNBigInteger(unscaledVal.negate(), rescaleFactor).negate());
         }
-        return encodeUnscaledValue(roundNLongDecimal(unscaledVal, rescaleFactor));
+        return encodeUnscaledValue(roundNBigInteger(unscaledVal, rescaleFactor));
     }
 
-    public static BigInteger roundNLongDecimal(BigInteger num, BigInteger rescaleFactor)
+    public static BigInteger roundNBigInteger(BigInteger num, BigInteger rescaleFactor)
     {
         BigInteger[] divideAndRemainder = num.divideAndRemainder(rescaleFactor);
         BigInteger roundUp = divideAndRemainder[1].compareTo(rescaleFactor.shiftRight(1)) >= 0 ? ONE : ZERO;
