@@ -59,6 +59,8 @@ import static com.facebook.presto.spi.type.StandardTypes.SMALLINT;
 import static com.facebook.presto.spi.type.StandardTypes.TINYINT;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.util.Failures.checkCondition;
+import static com.facebook.presto.util.JsonUtil.createJsonGenerator;
+import static com.facebook.presto.util.JsonUtil.createJsonParser;
 import static com.facebook.presto.util.Types.checkType;
 import static java.lang.Float.floatToRawIntBits;
 import static java.lang.Float.intBitsToFloat;
@@ -509,7 +511,7 @@ public final class DecimalCasts
     {
         try {
             SliceOutput dynamicSliceOutput = new DynamicSliceOutput(32);
-            try (JsonGenerator jsonGenerator = JSON_FACTORY.createGenerator(dynamicSliceOutput)) {
+            try (JsonGenerator jsonGenerator = createJsonGenerator(JSON_FACTORY, dynamicSliceOutput)) {
                 jsonGenerator.writeNumber(bigDecimal);
             }
             return dynamicSliceOutput.slice();
@@ -541,7 +543,7 @@ public final class DecimalCasts
     @Nullable
     private static BigDecimal jsonToDecimal(Slice json, long precision, long scale)
     {
-        try (JsonParser parser = JSON_FACTORY.createParser(json.getInput())) {
+        try (JsonParser parser = createJsonParser(JSON_FACTORY, json)) {
             parser.nextToken();
             BigDecimal result;
             switch (parser.getCurrentToken()) {
