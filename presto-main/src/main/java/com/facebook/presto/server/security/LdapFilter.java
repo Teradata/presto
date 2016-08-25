@@ -109,13 +109,13 @@ public class LdapFilter
             checkState(parts.size() == 2, "Invalid value for authorization header");
             checkState(parts.get(0).equalsIgnoreCase(AUTHENTICATION_TYPE), "Incorrect authentication type (expected basic): %s", AUTHENTICATION_TYPE);
 
-            List<String> credentials = Splitter.on(":").splitToList(new String(Base64.getDecoder().decode(parts.get(1))));
-            checkState(credentials.size() == 2, "Username/password missing in the request header");
+            String[] credentials = new String(Base64.getDecoder().decode(parts.get(1))).split(":", 2);
+            checkState(credentials.length == 2, "Username/password missing in the request header");
 
             DirContext context = null;
             try {
-                String user = credentials.get(0);
-                String password = credentials.get(1);
+                String user = credentials[0];
+                String password = credentials[1];
                 if (user.isEmpty() || password.isEmpty()) {
                     throw new AuthenticationException("Authentication failed. Username or Password is empty");
                 }

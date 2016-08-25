@@ -20,6 +20,7 @@ import io.airlift.http.client.Request;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
+import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.http.client.Request.Builder.fromRequest;
 import static java.util.Objects.requireNonNull;
 
@@ -38,6 +39,7 @@ public class LdapRequestFilter
     @Override
     public Request filterRequest(Request request)
     {
+        checkState(!user.contains(":"), "Illegal character ':' found in user name");
         String value = "Basic " + Base64.getEncoder().encodeToString((user + ":" + password).getBytes(StandardCharsets.ISO_8859_1));
         return fromRequest(request)
                 .addHeader(HttpHeaders.AUTHORIZATION, value)

@@ -339,6 +339,34 @@ public class PrestoCliTests
         skipAfterTestWithContext();
     }
 
+    @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldPassForPasswordWithSpecialCharacters()
+            throws IOException, InterruptedException
+    {
+        ldapUserName = "UserWithSpecialPwd";
+        ldapUserPassword = "LDAP:Pass ~!@#$%^&*()_+{}|:\"<>?/.,';\\][=-`";
+        launchPrestoCliWithServerArgument("--catalog", "hive", "--schema", "default", "--execute", "select * from nation;");
+        assertThat(trimLines(presto.readRemainingOutputLines())).containsAll(nationTableBatchLines);
+    }
+
+    @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldPassForUserWithWhitespace()
+            throws IOException, InterruptedException
+    {
+        ldapUserName = "User WithSpace";
+        launchPrestoCliWithServerArgument("--catalog", "hive", "--schema", "default", "--execute", "select * from nation;");
+        assertThat(trimLines(presto.readRemainingOutputLines())).containsAll(nationTableBatchLines);
+    }
+
+    @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailForUserWithColon()
+            throws IOException, InterruptedException
+    {
+        ldapUserName = "UserWith:Colon";
+        launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Illegal character ':' found in user name")));
+    }
+
     private void launchPrestoCliWithServerArgument(String... arguments)
             throws IOException, InterruptedException
     {

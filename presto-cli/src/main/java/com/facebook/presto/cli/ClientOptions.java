@@ -159,6 +159,7 @@ public class ClientOptions
             checkState(user != null, "Username cannot be null");
             try {
                 ConsoleReader consoleReader = new ConsoleReader();
+                consoleReader.setExpandEvents(false);
                 return consoleReader.readLine("Enter password: ", '*');
             }
             catch (IOException e) {
