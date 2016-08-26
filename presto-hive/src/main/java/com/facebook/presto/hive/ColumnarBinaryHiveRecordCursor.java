@@ -58,6 +58,7 @@ import static com.facebook.presto.hive.HiveUtil.bigintPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.booleanPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.datePartitionKey;
 import static com.facebook.presto.hive.HiveUtil.doublePartitionKey;
+import static com.facebook.presto.hive.HiveUtil.floatPartitionKey;
 import static com.facebook.presto.hive.HiveUtil.getPrefilledColumnValue;
 import static com.facebook.presto.hive.HiveUtil.getTableObjectInspector;
 import static com.facebook.presto.hive.HiveUtil.integerPartitionKey;
@@ -79,6 +80,7 @@ import static com.facebook.presto.spi.type.Decimals.isLongDecimal;
 import static com.facebook.presto.spi.type.Decimals.isShortDecimal;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
+import static com.facebook.presto.spi.type.RealType.REAL;
 import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.StandardTypes.DECIMAL;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
@@ -225,6 +227,9 @@ class ColumnarBinaryHiveRecordCursor<K>
                 else if (BIGINT.equals(type)) {
                     longs[columnIndex] = bigintPartitionKey(columnValue, name);
                 }
+                else if (REAL.equals(type)) {
+                    longs[columnIndex] = floatPartitionKey(partitionKey.getValue(), name);
+                }
                 else if (DOUBLE.equals(type)) {
                     doubles[columnIndex] = doublePartitionKey(columnValue, name);
                 }
@@ -366,10 +371,11 @@ class ColumnarBinaryHiveRecordCursor<K>
                 !types[fieldId].equals(TINYINT) &&
                 !types[fieldId].equals(DATE) &&
                 !types[fieldId].equals(TIMESTAMP) &&
-                !isShortDecimal(types[fieldId])) {
+                !isShortDecimal(types[fieldId]) &&
+                !types[fieldId].equals(REAL)) {
             // we don't use Preconditions.checkArgument because it requires boxing fieldId, which affects inner loop performance
             throw new IllegalArgumentException(
-                    format("Expected field to be %s, %s, %s, %s, %s, %s or %s , actual %s (field %s)", TINYINT, SMALLINT, INTEGER, BIGINT, DATE, TIMESTAMP, DECIMAL, types[fieldId], fieldId));
+                    format("Expected field to be %s, %s, %s, %s, %s, %s, %s or %s , actual %s (field %s)", TINYINT, SMALLINT, INTEGER, BIGINT, DATE, TIMESTAMP, DECIMAL, REAL, types[fieldId], fieldId));
         }
         if (!loaded[fieldId]) {
             parseLongColumn(fieldId);
@@ -452,9 +458,28 @@ class ColumnarBinaryHiveRecordCursor<K>
                 longs[column] = readVInt(bytes, start, length);
             }
         }
+        else if (hiveTypes[column].equals(HIVE_FLOAT)) {
+            checkState(length >= 1, "Float should be at least 1 byte");
+            if (length == 1) {
+                longs[column] = bytes[start];
+            }
+            else {
+                longs[column] = readRawBits(bytes, start, length);
+            }
+        }
         else {
             throw new RuntimeException(format("%s is not a valid LONG type", hiveTypes[column]));
         }
+    }
+
+    private static int readRawBits(byte[] bytes, int start, int length)
+    {
+        int value = bytes[start] & 0xFF;
+        for (int i = 1; i < length; i++) {
+            value <<= 8;
+            value |= (bytes[start + i] & 0xFF);
+        }
+        return value;
     }
 
     private static long readVInt(byte[] bytes, int start, int length)
@@ -754,6 +779,9 @@ class ColumnarBinaryHiveRecordCursor<K>
         }
         else if (DOUBLE.equals(type)) {
             parseDoubleColumn(column);
+        }
+        else if (REAL.equals(type)) {
+            parseLongColumn(column);
         }
         else if (isVarcharType(type) || VARBINARY.equals(type)) {
             parseStringColumn(column);

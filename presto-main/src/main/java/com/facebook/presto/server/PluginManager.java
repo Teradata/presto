@@ -75,6 +75,7 @@ public class PluginManager
             .add("io.airlift.slice")
             .add("javax.annotation")
             .add("java.")
+            .add("org.joda.time")
             .build();
 
     private static final Logger log = Logger.get(PluginManager.class);

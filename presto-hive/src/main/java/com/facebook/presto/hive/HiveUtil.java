@@ -92,6 +92,7 @@ import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DecimalType.createDecimalType;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.IntegerType.INTEGER;
+import static com.facebook.presto.spi.type.RealType.REAL;
 import static com.facebook.presto.spi.type.SmallintType.SMALLINT;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.facebook.presto.spi.type.TinyintType.TINYINT;
@@ -100,6 +101,8 @@ import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Lists.transform;
 import static java.lang.Byte.parseByte;
 import static java.lang.Double.parseDouble;
+import static java.lang.Float.floatToRawIntBits;
+import static java.lang.Float.parseFloat;
 import static java.lang.Integer.parseInt;
 import static java.lang.Long.parseLong;
 import static java.lang.Short.parseShort;
@@ -446,6 +449,16 @@ public final class HiveUtil
             return NullableValue.of(TIMESTAMP, timestampPartitionKey(value, timeZone, partitionName));
         }
 
+        if (REAL.equals(type)) {
+            if (isNull) {
+                return NullableValue.asNull(REAL);
+            }
+            if (value.isEmpty()) {
+                return NullableValue.of(REAL, floatToRawIntBits(0.0f));
+            }
+            return NullableValue.of(REAL, floatPartitionKey(value, partitionName));
+        }
+
         if (DOUBLE.equals(type)) {
             if (isNull) {
                 return NullableValue.asNull(DOUBLE);
@@ -577,6 +590,16 @@ public final class HiveUtil
         }
         catch (NumberFormatException e) {
             throw new PrestoException(HIVE_INVALID_PARTITION_VALUE, format("Invalid partition value '%s' for TINYINT partition key: %s", value, name));
+        }
+    }
+
+    public static long floatPartitionKey(String value, String name)
+    {
+        try {
+            return floatToRawIntBits(parseFloat(value));
+        }
+        catch (NumberFormatException e) {
+            throw new PrestoException(HIVE_INVALID_PARTITION_VALUE, format("Invalid partition value '%s' for FLOAT partition key: %s", value, name));
         }
     }
 
