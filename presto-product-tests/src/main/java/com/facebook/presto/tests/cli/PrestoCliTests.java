@@ -244,7 +244,7 @@ public class PrestoCliTests
     {
         ldapUserName = "ChildGroupUser";
         launchPrestoCliWithServerArgument("--catalog", "hive", "--schema", "default", "--execute", "select * from nation;");
-        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Authentication failed: User " + ldapUserName + " not a member of the group")));
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("User " + ldapUserName + " not a member of the group")));
     }
 
     @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
@@ -253,7 +253,7 @@ public class PrestoCliTests
     {
         ldapUserName = "GrandParentGroupUser";
         launchPrestoCliWithServerArgument("--catalog", "hive", "--schema", "default", "--execute", "select * from nation;");
-        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Authentication failed: User " + ldapUserName + " not a member of the group")));
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("User " + ldapUserName + " not a member of the group")));
     }
 
     @Test(groups = {CLI, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
@@ -262,7 +262,7 @@ public class PrestoCliTests
     {
         ldapUserName = "OrphanUser";
         launchPrestoCliWithServerArgument("--catalog", "hive", "--schema", "default", "--execute", "select * from nation;");
-        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Authentication failed: User " + ldapUserName + " not a member of the group")));
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("User " + ldapUserName + " not a member of the group")));
     }
 
     @Test(groups = {CLI, ACTIVE_DIRECTORY, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
