@@ -24,11 +24,12 @@ import com.facebook.presto.spi.connector.ConnectorRecordSetProvider;
 import com.facebook.presto.spi.connector.ConnectorSplitManager;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.transaction.IsolationLevel;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.Map;
 
+import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkState;
+import static java.lang.Integer.parseInt;
 import static java.util.Objects.requireNonNull;
 
 public class TpcdsConnectorFactory
@@ -64,7 +65,9 @@ public class TpcdsConnectorFactory
     @Override
     public Connector create(String connectorId, Map<String, String> config, ConnectorContext context)
     {
-        return new Connector() {
+        int splitsPerNode = getSplitsPerNode(config);
+        return new Connector()
+        {
             @Override
             public ConnectorTransactionHandle beginTransaction(IsolationLevel isolationLevel, boolean readOnly)
             {
@@ -80,20 +83,30 @@ public class TpcdsConnectorFactory
             @Override
             public ConnectorSplitManager getSplitManager()
             {
-                throw new NotImplementedException();
+                return new TpcdsSplitManager(connectorId, nodeManager, splitsPerNode);
             }
 
             @Override
             public ConnectorRecordSetProvider getRecordSetProvider()
             {
-                throw new NotImplementedException();
+                return new TpcdsRecordSetProvider();
             }
 
             @Override
             public ConnectorNodePartitioningProvider getNodePartitioningProvider()
             {
-                throw new NotImplementedException();
+                return new TpcdsNodePartitioningProvider(connectorId, nodeManager, splitsPerNode);
             }
         };
+    }
+
+    private int getSplitsPerNode(Map<String, String> properties)
+    {
+        try {
+            return parseInt(firstNonNull(properties.get("tpcds.splits-per-node"), String.valueOf(defaultSplitsPerNode)));
+        }
+        catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid property tpcds.splits-per-node");
+        }
     }
 }
