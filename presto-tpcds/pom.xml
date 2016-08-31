@@ -34,8 +34,8 @@
         </dependency>
 
         <dependency>
-            <groupId>com.facebook.presto</groupId>
-            <artifactId>presto-spi</artifactId>
+            <groupId>io.airlift</groupId>
+            <artifactId>slice</artifactId>
             <scope>provided</scope>
         </dependency>
 
