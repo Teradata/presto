@@ -72,7 +72,8 @@ public class OperatorContext
     private final CounterStat outputDataSize = new CounterStat();
     private final CounterStat outputPositions = new CounterStat();
 
-    private final AtomicReference<SettableFuture<?>> memoryFuture = new AtomicReference<>();
+    private final AtomicReference<SettableFuture<?>> memoryFuture;
+    private final AtomicReference<SettableFuture<?>> revocableMemoryFuture;
     private final AtomicReference<BlockedMonitor> blockedMonitor = new AtomicReference<>();
     private final AtomicLong blockedWallNanos = new AtomicLong();
 
@@ -82,6 +83,7 @@ public class OperatorContext
     private final AtomicLong finishUserNanos = new AtomicLong();
 
     private final AtomicLong memoryReservation = new AtomicLong();
+    private final AtomicLong revocableMemoryReservation = new AtomicLong();
     private final OperatorSystemMemoryContext systemMemoryContext;
     private final OperatorSpillContext spillContext;
 
@@ -98,9 +100,11 @@ public class OperatorContext
         this.systemMemoryContext = new OperatorSystemMemoryContext(this.driverContext);
         this.spillContext = new OperatorSpillContext(this.driverContext);
         this.executor = requireNonNull(executor, "executor is null");
-        SettableFuture<Object> future = SettableFuture.create();
-        future.set(null);
-        this.memoryFuture.set(future);
+
+        this.memoryFuture = new AtomicReference<>(SettableFuture.create());
+        this.memoryFuture.get().set(null);
+        this.revocableMemoryFuture = new AtomicReference<>(SettableFuture.create());
+        this.revocableMemoryFuture.get().set(null);
 
         collectTimings = driverContext.isVerboseStats() && driverContext.isCpuTimerEnabled();
     }
@@ -248,6 +252,64 @@ public class OperatorContext
             });
         }
         memoryReservation.addAndGet(bytes);
+    }
+
+    public void reserveRevocableMemory(long bytes)
+    {
+        ListenableFuture<?> future = driverContext.reserveRevocableMemory(bytes);
+        if (!future.isDone()) {
+            SettableFuture<?> currentMemoryFuture = revocableMemoryFuture.get();
+            while (currentMemoryFuture.isDone()) {
+                SettableFuture<?> settableFuture = SettableFuture.create();
+                // We can't replace one that's not done, because the task may be blocked on that future
+                if (revocableMemoryFuture.compareAndSet(currentMemoryFuture, settableFuture)) {
+                    currentMemoryFuture = settableFuture;
+                }
+                else {
+                    currentMemoryFuture = revocableMemoryFuture.get();
+                }
+            }
+
+            SettableFuture<?> finalMemoryFuture = currentMemoryFuture;
+            // Create a new future, so that this operator can un-block before the pool does, if it's moved to a new pool
+            Futures.addCallback(future, new FutureCallback<Object>()
+            {
+                @Override
+                public void onSuccess(Object result)
+                {
+                    finalMemoryFuture.set(null);
+                }
+
+                @Override
+                public void onFailure(Throwable t)
+                {
+                    finalMemoryFuture.set(null);
+                }
+            });
+        }
+        revocableMemoryReservation.addAndGet(bytes);
+    }
+
+    public void setRevocableMemoryReservation(long newRevocableMemoryReservation)
+    {
+        checkArgument(newRevocableMemoryReservation >= 0, "newRevocableMemoryReservation is negative");
+
+        long delta = newRevocableMemoryReservation - revocableMemoryReservation.get();
+
+        if (delta > 0) {
+            reserveRevocableMemory(delta);
+        }
+        else {
+            freeRevocableMemory(-delta);
+        }
+    }
+
+    public void freeRevocableMemory(long bytes)
+    {
+        checkArgument(bytes >= 0, "bytes is negative");
+        checkArgument(bytes <= revocableMemoryReservation.get(), "tried to free more revocable memory than is reserved");
+        driverContext.freeRevocableMemory(bytes);
+        revocableMemoryReservation.getAndAdd(-bytes);
     }
 
     public void freeMemory(long bytes)

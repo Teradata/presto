@@ -58,6 +58,9 @@ public class QueryContext
     private long reserved;
 
     @GuardedBy("this")
+    private long revocableReserved;
+
+    @GuardedBy("this")
     private MemoryPool memoryPool;
 
     @GuardedBy("this")
@@ -101,6 +104,14 @@ public class QueryContext
         return future;
     }
 
+    public synchronized ListenableFuture<?> reserveRevocableMemory(long bytes)
+    {
+        checkArgument(bytes >= 0, "bytes is negative");
+        ListenableFuture<?> future = memoryPool.reserve(queryId, bytes);
+        revocableReserved += bytes;
+        return future;
+    }
+
     public synchronized ListenableFuture<?> reserveSystemMemory(long bytes)
     {
         checkArgument(bytes >= 0, "bytes is negative");
@@ -139,6 +150,14 @@ public class QueryContext
     {
         checkArgument(reserved - bytes >= 0, "tried to free more memory than is reserved");
         reserved -= bytes;
+        memoryPool.free(queryId, bytes);
+    }
+
+    public synchronized void freeRevocableMemory(long bytes)
+    {
+        checkArgument(bytes >= 0, "bytes is negative");
+        checkArgument(revocableReserved - bytes >= 0, "tried to free more revocable memory than is reserved");
+        revocableReserved -= bytes;
         memoryPool.free(queryId, bytes);
     }
 
