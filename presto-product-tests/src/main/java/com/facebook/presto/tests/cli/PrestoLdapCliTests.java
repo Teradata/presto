@@ -50,8 +50,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertTrue;
 
 public class PrestoLdapCliTests
-    extends PrestoCliTests
-    implements RequirementsProvider
+        extends PrestoCliLauncher
+        implements RequirementsProvider
 {
     @Inject(optional = true)
     @Named("databases.presto.cli_ldap_truststore_path")
@@ -187,9 +187,9 @@ public class PrestoLdapCliTests
     public void shouldFailQueryForEmptyUser()
             throws IOException, InterruptedException
     {
-            ldapUserName = "";
-            launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
-            assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Invalid credentials")));
+        ldapUserName = "";
+        launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
+        assertTrue(trimLines(presto.readRemainingErrorLines()).stream().anyMatch(str -> str.contains("Invalid credentials")));
     }
 
     @Test(groups = {LDAP, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
@@ -230,27 +230,26 @@ public class PrestoLdapCliTests
         presto = null;
     }
 
-    @Override
     protected void launchPrestoCliWithServerArgument(String... arguments)
             throws IOException, InterruptedException
     {
-            requireNonNull(ldapTruststorePath, "databases.presto.cli_ldap_truststore_path is null");
-            requireNonNull(ldapTruststorePassword, "databases.presto.cli_ldap_truststore_password is null");
-            requireNonNull(ldapUserName, "databases.presto.cli_ldap_user_name is null");
-            requireNonNull(ldapServerAddress, "databases.presto.cli_ldap_server_address is null");
-            requireNonNull(ldapUserPassword, "databases.presto.cli_ldap_user_password is null");
+        requireNonNull(ldapTruststorePath, "databases.presto.cli_ldap_truststore_path is null");
+        requireNonNull(ldapTruststorePassword, "databases.presto.cli_ldap_truststore_password is null");
+        requireNonNull(ldapUserName, "databases.presto.cli_ldap_user_name is null");
+        requireNonNull(ldapServerAddress, "databases.presto.cli_ldap_server_address is null");
+        requireNonNull(ldapUserPassword, "databases.presto.cli_ldap_user_password is null");
 
-            ImmutableList.Builder<String> prestoClientOptions = ImmutableList.builder();
-            prestoClientOptions.add(
-                    "--server", ldapServerAddress,
-                    "--truststore-path", ldapTruststorePath,
-                    "--truststore-password", ldapTruststorePassword,
-                    "--user", ldapUserName,
-                    "--password");
+        ImmutableList.Builder<String> prestoClientOptions = ImmutableList.builder();
+        prestoClientOptions.add(
+                "--server", ldapServerAddress,
+                "--truststore-path", ldapTruststorePath,
+                "--truststore-password", ldapTruststorePassword,
+                "--user", ldapUserName,
+                "--password");
 
-            prestoClientOptions.add(arguments);
-            launchPrestoCli(prestoClientOptions.build());
-            setLdapPassword();
+        prestoClientOptions.add(arguments);
+        launchPrestoCli(prestoClientOptions.build());
+        setLdapPassword();
     }
 
     private void setLdapPassword()
