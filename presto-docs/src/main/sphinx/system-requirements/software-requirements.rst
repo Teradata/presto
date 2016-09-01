@@ -33,3 +33,18 @@ For more on SSH configuration, see :ref:`ssh-configuration-label`.
 **Other Configuration**
 
 * Sudo privileges on both the node running ``presto-admin`` and the nodes where Presto will be installed are required for a non-root presto-admin user.
+* The number of open file descriptors and user processes for the ``presto`` user should be set to the following values in ``/etc/security/limits.conf``.
+
+.. code-block:: none
+
+    presto soft nofile 32768
+    presto hard nofile 65536
+
+    presto soft nproc 32768
+    presto hard nproc 65536
+
+If you see this error "java.lang.OutOfMemoryError: unable to create new native thread" then install the :doc:`/connector/jmx` and run the following query to verify the limit for open file descriptors for your system.
+
+.. code-block:: sql
+
+    SELECT openfiledescriptorcount, maxfiledescriptorcount FROM jmx.current."java.lang:type=operatingsystem"
