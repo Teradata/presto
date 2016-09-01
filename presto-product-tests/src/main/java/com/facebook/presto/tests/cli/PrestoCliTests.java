@@ -19,7 +19,6 @@ import com.google.common.io.Files;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
 import com.teradata.tempto.AfterTestWithContext;
-import com.teradata.tempto.ProductTest;
 import com.teradata.tempto.Requirement;
 import com.teradata.tempto.RequirementsProvider;
 import com.teradata.tempto.configuration.Configuration;
@@ -28,40 +27,22 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.List;
 
 import static com.facebook.presto.tests.TestGroups.CLI;
 import static com.facebook.presto.tests.TestGroups.PREPARED_STATEMENTS;
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Strings.repeat;
-import static com.google.common.io.Resources.getResource;
-import static com.google.common.io.Resources.readLines;
 import static com.teradata.tempto.fulfillment.table.hive.tpch.TpchTableDefinitions.NATION;
 import static com.teradata.tempto.process.CliProcess.trimLines;
-import static com.teradata.tempto.process.JavaProcessLauncher.defaultJavaProcessLauncher;
 import static java.lang.String.format;
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
 public class PrestoCliTests
-        extends ProductTest
+        extends PrestoCliLauncher
         implements RequirementsProvider
 {
-    protected static final long TIMEOUT = 300 * 1000; // 30 secs per test
-    protected static final String EXIT_COMMAND = "exit";
-
-    protected final List<String> nationTableInteractiveLines;
-    protected final List<String> nationTableBatchLines;
-
-    @Inject
-    @Named("databases.presto.host")
-    protected String serverHost;
-
-    @Named("databases.presto.server_address")
-    private String serverAddress;
-
     @Inject(optional = true)
     @Named("databases.presto.cli_kerberos_authentication")
     private boolean kerberosAuthentication;
@@ -98,23 +79,15 @@ public class PrestoCliTests
     @Named("databases.presto.jdbc_user")
     private String jdbcUser;
 
-    protected PrestoCliProcess presto;
-
     public PrestoCliTests()
             throws IOException
-    {
-        nationTableInteractiveLines = readLines(getResource("com/facebook/presto/tests/cli/interactive_query.results"), UTF_8);
-        nationTableBatchLines = readLines(getResource("com/facebook/presto/tests/cli/batch_query.results"), UTF_8);
-    }
+    {}
 
     @AfterTestWithContext
     public void stopPresto()
             throws InterruptedException
     {
-        if (presto != null) {
-            presto.getProcessInput().println(EXIT_COMMAND);
-            presto.waitForWithTimeoutAndKill();
-        }
+        super.stopPresto();
     }
 
     @Override
@@ -147,7 +120,6 @@ public class PrestoCliTests
             throws IOException, InterruptedException
     {
         launchPrestoCliWithServerArgument("--execute", "select * from hive.default.nation;");
-
         assertThat(trimLines(presto.readRemainingOutputLines())).containsAll(nationTableBatchLines);
     }
 
@@ -237,17 +209,5 @@ public class PrestoCliTests
             prestoClientOptions.add(arguments);
             launchPrestoCli(prestoClientOptions.build());
         }
-    }
-
-    protected void launchPrestoCli(String... arguments)
-            throws IOException, InterruptedException
-    {
-        launchPrestoCli(asList(arguments));
-    }
-
-    protected void launchPrestoCli(List<String> arguments)
-            throws IOException, InterruptedException
-    {
-        presto = new PrestoCliProcess(defaultJavaProcessLauncher().launch(Presto.class, arguments));
     }
 }
