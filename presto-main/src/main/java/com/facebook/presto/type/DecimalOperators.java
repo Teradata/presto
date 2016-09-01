@@ -348,7 +348,7 @@ public final class DecimalOperators
 
         long rescaledUnsignedDividend = unsignedDividend * longTenToNth(rescaleFactor);
         long quotient = rescaledUnsignedDividend / unsignedDivisor;
-        long remainder = rescaledUnsignedDividend % unsignedDivisor;
+        long remainder = rescaledUnsignedDividend - (quotient * unsignedDivisor);
 
         if (Long.compareUnsigned(remainder * 2, unsignedDivisor) >= 0) {
             quotient++;

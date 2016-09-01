@@ -22,7 +22,6 @@ import sun.misc.Unsafe;
 import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.nio.ByteOrder;
-import java.util.Arrays;
 
 import static com.facebook.presto.spi.StandardErrorCode.DIVISION_BY_ZERO;
 import static com.facebook.presto.spi.StandardErrorCode.NUMERIC_VALUE_OUT_OF_RANGE;
@@ -31,6 +30,8 @@ import static com.facebook.presto.spi.type.Decimals.longTenToNth;
 import static io.airlift.slice.SizeOf.SIZE_OF_INT;
 import static io.airlift.slice.SizeOf.SIZE_OF_LONG;
 import static java.lang.String.format;
+import static java.lang.System.arraycopy;
+import static java.util.Arrays.fill;
 
 /**
  * 128 bit unscaled decimal arithmetic.
@@ -1185,7 +1186,8 @@ public final class UnscaledDecimal128Arithmetic
 
         if (dividendScaleFactor > 0) {
             Slice sliceDividend = Slices.wrappedIntArray(dividend);
-            multiply(sliceDividend, POWERS_OF_TEN[dividendScaleFactor], sliceDividend);
+            multiply(POWERS_OF_FIVE[dividendScaleFactor], sliceDividend, sliceDividend);
+            shiftLeftMultiPrecision(dividend, NUMBER_OF_INTS * 2, dividendScaleFactor);
         }
 
         int[] divisor = new int[NUMBER_OF_INTS * 2];
@@ -1196,7 +1198,8 @@ public final class UnscaledDecimal128Arithmetic
 
         if (divisorScaleFactor > 0) {
             Slice sliceDivisor = Slices.wrappedIntArray(divisor);
-            multiply(sliceDivisor, POWERS_OF_TEN[divisorScaleFactor], sliceDivisor);
+            multiply(POWERS_OF_FIVE[divisorScaleFactor], sliceDivisor, sliceDivisor);
+            shiftLeftMultiPrecision(divisor, NUMBER_OF_INTS * 2, divisorScaleFactor);
         }
 
         int[] multiPrecisionQuotient = new int[NUMBER_OF_INTS * 2];
@@ -1228,31 +1231,32 @@ public final class UnscaledDecimal128Arithmetic
         }
 
         if (divisorLength == 1) {
-            int remainder = divideUnsignedMultiPrecision(dividend, divisor[0]);
+            int remainder = divideUnsignedMultiPrecision(dividend, dividendLength, divisor[0]);
             checkState(dividend[dividend.length - 1] == 0);
-            System.arraycopy(dividend, 0, quotient, 0, quotient.length);
-            Arrays.fill(dividend, 0);
+            arraycopy(dividend, 0, quotient, 0, quotient.length);
+            fill(dividend, 0);
             dividend[0] = remainder;
             return;
         }
 
-        long normalizationScale = (INT_BASE / ((divisor[divisorLength - 1] & LONG_MASK) + 1L));
-        if (normalizationScale > 1) {
-            multiplyUnsignedMultiPrecision(dividend, (int) normalizationScale);
-            multiplyUnsignedMultiPrecision(divisor, (int) normalizationScale);
-        }
+        // normalize divisor. Most significant divisor word must be > BASE/2
+        // effectively it can be achieved by shifting divisor left until the leftmost bit is 1
+        int nlz = Integer.numberOfLeadingZeros(divisor[divisorLength - 1]);
+        shiftLeftMultiPrecision(divisor, divisorLength, nlz);
+        int normalizedDividendLength = Math.min(dividend.length, dividendLength + 1);
+        shiftLeftMultiPrecision(dividend, normalizedDividendLength, nlz);
 
-        divideKnuthNormalized(dividend, divisor, divisorLength, quotient);
-        if (normalizationScale > 1) {
-            divideUnsignedMultiPrecision(dividend, (int) normalizationScale);
-        }
+        divideKnuthNormalized(dividend, normalizedDividendLength, divisor, divisorLength, quotient);
+
+        // un-normalize remainder which is stored in dividend
+        shiftRightMultiPrecision(dividend, normalizedDividendLength, nlz);
     }
 
-    private static void divideKnuthNormalized(int[] remainder, int[] divisor, int divisorLength, int[] quotient)
+    private static void divideKnuthNormalized(int[] remainder, int dividendLength, int[] divisor, int divisorLength, int[] quotient)
     {
-        long v1 = (divisor[divisorLength - 1] & LONG_MASK);
-        long v0 = (divisor[divisorLength - 2] & LONG_MASK);
-        for (int reminderIndex = remainder.length - 1; reminderIndex >= divisorLength; reminderIndex--) {
+        int v1 = divisor[divisorLength - 1];
+        int v0 = divisor[divisorLength - 2];
+        for (int reminderIndex = dividendLength - 1; reminderIndex >= divisorLength; reminderIndex--) {
             int qHat = estimateQuotient(remainder[reminderIndex], remainder[reminderIndex - 1], remainder[reminderIndex - 2], v1, v0);
             if (qHat != 0) {
                 boolean overflow = multiplyAndSubtractUnsignedMultiPrecision(remainder, reminderIndex, divisor, divisorLength, qHat);
@@ -1272,16 +1276,19 @@ public final class UnscaledDecimal128Arithmetic
      * u{x} - dividend
      * v{v} - divisor
      */
-    private static int estimateQuotient(int u2, int u1, int u0, long v1, long v0)
+    private static int estimateQuotient(int u2, int u1, int u0, int v1, int v0)
     {
         // estimate qhat based on the first 2 digits of divisor divided by the first digit of a dividend
         long u21 = combineInts(u2, u1);
         long qhat;
-        if ((u2 & LONG_MASK) == v1) {
+        if (u2 == v1) {
             qhat = INT_BASE - 1;
         }
+        else if (u21 >= 0) {
+            qhat = u21 / (v1 & LONG_MASK);
+        }
         else {
-            qhat = Long.divideUnsigned(u21, v1);
+            qhat = divideUnsignedLong(u21, v1);
         }
 
         if (qhat == 0) {
@@ -1300,11 +1307,11 @@ public final class UnscaledDecimal128Arithmetic
         // When ((u21 - v1 * qhat) * b + u0) is less than (v0 * qhat) decrease qhat by one
 
         int iterations = 0;
-        long rhat = u21 - v1 * qhat;
-        while (Long.compareUnsigned(rhat, INT_BASE) < 0 && Long.compareUnsigned(v0 * qhat, combineInts(lowInt(rhat), u0)) > 0) {
+        long rhat = u21 - (v1 & LONG_MASK) * qhat;
+        while (Long.compareUnsigned(rhat, INT_BASE) < 0 && Long.compareUnsigned((v0 & LONG_MASK) * qhat, combineInts(lowInt(rhat), u0)) > 0) {
             iterations++;
             qhat--;
-            rhat += v1;
+            rhat += (v1 & LONG_MASK);
         }
 
         if (iterations > 2) {
@@ -1312,6 +1319,25 @@ public final class UnscaledDecimal128Arithmetic
         }
 
         return (int) qhat;
+    }
+
+    private static long divideUnsignedLong(long dividend, int divisor)
+    {
+        if (divisor == 1) {
+            return dividend;
+        }
+        long unsignedDivisor = divisor & LONG_MASK;
+        long quotient = (dividend >>> 1) / (unsignedDivisor >>> 1);
+        long remainder = dividend - quotient * unsignedDivisor;
+        while (remainder < 0) {
+            remainder += unsignedDivisor;
+            quotient--;
+        }
+        while (remainder >= unsignedDivisor) {
+            remainder -= unsignedDivisor;
+            quotient++;
+        }
+        return quotient;
     }
 
     /**
@@ -1348,30 +1374,86 @@ public final class UnscaledDecimal128Arithmetic
         left[leftIndex] += carry;
     }
 
-    private static void multiplyUnsignedMultiPrecision(int[] mutableNumber, int multiplier)
+    // visible for testing
+    static int[] shiftLeftMultiPrecision(int[] number, int length, int shifts)
     {
-        long multiplierUnsigned = multiplier & LONG_MASK;
-        long product = 0L;
-        for (int i = 0; i < mutableNumber.length; ++i) {
-            product = (mutableNumber[i] & LONG_MASK) * multiplierUnsigned + (product >>> 32);
-            mutableNumber[i] = (int) product;
+        if (shifts == 0) {
+            return number;
         }
-        if ((product >>> 32) != 0) {
-            throwOverflowException();
+        // wordShifts = shifts / 32
+        int wordShifts = shifts >>> 5;
+        // we don't wan't to loose any leading bits
+        for (int i = 0; i < wordShifts; i++) {
+            checkState(number[length - i - 1] == 0);
         }
+        if (wordShifts > 0) {
+            arraycopy(number, 0, number, wordShifts, length - wordShifts);
+            fill(number, 0, wordShifts, 0);
+        }
+        // bitShifts = shifts % 32
+        int bitShifts = shifts & 0b11111;
+        if (bitShifts > 0) {
+            // we don't wan't to loose any leading bits
+            checkState(number[length - 1] >>> (Integer.SIZE - bitShifts) == 0);
+            for (int position = length - 1; position > 0; position--) {
+                number[position] = (number[position] << bitShifts) | (number[position - 1] >>> (Integer.SIZE - bitShifts));
+            }
+            number[0] = number[0] << bitShifts;
+        }
+        return number;
     }
 
-    private static int divideUnsignedMultiPrecision(int[] dividend, int divisor)
+    // visible for testing
+    static int[] shiftRightMultiPrecision(int[] number, int length, int shifts)
+    {
+        if (shifts == 0) {
+            return number;
+        }
+        // wordShifts = shifts / 32
+        int wordShifts = shifts >>> 5;
+        // we don't wan't to loose any trailing bits
+        for (int i = 0; i < wordShifts; i++) {
+            checkState(number[i] == 0);
+        }
+        if (wordShifts > 0) {
+            arraycopy(number, wordShifts, number, 0, length - wordShifts);
+            fill(number, length - wordShifts, length, 0);
+        }
+        // bitShifts = shifts % 32
+        int bitShifts = shifts & 0b11111;
+        if (bitShifts > 0) {
+            // we don't wan't to loose any trailing bits
+            checkState(number[0] << (Integer.SIZE - bitShifts) == 0);
+            for (int position = 0; position < length - 1; position++) {
+                number[position] = (number[position] >>> bitShifts) | (number[position + 1] << (Integer.SIZE - bitShifts));
+            }
+            number[length - 1] = number[length - 1] >>> bitShifts;
+        }
+        return number;
+    }
+
+    private static int divideUnsignedMultiPrecision(int[] dividend, int dividendLength, int divisor)
     {
         if (divisor == 0) {
             throwDivisionByZeroException();
         }
+
+        if (dividendLength == 1) {
+            long dividendUnsigned = dividend[0] & LONG_MASK;
+            long divisorUnsigned = divisor & LONG_MASK;
+            long quotient = dividendUnsigned / divisorUnsigned;
+            long remainder = dividendUnsigned - (divisorUnsigned * quotient);
+            dividend[0] = (int) quotient;
+            return (int) remainder;
+        }
+
         long divisorUnsigned = divisor & LONG_MASK;
         long remainder = 0;
-        for (int dividendIndex = dividend.length - 1; dividendIndex >= 0; dividendIndex--) {
+        for (int dividendIndex = dividendLength - 1; dividendIndex >= 0; dividendIndex--) {
             remainder = (remainder << 32) + (dividend[dividendIndex] & LONG_MASK);
-            dividend[dividendIndex] = (int) (remainder / divisorUnsigned);
-            remainder = remainder % divisorUnsigned;
+            long quotient = remainder / divisorUnsigned;
+            dividend[dividendIndex] = (int) quotient;
+            remainder = remainder - (quotient * divisorUnsigned);
         }
         return (int) remainder;
     }
