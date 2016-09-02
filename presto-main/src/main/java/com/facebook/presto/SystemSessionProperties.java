@@ -61,6 +61,7 @@ public final class SystemSessionProperties
     public static final String SPLIT_CONCURRENCY_ADJUSTMENT_INTERVAL = "split_concurrency_adjustment_interval";
     public static final String OPTIMIZE_METADATA_QUERIES = "optimize_metadata_queries";
     public static final String QUERY_PRIORITY = "query_priority";
+    public static final String REORDER_WINDOWS = "reorder_windows";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -219,6 +220,11 @@ public final class SystemSessionProperties
                         COLOCATED_JOIN,
                         "Experimental: Use a colocated join when possible",
                         featuresConfig.isColocatedJoinsEnabled(),
+                        false),
+                booleanSessionProperty(
+                        REORDER_WINDOWS,
+                        "Allow reordering window functions in query",
+                        featuresConfig.isReorderWindows(),
                         false));
     }
 
@@ -332,6 +338,11 @@ public final class SystemSessionProperties
         Integer priority = session.getProperty(QUERY_PRIORITY, Integer.class);
         checkArgument(priority > 0, "Query priority must be positive");
         return priority;
+    }
+
+    public static boolean isReorderWindowsEnabled(Session session)
+    {
+        return session.getProperty(REORDER_WINDOWS, Boolean.class);
     }
 
     public static Duration getSplitConcurrencyAdjustmentInterval(Session session)

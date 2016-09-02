@@ -45,6 +45,7 @@ public class FeaturesConfig
     private boolean optimizeMetadataQueries;
     private boolean optimizeHashGeneration = true;
     private boolean optimizeSingleDistinct = true;
+    private boolean optimizerReorderWindows = true;
     private boolean pushTableWriteThroughUnion = true;
     private boolean legacyArrayAgg;
 
@@ -229,6 +230,18 @@ public class FeaturesConfig
     public FeaturesConfig setDictionaryAggregation(boolean dictionaryAggregation)
     {
         this.dictionaryAggregation = dictionaryAggregation;
+        return this;
+    }
+
+    public boolean isReorderWindows()
+    {
+        return optimizerReorderWindows;
+    }
+
+    @Config("optimizer.reorder-windows")
+    public FeaturesConfig setReorderWindows(boolean reorderWindows)
+    {
+        this.optimizerReorderWindows = reorderWindows;
         return this;
     }
 

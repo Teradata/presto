@@ -3301,6 +3301,47 @@ public abstract class AbstractTestQueries
     }
 
     @Test
+    public void testWindowsSameOrdering()
+            throws Exception
+    {
+        assertQuery("SELECT " +
+                    "sum(quantity) OVER(PARTITION BY suppkey ORDER BY orderkey)," +
+                    "min(tax) OVER(PARTITION BY suppkey ORDER BY shipdate)" +
+                    "FROM lineitem");
+    }
+
+    @Test
+    public void testWindowsPrefixPartitioning()
+            throws Exception
+    {
+        assertQuery("SELECT " +
+                    "avg(discount) OVER(PARTITION BY suppkey, tax ORDER BY receiptdate)," +
+                    "sum(quantity) OVER(PARTITION BY suppkey ORDER BY orderkey)" +
+                    "FROM lineitem");
+    }
+
+    @Test
+    public void testWindowsDifferentPartitions()
+            throws Exception
+    {
+        assertQuery("SELECT " +
+                "sum(quantity) OVER(PARTITION BY suppkey ORDER BY orderkey)," +
+                "avg(discount) OVER(PARTITION BY partkey ORDER BY receiptdate)," +
+                "min(tax) OVER(PARTITION BY suppkey, tax ORDER BY receiptdate)" +
+                "FROM lineitem");
+    }
+
+    @Test
+    public void testWindowsConstantExpression()
+            throws Exception
+    {
+        assertQuery("SELECT " +
+                "avg(discount) OVER(PARTITION BY suppkey ORDER BY receiptdate)," +
+                "lag(quantity, 1) OVER(PARTITION BY suppkey ORDER BY orderkey)" +
+                "FROM lineitem");
+    }
+
+    @Test
     public void testHaving()
             throws Exception
     {
