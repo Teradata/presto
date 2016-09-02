@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.planner.assertions;
 
 import com.facebook.presto.sql.tree.AstVisitor;
+import com.facebook.presto.sql.tree.Cast;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.GenericLiteral;
@@ -113,6 +114,16 @@ final class ExpressionVerifier
         else {
             throw new IllegalArgumentException("Unsupported literal expression type: " + expression.getClass().getName());
         }
+    }
+
+    @Override
+    protected Boolean visitCast(Cast actual, Expression expectedExpession)
+    {
+        if (expectedExpession instanceof Cast) {
+            Cast expected = (Cast) expectedExpession;
+            return process(actual.getExpression(), expected.getExpression());
+        }
+        return false;
     }
 
     @Override

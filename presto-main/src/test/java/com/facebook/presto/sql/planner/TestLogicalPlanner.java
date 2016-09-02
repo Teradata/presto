@@ -27,6 +27,8 @@ import com.facebook.presto.testing.LocalQueryRunner;
 import com.facebook.presto.tpch.TpchConnectorFactory;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import org.intellij.lang.annotations.Language;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import java.util.List;
@@ -54,10 +56,12 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
 public class TestLogicalPlanner
+    implements PlanTester
 {
-    private final LocalQueryRunner queryRunner;
+    private LocalQueryRunner queryRunner;
 
-    public TestLogicalPlanner()
+    @BeforeTest
+    public void setUp()
     {
         this.queryRunner = new LocalQueryRunner(testSessionBuilder()
                 .setCatalog("local")
@@ -72,7 +76,7 @@ public class TestLogicalPlanner
     @Test
     public void testJoin()
     {
-        assertPlan("SELECT o.orderkey FROM orders o, lineitem l WHERE l.orderkey = o.orderkey",
+        assertPlanMatches("SELECT o.orderkey FROM orders o, lineitem l WHERE l.orderkey = o.orderkey",
                 anyTree(
                         join(INNER, ImmutableList.of(aliasPair("O", "L")),
                                 any(
@@ -84,7 +88,7 @@ public class TestLogicalPlanner
     @Test
     public void testUncorrelatedSubqueries()
     {
-        assertPlan("SELECT * FROM orders WHERE orderkey = (SELECT orderkey FROM lineitem ORDER BY orderkey LIMIT 1)",
+        assertPlanMatches("SELECT * FROM orders WHERE orderkey = (SELECT orderkey FROM lineitem ORDER BY orderkey LIMIT 1)",
                 anyTree(
                         join(INNER, ImmutableList.of(aliasPair("X", "Y")),
                                 project(
@@ -94,7 +98,7 @@ public class TestLogicalPlanner
                                                 anyTree(
                                                         tableScan("lineitem").withSymbol("orderkey", "Y")))))));
 
-        assertPlan("SELECT * FROM orders WHERE orderkey IN (SELECT orderkey FROM lineitem WHERE linenumber % 4 = 0)",
+        assertPlanMatches("SELECT * FROM orders WHERE orderkey IN (SELECT orderkey FROM lineitem WHERE linenumber % 4 = 0)",
                 anyTree(
                         filter("S",
                                 project(
@@ -104,7 +108,7 @@ public class TestLogicalPlanner
                                                 anyTree(
                                                         tableScan("lineitem").withSymbol("orderkey", "Y")))))));
 
-        assertPlan("SELECT * FROM orders WHERE orderkey NOT IN (SELECT orderkey FROM lineitem WHERE linenumber < 0)",
+        assertPlanMatches("SELECT * FROM orders WHERE orderkey NOT IN (SELECT orderkey FROM lineitem WHERE linenumber < 0)",
                 anyTree(
                         filter("NOT S",
                                 project(
@@ -122,7 +126,7 @@ public class TestLogicalPlanner
                 .put("name", singleValue(createVarcharType(25), utf8Slice("blah")))
                 .build();
 
-        assertPlan(
+        assertPlanMatches(
                 "SELECT nationkey FROM nation LEFT OUTER JOIN region " +
                         "ON nation.regionkey = region.regionkey and nation.name = region.name WHERE nation.name = 'blah'",
                 anyTree(
@@ -187,7 +191,7 @@ public class TestLogicalPlanner
     @Test
     public void testCorrelatedSubqueries()
     {
-        assertPlan(
+        assertPlanMatches(
                 "SELECT orderkey FROM orders WHERE 3 = (SELECT orderkey)",
                 LogicalPlanner.Stage.OPTIMIZED,
                 anyTree(
@@ -200,7 +204,7 @@ public class TestLogicalPlanner
                                                 ))))));
 
         // double nesting
-        assertPlan(
+        assertPlanMatches(
                 "SELECT orderkey FROM orders o " +
                         "WHERE 3 IN (SELECT o.custkey FROM lineitem l WHERE (SELECT l.orderkey = o.orderkey))",
                 LogicalPlanner.Stage.OPTIMIZED,
@@ -218,21 +222,26 @@ public class TestLogicalPlanner
                                                                 ))))))));
     }
 
-    private void assertPlan(String sql, PlanMatchPattern pattern)
+    public void assertPlanDoesNotMatch(@Language("SQL") String sql, PlanMatchPattern pattern)
     {
-        assertPlan(sql, LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED, pattern);
+        throw new UnsupportedOperationException("assertPlanDoesNotMatch() is not supported");
     }
 
-    private void assertPlan(String sql, LogicalPlanner.Stage stage, PlanMatchPattern pattern)
+    public void assertPlanMatches(@Language("SQL") String sql, PlanMatchPattern pattern)
+    {
+        assertPlanMatches(sql, LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED, pattern);
+    }
+
+    private void assertPlanMatches(@Language("SQL") String sql, LogicalPlanner.Stage stage, PlanMatchPattern pattern)
     {
         Plan actualPlan = plan(sql, stage);
         queryRunner.inTransaction(transactionSession -> {
-            PlanAssert.assertPlan(transactionSession, queryRunner.getMetadata(), actualPlan, pattern);
+            PlanAssert.assertPlanMatches(transactionSession, queryRunner.getMetadata(), actualPlan, pattern);
             return null;
         });
     }
 
-    private Plan plan(String sql)
+    public Plan plan(String sql)
     {
         return plan(sql, LogicalPlanner.Stage.OPTIMIZED_AND_VALIDATED);
     }

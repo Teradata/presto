@@ -126,7 +126,7 @@ public class TestMergeIdenticalWindows
 
         Plan actualPlan = queryRunner.inTransaction(transactionSession -> queryRunner.createPlan(transactionSession, sql));
         queryRunner.inTransaction(transactionSession -> {
-            PlanAssert.assertPlan(transactionSession, queryRunner.getMetadata(), actualPlan, pattern);
+            PlanAssert.assertPlanMatches(transactionSession, queryRunner.getMetadata(), actualPlan, pattern);
             return null;
         });
     }
@@ -323,7 +323,7 @@ public class TestMergeIdenticalWindows
     {
         Plan actualPlan = unitPlan(sql);
         queryRunner.inTransaction(transactionSession -> {
-            PlanAssert.assertPlan(transactionSession, queryRunner.getMetadata(), actualPlan, pattern);
+            PlanAssert.assertPlanMatches(transactionSession, queryRunner.getMetadata(), actualPlan, pattern);
             return null;
         });
     }
