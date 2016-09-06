@@ -14,12 +14,12 @@
 package com.facebook.presto.operator.scalar;
 
 import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.function.Constraint;
 import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.LiteralParameters;
 import com.facebook.presto.spi.function.ScalarFunction;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.type.StandardTypes;
-import com.facebook.presto.type.Constraint;
 import com.facebook.presto.type.Re2JRegexp;
 import com.facebook.presto.type.Re2JRegexpType;
 import io.airlift.slice.Slice;
