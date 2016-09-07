@@ -95,6 +95,7 @@ import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.transaction.TransactionManager.createTestTransactionManager;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
+import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.transform;
 import static java.lang.String.format;
@@ -525,6 +526,24 @@ public class MetadataManager
         ConnectorSession connectorSession = session.toConnectorSession(entry.getCatalog());
         return metadata.getNewTableLayout(connectorSession, tableMetadata.getMetadata())
                 .map(layout -> new NewTableLayout(entry.getConnectorId(), transactionHandle, layout));
+    }
+
+    @Override
+    public void beginQuery(Session session, Collection<TableHandle> tableHandles)
+    {
+        Set<String> distrinctConnectors = retrieveConnectorIds(tableHandles);
+
+        for (String connectorId : distrinctConnectors) {
+            ConnectorEntry entry = connectorsById.get(connectorId);
+            ConnectorSession connectorSession = session.toConnectorSession(entry.getCatalog());
+            ConnectorMetadata metadata = entry.getMetadata(session);
+            metadata.beginQuery(connectorSession);
+        }
+    }
+
+    private static Set<String> retrieveConnectorIds(Collection<TableHandle> tableHandles)
+    {
+        return tableHandles.stream().map(TableHandle::getConnectorId).collect(toImmutableSet());
     }
 
     @Override
