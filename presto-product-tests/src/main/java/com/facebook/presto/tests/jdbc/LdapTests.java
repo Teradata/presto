@@ -110,7 +110,8 @@ public class LdapTests
     {
         if (usingTeradataJdbcDriver(defaultQueryExecutor().getConnection())) {
             if (prestoSslPort == null) {
-                LOGGER.debug("prestoSslPort not specified in properties file.  Using default value.");
+                LOGGER.warn("databases.presto.ssl_port not specified in properties file.  Using default value: " +
+                        DEFAULT_SSL_PORT);
                 prestoSslPort = DEFAULT_SSL_PORT;
             }
             LOGGER.debug("Using Presto server SSL port: " + prestoSslPort);
