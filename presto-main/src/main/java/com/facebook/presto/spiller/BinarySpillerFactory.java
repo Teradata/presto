@@ -67,4 +67,10 @@ public class BinarySpillerFactory
     {
         return new BinaryFileSpiller(blockEncodingSerde, executor, spillPath, spilledBytes);
     }
+
+    @Override
+    public SingleStreamSpiller createSingleStreamSpiller(List<Type> types)
+    {
+        return new BinaryFileSingleStreamSpiller(blockEncodingSerde, executor, spillPath);
+    }
 }
