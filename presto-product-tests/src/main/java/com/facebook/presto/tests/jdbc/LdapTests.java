@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.tests.jdbc;
 
-import com.facebook.presto.tests.ImmutableTpchTablesRequirements;
+import com.facebook.presto.tests.ImmutableTpchTablesRequirements.ImmutableNationTable;
 import com.google.inject.Inject;
 import com.google.inject.name.Named;
 import com.teradata.tempto.BeforeTestWithContext;
@@ -25,7 +25,6 @@ import com.teradata.tempto.configuration.Configuration;
 import com.teradata.tempto.fulfillment.ldap.LdapObjectRequirement;
 import com.teradata.tempto.query.QueryResult;
 import org.slf4j.LoggerFactory;
-import org.testng.TestException;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -52,21 +51,31 @@ import static com.facebook.presto.tests.TpchTableResults.PRESTO_NATION_RESULT;
 import static com.facebook.presto.tests.utils.JdbcDriverUtils.usingTeradataJdbcDriver;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
 import static com.teradata.tempto.query.QueryExecutor.defaultQueryExecutor;
-import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 public class LdapTests
         extends ProductTest
         implements RequirementsProvider
 
 {
-    private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(JdbcTests.class);
+    private static final org.slf4j.Logger LOGGER = LoggerFactory.getLogger(LdapTests.class);
     private static final long TIMEOUT = 300 * 1000; // 30 secs per test
 
-    private static final String SELECT_QUERY = "select * from tpch.tiny.nation";
+    private static final String NATION_SELECT_ALL_QUERY = "select * from tpch.tiny.nation";
     private static final String JDBC_URL_FORMAT = "jdbc:presto://%s:%s;AuthenticationType=LDAP Authentication;" +
             "SSLTrustStorePath=%s;SSLTrustStorePwd=%s;AllowSelfSignedServerCert=1;AllowHostNameCNMismatch=1";
 
     private static final String DEFAULT_SSL_PORT = "8443";
+
+    private static final String SSL_CERTIFICATE_ERROR =
+            "[Teradata][Presto](100140) SSL certificate error: Keystore was tampered with, or password was incorrect.";
+    private static final String INVALID_CREDENTIALS_ERROR =
+            "[Teradata][Presto](100240) Authentication failed: Invalid credentials.";
+    private static final String UNAUTHORIZED_USER_ERROR =
+            "[Teradata][Presto](100240) Authentication failed: Unauthorized User.";
+    private static final String INVALID_SSL_PROPERTY =
+            "[Teradata][Presto](100200) Connection string is invalid: SSL value is not valid for given AuthenticationType.";
 
     @Inject(optional = true)
     @Named("databases.presto.cli_ldap_truststore_path")
@@ -95,14 +104,13 @@ public class LdapTests
 
     private boolean usingTeradataDriver = false;
 
-    private static final String INVALID_CREDENTIALS = "Invalid credentials";
-
     @BeforeTestWithContext
     public void setup()
             throws SQLException
     {
         if (usingTeradataJdbcDriver(defaultQueryExecutor().getConnection())) {
             if (prestoSslPort == null) {
+                LOGGER.debug("prestoSslPort not specified in properties file.  Using default value.");
                 prestoSslPort = DEFAULT_SSL_PORT;
             }
             LOGGER.debug("Using Presto server SSL port: " + prestoSslPort);
@@ -124,13 +132,13 @@ public class LdapTests
                 ));
     }
 
-    @Requires(ImmutableTpchTablesRequirements.ImmutableNationTable.class)
+    @Requires(ImmutableNationTable.class)
     @Test(groups = {LDAP, SIMBA_JDBC, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
     public void shouldRunQueryWithLdap()
             throws InterruptedException, SQLException
     {
         if (usingTeradataDriver) {
-            assertThat(executeQuery(SELECT_QUERY, ldapUserName, ldapUserPassword)).matches(PRESTO_NATION_RESULT);
+            assertThat(executeLdapQuery(NATION_SELECT_ALL_QUERY, ldapUserName, ldapUserPassword)).matches(PRESTO_NATION_RESULT);
         }
     }
 
@@ -169,7 +177,7 @@ public class LdapTests
             throws IOException, InterruptedException
     {
         if (usingTeradataDriver) {
-            expectQueryToFail(ldapUserName, "wrong_password", INVALID_CREDENTIALS);
+            expectQueryToFail(ldapUserName, "wrong_password", INVALID_CREDENTIALS_ERROR);
         }
     }
 
@@ -178,7 +186,7 @@ public class LdapTests
             throws IOException, InterruptedException
     {
         if (usingTeradataDriver) {
-            expectQueryToFail("invalid_user", ldapUserPassword, INVALID_CREDENTIALS);
+            expectQueryToFail("invalid_user", ldapUserPassword, INVALID_CREDENTIALS_ERROR);
         }
     }
 
@@ -187,7 +195,7 @@ public class LdapTests
             throws IOException, InterruptedException
     {
         if (usingTeradataDriver) {
-            expectQueryToFail("", ldapUserPassword, INVALID_CREDENTIALS);
+            expectQueryToFail("", ldapUserPassword, INVALID_CREDENTIALS_ERROR);
         }
     }
 
@@ -196,7 +204,7 @@ public class LdapTests
             throws IOException, InterruptedException
     {
         if (usingTeradataDriver) {
-            expectQueryToFail(ldapUserName, "", INVALID_CREDENTIALS);
+            expectQueryToFail(ldapUserName, "", INVALID_CREDENTIALS_ERROR);
         }
     }
 
@@ -207,11 +215,10 @@ public class LdapTests
         if (usingTeradataDriver) {
             try {
                 DriverManager.getConnection(getLdapUrl() + ";SSL=0", ldapUserName, ldapUserPassword);
-                throw new TestException("Expected exception was not thrown.");
+                fail();
             }
             catch (SQLException exception) {
-                LOGGER.debug("shouldFailQueryForLdapWithoutSsl", exception);
-                assertTrue(exception.getMessage().contains("SSL value is not valid for given AuthenticationType"));
+                assertEquals(exception.getMessage(), INVALID_SSL_PROPERTY);
             }
         }
     }
@@ -224,44 +231,48 @@ public class LdapTests
             try {
                 String url = String.format(JDBC_URL_FORMAT, prestoHost, prestoSslPort, ldapTruststorePath, "wrong_password");
                 DriverManager.getConnection(url, ldapUserName, ldapUserPassword);
-                throw new TestException("Expected exception was not thrown.");
+                fail();
             }
             catch (SQLException exception) {
-                LOGGER.debug("shouldFailForIncorrectTrustStore", exception);
-                assertTrue(exception.getMessage().contains("Keystore was tampered with, or password was incorrect"));
+                assertEquals(exception.getMessage(), SSL_CERTIFICATE_ERROR);
             }
         }
     }
 
+    @Test(groups = {LDAP, SIMBA_JDBC, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
+    public void shouldFailForUserWithColon()
+           throws SQLException, InterruptedException
+    {
+        expectQueryToFail("UserWith:Colon", ldapUserPassword, "Illegal character ':' found in user name");
+    }
+
     private void expectQueryToFailForUserNotInGroup(String user)
     {
-        expectQueryToFail(user, ldapUserPassword,
-                String.format("Authentication failed: User %s not a member of the group", user));
+        expectQueryToFail(user, ldapUserPassword, UNAUTHORIZED_USER_ERROR);
     }
 
     private void expectQueryToFail(String user, String password, String message)
     {
         try {
-            executeQuery(SELECT_QUERY, user, password);
-            throw new TestException("Expected exception was not thrown.");
+            executeLdapQuery(NATION_SELECT_ALL_QUERY, user, password);
+            fail();
         }
         catch (SQLException exception) {
-            LOGGER.debug("expectQueryToFail", exception);
-            assertTrue(exception.getMessage().contains(message));
+            assertEquals(exception.getMessage(), message);
         }
     }
 
-    private QueryResult executeQuery(String query, String name, String password)
+    private QueryResult executeLdapQuery(String query, String name, String password)
         throws SQLException
     {
-        try (Connection connection = getConnection(name, password)) {
+        try (Connection connection = getLdapConnection(name, password)) {
             Statement statement = connection.createStatement();
             ResultSet rs = statement.executeQuery(query);
             return QueryResult.forResultSet(rs);
         }
     }
 
-    private Connection getConnection(String name, String password)
+    private Connection getLdapConnection(String name, String password)
             throws SQLException
     {
         return DriverManager.getConnection(getLdapUrl(), name, password);
