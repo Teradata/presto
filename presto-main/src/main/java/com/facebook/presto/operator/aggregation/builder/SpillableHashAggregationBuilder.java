@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator.aggregation.builder;
 
+import com.facebook.presto.memory.AbstractAggregatedMemoryContext;
 import com.facebook.presto.memory.LocalMemoryContext;
 import com.facebook.presto.operator.MergeSort;
 import com.facebook.presto.operator.OperatorContext;
@@ -49,7 +50,8 @@ public class SpillableHashAggregationBuilder
     private Optional<Spiller> spiller = Optional.empty();
     private Optional<MergingHashAggregationBuilder> merger = Optional.empty();
     private CompletableFuture<?> spillInProgress = CompletableFuture.completedFuture(null);
-    private final LocalMemoryContext systemMemoryContext;
+    private final LocalMemoryContext aggregationMemoryContext;
+    private final LocalMemoryContext spillMemoryContext;
 
     public SpillableHashAggregationBuilder(
             List<AccumulatorFactory> accumulatorFactories,
@@ -71,7 +73,10 @@ public class SpillableHashAggregationBuilder
         this.operatorContext = operatorContext;
         this.memorySizeBeforeSpill = memoryLimitBeforeSpill.toBytes();
         this.spillerFactory = spillerFactory;
-        this.systemMemoryContext = operatorContext.getSystemMemoryContext().newLocalMemoryContext();
+
+        AbstractAggregatedMemoryContext systemMemoryContext = operatorContext.getSystemMemoryContext();
+        this.aggregationMemoryContext = systemMemoryContext.newLocalMemoryContext();
+        this.spillMemoryContext = systemMemoryContext.newLocalMemoryContext();
 
         rebuildHashAggregationBuilder();
     }
@@ -89,7 +94,12 @@ public class SpillableHashAggregationBuilder
 
     public boolean checkFullAndUpdateMemory()
     {
-        systemMemoryContext.setBytes(hashAggregationBuilder.getSizeInMemory());
+        aggregationMemoryContext.setBytes(hashAggregationBuilder.getSizeInMemory());
+
+        if (spillInProgress.isDone()) {
+            spillMemoryContext.setBytes(0L);
+        }
+
         return false;
     }
 
@@ -144,9 +154,11 @@ public class SpillableHashAggregationBuilder
 
         // start spilling process with current content of the hashAggregationBuilder builder...
         spillInProgress = spiller.get().spill(hashAggregationBuilder.buildResultSorted());
+        spillMemoryContext.setBytes(hashAggregationBuilder.getSizeInMemory());
         // ... and immediately create new hashAggregationBuilder so effectively memory ownership
         // over hashAggregationBuilder is transferred from this thread to a spilling thread
         rebuildHashAggregationBuilder();
+        aggregationMemoryContext.setBytes(hashAggregationBuilder.getSizeInMemory());
 
         return spillInProgress;
     }
@@ -168,7 +180,7 @@ public class SpillableHashAggregationBuilder
                 hashChannel,
                 operatorContext,
                 mergedSpilledPages,
-                systemMemoryContext,
+                operatorContext.getSystemMemoryContext().newLocalMemoryContext(),
                 memorySizeBeforeSpill,
                 hashAggregationBuilder.getKeyChannels()));
 
