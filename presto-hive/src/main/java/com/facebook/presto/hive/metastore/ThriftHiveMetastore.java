@@ -64,6 +64,7 @@ import static com.facebook.presto.hive.HiveUtil.PRESTO_VIEW_FLAG;
 import static com.facebook.presto.hive.metastore.HivePrivilegeInfo.HivePrivilege.OWNERSHIP;
 import static com.facebook.presto.hive.metastore.HivePrivilegeInfo.parsePrivilege;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.function.Function.identity;
@@ -539,9 +540,21 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public void grantTablePrivileges(String databaseName, String tableName, String grantee, Set<PrivilegeGrantInfo> privilegeGrantInfoSet)
+    public void grantTablePrivileges(String databaseName, String tableName, String grantee, Set<PrivilegeGrantInfo> requestedPrivileges)
     {
+        checkArgument(!containsAllPrivilege(requestedPrivileges), "\"ALL\" not supported in PrivilegeGrantInfo.privilege");
+
         try {
+            Set<HivePrivilegeInfo> existingPrivileges = getTablePrivileges(grantee, databaseName, tableName);
+
+            Set<PrivilegeGrantInfo> privilegesToGrant = requestedPrivileges.stream()
+                    .filter(privilege -> !existingPrivileges.contains(getOnlyElement(parsePrivilege(privilege))))
+                    .collect(toSet());
+
+            if (privilegesToGrant.isEmpty()) {
+                return;
+            }
+
             retry()
                     .stopOnIllegalExceptions()
                     .run("grantTablePrivileges", stats.getGrantTablePrivileges().wrap(() -> {
@@ -556,7 +569,7 @@ public class ThriftHiveMetastore
                             }
 
                             ImmutableList.Builder<HiveObjectPrivilege> privilegeBagBuilder = ImmutableList.builder();
-                            for (PrivilegeGrantInfo privilegeGrantInfo : privilegeGrantInfoSet) {
+                            for (PrivilegeGrantInfo privilegeGrantInfo : privilegesToGrant) {
                                 privilegeBagBuilder.add(
                                         new HiveObjectPrivilege(new HiveObjectRef(HiveObjectType.TABLE, databaseName, tableName, null, null),
                                                 grantee,
@@ -564,7 +577,6 @@ public class ThriftHiveMetastore
                                                 privilegeGrantInfo));
                             }
                             // TODO: Check whether the user/role exists in the hive metastore.
-                            // TODO: Check whether the user already has the given privilege.
                             metastoreClient.grantPrivileges(new PrivilegeBag(privilegeBagBuilder.build()));
                         }
                         return null;
@@ -579,9 +591,21 @@ public class ThriftHiveMetastore
     }
 
     @Override
-    public void revokeTablePrivileges(String databaseName, String tableName, String grantee, Set<PrivilegeGrantInfo> privilegeGrantInfoSet)
+    public void revokeTablePrivileges(String databaseName, String tableName, String grantee, Set<PrivilegeGrantInfo> requestedPrivileges)
     {
+        checkArgument(!containsAllPrivilege(requestedPrivileges), "\"ALL\" not supported in PrivilegeGrantInfo.privilege");
+
         try {
+            Set<HivePrivilegeInfo> existingPrivileges = getTablePrivileges(grantee, databaseName, tableName);
+
+            Set<PrivilegeGrantInfo> privilegesToRevoke = requestedPrivileges.stream()
+                    .filter(privilege -> existingPrivileges.contains(getOnlyElement(parsePrivilege(privilege))))
+                    .collect(toSet());
+
+            if (privilegesToRevoke.isEmpty()) {
+                return;
+            }
+
             retry()
                     .stopOnIllegalExceptions()
                     .run("revokeTablePrivileges", stats.getRevokeTablePrivileges().wrap(() -> {
@@ -596,7 +620,7 @@ public class ThriftHiveMetastore
                             }
 
                             ImmutableList.Builder<HiveObjectPrivilege> privilegeBagBuilder = ImmutableList.builder();
-                            for (PrivilegeGrantInfo privilegeGrantInfo : privilegeGrantInfoSet) {
+                            for (PrivilegeGrantInfo privilegeGrantInfo : privilegesToRevoke) {
                                 privilegeBagBuilder.add(
                                         new HiveObjectPrivilege(
                                                 new HiveObjectRef(HiveObjectType.TABLE, databaseName, tableName, null, null),
@@ -605,7 +629,6 @@ public class ThriftHiveMetastore
                                                 privilegeGrantInfo));
                             }
                             // TODO: Check whether the user/role exists in the hive metastore.
-                            // TODO: Check whether the user possesses the given privilege before revoking.
                             metastoreClient.revokePrivileges(new PrivilegeBag(privilegeBagBuilder.build()));
                         }
                         return null;
@@ -620,6 +643,12 @@ public class ThriftHiveMetastore
             }
             throw Throwables.propagate(e);
         }
+    }
+
+    private boolean containsAllPrivilege(Set<PrivilegeGrantInfo> requestedPrivileges)
+    {
+        return requestedPrivileges.stream()
+                .anyMatch(privilege -> privilege.getPrivilege().equalsIgnoreCase("all"));
     }
 
     private Set<HivePrivilegeInfo> getPrivileges(String user, HiveObjectRef objectReference)
