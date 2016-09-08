@@ -18,8 +18,10 @@ import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.memory.VersionedMemoryPoolId;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.MetadataManager;
+import com.facebook.presto.metadata.QualifiedObjectName;
 import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.spi.QueryId;
+import com.facebook.presto.sql.tree.CatalogRelatedStatement;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Statement;
 import com.facebook.presto.transaction.TransactionManager;
@@ -35,6 +37,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
+import static com.facebook.presto.metadata.MetadataUtil.createQualifiedObjectName;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
@@ -65,6 +68,21 @@ public class DataDefinitionExecution<T extends Statement>
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.stateMachine = requireNonNull(stateMachine, "stateMachine is null");
         this.parameters = parameters;
+
+        stateMachine.addStateChangeListener(state -> {
+            if (state == QueryState.RUNNING) { // DDLs don't have STARTING phase
+                if (statement instanceof CatalogRelatedStatement) {
+                    notifyBeginQuery((CatalogRelatedStatement) statement);
+                }
+            }
+        });
+    }
+
+    private void notifyBeginQuery(CatalogRelatedStatement statement)
+    {
+        Session session = stateMachine.getSession();
+        QualifiedObjectName tableName = createQualifiedObjectName(session, statement, statement.getQualifiedName());
+        metadata.beginQuery(session, tableName.getCatalogName());
     }
 
     @Override
