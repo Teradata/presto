@@ -15,12 +15,14 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spiller.SpillerFactory;
 import com.facebook.presto.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.concurrent.MoreFutures;
+import io.airlift.units.DataSize;
 
 import javax.annotation.concurrent.ThreadSafe;
 
@@ -48,6 +50,9 @@ public class HashBuilderOperator
         private final Optional<JoinFilterFunctionFactory> filterFunctionFactory;
 
         private final int expectedPositions;
+        private final boolean spillEnabled;
+        private final DataSize memoryLimitBeforeSpill;
+        private final SpillerFactory spillerFactory;
 
         private int partitionIndex;
         private boolean closed;
@@ -62,7 +67,10 @@ public class HashBuilderOperator
                 boolean outer,
                 Optional<JoinFilterFunctionFactory> filterFunctionFactory,
                 int expectedPositions,
-                int partitionCount)
+                int partitionCount,
+                boolean spillEnabled,
+                DataSize memoryLimitBeforeSpill,
+                SpillerFactory spillerFactory)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -78,6 +86,9 @@ public class HashBuilderOperator
             this.hashChannels = ImmutableList.copyOf(requireNonNull(hashChannels, "hashChannels is null"));
             this.preComputedHashChannel = requireNonNull(preComputedHashChannel, "preComputedHashChannel is null");
             this.filterFunctionFactory = requireNonNull(filterFunctionFactory, "filterFunctionFactory is null");
+            this.spillEnabled = spillEnabled;
+            this.memoryLimitBeforeSpill = requireNonNull(memoryLimitBeforeSpill, "memoryLimitBeforeSpill is null");
+            this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
 
             this.expectedPositions = expectedPositions;
         }
@@ -105,7 +116,10 @@ public class HashBuilderOperator
                     hashChannels,
                     preComputedHashChannel,
                     filterFunctionFactory,
-                    expectedPositions);
+                    expectedPositions,
+                    spillEnabled,
+                    memoryLimitBeforeSpill,
+                    spillerFactory);
 
             partitionIndex++;
             return operator;
@@ -134,6 +148,10 @@ public class HashBuilderOperator
 
     private final PagesIndex index;
 
+    private final boolean spillEnabled;
+    private final DataSize memoryLimitBeforeSpill;
+    private final SpillerFactory spillerFactory;
+
     private boolean finishing;
 
     public HashBuilderOperator(
@@ -143,7 +161,10 @@ public class HashBuilderOperator
             List<Integer> hashChannels,
             Optional<Integer> preComputedHashChannel,
             Optional<JoinFilterFunctionFactory> filterFunctionFactory,
-            int expectedPositions)
+            int expectedPositions,
+            boolean spillEnabled,
+            DataSize memoryLimitBeforeSpill,
+            SpillerFactory spillerFactory)
     {
         this.operatorContext = operatorContext;
         this.partitionIndex = partitionIndex;
@@ -154,6 +175,10 @@ public class HashBuilderOperator
 
         this.hashChannels = hashChannels;
         this.preComputedHashChannel = preComputedHashChannel;
+
+        this.spillEnabled = spillEnabled;
+        this.memoryLimitBeforeSpill = memoryLimitBeforeSpill;
+        this.spillerFactory = spillerFactory;
     }
 
     @Override
