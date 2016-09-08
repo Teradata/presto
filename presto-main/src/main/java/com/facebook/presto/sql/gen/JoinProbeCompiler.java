@@ -93,7 +93,7 @@ public class JoinProbeCompiler
     {
         try {
             HashJoinOperatorFactoryFactory operatorFactoryFactory = joinProbeFactories.get(new JoinOperatorCacheKey(probeTypes, probeJoinChannel, probeHashChannel, joinType, filterFunctionPresent));
-            return operatorFactoryFactory.createHashJoinOperatorFactory(operatorId, planNodeId, lookupSourceFactory, probeTypes, probeJoinChannel, joinType);
+            return operatorFactoryFactory.createHashJoinOperatorFactory(operatorId, planNodeId, lookupSourceFactory, probeTypes, probeJoinChannel, probeHashChannel, joinType);
         }
         catch (ExecutionException | UncheckedExecutionException | ExecutionError e) {
             throw Throwables.propagate(e.getCause());
@@ -543,7 +543,15 @@ public class JoinProbeCompiler
             this.joinProbeFactory = joinProbeFactory;
 
             try {
-                constructor = operatorFactoryClass.getConstructor(int.class, PlanNodeId.class, LookupSourceFactory.class, List.class, JoinType.class, JoinProbeFactory.class);
+                constructor = operatorFactoryClass.getConstructor(
+                        int.class,
+                        PlanNodeId.class,
+                        LookupSourceFactory.class,
+                        List.class,
+                        JoinType.class,
+                        JoinProbeFactory.class,
+                        List.class,
+                        Optional.class);
             }
             catch (NoSuchMethodException e) {
                 throw Throwables.propagate(e);
@@ -556,10 +564,11 @@ public class JoinProbeCompiler
                 LookupSourceFactory lookupSourceFactory,
                 List<? extends Type> probeTypes,
                 List<Integer> probeJoinChannel,
+                Optional<Integer> probeHashChannel,
                 JoinType joinType)
         {
             try {
-                return constructor.newInstance(operatorId, planNodeId, lookupSourceFactory, probeTypes, joinType, joinProbeFactory);
+                return constructor.newInstance(operatorId, planNodeId, lookupSourceFactory, probeTypes, joinType, joinProbeFactory, probeJoinChannel, probeHashChannel);
             }
             catch (Exception e) {
                 throw Throwables.propagate(e);
