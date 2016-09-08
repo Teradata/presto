@@ -15,6 +15,7 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.ExceededMemoryLimitException;
 import com.facebook.presto.RowPagesBuilder;
+import com.facebook.presto.memory.LocalMemoryContext;
 import com.facebook.presto.operator.HashBuilderOperator.HashBuilderOperatorFactory;
 import com.facebook.presto.operator.ValuesOperator.ValuesOperatorFactory;
 import com.facebook.presto.operator.exchange.LocalExchange;
@@ -24,6 +25,10 @@ import com.facebook.presto.operator.exchange.LocalExchangeSourceOperator.LocalEx
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spiller.GenericPartitioningSpillerFactory;
+import com.facebook.presto.spiller.PartitioningSpillerFactory;
+import com.facebook.presto.spiller.SingleStreamSpiller;
+import com.facebook.presto.spiller.SingleStreamSpillerFactory;
 import com.facebook.presto.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
 import com.facebook.presto.sql.gen.JoinProbeCompiler;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
@@ -33,12 +38,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -56,13 +64,16 @@ import static com.google.common.collect.Iterables.concat;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.units.DataSize.Unit.BYTE;
 import static java.util.concurrent.Executors.newCachedThreadPool;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 @Test(singleThreaded = true)
 public class TestHashJoinOperator
 {
     private static final int PARTITION_COUNT = 4;
     private static final LookupJoinOperators LOOKUP_JOIN_OPERATORS = new LookupJoinOperators(new JoinProbeCompiler());
-
+    private static final SingleStreamSpillerFactory SINGLE_STREAM_SPILLER_FACTORY = new DummySpillerFactory();
+    private static final PartitioningSpillerFactory PARTITIONING_SPILLER_FACTORY = new GenericPartitioningSpillerFactory(SINGLE_STREAM_SPILLER_FACTORY);
     private ExecutorService executor;
 
     @BeforeClass
@@ -714,7 +725,11 @@ public class TestHashJoinOperator
                 filterFunctionFactory,
                 100,
                 partitionCount,
-                new PagesIndex.TestingFactory());
+                new PagesIndex.TestingFactory(),
+                false,
+                DataSize.succinctBytes(0),
+                SINGLE_STREAM_SPILLER_FACTORY,
+                PARTITIONING_SPILLER_FACTORY);
         PipelineContext buildPipeline = taskContext.addPipelineContext(1, true, true);
 
         Driver[] buildDrivers = new Driver[partitionCount];
@@ -761,6 +776,46 @@ public class TestHashJoinOperator
         public boolean filter(int leftPosition, Block[] leftBlocks, int rightPosition, Block[] rightBlocks)
         {
             return lambda.filter(leftPosition, leftBlocks, rightPosition, rightBlocks);
+        }
+    }
+
+    private static class DummySpillerFactory
+            implements SingleStreamSpillerFactory
+    {
+        @Override
+        public SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext)
+        {
+            return new SingleStreamSpiller()
+            {
+                private final ImmutableList.Builder<Page> spills = ImmutableList.builder();
+
+                @Override
+                public ListenableFuture<?> spill(Iterator<Page> pageIterator)
+                {
+                    while (pageIterator.hasNext()) {
+                        spill(pageIterator.next());
+                    }
+                    return Futures.immediateFuture(null);
+                }
+
+                @Override
+                public ListenableFuture<?> spill(Page page)
+                {
+                    spills.add(page);
+                    return Futures.immediateFuture(null);
+                }
+
+                @Override
+                public Iterator<Page> getSpilledPages()
+                {
+                    return spills.build().iterator();
+                }
+
+                @Override
+                public void close()
+                {
+                }
+            };
         }
     }
 }
