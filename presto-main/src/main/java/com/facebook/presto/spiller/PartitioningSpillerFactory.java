@@ -29,4 +29,11 @@ public interface PartitioningSpillerFactory
             int partitionsCount,
             Supplier<SpillContext> spillContextSupplier,
             AggregatedMemoryContext memoryContext);
+
+    static PartitioningSpillerFactory unsupportedPartitioningSpillerFactory()
+    {
+        return (types, partitionGenerator, partitionsCount, spillContextSupplier, memoryContext) -> {
+            throw new UnsupportedOperationException();
+        };
+    }
 }
