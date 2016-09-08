@@ -20,7 +20,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 public class AddColumn
-        extends Statement
+        extends CatalogRelatedStatement
 {
     private final QualifiedName name;
     private final TableElement column;
@@ -42,6 +42,7 @@ public class AddColumn
         this.column = requireNonNull(column, "column is null");
     }
 
+    @Override
     public QualifiedName getQualifiedName()
     {
         return name;

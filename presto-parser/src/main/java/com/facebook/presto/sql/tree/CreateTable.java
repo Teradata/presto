@@ -25,7 +25,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 public class CreateTable
-        extends Statement
+        extends CatalogRelatedStatement
 {
     private final QualifiedName name;
     private final List<TableElement> elements;
@@ -51,6 +51,7 @@ public class CreateTable
         this.properties = ImmutableMap.copyOf(requireNonNull(properties, "properties is null"));
     }
 
+    @Override
     public QualifiedName getQualifiedName()
     {
         return name;

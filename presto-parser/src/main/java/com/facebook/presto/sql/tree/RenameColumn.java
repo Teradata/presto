@@ -20,7 +20,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 public class RenameColumn
-        extends Statement
+        extends CatalogRelatedStatement
 {
     private final QualifiedName table;
     private final String source;
@@ -44,6 +44,7 @@ public class RenameColumn
         this.target = requireNonNull(target, "target is null");
     }
 
+    @Override
     public QualifiedName getQualifiedName()
     {
         return table;

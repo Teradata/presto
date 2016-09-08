@@ -20,7 +20,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 public class CreateView
-        extends Statement
+        extends CatalogRelatedStatement
 {
     private final QualifiedName name;
     private final Query query;
@@ -44,6 +44,7 @@ public class CreateView
         this.replace = replace;
     }
 
+    @Override
     public QualifiedName getQualifiedName()
     {
         return name;
