@@ -229,7 +229,13 @@ public class TestUnscaledDecimal128Arithmetic
         assertShiftRightArray8(TWO.pow(15).add(TWO.pow(3)), 20);
 
         assertShiftRightArray8(TWO.pow(70), 30);
-        assertShiftRightArray8(TWO.pow(70).add(TWO.pow(1)), 30);
+        assertShiftRightArray8(TWO.pow(70).subtract(TWO.pow(1)), 30, true);
+        assertShiftRightArray8(TWO.pow(70), 32);
+        assertShiftRightArray8(TWO.pow(70).subtract(TWO.pow(1)), 32, true);
+        assertShiftRightArray8(TWO.pow(120), 70);
+        assertShiftRightArray8(TWO.pow(120).subtract(TWO.pow(1)), 70, true);
+        assertShiftRightArray8(TWO.pow(120), 96);
+        assertShiftRightArray8(TWO.pow(120).subtract(TWO.pow(1)), 96, true);
 
         assertShiftRightArray8(MAX_DECIMAL_UNSCALED_VALUE, 20, true);
         assertShiftRightArray8(MAX_DECIMAL_UNSCALED_VALUE.multiply(MAX_DECIMAL_UNSCALED_VALUE), 130);

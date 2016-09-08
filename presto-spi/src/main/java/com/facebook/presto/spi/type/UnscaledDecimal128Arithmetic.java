@@ -955,7 +955,7 @@ public final class UnscaledDecimal128Arithmetic
         // be aware that result could be the same object as decimal.
         boolean roundCarry;
         if (bitShiftsInWord == 0) {
-            roundCarry = values[wordShifts - NUMBER_OF_INTS - 1] < 0;
+            roundCarry = values[wordShifts - 1] < 0;
         }
         else {
             roundCarry = (values[wordShifts] & (1 << (bitShiftsInWord - 1))) != 0;
