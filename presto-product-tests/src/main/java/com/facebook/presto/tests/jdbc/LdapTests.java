@@ -25,6 +25,7 @@ import com.teradata.tempto.configuration.Configuration;
 import com.teradata.tempto.fulfillment.ldap.LdapObjectRequirement;
 import com.teradata.tempto.query.QueryResult;
 import org.slf4j.LoggerFactory;
+import org.testng.TestException;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
@@ -118,7 +119,7 @@ public class LdapTests
             usingTeradataDriver = true;
         }
         else {
-            LOGGER.warn("Tests in this class only apply to Teradata Jdbc Driver");
+            throw new TestException("Tests in this class only apply to Teradata Jdbc Driver");
         }
     }
 
