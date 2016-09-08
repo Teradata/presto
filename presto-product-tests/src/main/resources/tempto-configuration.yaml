@@ -7,10 +7,6 @@ hdfs:
 presto_rest:
   base_uri: http://${databases.presto.server_address}/
 
-hive:
-  database:
-    path: /user/hive/warehouse/
-
 databases:
   default:
     alias: presto
@@ -26,6 +22,7 @@ databases:
     prepare_statement: USE ${databases.hive.schema}
     table_manager_type: hive
     warehouse_directory_path: /user/hive/warehouse
+    path: /user/hive/warehouse
 
   presto:
     host: localhost
