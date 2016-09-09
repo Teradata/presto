@@ -244,6 +244,12 @@ public interface ConnectorMetadata
     {}
 
     /**
+     * End a SELECT/UPDATE/INSERT/DELETE query. This is the very last notification after the query finishes, whether it succeeds or fails.
+     */
+    default void endQuery(ConnectorSession session)
+    {}
+
+    /**
      * Begin insert query
      */
     default ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)

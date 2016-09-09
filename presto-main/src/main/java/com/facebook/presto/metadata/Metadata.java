@@ -166,9 +166,14 @@ public interface Metadata
     void beginQuery(Session session, Collection<TableHandle> tableHandles);
 
     /**
-     * Notify catalogName of the execution of a query
+     * Start a query
      */
     void beginQuery(Session session, String catalogName);
+
+    /**
+     * End a query. This is the very last notification after the query finishes, whether it succeeds or fails.
+     */
+    void endQuery(Session session);
 
     /**
      * Begin insert query

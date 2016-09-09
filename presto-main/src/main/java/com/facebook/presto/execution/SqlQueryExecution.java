@@ -171,6 +171,9 @@ public final class SqlQueryExecution
                     checkState(tableHandles != null, "Analysis must happen before query starts");
                     metadata.beginQuery(getSession(), tableHandles);
                 }
+                if (state.isDone()) {
+                    metadata.endQuery(getSession());
+                }
             });
 
             this.remoteTaskFactory = new MemoryTrackingRemoteTaskFactory(requireNonNull(remoteTaskFactory, "remoteTaskFactory is null"), stateMachine);
