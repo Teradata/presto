@@ -45,6 +45,10 @@ script:
       presto-product-tests/bin/run_on_docker.sh \
         singlenode-kerberos-hdfs-impersonation -g storage_formats,cli,hdfs_impersonation,authorization
   - |
+    test ! -v PRODUCT_TESTS ||
+      presto-product-tests/bin/run_on_docker.sh \
+        singlenode-ldap -g ldap_cli
+  - |
     test ! -v INTEGRATION_TESTS ||
       presto-hive-hadoop2/bin/run_on_docker.sh
   - |
