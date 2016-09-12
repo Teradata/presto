@@ -13,7 +13,10 @@
  */
 package com.facebook.presto.operator;
 
+import com.facebook.presto.spi.Page;
+import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spiller.SingleStreamSpiller;
 import com.facebook.presto.sql.planner.Symbol;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -24,8 +27,10 @@ import com.google.common.util.concurrent.SettableFuture;
 import javax.annotation.concurrent.GuardedBy;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 
 import static com.facebook.presto.operator.OuterLookupSource.createOuterLookupSourceSupplier;
@@ -50,12 +55,21 @@ public final class PartitionedLookupSourceFactory
     private int partitionsSet;
 
     @GuardedBy("this")
+    private Map<Integer, SingleStreamSpiller> spilledLookupSources = new HashMap<>();
+
+    @GuardedBy("this")
     private Supplier<LookupSource> lookupSourceSupplier;
 
     @GuardedBy("this")
     private final List<SettableFuture<LookupSource>> lookupSourceFutures = new ArrayList<>();
 
-    public PartitionedLookupSourceFactory(List<Type> types, List<Type> outputTypes, List<Integer> hashChannels, int partitionCount, Map<Symbol, Integer> layout, boolean outer)
+    public PartitionedLookupSourceFactory(
+            List<Type> types,
+            List<Type> outputTypes,
+            List<Integer> hashChannels,
+            int partitionCount,
+            Map<Symbol, Integer> layout,
+            boolean outer)
     {
         this.types = ImmutableList.copyOf(requireNonNull(types, "types is null"));
         this.outputTypes = ImmutableList.copyOf(requireNonNull(outputTypes, "outputTypes is null"));
@@ -98,54 +112,175 @@ public final class PartitionedLookupSourceFactory
         return lookupSourceFuture;
     }
 
-    public void setPartitionLookupSourceSupplier(int partitionIndex, Supplier<LookupSource> partitionLookupSource)
+    public synchronized void setPartitionLookupSourceSupplier(int partitionIndex, Supplier<LookupSource> partitionLookupSource)
     {
-        requireNonNull(partitionLookupSource, "partitionLookupSource is null");
+        SetLookupSourceResult result = internalSetLookupSource(partitionIndex, partitionLookupSource);
 
-        Supplier<LookupSource> lookupSourceSupplier = null;
-        List<SettableFuture<LookupSource>> lookupSourceFutures = null;
-        synchronized (this) {
-            if (destroyed.isDone()) {
-                return;
-            }
-
-            checkState(partitions[partitionIndex] == null, "Partition already set");
-            partitions[partitionIndex] = partitionLookupSource;
-            partitionsSet++;
-
-            if (partitionsSet == partitions.length) {
-                if (partitionsSet != 1) {
-                    List<Supplier<LookupSource>> partitions = ImmutableList.copyOf(this.partitions);
-                    this.lookupSourceSupplier = createPartitionedLookupSourceSupplier(partitions, hashChannelTypes, outer);
-                }
-                else if (outer) {
-                    this.lookupSourceSupplier = createOuterLookupSourceSupplier(partitionLookupSource);
-                }
-                else {
-                    this.lookupSourceSupplier = partitionLookupSource;
-                }
-
-                // store lookup source supplier and futures into local variables so they can be used outside of the lock
-                lookupSourceSupplier = this.lookupSourceSupplier;
-                lookupSourceFutures = ImmutableList.copyOf(this.lookupSourceFutures);
-            }
-        }
-
-        if (lookupSourceSupplier != null) {
+        if (result.getLookupSourceSupplier() != null) {
             for (SettableFuture<LookupSource> lookupSourceFuture : lookupSourceFutures) {
                 lookupSourceFuture.set(lookupSourceSupplier.get());
             }
         }
     }
 
+    public synchronized void setPartitionSpilledLookupSourceSupplier(int partitionIndex, SingleStreamSpiller lookupSourceSpiller)
+    {
+        SetLookupSourceResult result;
+        synchronized (this) {
+            requireNonNull(lookupSourceSpiller, "lookupSource is null");
+
+            spilledLookupSources.put(partitionIndex, lookupSourceSpiller);
+
+            result = internalSetLookupSource(partitionIndex, () -> new SpilledLookupSource(outputTypes.size()));
+        }
+
+        if (result.getLookupSourceSupplier() != null) {
+            for (SettableFuture<LookupSource> lookupSourceFuture : lookupSourceFutures) {
+                lookupSourceFuture.set(lookupSourceSupplier.get());
+            }
+        }
+    }
+
+    private synchronized SetLookupSourceResult internalSetLookupSource(int partitionIndex, Supplier<LookupSource> partitionLookupSource)
+    {
+        requireNonNull(partitionLookupSource, "partitionLookupSource is null");
+
+        if (destroyed.isDone()) {
+            return new SetLookupSourceResult();
+        }
+
+        checkState(partitions[partitionIndex] == null, "Partition already set");
+        partitions[partitionIndex] = partitionLookupSource;
+        partitionsSet++;
+
+        if (partitionsSet == partitions.length) {
+            if (partitionsSet != 1) {
+                List<Supplier<LookupSource>> partitions = ImmutableList.copyOf(this.partitions);
+                this.lookupSourceSupplier = createPartitionedLookupSourceSupplier(partitions, hashChannelTypes, outer);
+            }
+            else if (outer) {
+                this.lookupSourceSupplier = createOuterLookupSourceSupplier(partitionLookupSource);
+            }
+            else {
+                this.lookupSourceSupplier = partitionLookupSource;
+            }
+
+            // store lookup source supplier and futures into local variables so they can be used outside of the lock
+            return new SetLookupSourceResult(lookupSourceSupplier, ImmutableList.copyOf(this.lookupSourceFutures));
+        }
+        return new SetLookupSourceResult();
+    }
+
     @Override
     public void destroy()
     {
+        synchronized (this) {
+            spilledLookupSources.values().forEach(SingleStreamSpiller::close);
+            spilledLookupSources.clear();
+        }
         destroyed.set(null);
     }
 
     public ListenableFuture<?> isDestroyed()
     {
         return nonCancellationPropagating(destroyed);
+    }
+
+    @Override
+    public synchronized Set<Integer> getSpilledPartitions()
+    {
+        return spilledLookupSources.keySet();
+    }
+
+    private static class SpilledLookupSource
+            implements LookupSource
+    {
+        private final int channelCount;
+
+        public SpilledLookupSource(int channelCount)
+        {
+            this.channelCount = channelCount;
+        }
+
+        @Override
+        public int getChannelCount()
+        {
+            return channelCount;
+        }
+
+        @Override
+        public long getInMemorySizeInBytes()
+        {
+            return 0;
+        }
+
+        @Override
+        public int getJoinPositionCount()
+        {
+            throw new IllegalStateException("Illegal access to spilled partition");
+        }
+
+        @Override
+        public long getJoinPosition(int position, Page hashChannelsPage, Page allChannelsPage, long rawHash)
+        {
+            throw new IllegalStateException("Illegal access to spilled partition");
+        }
+
+        @Override
+        public long getJoinPosition(int position, Page hashChannelsPage, Page allChannelsPage)
+        {
+            throw new IllegalStateException("Illegal access to spilled partition");
+        }
+
+        @Override
+        public long getNextJoinPosition(long currentJoinPosition, int probePosition, Page allProbeChannelsPage)
+        {
+            throw new IllegalStateException("Illegal access to spilled partition");
+        }
+
+        @Override
+        public void appendTo(long position, PageBuilder pageBuilder, int outputChannelOffset)
+        {
+            throw new IllegalStateException("Illegal access to spilled partition");
+        }
+
+        @Override
+        public boolean isJoinPositionEligible(long currentJoinPosition, int probePosition, Page allProbeChannelsPage)
+        {
+            throw new IllegalStateException("Illegal access to spilled partition");
+        }
+
+        @Override
+        public void close()
+        {
+        }
+    }
+
+    private static class SetLookupSourceResult
+    {
+        private final Supplier<LookupSource> lookupSourceSupplier;
+        private final List<SettableFuture<LookupSource>> lookupSourceFutures;
+
+        public SetLookupSourceResult(Supplier<LookupSource> lookupSourceSupplier, List<SettableFuture<LookupSource>> lookupSourceFutures)
+        {
+            this.lookupSourceSupplier = lookupSourceSupplier;
+            this.lookupSourceFutures = lookupSourceFutures;
+        }
+
+        public SetLookupSourceResult()
+        {
+            this.lookupSourceSupplier = null;
+            this.lookupSourceFutures = ImmutableList.of();
+        }
+
+        public Supplier<LookupSource> getLookupSourceSupplier()
+        {
+            return lookupSourceSupplier;
+        }
+
+        public List<SettableFuture<LookupSource>> getLookupSourceFutures()
+        {
+            return lookupSourceFutures;
+        }
     }
 }
