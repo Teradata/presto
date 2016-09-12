@@ -18,8 +18,7 @@ import com.teradata.tempto.ProductTest;
 import com.teradata.tempto.query.QueryExecutionException;
 import com.teradata.tempto.query.QueryResult;
 import com.teradata.tempto.query.QueryType;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.airlift.log.Logger;
 import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
@@ -42,7 +41,7 @@ import static java.lang.String.format;
 public class TestHiveS3Connector
         extends ProductTest
 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(TestHiveS3Connector.class);
+    private static final Logger LOGGER = Logger.get(TestHiveS3Connector.class);
 
     @Test(groups = {S3_CONNECTOR})
     public void testSelectFromTextFile()
@@ -50,9 +49,9 @@ public class TestHiveS3Connector
     {
         // This test uses a standard tpch nation table.  It assumes that table is already created in the hive catalog
         // and has data loaded.
-        String tableName = "hive.default.nation";
+        String tableName = "hive.default.nation_s3";
         if (isCreated(tableName)) {
-            QueryResult queryResult = query("SELECT n_name FROM hive.default.nation where n_nationkey = 7");
+            QueryResult queryResult = query(format("SELECT n_name FROM %s WHERE n_nationkey = 7", tableName));
             assertThat(queryResult).containsOnly(row("GERMANY"));
         }
         else {
@@ -67,10 +66,10 @@ public class TestHiveS3Connector
         // This test uses the all_types table as defined in the AllSimpleTypesTableDefinition class and
         // data from hive/data/all_types/data.textfile. The table is create with the name 'alltypes_text'.
         // The test assumes that table is already created in the hive catalog and has data loaded.
-        String tableName = "alltypes_text";
+        String tableName = "alltypes_s3_text";
         if (isCreated(tableName)) {
-            assertProperAllDatatypesSchema("alltypes_text");
-            QueryResult queryResult = query("SELECT * FROM alltypes_text");
+            assertProperAllDatatypesSchema(tableName);
+            QueryResult queryResult = query(format("SELECT * FROM %s", tableName));
 
             assertThat(queryResult).containsOnly(
                     row(
@@ -105,7 +104,7 @@ public class TestHiveS3Connector
         // from hive/data/all_types/data.rcfile.  the table is created with the name alltypes_rcfile.
         // The test assumes that table is already created in the hive catalog and has data loaded.
 
-        String tableName = "alltypes_rcfile";
+        String tableName = "alltypes_s3_rcfile";
         if (isCreated(tableName)) {
             assertProperAllDatatypesSchema(tableName);
             QueryResult queryResult = query(format("SELECT * FROM %s", tableName));
@@ -182,7 +181,7 @@ public class TestHiveS3Connector
         // hive/data/all_types/data.textfile. The table is created with the name alltypes_parquet.
         // The test assumes that table is already created in the hive catalog and has data loaded.
 
-        String tableName = "alltypes_parquet";
+        String tableName = "alltypes_s3_parquet";
         if (isCreated(tableName)) {
             assertProperParquetDatatypesSchema(tableName);
             QueryResult queryResult = query(format("SELECT * FROM %s", tableName));
@@ -212,9 +211,9 @@ public class TestHiveS3Connector
     public void shouldCreateTableAsSelect()
             throws Exception
     {
-        String selectTable = "nation";
+        String selectTable = "nation_s3";
         if (isCreated(selectTable)) {
-            String createTable = "create_table_as_select";
+            String createTable = "create_table_as_select_s3";
             query(format("DROP TABLE IF EXISTS %s", createTable));
             query(format("CREATE TABLE %s AS SELECT * FROM %s", createTable, selectTable));
             assertThat(query(format("SELECT * FROM %s", createTable))).hasRowsCount(25);
