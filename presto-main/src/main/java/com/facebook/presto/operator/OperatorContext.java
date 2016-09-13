@@ -90,6 +90,9 @@ public class OperatorContext
     private final AtomicReference<Supplier<OperatorInfo>> infoSupplier = new AtomicReference<>();
     private final boolean collectTimings;
 
+    // memoryRevokingRequestedFuture is done iff memory revoking was requested for operator
+    private final AtomicReference<SettableFuture<?>> memoryRevokingRequestedFuture = new AtomicReference<>();
+
     public OperatorContext(int operatorId, PlanNodeId planNodeId, String operatorType, DriverContext driverContext, Executor executor)
     {
         checkArgument(operatorId >= 0, "operatorId is negative");
@@ -105,6 +108,8 @@ public class OperatorContext
         this.memoryFuture.get().set(null);
         this.revocableMemoryFuture = new AtomicReference<>(SettableFuture.create());
         this.revocableMemoryFuture.get().set(null);
+
+        this.memoryRevokingRequestedFuture.set(SettableFuture.create());
 
         collectTimings = driverContext.isVerboseStats() && driverContext.isCpuTimerEnabled();
     }
@@ -370,6 +375,27 @@ public class OperatorContext
             freeMemory(-delta);
         }
         return true;
+    }
+
+    public boolean isMemoryRevokingRequested()
+    {
+        return memoryRevokingRequestedFuture.get().isDone();
+    }
+
+    public void requestMemoryRevoking()
+    {
+        memoryRevokingRequestedFuture.get().set(null);
+    }
+
+    public void resetMemoryRevokingRequested()
+    {
+        SettableFuture<?> currentFuture = memoryRevokingRequestedFuture.get();
+        if (!currentFuture.isDone()) {
+            return;
+        }
+        memoryRevokingRequestedFuture.compareAndSet(currentFuture, SettableFuture.create());
+        // if we do not change the value of currentFuture we are still good as this means other thread
+        // changed it to SettableFuture.create in exactly same method.
     }
 
     public void setInfoSupplier(Supplier<OperatorInfo> infoSupplier)
