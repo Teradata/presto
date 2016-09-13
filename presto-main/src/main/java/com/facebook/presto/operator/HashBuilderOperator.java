@@ -80,6 +80,8 @@ public class HashBuilderOperator
             lookupSourceFactory = new PartitionedLookupSourceFactory(
                     types,
                     hashChannels,
+                    preComputedHashChannel,
+                    filterFunctionFactory,
                     partitionCount,
                     requireNonNull(layout, "layout is null"),
                     outer,
