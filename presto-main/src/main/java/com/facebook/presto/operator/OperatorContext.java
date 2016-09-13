@@ -218,6 +218,11 @@ public class OperatorContext
         return memoryFuture.get();
     }
 
+    public ListenableFuture<?> isWaitingForRevocableMemory()
+    {
+        return revocableMemoryFuture.get();
+    }
+
     public void reserveMemory(long bytes)
     {
         updateMemoryFuture(driverContext.reserveMemory(bytes), memoryFuture);
