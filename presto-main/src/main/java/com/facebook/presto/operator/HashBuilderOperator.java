@@ -127,10 +127,14 @@ public class HashBuilderOperator
                             .map(types::get)
                             .collect(toImmutableList()),
                     hashChannels,
+                    outputChannels,
+                    preComputedHashChannel,
+                    filterFunctionFactory,
                     partitionCount,
                     requireNonNull(layout, "layout is null"),
                     outer,
-                    partitioningSpillerFactory);
+                    partitioningSpillerFactory,
+                    pagesIndexFactory);
 
             this.outputChannels = ImmutableList.copyOf(requireNonNull(outputChannels, "outputChannels is null"));
             this.hashChannels = ImmutableList.copyOf(requireNonNull(hashChannels, "hashChannels is null"));

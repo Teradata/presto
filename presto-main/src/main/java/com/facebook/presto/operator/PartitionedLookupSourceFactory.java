@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator;
 
+import com.facebook.presto.Session;
 import com.facebook.presto.operator.exchange.LocalPartitionGenerator;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
@@ -20,6 +21,7 @@ import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spiller.PartitioningSpiller;
 import com.facebook.presto.spiller.PartitioningSpillerFactory;
 import com.facebook.presto.spiller.SingleStreamSpiller;
+import com.facebook.presto.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
 import com.facebook.presto.sql.planner.Symbol;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -32,8 +34,10 @@ import javax.annotation.concurrent.GuardedBy;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -54,6 +58,11 @@ public final class PartitionedLookupSourceFactory
     private final Supplier<LookupSource>[] partitions;
     private final boolean outer;
     private final SettableFuture<?> destroyed = SettableFuture.create();
+    private final List<Integer> hashChannels;
+    private final List<Integer> outputChannels;
+    private final Optional<Integer> preComputedHashChannel;
+    private final Optional<JoinFilterFunctionFactory> filterFunctionFactory;
+    private final PagesIndex.Factory pagesIndexFactory;
 
     @GuardedBy("this")
     private int partitionsSet;
@@ -74,10 +83,14 @@ public final class PartitionedLookupSourceFactory
             List<Type> types,
             List<Type> outputTypes,
             List<Integer> hashChannels,
+            List<Integer> outputChannels,
+            Optional<Integer> preComputedHashChannel,
+            Optional<JoinFilterFunctionFactory> filterFunctionFactory,
             int partitionCount,
             Map<Symbol, Integer> layout,
             boolean outer,
-            PartitioningSpillerFactory partitioningSpillerFactory)
+            PartitioningSpillerFactory partitioningSpillerFactory,
+            PagesIndex.Factory pagesIndexFactory)
     {
         this.types = ImmutableList.copyOf(requireNonNull(types, "types is null"));
         this.outputTypes = ImmutableList.copyOf(requireNonNull(outputTypes, "outputTypes is null"));
@@ -85,6 +98,11 @@ public final class PartitionedLookupSourceFactory
         this.partitions = (Supplier<LookupSource>[]) new Supplier<?>[partitionCount];
         this.outer = outer;
         this.partitioningSpillerFactory = partitioningSpillerFactory;
+        this.hashChannels = hashChannels;
+        this.outputChannels = outputChannels;
+        this.preComputedHashChannel = preComputedHashChannel;
+        this.filterFunctionFactory = filterFunctionFactory;
+        this.pagesIndexFactory = requireNonNull(pagesIndexFactory, "pagesIndexFactory is null");
 
         hashChannelTypes = hashChannels.stream()
                 .map(types::get)
@@ -226,6 +244,27 @@ public final class PartitionedLookupSourceFactory
     public synchronized Set<Integer> getSpilledPartitions()
     {
         return spilledLookupSources.keySet();
+    }
+
+    @Override
+    public ListenableFuture<LookupSource> readSpilledLookupSource(Session session, int partition)
+    {
+        SingleStreamSpiller lookupSourceSpiller = spilledLookupSources.get(partition);
+        Iterator<Page> spilledBuildPages = lookupSourceSpiller.getSpilledPages();
+
+        PagesIndex index = pagesIndexFactory.newPagesIndex(types, 10_000);
+
+        while (spilledBuildPages.hasNext()) {
+            index.addPage(spilledBuildPages.next());
+        }
+
+        return Futures.immediateFuture(
+                index.createLookupSourceSupplier(
+                        session,
+                        hashChannels,
+                        preComputedHashChannel,
+                        filterFunctionFactory,
+                        Optional.of(outputChannels)).get());
     }
 
     private static class SpilledLookupSource
