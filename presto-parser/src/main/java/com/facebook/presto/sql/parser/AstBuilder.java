@@ -114,6 +114,7 @@ import com.facebook.presto.sql.tree.ShowCatalogs;
 import com.facebook.presto.sql.tree.ShowColumns;
 import com.facebook.presto.sql.tree.ShowCreate;
 import com.facebook.presto.sql.tree.ShowFunctions;
+import com.facebook.presto.sql.tree.ShowGrants;
 import com.facebook.presto.sql.tree.ShowPartitions;
 import com.facebook.presto.sql.tree.ShowSchemas;
 import com.facebook.presto.sql.tree.ShowSession;
@@ -746,6 +747,31 @@ class AstBuilder
                 context.TABLE() != null,
                 getQualifiedName(context.qualifiedName()),
                 context.grantee.getText());
+    }
+
+    @Override
+    public Node visitShowGrants(SqlBaseParser.ShowGrantsContext context)
+    {
+        Optional<ShowGrants.IdentityType> identityType = Optional.empty();
+        Optional<String> identity = Optional.empty();
+        Optional<QualifiedName> tableName = Optional.empty();
+
+        if (context.USER() != null) {
+            identityType = Optional.of(ShowGrants.IdentityType.USER);
+            identity = Optional.of(context.identifier().getText());
+        }
+
+        if (context.ALL() == null) {
+            tableName = Optional.of(getQualifiedName(context.qualifiedName()));
+        }
+
+        return new ShowGrants(
+                getLocation(context),
+                identityType,
+                identity,
+                context.TABLE() != null,
+                tableName,
+                context.ALL() != null);
     }
 
     // ***************** boolean expressions ******************

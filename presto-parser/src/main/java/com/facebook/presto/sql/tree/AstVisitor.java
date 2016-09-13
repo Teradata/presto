@@ -587,6 +587,11 @@ public abstract class AstVisitor<R, C>
         return visitDataDefinitionStatement(node, context);
     }
 
+    protected R visitShowGrants(ShowGrants node, C context)
+    {
+        return visitStatement(node, context);
+    }
+
     protected R visitTransactionMode(TransactionMode node, C context)
     {
         return visitNode(node, context);
