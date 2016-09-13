@@ -238,6 +238,18 @@ public interface ConnectorMetadata
     }
 
     /**
+     * Notification of starting a query
+     */
+    default void beginQuery(ConnectorSession session)
+    {}
+
+    /**
+     * Notification of ending a query
+     */
+    default void endQuery(ConnectorSession session)
+    {}
+
+    /**
      * Begin insert query
      */
     default ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle)

@@ -29,6 +29,7 @@ import com.facebook.presto.spi.ConnectorTableMetadata;
 import com.facebook.presto.spi.ConnectorViewDefinition;
 import com.facebook.presto.spi.Constraint;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
@@ -48,6 +49,7 @@ import com.facebook.presto.transaction.TransactionManager;
 import com.facebook.presto.type.TypeDeserializer;
 import com.facebook.presto.type.TypeRegistry;
 import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Joiner;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
@@ -72,6 +74,7 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Predicate;
@@ -110,6 +113,7 @@ public class MetadataManager
     private final ConcurrentMap<String, ConnectorEntry> systemTablesByCatalog = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ConnectorEntry> connectorsByCatalog = new ConcurrentHashMap<>();
     private final ConcurrentMap<String, ConnectorEntry> connectorsById = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, Collection<ConnectorMetadata>> catalogsByQueryId = new ConcurrentHashMap<>();
     private final FunctionRegistry functions;
     private final ProcedureRegistry procedures;
     private final TypeManager typeManager;
@@ -528,6 +532,62 @@ public class MetadataManager
     }
 
     @Override
+    public void beginQuery(Session session, Collection<TableHandle> tableHandles)
+    {
+        Collection<TableHandle> distinctHandles = filterDuplicateCatalogs(tableHandles); // don't trigger ConnectorMetadata.beginQuery more than once when >1 tables of the same catalog are involved in the query
+
+        for (TableHandle handle : distinctHandles) {
+            ConnectorEntry entry = connectorsById.get(handle.getConnectorId());
+            ConnectorSession connectorSession = session.toConnectorSession(entry.getCatalog());
+            ConnectorMetadata metadata = entry.getMetadata(session);
+            metadata.beginQuery(connectorSession);
+            registerCatalogForQueryId(session.getQueryId(), metadata);
+        }
+    }
+
+    private void registerCatalogForQueryId(QueryId queryId, ConnectorMetadata metadata)
+    {
+        catalogsByQueryId.putIfAbsent(queryId.getId(), new ArrayList<>());
+        catalogsByQueryId.get(queryId.getId()).add(metadata);
+    }
+
+    @Override
+    public void endQuery(Session session)
+    {
+        try {
+            Collection<ConnectorMetadata> catalogs = catalogsByQueryId.get(session.getQueryId().getId());
+            if (catalogs == null) {
+                return;
+            }
+
+            for (ConnectorMetadata metadata : catalogs) {
+                metadata.endQuery(session.toConnectorSession());
+            }
+        }
+        finally {
+            catalogsByQueryId.remove(session.getQueryId().getId());
+        }
+    }
+
+    private static Collection<TableHandle> filterDuplicateCatalogs(Collection<TableHandle> tableHandles)
+    {
+        Set<TableHandle> handlesOfUniqueConnectors = new TreeSet<>((l, r) -> l.getConnectorId().compareTo(r.getConnectorId()));
+        handlesOfUniqueConnectors.addAll(tableHandles);
+
+        return ImmutableList.copyOf(handlesOfUniqueConnectors);
+    }
+
+    @Override
+    public void beginQuery(Session session, String catalogName)
+    {
+        ConnectorEntry entry = connectorsByCatalog.get(catalogName);
+        ConnectorSession connectorSession = session.toConnectorSession(entry.getCatalog());
+        ConnectorMetadata metadata = entry.getMetadata(session);
+        metadata.beginQuery(connectorSession);
+        registerCatalogForQueryId(session.getQueryId(), metadata);
+    }
+
+    @Override
     public OutputTableHandle beginCreateTable(Session session, String catalogName, TableMetadata tableMetadata, Optional<NewTableLayout> layout)
     {
         ConnectorEntry entry = connectorsByCatalog.get(catalogName);
@@ -875,5 +935,11 @@ public class MetadataManager
         ObjectMapperProvider provider = new ObjectMapperProvider();
         provider.setJsonDeserializers(ImmutableMap.<Class<?>, JsonDeserializer<?>>of(Type.class, new TypeDeserializer(new TypeRegistry())));
         return new JsonCodecFactory(provider).jsonCodec(ViewDefinition.class);
+    }
+
+    @VisibleForTesting
+    public Map<String, Collection<ConnectorMetadata>> getCatalogsByQueryId()
+    {
+        return ImmutableMap.copyOf(catalogsByQueryId);
     }
 }
