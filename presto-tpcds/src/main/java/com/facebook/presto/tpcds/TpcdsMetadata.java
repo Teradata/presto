@@ -231,6 +231,7 @@ public class TpcdsMetadata
             layout = createLayoutForPartitioningColumn(tableHandle, partitioningColumn.get(), tpcdsTable.get());
         }
         else {
+            // the INVENTORY and DBGEN_VERSION tables
             layout = new ConnectorTableLayout(
                     new TpcdsTableLayoutHandle(tableHandle),
                     Optional.empty(),

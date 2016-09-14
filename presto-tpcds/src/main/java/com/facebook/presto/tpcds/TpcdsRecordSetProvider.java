@@ -56,7 +56,11 @@ public class TpcdsRecordSetProvider
             builder.add(table.getColumn(columnName));
         }
 
-        Session session = Session.getDefaultSession().withScale(scaleFactor).withParallelism(totalParts).withChunkNumber(partNumber + 1).withTable(table);
+        Session session = Session.getDefaultSession()
+                .withScale(scaleFactor)
+                .withParallelism(totalParts)
+                .withChunkNumber(partNumber + 1)
+                .withTable(table);
         Results results = constructResults(table, session);
         return new TpcdsRecordSet(results, builder.build());
     }

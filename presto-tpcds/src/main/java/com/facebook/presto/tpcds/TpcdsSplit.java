@@ -26,7 +26,6 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
-// Right now, splits are just the entire TPCH table
 public class TpcdsSplit
         implements ConnectorSplit
 {
