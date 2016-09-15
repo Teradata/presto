@@ -19,7 +19,7 @@ import java.util.Optional;
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 public class DropTable
-        extends Statement
+        extends CatalogRelatedStatement
 {
     private final QualifiedName tableName;
     private final boolean exists;
@@ -41,7 +41,8 @@ public class DropTable
         this.exists = exists;
     }
 
-    public QualifiedName getTableName()
+    @Override
+    public QualifiedName getQualifiedName()
     {
         return tableName;
     }

@@ -161,6 +161,21 @@ public interface Metadata
     Optional<NewTableLayout> getInsertLayout(Session session, TableHandle target);
 
     /**
+     * Start a query
+     */
+    void beginQuery(Session session, Collection<TableHandle> tableHandles);
+
+    /**
+     * Start a query
+     */
+    void beginQuery(Session session, String catalogName);
+
+    /**
+     * End a query. This is the very last notification after the query finishes, whether it succeeds or fails.
+     */
+    void endQuery(Session session);
+
+    /**
      * Begin insert query
      */
     InsertTableHandle beginInsert(Session session, TableHandle tableHandle);

@@ -23,7 +23,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 public final class Call
-        extends Statement
+        extends CatalogRelatedStatement
 {
     private final QualifiedName name;
     private final List<CallArgument> arguments;
@@ -45,7 +45,8 @@ public final class Call
         this.arguments = ImmutableList.copyOf(requireNonNull(arguments, "arguments is null"));
     }
 
-    public QualifiedName getName()
+    @Override
+    public QualifiedName getQualifiedName()
     {
         return name;
     }

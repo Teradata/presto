@@ -19,7 +19,7 @@ import java.util.Optional;
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 public class DropView
-        extends Statement
+        extends CatalogRelatedStatement
 {
     private final QualifiedName name;
     private final boolean exists;
@@ -41,7 +41,8 @@ public class DropView
         this.exists = exists;
     }
 
-    public QualifiedName getName()
+    @Override
+    public QualifiedName getQualifiedName()
     {
         return name;
     }
