@@ -33,12 +33,14 @@ public class TpcdsSplit
     private final int totalParts;
     private final int partNumber;
     private final List<HostAddress> addresses;
+    private final boolean noSexism;
 
     @JsonCreator
     public TpcdsSplit(@JsonProperty("tableHandle") TpcdsTableHandle tableHandle,
             @JsonProperty("partNumber") int partNumber,
             @JsonProperty("totalParts") int totalParts,
-            @JsonProperty("addresses") List<HostAddress> addresses)
+            @JsonProperty("addresses") List<HostAddress> addresses,
+            @JsonProperty("noSexism") boolean noSexism)
     {
         checkState(partNumber >= 0, "partNumber must be >= 0");
         checkState(totalParts >= 1, "totalParts must be >= 1");
@@ -48,6 +50,7 @@ public class TpcdsSplit
         this.partNumber = partNumber;
         this.totalParts = totalParts;
         this.addresses = ImmutableList.copyOf(addresses);
+        this.noSexism = noSexism;
     }
 
     @JsonProperty
@@ -116,5 +119,11 @@ public class TpcdsSplit
                 .add("partNumber", partNumber)
                 .add("totalParts", totalParts)
                 .toString();
+    }
+
+    @JsonProperty
+    public boolean isNoSexism()
+    {
+        return noSexism;
     }
 }

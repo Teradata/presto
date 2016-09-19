@@ -29,6 +29,7 @@ import java.util.Map;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkState;
+import static java.lang.Boolean.parseBoolean;
 import static java.lang.Integer.parseInt;
 import static java.util.Objects.requireNonNull;
 
@@ -83,7 +84,7 @@ public class TpcdsConnectorFactory
             @Override
             public ConnectorSplitManager getSplitManager()
             {
-                return new TpcdsSplitManager(connectorId, nodeManager, splitsPerNode);
+                return new TpcdsSplitManager(connectorId, nodeManager, splitsPerNode, isWithNoSexism(config));
             }
 
             @Override
@@ -108,5 +109,10 @@ public class TpcdsConnectorFactory
         catch (NumberFormatException e) {
             throw new IllegalArgumentException("Invalid property tpcds.splits-per-node");
         }
+    }
+
+    private boolean isWithNoSexism(Map<String, String> properties)
+    {
+        return parseBoolean(firstNonNull(properties.get("tpcds.with-no-sexism"), String.valueOf(false)));
     }
 }

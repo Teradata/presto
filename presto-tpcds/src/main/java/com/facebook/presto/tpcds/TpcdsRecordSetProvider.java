@@ -40,7 +40,7 @@ public class TpcdsRecordSetProvider
         TpcdsSplit tpcdsSplit = checkType(split, TpcdsSplit.class, "split");
         String tableName = tpcdsSplit.getTableHandle().getTableName();
         Table table = getTable(tableName);
-        return getRecordSet(table, columns, tpcdsSplit.getTableHandle().getScaleFactor(), tpcdsSplit.getPartNumber(), tpcdsSplit.getTotalParts());
+        return getRecordSet(table, columns, tpcdsSplit.getTableHandle().getScaleFactor(), tpcdsSplit.getPartNumber(), tpcdsSplit.getTotalParts(), tpcdsSplit.isNoSexism());
     }
 
     private RecordSet getRecordSet(
@@ -48,7 +48,8 @@ public class TpcdsRecordSetProvider
             List<? extends  ColumnHandle> columns,
             int scaleFactor,
             int partNumber,
-            int totalParts)
+            int totalParts,
+            boolean noSexism)
     {
         ImmutableList.Builder<Column> builder = ImmutableList.builder();
         for (ColumnHandle column : columns) {
@@ -60,7 +61,8 @@ public class TpcdsRecordSetProvider
                 .withScale(scaleFactor)
                 .withParallelism(totalParts)
                 .withChunkNumber(partNumber + 1)
-                .withTable(table);
+                .withTable(table)
+                .withNoSexism(noSexism);
         Results results = constructResults(table, session);
         return new TpcdsRecordSet(results, builder.build());
     }

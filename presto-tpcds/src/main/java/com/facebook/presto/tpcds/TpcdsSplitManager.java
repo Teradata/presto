@@ -37,8 +37,9 @@ public class TpcdsSplitManager
     private final String connectorId;
     private final NodeManager nodeManager;
     private final int splitsPerNode;
+    private final boolean noSexism;
 
-    public TpcdsSplitManager(String connectorId, NodeManager nodeManager, int splitsPerNode)
+    public TpcdsSplitManager(String connectorId, NodeManager nodeManager, int splitsPerNode, boolean noSexism)
     {
         requireNonNull(connectorId);
         requireNonNull(nodeManager);
@@ -47,6 +48,7 @@ public class TpcdsSplitManager
         this.connectorId = connectorId;
         this.nodeManager = nodeManager;
         this.splitsPerNode = splitsPerNode;
+        this.noSexism = noSexism;
     }
 
     @Override
@@ -64,7 +66,7 @@ public class TpcdsSplitManager
         ImmutableList.Builder<ConnectorSplit> splits = ImmutableList.builder();
         for (Node node : nodes) {
             for (int i = 0; i < splitsPerNode; i++) {
-                splits.add(new TpcdsSplit(tableHandle, partNumber, totalParts, ImmutableList.of(node.getHostAndPort())));
+                splits.add(new TpcdsSplit(tableHandle, partNumber, totalParts, ImmutableList.of(node.getHostAndPort()), noSexism));
                 partNumber++;
             }
         }
