@@ -13,10 +13,12 @@
  */
 package com.facebook.presto.tests.hive;
 
+import com.facebook.presto.tests.ImmutableTpchTablesRequirements.ImmutableLineItemTable;
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.teradata.tempto.ProductTest;
+import com.teradata.tempto.Requires;
 import com.teradata.tempto.assertions.QueryAssert.Row;
 import com.teradata.tempto.query.QueryResult;
 import org.testng.annotations.DataProvider;
@@ -24,11 +26,14 @@ import org.testng.annotations.Test;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 
+import static com.facebook.presto.tests.TestGroups.BIG_QUERY;
 import static com.facebook.presto.tests.TestGroups.STORAGE_FORMATS;
 import static com.facebook.presto.tests.utils.JdbcDriverUtils.setSessionProperty;
+import static com.facebook.presto.tests.utils.QueryExecutors.onHive;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.teradata.tempto.assertions.QueryAssert.Row.row;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
@@ -41,6 +46,7 @@ public class TestHiveStorageFormats
         extends ProductTest
 {
     private static final String TPCH_SCHEMA = "tiny";
+    private static final String TEST_TPCH_LINIETEM = "tpch." + TPCH_SCHEMA + ".lineitem";
 
     @DataProvider(name = "storage_formats")
     public static Object[][] storageFormats()
@@ -97,7 +103,7 @@ public class TestHiveStorageFormats
         query(insertInto);
 
         // SELECT FROM TABLE
-        assertSelect("select sum(tax), sum(discount), sum(linenumber) from %s", tableName);
+        assertSelect("select sum(tax), sum(discount), sum(linenumber) from %s", tableName, TEST_TPCH_LINIETEM);
 
         // DROP TABLE
         query(format("DROP TABLE %s", tableName));
@@ -125,7 +131,7 @@ public class TestHiveStorageFormats
         query(createTableAsSelect);
 
         // SELECT FROM TABLE
-        assertSelect("select sum(extendedprice), sum(suppkey), count(partkey) from %s", tableName);
+        assertSelect("select sum(extendedprice), sum(suppkey), count(partkey) from %s", tableName, TEST_TPCH_LINIETEM);
 
         // DROP TABLE
         query(format("DROP TABLE %s", tableName));
@@ -171,7 +177,7 @@ public class TestHiveStorageFormats
         query(insertInto);
 
         // SELECT FROM TABLE
-        assertSelect("select sum(tax), sum(discount), sum(length(returnflag)) from %s", tableName);
+        assertSelect("select sum(tax), sum(discount), sum(length(returnflag)) from %s", tableName, TEST_TPCH_LINIETEM);
 
         // DROP TABLE
         query(format("DROP TABLE %s", tableName));
@@ -199,15 +205,72 @@ public class TestHiveStorageFormats
         query(createTableAsSelect);
 
         // SELECT FROM TABLE
-        assertSelect("select sum(tax), sum(discount), sum(length(returnflag)) from %s", tableName);
+        assertSelect("select sum(tax), sum(discount), sum(length(returnflag)) from %s", tableName, TEST_TPCH_LINIETEM);
 
         // DROP TABLE
         query(format("DROP TABLE %s", tableName));
     }
 
-    private static void assertSelect(String query, String tableName)
+    @Requires(ImmutableLineItemTable.class)
+    @Test(groups = {STORAGE_FORMATS, BIG_QUERY})
+    public void testSelectFromPartitionedBzipTable() throws Exception
     {
-        QueryResult expected = query(format(query, "tpch." + TPCH_SCHEMA + ".lineitem"));
+        // This test is marked as "big_query" because INSERT OVERWRITE TABLE is very slow, but that
+        // is the only way to get bzip tables in Hive.
+
+        String tableName = "storage_formats_test_select_partitioned_bzip";
+        query(format("DROP TABLE IF EXISTS %s", tableName));
+
+        // The BZIP part of the table comes from the configs that are set during insert
+        String createTable = format(
+                "CREATE TABLE %s(" +
+                        "   l_orderkey      BIGINT," +
+                        "   l_partkey       BIGINT," +
+                        "   l_suppkey       BIGINT," +
+                        "   l_linenumber    INT," +
+                        "   l_quantity      DOUBLE," +
+                        "   l_extendedprice DOUBLE," +
+                        "   l_discount      DOUBLE," +
+                        "   l_tax           DOUBLE," +
+                        "   l_linestatus    VARCHAR(1)," +
+                        "   l_shipinstruct  VARCHAR(25)," +
+                        "   l_shipmode      VARCHAR(10)," +
+                        "   l_comment       VARCHAR(44)" +
+                        ") PARTITIONED BY (l_returnflag VARCHAR(1)) ROW FORMAT DELIMITED FIELDS TERMINATED BY '|' STORED AS TEXTFILE",
+                tableName);
+        onHive().executeQuery(createTable);
+
+        try {
+            String insertInto = format(
+                    "INSERT OVERWRITE TABLE %s PARTITION(l_returnflag) " +
+                            "SELECT l_orderkey, l_partkey, l_suppkey, l_linenumber, l_quantity, l_extendedprice, l_discount, l_tax, " +
+                            "l_linestatus, l_shipinstruct, l_shipmode, l_comment, l_returnflag " +
+                            "FROM default.lineitem", tableName);
+            Statement statement = onHive().getConnection().createStatement();
+            setHiveConfigsForBzipInsert(statement);
+            statement.execute(insertInto);
+            statement.close();
+
+            assertSelect("select sum(l_tax), sum(l_discount), sum(length(l_returnflag)) from %s", tableName, "hive.default.lineitem");
+        }
+        finally {
+            query(format("DROP TABLE %s", tableName));
+        }
+    }
+
+    private void setHiveConfigsForBzipInsert(Statement statement)
+            throws SQLException
+    {
+        statement.execute("SET hive.exec.compress.output=true;");
+        statement.execute("SET mapreduce.output.fileoutputformat.compress=true;");
+        statement.execute("SET mapred.output.compress=true");
+        statement.execute("SET mapreduce.output.fileoutputformat.compress.codec=org.apache.hadoop.io.compress.BZip2Codec");
+        statement.execute("SET hive.exec.dynamic.partition.mode=nonstrict;");
+    }
+
+    private static void assertSelect(String query, String tableName, String expectedTable)
+    {
+        QueryResult expected = query(format(query, expectedTable));
         List<Row> expectedRows = expected.rows().stream()
                 .map((columns) -> row(columns.toArray()))
                 .collect(toImmutableList());
