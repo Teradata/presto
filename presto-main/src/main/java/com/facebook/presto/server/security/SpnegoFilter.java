@@ -53,6 +53,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.google.common.io.ByteStreams.skipFully;
 import static java.lang.String.format;
 import static javax.security.auth.login.AppConfigurationEntry.LoginModuleControlFlag.REQUIRED;
 import static javax.servlet.http.HttpServletResponse.SC_UNAUTHORIZED;
@@ -174,7 +175,7 @@ public class SpnegoFilter
             }
         }
 
-        sendChallenge(response, includeRealm, requestSpnegoToken);
+        sendChallenge(request, response, includeRealm, requestSpnegoToken);
     }
 
     private Optional<Result> authenticate(String token)
@@ -211,9 +212,13 @@ public class SpnegoFilter
         return Optional.empty();
     }
 
-    private static void sendChallenge(HttpServletResponse response, boolean includeRealm, String invalidSpnegoToken)
+    private static void sendChallenge(HttpServletRequest request, HttpServletResponse response, boolean includeRealm, String invalidSpnegoToken)
         throws IOException
     {
+        long contentLength = request.getContentLengthLong();
+        if (contentLength > 0) {
+            skipFully(request.getInputStream(), contentLength);
+        }
         if (invalidSpnegoToken != null) {
             response.sendError(SC_UNAUTHORIZED, format("Authentication failed for token %s", invalidSpnegoToken));
         }
