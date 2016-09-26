@@ -515,7 +515,8 @@ public class Driver
         if (blocked.isDone()) {
             blocked = operator.getOperatorContext().isWaitingForSystemRevocableMemory();
         }
-        return blocked;
+
+        return firstFinishedFuture(ImmutableList.of(blocked, operator.getOperatorContext().getSystemMemoryRevokingRequestedFuture()));
     }
 
     private static Throwable addSuppressedException(Throwable inFlightException, Throwable newException, String message, Object... args)
