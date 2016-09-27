@@ -27,6 +27,7 @@ import com.facebook.presto.tpch.TpchConnectorFactory;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
+import org.testng.annotations.BeforeTest;
 import org.testng.annotations.Test;
 
 import java.util.List;
@@ -41,11 +42,14 @@ import static org.testng.Assert.assertTrue;
 
 public class TestMemoryPools
 {
-    private static final long TEN_MEGABYTES = new DataSize(10, MEGABYTE).toBytes();
+    private static final DataSize TEN_MEGABYTES = new DataSize(10, MEGABYTE);
 
-    @Test
-    public void testBlocking()
-            throws Exception
+    private QueryId fakeQueryId;
+    private MemoryPool userPool;
+    private List<Driver> drivers;
+
+    @BeforeTest
+    public void setUp()
     {
         Session session = testSessionBuilder()
                 .setCatalog("tpch")
@@ -58,18 +62,31 @@ public class TestMemoryPools
         // add tpch
         localQueryRunner.createCatalog("tpch", new TpchConnectorFactory(1), ImmutableMap.of());
 
-        // reserve all the memory in the pool
-        MemoryPool pool = new MemoryPool(new MemoryPoolId("test"), new DataSize(10, MEGABYTE));
-        QueryId fakeQueryId = new QueryId("fake");
-        assertTrue(pool.tryReserve(fakeQueryId, TEN_MEGABYTES));
-        MemoryPool systemPool = new MemoryPool(new MemoryPoolId("testSystem"), new DataSize(10, MEGABYTE));
+        userPool = new MemoryPool(new MemoryPoolId("test"), TEN_MEGABYTES);
+        MemoryPool systemPool = new MemoryPool(new MemoryPoolId("testSystem"), TEN_MEGABYTES);
+        fakeQueryId = new QueryId("fake");
         SpillSpaceTracker spillSpaceTracker = new SpillSpaceTracker(new DataSize(1, GIGABYTE));
-        QueryContext queryContext = new QueryContext(new QueryId("query"), new DataSize(10, MEGABYTE), pool, systemPool, localQueryRunner.getExecutor(), new DataSize(10, MEGABYTE), spillSpaceTracker);
-        // discard all output
+        QueryContext queryContext = new QueryContext(new QueryId("query"), TEN_MEGABYTES, userPool, systemPool, localQueryRunner.getExecutor(), TEN_MEGABYTES, spillSpaceTracker);
+
+        // query will reserve all memory in the user pool and discard the output
         OutputFactory outputFactory = new PageConsumerOutputFactory(types -> (page -> { }));
         TaskContext taskContext = createTaskContext(queryContext, localQueryRunner.getExecutor(), session);
-        List<Driver> drivers = localQueryRunner.createDrivers("SELECT COUNT(*) FROM orders JOIN lineitem USING (orderkey)", outputFactory, taskContext);
+        drivers = localQueryRunner.createDrivers("SELECT COUNT(*) FROM orders JOIN lineitem USING (orderkey)", outputFactory, taskContext);
+    }
 
+    @Test
+    public void testBlockingOnUserMemory()
+            throws Exception
+    {
+        assertTrue(userPool.tryReserve(fakeQueryId, TEN_MEGABYTES.toBytes()));
+        runDriversUntilBlocked();
+        assertTrue(userPool.getFreeBytes() <= 0, String.format("Expected empty pool but got [%d]", userPool.getFreeBytes()));
+        userPool.free(fakeQueryId, TEN_MEGABYTES.toBytes());
+        assertDriversProgress();
+    }
+
+    private void runDriversUntilBlocked()
+    {
         // run driver, until it blocks
         while (!isWaitingForMemory(drivers)) {
             for (Driver driver : drivers) {
@@ -81,10 +98,10 @@ public class TestMemoryPools
         for (Driver driver : drivers) {
             assertFalse(driver.isFinished());
         }
-        assertTrue(pool.getFreeBytes() <= 0);
+    }
 
-        pool.free(fakeQueryId, TEN_MEGABYTES);
-
+    private void assertDriversProgress()
+    {
         do {
             assertFalse(isWaitingForMemory(drivers));
             boolean progress = false;
@@ -94,7 +111,8 @@ public class TestMemoryPools
             }
             // query should not block
             assertTrue(progress);
-        } while (!drivers.stream().allMatch(Driver::isFinished));
+        }
+        while (!drivers.stream().allMatch(Driver::isFinished));
     }
 
     public static boolean isWaitingForMemory(List<Driver> drivers)
