@@ -24,7 +24,7 @@ import com.facebook.presto.spi.Constraint;
 import com.facebook.presto.spi.TableIdentity;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import com.facebook.presto.spi.security.Privilege;
+import com.facebook.presto.spi.security.PrivilegeInfo.Privilege;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;

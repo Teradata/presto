@@ -15,7 +15,7 @@ package com.facebook.presto.spi.connector;
 
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.security.Identity;
-import com.facebook.presto.spi.security.Privilege;
+import com.facebook.presto.spi.security.PrivilegeInfo.Privilege;
 
 import static com.facebook.presto.spi.security.AccessDeniedException.denyAddColumn;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyCreateSchema;

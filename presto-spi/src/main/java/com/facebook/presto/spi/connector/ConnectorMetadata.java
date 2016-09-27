@@ -33,7 +33,7 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.TableIdentity;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import com.facebook.presto.spi.security.Privilege;
+import com.facebook.presto.spi.security.PrivilegeInfo.Privilege;
 import io.airlift.slice.Slice;
 
 import java.util.Collection;

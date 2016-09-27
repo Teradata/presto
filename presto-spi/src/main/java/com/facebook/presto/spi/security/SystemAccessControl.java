@@ -15,6 +15,7 @@ package com.facebook.presto.spi.security;
 
 import com.facebook.presto.spi.CatalogSchemaName;
 import com.facebook.presto.spi.CatalogSchemaTableName;
+import com.facebook.presto.spi.security.PrivilegeInfo.Privilege;
 
 import java.security.Principal;
 

@@ -16,7 +16,7 @@ package com.facebook.presto.security;
 import com.facebook.presto.metadata.QualifiedObjectName;
 import com.facebook.presto.spi.CatalogSchemaName;
 import com.facebook.presto.spi.security.Identity;
-import com.facebook.presto.spi.security.Privilege;
+import com.facebook.presto.spi.security.PrivilegeInfo.Privilege;
 import com.facebook.presto.transaction.TransactionId;
 
 import java.security.Principal;

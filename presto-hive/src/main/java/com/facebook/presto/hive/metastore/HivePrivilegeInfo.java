@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.hive.metastore;
 
-import com.facebook.presto.spi.security.Privilege;
+import com.facebook.presto.spi.security.PrivilegeInfo.Privilege;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
 
