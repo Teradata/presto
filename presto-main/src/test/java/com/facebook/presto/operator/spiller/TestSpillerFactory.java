@@ -17,6 +17,7 @@ import com.facebook.presto.server.testing.TestingPrestoServer;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spiller.Spiller;
 import com.facebook.presto.spiller.SpillerFactory;
+import com.facebook.presto.spiller.SpillerFactoryWithStats;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Files;
@@ -72,7 +73,7 @@ public class TestSpillerFactory
     }
 
     private static class CustomSpillerFactory
-            implements SpillerFactory
+            extends SpillerFactoryWithStats
     {
         @Override
         public Spiller create(List<Type> types)

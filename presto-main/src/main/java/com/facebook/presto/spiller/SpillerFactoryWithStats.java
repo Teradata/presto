@@ -11,18 +11,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.facebook.presto.spiller;
 
-import com.facebook.presto.spi.type.Type;
 import org.weakref.jmx.Managed;
 
-import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
-public interface SpillerFactory
+public abstract class SpillerFactoryWithStats
+        implements SpillerFactory
 {
-    @Managed
-    long getSpilledData();
+    protected final AtomicLong spilledData = new AtomicLong();
 
-    com.facebook.presto.spiller.Spiller create(List<Type> types);
+    @Override
+    @Managed
+    public long getSpilledData()
+    {
+        return spilledData.get();
+    }
 }

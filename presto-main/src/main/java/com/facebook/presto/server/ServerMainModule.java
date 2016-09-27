@@ -394,6 +394,10 @@ public class ServerMainModule
                 FeaturesConfig.class,
                 config -> BINARY_FILE.equalsIgnoreCase(config.getSpillerImplementation()),
                 moduleBinder -> moduleBinder.bind(SpillerFactory.class).to(BinarySpillerFactory.class).in(Scopes.SINGLETON)));
+        install(installModuleIf(
+                FeaturesConfig.class,
+                config -> BINARY_FILE.equalsIgnoreCase(config.getSpillerImplementation()),
+                moduleBinder -> newExporter(moduleBinder).export(SpillerFactory.class).withGeneratedName()));
     }
 
     @Provides

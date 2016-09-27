@@ -43,6 +43,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
@@ -66,7 +67,7 @@ public class BenchmarkBinaryFileSpiller
     public void write(BenchmarkData data)
             throws ExecutionException, InterruptedException
     {
-        try (Spiller spiller = new BinaryFileSpiller(BLOCK_ENCODING_MANAGER, data.getExecutor(), SPILL_PATH)) {
+        try (Spiller spiller = new BinaryFileSpiller(BLOCK_ENCODING_MANAGER, data.getExecutor(), SPILL_PATH, new AtomicLong())) {
             spiller.spill(data.getPages().iterator()).get();
         }
     }
@@ -103,7 +104,7 @@ public class BenchmarkBinaryFileSpiller
         {
             executor = listeningDecorator(newSingleThreadScheduledExecutor());
             pages = createInputPages();
-            spiller = new BinaryFileSpiller(BLOCK_ENCODING_MANAGER, executor, SPILL_PATH);
+            spiller = new BinaryFileSpiller(BLOCK_ENCODING_MANAGER, executor, SPILL_PATH, new AtomicLong());
             spiller.spill(pages.iterator()).get();
         }
 

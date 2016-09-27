@@ -21,7 +21,7 @@ import java.util.List;
 
 import static org.testng.Assert.assertEquals;
 
-public class TestJmxStatsHolder
+public class TestJmxHistoricalData
 {
     private static final String TABLE_NAME = "test";
     private static final String NOT_EXISTING_TABLE_NAME = "not-existing-test";
@@ -45,5 +45,23 @@ public class TestJmxStatsHolder
         jmxHistoricalData.addRow(TABLE_NAME, ImmutableList.<Object>of(42, "ala"));
         jmxHistoricalData.addRow(TABLE_NAME, ImmutableList.<Object>of(42, "ala"));
         assertEquals(jmxHistoricalData.getRows(TABLE_NAME, bothColumns).size(), MAX_ENTRIES);
+    }
+
+    @Test
+    public void testCaseInsensitive()
+    {
+        JmxHistoricalData jmxHistoricalData = new JmxHistoricalData(MAX_ENTRIES, ImmutableSet.of(TABLE_NAME.toUpperCase()));
+
+        List<Integer> columns = ImmutableList.of(0);
+        assertEquals(jmxHistoricalData.getRows(TABLE_NAME, columns), ImmutableList.of());
+        assertEquals(jmxHistoricalData.getRows(TABLE_NAME.toUpperCase(), columns), ImmutableList.of());
+
+        jmxHistoricalData.addRow(TABLE_NAME, ImmutableList.<Object>of(42));
+        jmxHistoricalData.addRow(TABLE_NAME.toUpperCase(), ImmutableList.<Object>of(44));
+
+        assertEquals(jmxHistoricalData.getRows(TABLE_NAME, columns), ImmutableList.of(
+                ImmutableList.<Object>of(42), ImmutableList.<Object>of(44)));
+        assertEquals(jmxHistoricalData.getRows(TABLE_NAME.toUpperCase(), columns), ImmutableList.of(
+                ImmutableList.<Object>of(42), ImmutableList.<Object>of(44)));
     }
 }
