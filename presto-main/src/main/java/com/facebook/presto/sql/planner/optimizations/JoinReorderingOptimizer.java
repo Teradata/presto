@@ -29,6 +29,9 @@ import com.facebook.presto.statistics.StatisticsCalculator;
 import java.util.List;
 import java.util.Map;
 
+import static com.facebook.presto.sql.planner.plan.JoinNode.Method.booleanToJoinMethod;
+import static com.facebook.presto.sql.planner.plan.JoinNode.canDistributeJoin;
+import static com.facebook.presto.sql.planner.plan.JoinNode.mustDistributeJoin;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
@@ -97,8 +100,11 @@ public class JoinReorderingOptimizer
             }
 
             if (flipNeeded) {
+                JoinNode.Type joinType = flipJoinType(node.getType());
+                boolean isDistributedJoin = mustDistributeJoin(joinType) || (canDistributeJoin(session, leftRewritten, node.getCriteria(), joinType) && node.isDistributed());
                 return new JoinNode(node.getId(),
-                        flipJoinType(node.getType()),
+                        joinType,
+                        booleanToJoinMethod(isDistributedJoin),
                         rightRewritten,
                         leftRewritten,
                         flipJoinCriteria(node.getCriteria()),
@@ -108,8 +114,11 @@ public class JoinReorderingOptimizer
             }
 
             if (leftRewritten != node.getLeft() || rightRewritten != node.getRight()) {
+                JoinNode.Type joinType = node.getType();
+                boolean isDistributedJoin = canDistributeJoin(session, leftRewritten, node.getCriteria(), joinType) && node.isDistributed();
                 return new JoinNode(node.getId(),
                         node.getType(),
+                        booleanToJoinMethod(isDistributedJoin),
                         leftRewritten,
                         rightRewritten,
                         node.getCriteria(),

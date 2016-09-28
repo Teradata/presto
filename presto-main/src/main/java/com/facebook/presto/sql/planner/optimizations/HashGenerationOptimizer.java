@@ -285,6 +285,7 @@ public class HashGenerationOptimizer
                         new JoinNode(
                                 idAllocator.getNextId(),
                                 node.getType(),
+                                node.getMethod(),
                                 left.getNode(),
                                 right.getNode(),
                                 node.getCriteria(),
@@ -319,6 +320,7 @@ public class HashGenerationOptimizer
                     new JoinNode(
                             idAllocator.getNextId(),
                             node.getType(),
+                            node.getMethod(),
                             left.getNode(),
                             right.getNode(),
                             node.getCriteria(),

@@ -398,7 +398,7 @@ public class PredicatePushDown
                 leftSource = new ProjectNode(idAllocator.getNextId(), leftSource, leftProjections.build());
                 rightSource = new ProjectNode(idAllocator.getNextId(), rightSource, rightProjections.build());
 
-                output = new JoinNode(node.getId(), node.getType(), leftSource, rightSource, joinConditionBuilder.build(), newJoinFilter, node.getLeftHashSymbol(), node.getRightHashSymbol());
+                output = new JoinNode(node.getId(), node.getType(), node.getMethod(), leftSource, rightSource, joinConditionBuilder.build(), newJoinFilter, node.getLeftHashSymbol(), node.getRightHashSymbol());
             }
             if (!postJoinPredicate.equals(BooleanLiteral.TRUE_LITERAL)) {
                 output = new FilterNode(idAllocator.getNextId(), output, postJoinPredicate);
@@ -694,10 +694,10 @@ public class PredicatePushDown
                     return node;
                 }
                 if (canConvertToLeftJoin && canConvertToRightJoin) {
-                    return new JoinNode(node.getId(), INNER, node.getLeft(), node.getRight(), node.getCriteria(), node.getFilter(), node.getLeftHashSymbol(), node.getRightHashSymbol());
+                    return new JoinNode(node.getId(), INNER, node.getMethod(), node.getLeft(), node.getRight(), node.getCriteria(), node.getFilter(), node.getLeftHashSymbol(), node.getRightHashSymbol());
                 }
                 else {
-                    return new JoinNode(node.getId(), canConvertToLeftJoin ? LEFT : RIGHT,
+                    return new JoinNode(node.getId(), canConvertToLeftJoin ? LEFT : RIGHT, node.getMethod(),
                             node.getLeft(), node.getRight(), node.getCriteria(), node.getFilter(), node.getLeftHashSymbol(), node.getRightHashSymbol());
                 }
             }
@@ -706,7 +706,16 @@ public class PredicatePushDown
                     node.getType() == JoinNode.Type.RIGHT && !canConvertOuterToInner(node.getLeft().getOutputSymbols(), inheritedPredicate)) {
                 return node;
             }
-            return new JoinNode(node.getId(), JoinNode.Type.INNER, node.getLeft(), node.getRight(), node.getCriteria(), node.getFilter(), node.getLeftHashSymbol(), node.getRightHashSymbol());
+            return new JoinNode(
+                    node.getId(),
+                    JoinNode.Type.INNER,
+                    node.getMethod(),
+                    node.getLeft(),
+                    node.getRight(),
+                    node.getCriteria(),
+                    node.getFilter(),
+                    node.getLeftHashSymbol(),
+                    node.getRightHashSymbol());
         }
 
         private boolean canConvertOuterToInner(List<Symbol> innerSymbolsForOuterJoin, Expression inheritedPredicate)

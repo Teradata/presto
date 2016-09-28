@@ -44,6 +44,8 @@ import java.util.stream.Stream;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.SOURCE_DISTRIBUTION;
+import static com.facebook.presto.sql.planner.plan.JoinNode.Method.BROADCAST;
+import static com.facebook.presto.sql.planner.plan.JoinNode.Method.DISTRIBUTED;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.RIGHT;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
@@ -191,6 +193,7 @@ public class TestPhasedExecutionSchedule
         PlanNode join = new JoinNode(
                 new PlanNodeId(name + "_id"),
                 INNER,
+                BROADCAST,
                 tableScan,
                 new RemoteSourceNode(new PlanNodeId("build_id"), buildFragment.getId(), ImmutableList.of()),
                 ImmutableList.of(),
@@ -206,6 +209,7 @@ public class TestPhasedExecutionSchedule
         PlanNode planNode = new JoinNode(
                 new PlanNodeId(name + "_id"),
                 joinType,
+                DISTRIBUTED,
                 new RemoteSourceNode(new PlanNodeId("probe_id"), probeFragment.getId(), ImmutableList.of()),
                 new RemoteSourceNode(new PlanNodeId("build_id"), buildFragment.getId(), ImmutableList.of()),
                 ImmutableList.of(),

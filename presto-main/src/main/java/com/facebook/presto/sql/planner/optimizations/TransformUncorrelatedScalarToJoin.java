@@ -25,9 +25,12 @@ import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.SimplePlanRewriter;
 import com.google.common.collect.ImmutableList;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.facebook.presto.sql.planner.plan.JoinNode.Method.booleanToJoinMethod;
+import static com.facebook.presto.sql.planner.plan.JoinNode.canDistributeJoin;
 import static java.util.Objects.requireNonNull;
 
 public class TransformUncorrelatedScalarToJoin
@@ -36,17 +39,19 @@ public class TransformUncorrelatedScalarToJoin
     @Override
     public PlanNode optimize(PlanNode plan, Session session, Map<Symbol, Type> types, SymbolAllocator symbolAllocator, PlanNodeIdAllocator idAllocator)
     {
-        return SimplePlanRewriter.rewriteWith(new Rewriter(idAllocator), plan, null);
+        return SimplePlanRewriter.rewriteWith(new Rewriter(idAllocator, session), plan, null);
     }
 
     private class Rewriter
             extends SimplePlanRewriter<PlanNode>
     {
         private final PlanNodeIdAllocator idAllocator;
+        private final Session session;
 
-        public Rewriter(PlanNodeIdAllocator idAllocator)
+        public Rewriter(PlanNodeIdAllocator idAllocator, Session session)
         {
             this.idAllocator = requireNonNull(idAllocator, "idAllocator is null");
+            this.session = requireNonNull(session, "session is null");
         }
 
         @Override
@@ -54,12 +59,16 @@ public class TransformUncorrelatedScalarToJoin
         {
             ApplyNode rewrittenNode = (ApplyNode) context.defaultRewrite(node, context.get());
             if (rewrittenNode.getCorrelation().isEmpty() && rewrittenNode.getSubquery() instanceof EnforceSingleRowNode) {
+                PlanNode rightNode = rewrittenNode.getSubquery();
+                List<JoinNode.EquiJoinClause> equiJoinClauses = ImmutableList.of();
+                JoinNode.Type type = JoinNode.Type.INNER;
                 return new JoinNode(
                         idAllocator.getNextId(),
-                        JoinNode.Type.INNER,
+                        type,
+                        booleanToJoinMethod(canDistributeJoin(session, rightNode, equiJoinClauses, type)),
                         rewrittenNode.getInput(),
-                        rewrittenNode.getSubquery(),
-                        ImmutableList.of(),
+                        rightNode,
+                        equiJoinClauses,
                         Optional.empty(),
                         Optional.empty(),
                         Optional.empty());

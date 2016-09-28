@@ -424,6 +424,7 @@ public class TestEffectivePredicateExtractor
 
         PlanNode node = new JoinNode(newId(),
                 JoinNode.Type.INNER,
+                JoinNode.Method.DISTRIBUTED,
                 filter(leftScan,
                         and(
                                 lessThan(BE, AE),
@@ -482,6 +483,7 @@ public class TestEffectivePredicateExtractor
 
         PlanNode node = new JoinNode(newId(),
                 JoinNode.Type.LEFT,
+                JoinNode.Method.DISTRIBUTED,
                 filter(leftScan,
                         and(
                                 lessThan(BE, AE),
@@ -537,6 +539,7 @@ public class TestEffectivePredicateExtractor
 
         PlanNode node = new JoinNode(newId(),
                 JoinNode.Type.LEFT,
+                JoinNode.Method.DISTRIBUTED,
                 filter(leftScan,
                         and(
                                 lessThan(BE, AE),
@@ -589,6 +592,7 @@ public class TestEffectivePredicateExtractor
 
         PlanNode node = new JoinNode(newId(),
                 JoinNode.Type.RIGHT,
+                JoinNode.Method.DISTRIBUTED,
                 filter(leftScan,
                         and(
                                 lessThan(BE, AE),
@@ -644,6 +648,7 @@ public class TestEffectivePredicateExtractor
 
         PlanNode node = new JoinNode(newId(),
                 JoinNode.Type.RIGHT,
+                JoinNode.Method.DISTRIBUTED,
                 filter(leftScan, FALSE_LITERAL),
                 filter(rightScan,
                         and(

@@ -13,6 +13,8 @@
  */
 package com.facebook.presto.sql.planner.plan;
 
+import com.facebook.presto.Session;
+import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Join;
@@ -25,6 +27,8 @@ import javax.annotation.concurrent.Immutable;
 import java.util.List;
 import java.util.Optional;
 
+import static com.facebook.presto.sql.planner.optimizations.ScalarQueryUtil.isScalar;
+import static com.facebook.presto.sql.planner.plan.JoinNode.Method.DISTRIBUTED;
 import static java.util.Objects.requireNonNull;
 
 @Immutable
@@ -32,6 +36,7 @@ public class JoinNode
         extends PlanNode
 {
     private final Type type;
+    private final Method method;
     private final PlanNode left;
     private final PlanNode right;
     private final List<EquiJoinClause> criteria;
@@ -42,6 +47,7 @@ public class JoinNode
     @JsonCreator
     public JoinNode(@JsonProperty("id") PlanNodeId id,
             @JsonProperty("type") Type type,
+            @JsonProperty("method") Method method,
             @JsonProperty("left") PlanNode left,
             @JsonProperty("right") PlanNode right,
             @JsonProperty("criteria") List<EquiJoinClause> criteria,
@@ -59,12 +65,24 @@ public class JoinNode
         requireNonNull(rightHashSymbol, "rightHashSymbol is null");
 
         this.type = type;
+        this.method = method;
         this.left = left;
         this.right = right;
         this.criteria = ImmutableList.copyOf(criteria);
         this.filter = filter;
         this.leftHashSymbol = leftHashSymbol;
         this.rightHashSymbol = rightHashSymbol;
+    }
+
+    public enum Method
+    {
+        BROADCAST,
+        DISTRIBUTED;
+
+        public static Method booleanToJoinMethod(boolean isDistributed)
+        {
+            return isDistributed ? DISTRIBUTED : BROADCAST;
+        }
     }
 
     public enum Type
@@ -104,6 +122,12 @@ public class JoinNode
                     throw new UnsupportedOperationException("Unsupported join type: " + joinType);
             }
         }
+    }
+
+    @JsonProperty("method")
+    public Method getMethod()
+    {
+        return method;
     }
 
     @JsonProperty("type")
@@ -193,5 +217,23 @@ public class JoinNode
         {
             return right;
         }
+    }
+
+    public boolean isDistributed()
+    {
+        return method == DISTRIBUTED;
+    }
+
+    public static boolean canDistributeJoin(Session session, PlanNode rightNode, List<JoinNode.EquiJoinClause> equiJoinClauses, JoinNode.Type type)
+    {
+        // The implementation of full outer join only works if the data is hash partitioned. See LookupJoinOperators#buildSideOuterJoinUnvisitedPositions
+        boolean isCrossJoin = type == Type.INNER && equiJoinClauses.isEmpty();
+        return mustDistributeJoin(type) || (SystemSessionProperties.isDistributedJoinEnabled(session) && !isScalar(rightNode) && !isCrossJoin);
+    }
+
+    public static boolean mustDistributeJoin(JoinNode.Type type)
+    {
+        // The implementation of full outer join only works if the data is hash partitioned. See LookupJoinOperators#buildSideOuterJoinUnvisitedPositions
+        return type == Type.RIGHT || type == Type.FULL;
     }
 }

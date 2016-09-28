@@ -81,6 +81,8 @@ import java.util.Set;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.NOT_SUPPORTED;
 import static com.facebook.presto.sql.planner.ExpressionInterpreter.evaluateConstantExpression;
+import static com.facebook.presto.sql.planner.plan.JoinNode.Method.booleanToJoinMethod;
+import static com.facebook.presto.sql.planner.plan.JoinNode.canDistributeJoin;
 import static com.facebook.presto.sql.tree.Join.Type.INNER;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.facebook.presto.util.Types.checkType;
@@ -219,7 +221,7 @@ class RelationPlanner
                 .addAll(rightPlan.getOutputSymbols())
                 .build();
 
-        ImmutableList.Builder<JoinNode.EquiJoinClause> equiClauses = ImmutableList.builder();
+        ImmutableList.Builder<JoinNode.EquiJoinClause> equiClausesBuilder = ImmutableList.builder();
         List<Expression> complexJoinExpressions = new ArrayList<>();
         List<Expression> postInnerJoinConditions = new ArrayList<>();
 
@@ -280,7 +282,7 @@ class RelationPlanner
                 Symbol rightSymbol = rightPlanBuilder.translate(rightComparisonExpressions.get(i));
 
                 if (joinConditionComparisonTypes.get(i) == ComparisonExpression.Type.EQUAL) {
-                    equiClauses.add(new JoinNode.EquiJoinClause(leftSymbol, rightSymbol));
+                    equiClausesBuilder.add(new JoinNode.EquiJoinClause(leftSymbol, rightSymbol));
                 }
                 else {
                     Expression leftExpression = leftPlanBuilder.rewrite(leftComparisonExpressions.get(i));
@@ -290,11 +292,16 @@ class RelationPlanner
             }
         }
 
+        JoinNode.Type type = JoinNode.Type.typeConvert(node.getType());
+        List<JoinNode.EquiJoinClause> equiClauses = equiClausesBuilder.build();
+        JoinNode.Method joinMethod = booleanToJoinMethod(canDistributeJoin(session, rightPlanBuilder.getRoot(), equiClauses, type));
+
         PlanNode root = new JoinNode(idAllocator.getNextId(),
-                JoinNode.Type.typeConvert(node.getType()),
+                type,
+                joinMethod,
                 leftPlanBuilder.getRoot(),
                 rightPlanBuilder.getRoot(),
-                equiClauses.build(),
+                equiClauses,
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty());
@@ -310,10 +317,11 @@ class RelationPlanner
             Expression joinedFilterCondition = ExpressionUtils.and(complexJoinExpressions);
             Expression rewritenFilterCondition = translationMap.rewrite(joinedFilterCondition);
             root = new JoinNode(idAllocator.getNextId(),
-                    JoinNode.Type.typeConvert(node.getType()),
+                    type,
+                    joinMethod,
                     leftPlanBuilder.getRoot(),
                     rightPlanBuilder.getRoot(),
-                    equiClauses.build(),
+                    equiClauses,
                     Optional.of(rewritenFilterCondition),
                     Optional.empty(),
                     Optional.empty());
