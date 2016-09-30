@@ -89,6 +89,7 @@ public class PrestoServer
 
         ImmutableList.Builder<Module> modules = ImmutableList.builder();
         modules.add(
+                new InternalHttpClientConfigurationModule(),
                 new NodeModule(),
                 new DiscoveryModule(),
                 new HttpServerModule(),
