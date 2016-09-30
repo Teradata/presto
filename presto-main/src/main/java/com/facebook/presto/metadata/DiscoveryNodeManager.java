@@ -325,7 +325,7 @@ public final class DiscoveryNodeManager
 
     private static URI getHttpUri(ServiceDescriptor descriptor)
     {
-        for (String type : asList("http", "https")) {
+        for (String type : asList("http-external", "https-external")) {
             String url = descriptor.getProperties().get(type);
             if (url != null) {
                 try {

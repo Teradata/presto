@@ -37,13 +37,13 @@ public class HttpLocationFactory
     @Inject
     public HttpLocationFactory(InternalNodeManager nodeManager, HttpServerInfo httpServerInfo)
     {
-        this(nodeManager, httpServerInfo.getHttpUri());
+        this(nodeManager, httpServerInfo.getHttpExternalUri() != null ? httpServerInfo.getHttpExternalUri() : httpServerInfo.getHttpsExternalUri());
     }
 
     public HttpLocationFactory(InternalNodeManager nodeManager, URI baseUri)
     {
-        this.nodeManager = nodeManager;
-        this.baseUri = baseUri;
+        this.nodeManager = requireNonNull(nodeManager, "nodeManager is null");
+        this.baseUri = requireNonNull(baseUri, "baseUri is null");
     }
 
     @Override
