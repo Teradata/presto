@@ -7,3 +7,4 @@ Security
 
     security/server
     security/cli
+    security/internal-communication
