@@ -104,7 +104,8 @@ public class TestHiveClientConfig
                 .setHdfsPrestoKeytab(null)
                 .setBucketExecutionEnabled(true)
                 .setForceIntegralToBigint(false)
-                .setBucketWritingEnabled(true));
+                .setBucketWritingEnabled(true)
+                .setMultiFileBucketingEnabled(false));
     }
 
     @Test
@@ -180,6 +181,7 @@ public class TestHiveClientConfig
                 .put("hive.bucket-execution", "false")
                 .put("deprecated.hive.integral-types-as-bigint", "true")
                 .put("hive.bucket-writing", "false")
+                .put("hive.multi-file-bucketing.enabled", "true")
                 .build();
 
         HiveClientConfig expected = new HiveClientConfig()
@@ -251,7 +253,8 @@ public class TestHiveClientConfig
                 .setHdfsPrestoKeytab("/tmp/presto.keytab")
                 .setBucketExecutionEnabled(false)
                 .setForceIntegralToBigint(true)
-                .setBucketWritingEnabled(false);
+                .setBucketWritingEnabled(false)
+                .setMultiFileBucketingEnabled(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }
