@@ -21,10 +21,6 @@ import com.teradata.tempto.RequirementsProvider;
 import com.teradata.tempto.Requires;
 import com.teradata.tempto.configuration.Configuration;
 import com.teradata.tempto.fulfillment.table.MutableTableRequirement;
-import com.teradata.tempto.fulfillment.table.MutableTablesState;
-import com.teradata.tempto.fulfillment.table.TableDefinition;
-import com.teradata.tempto.fulfillment.table.TableHandle;
-import com.teradata.tempto.fulfillment.table.TableInstance;
 import com.teradata.tempto.query.QueryResult;
 import com.teradata.tempto.query.QueryType;
 import org.testng.annotations.Test;
@@ -41,15 +37,14 @@ import static com.facebook.presto.tests.hive.AllSimpleTypesTableDefinitions.ALL_
 import static com.facebook.presto.tests.hive.AllSimpleTypesTableDefinitions.ALL_HIVE_SIMPLE_TYPES_PARQUET;
 import static com.facebook.presto.tests.hive.AllSimpleTypesTableDefinitions.ALL_HIVE_SIMPLE_TYPES_RCFILE;
 import static com.facebook.presto.tests.hive.AllSimpleTypesTableDefinitions.ALL_HIVE_SIMPLE_TYPES_TEXTFILE;
-import static com.facebook.presto.tests.hive.AllSimpleTypesTableDefinitions.onHive;
 import static com.facebook.presto.tests.hive.AllSimpleTypesTableDefinitions.populateDataToHiveTable;
 import static com.facebook.presto.tests.utils.JdbcDriverUtils.usingPrestoJdbcDriver;
 import static com.facebook.presto.tests.utils.JdbcDriverUtils.usingTeradataJdbcDriver;
+import static com.facebook.presto.tests.utils.QueryExecutors.onHive;
+import static com.facebook.presto.tests.utils.TableDefinitionUtils.mutableTableInstanceOf;
 import static com.teradata.tempto.assertions.QueryAssert.Row.row;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
-import static com.teradata.tempto.context.ThreadLocalTestContextHolder.testContext;
 import static com.teradata.tempto.fulfillment.table.MutableTableRequirement.State.CREATED;
-import static com.teradata.tempto.fulfillment.table.TableHandle.tableHandle;
 import static com.teradata.tempto.fulfillment.table.TableRequirements.immutableTable;
 import static com.teradata.tempto.query.QueryExecutor.defaultQueryExecutor;
 import static com.teradata.tempto.query.QueryExecutor.query;
@@ -356,34 +351,5 @@ public class TestAllDatatypesFromHiveConnector
                         "ala ma    ",
                         true,
                         "kot binarny".getBytes()));
-    }
-
-    private static TableInstance mutableTableInstanceOf(TableDefinition tableDefinition)
-    {
-        if (tableDefinition.getDatabase().isPresent()) {
-            return mutableTableInstanceOf(tableDefinition, tableDefinition.getDatabase().get());
-        }
-        else {
-            return mutableTableInstanceOf(tableHandleInSchema(tableDefinition));
-        }
-    }
-
-    private static TableInstance mutableTableInstanceOf(TableDefinition tableDefinition, String database)
-    {
-        return mutableTableInstanceOf(tableHandleInSchema(tableDefinition).inDatabase(database));
-    }
-
-    private static TableInstance mutableTableInstanceOf(TableHandle tableHandle)
-    {
-        return testContext().getDependency(MutableTablesState.class).get(tableHandle);
-    }
-
-    private static TableHandle tableHandleInSchema(TableDefinition tableDefinition)
-    {
-        TableHandle tableHandle = tableHandle(tableDefinition.getName());
-        if (tableDefinition.getSchema().isPresent()) {
-            tableHandle = tableHandle.inSchema(tableDefinition.getSchema().get());
-        }
-        return tableHandle;
     }
 }
