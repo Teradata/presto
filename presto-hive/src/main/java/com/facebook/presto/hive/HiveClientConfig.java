@@ -131,6 +131,8 @@ public class HiveClientConfig
     private boolean bucketExecutionEnabled = true;
     private boolean bucketWritingEnabled = true;
 
+    private boolean multiFileBucketingEnabled = false;
+
     public int getMaxInitialSplits()
     {
         return maxInitialSplits;
@@ -1041,6 +1043,19 @@ public class HiveClientConfig
     public HiveClientConfig setBucketWritingEnabled(boolean bucketWritingEnabled)
     {
         this.bucketWritingEnabled = bucketWritingEnabled;
+        return this;
+    }
+
+    public boolean isMultiFileBucketingEnabled()
+    {
+        return multiFileBucketingEnabled;
+    }
+
+    @Config("hive.multi-file-bucketing.enabled")
+    @ConfigDescription("Allow multiple files per bucket for clustered table")
+    public HiveClientConfig setMultiFileBucketingEnabled(boolean multiFileBucketingEnabled)
+    {
+        this.multiFileBucketingEnabled = multiFileBucketingEnabled;
         return this;
     }
 }

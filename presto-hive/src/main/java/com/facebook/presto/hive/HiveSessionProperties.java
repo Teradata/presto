@@ -36,6 +36,7 @@ public final class HiveSessionProperties
     private static final String PARQUET_OPTIMIZED_READER_ENABLED = "parquet_optimized_reader_enabled";
     private static final String MAX_SPLIT_SIZE = "max_split_size";
     private static final String MAX_INITIAL_SPLIT_SIZE = "max_initial_split_size";
+    private static final String MULTI_FILE_BUCKETING_ENABLED = "multi_file_bucketing_enabled";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -87,6 +88,11 @@ public final class HiveSessionProperties
                         MAX_INITIAL_SPLIT_SIZE,
                         "Max initial split size",
                         config.getMaxInitialSplitSize(),
+                        true),
+                booleanSessionProperty(
+                        MULTI_FILE_BUCKETING_ENABLED,
+                        "Allow multiple files per bucket for clustered table",
+                        config.isMultiFileBucketingEnabled(),
                         true));
     }
 
@@ -138,6 +144,11 @@ public final class HiveSessionProperties
     public static DataSize getMaxInitialSplitSize(ConnectorSession session)
     {
         return session.getProperty(MAX_INITIAL_SPLIT_SIZE, DataSize.class);
+    }
+
+    public static boolean isMultiFileBucketingEnabled(ConnectorSession session)
+    {
+        return session.getProperty(MULTI_FILE_BUCKETING_ENABLED, Boolean.class);
     }
 
     public static PropertyMetadata<DataSize> dataSizeSessionProperty(String name, String description, DataSize defaultValue, boolean hidden)
