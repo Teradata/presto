@@ -240,19 +240,12 @@ import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
-import static com.facebook.presto.type.CharOperators.CHAR_BETWEEN_NO_PAD;
 import static com.facebook.presto.type.CharOperators.CHAR_BETWEEN_PAD_SPACES;
-import static com.facebook.presto.type.CharOperators.CHAR_EQUAL_NO_PAD;
 import static com.facebook.presto.type.CharOperators.CHAR_EQUAL_PAD_SPACES;
-import static com.facebook.presto.type.CharOperators.CHAR_GREATER_THAN_NO_PAD;
-import static com.facebook.presto.type.CharOperators.CHAR_GREATER_THAN_OR_EQUAL_NO_PAD;
 import static com.facebook.presto.type.CharOperators.CHAR_GREATER_THAN_OR_EQUAL_PAD_SPACES;
 import static com.facebook.presto.type.CharOperators.CHAR_GREATER_THAN_PAD_SPACES;
-import static com.facebook.presto.type.CharOperators.CHAR_LESS_THAN_NO_PAD;
-import static com.facebook.presto.type.CharOperators.CHAR_LESS_THAN_OR_EQUAL_NO_PAD;
 import static com.facebook.presto.type.CharOperators.CHAR_LESS_THAN_OR_EQUAL_PAD_SPACES;
 import static com.facebook.presto.type.CharOperators.CHAR_LESS_THAN_PAD_SPACES;
-import static com.facebook.presto.type.CharOperators.CHAR_NOT_EQUAL_NO_PAD;
 import static com.facebook.presto.type.CharOperators.CHAR_NOT_EQUAL_PAD_SPACES;
 import static com.facebook.presto.type.DecimalCasts.BIGINT_TO_DECIMAL_CAST;
 import static com.facebook.presto.type.DecimalCasts.BOOLEAN_TO_DECIMAL_CAST;
@@ -531,24 +524,13 @@ public class FunctionRegistry
                 break;
         }
 
-        if (featuresConfig.isCharPadSpaces()) {
-            builder.function(CHAR_EQUAL_PAD_SPACES)
-                    .function(CHAR_NOT_EQUAL_PAD_SPACES)
-                    .function(CHAR_LESS_THAN_PAD_SPACES)
-                    .function(CHAR_LESS_THAN_OR_EQUAL_PAD_SPACES)
-                    .function(CHAR_GREATER_THAN_PAD_SPACES)
-                    .function(CHAR_GREATER_THAN_OR_EQUAL_PAD_SPACES)
-                    .function(CHAR_BETWEEN_PAD_SPACES);
-        }
-        else {
-            builder.function(CHAR_EQUAL_NO_PAD)
-                    .function(CHAR_NOT_EQUAL_NO_PAD)
-                    .function(CHAR_LESS_THAN_NO_PAD)
-                    .function(CHAR_LESS_THAN_OR_EQUAL_NO_PAD)
-                    .function(CHAR_GREATER_THAN_NO_PAD)
-                    .function(CHAR_GREATER_THAN_OR_EQUAL_NO_PAD)
-                    .function(CHAR_BETWEEN_NO_PAD);
-        }
+        builder.function(CHAR_EQUAL_PAD_SPACES)
+                .function(CHAR_NOT_EQUAL_PAD_SPACES)
+                .function(CHAR_LESS_THAN_PAD_SPACES)
+                .function(CHAR_LESS_THAN_OR_EQUAL_PAD_SPACES)
+                .function(CHAR_GREATER_THAN_PAD_SPACES)
+                .function(CHAR_GREATER_THAN_OR_EQUAL_PAD_SPACES)
+                .function(CHAR_BETWEEN_PAD_SPACES);
 
         if (featuresConfig.isExperimentalSyntaxEnabled()) {
             builder.aggregate(ApproximateAverageAggregations.class)

@@ -33,19 +33,12 @@ import static com.facebook.presto.metadata.OperatorType.HASH_CODE;
 import static com.facebook.presto.metadata.OperatorType.LESS_THAN;
 import static com.facebook.presto.metadata.OperatorType.LESS_THAN_OR_EQUAL;
 import static com.facebook.presto.metadata.OperatorType.NOT_EQUAL;
+import static com.facebook.presto.spi.type.Chars.compareChars;
 import static com.facebook.presto.spi.type.StandardTypes.BOOLEAN;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 
 public final class CharOperators
 {
-    public static final SqlScalarFunction CHAR_EQUAL_NO_PAD = charLogicalOperator(EQUAL, "equalNoPad");
-    public static final SqlScalarFunction CHAR_NOT_EQUAL_NO_PAD = charLogicalOperator(NOT_EQUAL, "notEqualNoPad");
-    public static final SqlScalarFunction CHAR_LESS_THAN_NO_PAD = charLogicalOperator(LESS_THAN, "lessThanNoPad");
-    public static final SqlScalarFunction CHAR_LESS_THAN_OR_EQUAL_NO_PAD = charLogicalOperator(LESS_THAN_OR_EQUAL, "lessThanOrEqualNoPad");
-    public static final SqlScalarFunction CHAR_GREATER_THAN_NO_PAD = charLogicalOperator(GREATER_THAN, "greaterThanNoPad");
-    public static final SqlScalarFunction CHAR_GREATER_THAN_OR_EQUAL_NO_PAD = charLogicalOperator(GREATER_THAN_OR_EQUAL, "greaterThanOrEqualNoPad");
-    public static final SqlScalarFunction CHAR_BETWEEN_NO_PAD = charBetweenOperator("betweenNoPad");
-
     public static final SqlScalarFunction CHAR_EQUAL_PAD_SPACES = charLogicalOperator(EQUAL, "equalPadSpaces");
     public static final SqlScalarFunction CHAR_NOT_EQUAL_PAD_SPACES = charLogicalOperator(NOT_EQUAL, "notEqualPadSpaces");
     public static final SqlScalarFunction CHAR_LESS_THAN_PAD_SPACES = charLogicalOperator(LESS_THAN, "lessThanPadSpaces");
@@ -99,59 +92,6 @@ public final class CharOperators
     }
 
     @UsedByGeneratedCode
-    public static boolean equalNoPad(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
-    {
-        return left.equals(right) && leftTypeLength == rightTypeLength;
-    }
-
-    @UsedByGeneratedCode
-    public static boolean notEqualNoPad(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
-    {
-        return !equalNoPad(left, right, leftTypeLength, rightTypeLength);
-    }
-
-    @UsedByGeneratedCode
-    public static boolean lessThanNoPad(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
-    {
-        return compareNoPad(left, right, leftTypeLength, rightTypeLength) < 0;
-    }
-
-    @UsedByGeneratedCode
-    public static boolean lessThanOrEqualNoPad(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
-    {
-        return compareNoPad(left, right, leftTypeLength, rightTypeLength) <= 0;
-    }
-
-    @UsedByGeneratedCode
-    public static boolean greaterThanNoPad(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
-    {
-        return compareNoPad(left, right, leftTypeLength, rightTypeLength) > 0;
-    }
-
-    @UsedByGeneratedCode
-    public static boolean greaterThanOrEqualNoPad(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
-    {
-        return compareNoPad(left, right, leftTypeLength, rightTypeLength) >= 0;
-    }
-
-    @UsedByGeneratedCode
-    public static boolean betweenNoPad(Slice value, Slice min, Slice max, long valueTypeLength, long minTypeLength, long maxTypeLength)
-    {
-        return compareNoPad(min, value, minTypeLength, valueTypeLength) <= 0
-                && compareNoPad(value, max, valueTypeLength, maxTypeLength) <= 0;
-    }
-
-    private static int compareNoPad(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
-    {
-        int compareResult = left.compareTo(right);
-        if (compareResult != 0) {
-            return compareResult;
-        }
-
-        return (int) (leftTypeLength - rightTypeLength);
-    }
-
-    @UsedByGeneratedCode
     public static boolean equalPadSpaces(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
     {
         return left.equals(right);
@@ -166,31 +106,31 @@ public final class CharOperators
     @UsedByGeneratedCode
     public static boolean lessThanPadSpaces(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
     {
-        return left.compareTo(right) < 0;
+        return compareChars(left, right) < 0;
     }
 
     @UsedByGeneratedCode
     public static boolean lessThanOrEqualPadSpaces(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
     {
-        return left.compareTo(right) <= 0;
+        return compareChars(left, right) <= 0;
     }
 
     @UsedByGeneratedCode
     public static boolean greaterThanPadSpaces(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
     {
-        return left.compareTo(right) > 0;
+        return compareChars(left, right) > 0;
     }
 
     @UsedByGeneratedCode
     public static boolean greaterThanOrEqualPadSpaces(Slice left, Slice right, long leftTypeLength, long rightTypeLength)
     {
-        return left.compareTo(right) >= 0;
+        return compareChars(left, right) >= 0;
     }
 
     @UsedByGeneratedCode
     public static boolean betweenPadSpaces(Slice value, Slice min, Slice max, long valueTypeLength, long minTypeLength, long maxTypeLength)
     {
-        return min.compareTo(value) <= 0 && value.compareTo(max) <= 0;
+        return compareChars(min, value) <= 0 && compareChars(value, max) <= 0;
     }
 
     @LiteralParameters("x")
