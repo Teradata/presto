@@ -21,6 +21,7 @@ import com.teradata.tempto.configuration.Configuration;
 import com.teradata.tempto.fulfillment.table.MutableTableRequirement;
 import com.teradata.tempto.fulfillment.table.TableDefinitionsRepository;
 import com.teradata.tempto.fulfillment.table.hive.HiveTableDefinition;
+import com.teradata.tempto.query.QueryExecutionException;
 import org.testng.annotations.Test;
 
 import java.sql.SQLException;
@@ -28,6 +29,7 @@ import java.util.Optional;
 
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
 import static com.facebook.presto.tests.TpchTableResults.PRESTO_NATION_RESULT;
+import static com.facebook.presto.tests.utils.JdbcDriverUtils.setSessionProperty;
 import static com.facebook.presto.tests.utils.QueryExecutors.onHive;
 import static com.facebook.presto.tests.utils.TableDefinitionUtils.mutableTableInstanceOf;
 import static com.teradata.tempto.assertions.QueryAssert.Row.row;
@@ -35,6 +37,7 @@ import static com.teradata.tempto.assertions.QueryAssert.assertThat;
 import static com.teradata.tempto.fulfillment.table.MutableTableRequirement.State.CREATED;
 import static com.teradata.tempto.fulfillment.table.TableRequirements.immutableTable;
 import static com.teradata.tempto.fulfillment.table.hive.tpch.TpchTableDefinitions.NATION;
+import static com.teradata.tempto.query.QueryExecutor.defaultQueryExecutor;
 import static com.teradata.tempto.query.QueryExecutor.query;
 import static java.lang.String.format;
 
@@ -86,11 +89,22 @@ public class TestHiveBucketedTables
 
         assertThat(query(format("SELECT * FROM %s", tableName))).matches(PRESTO_NATION_RESULT);
         assertThat(query(format("SELECT count(*) FROM %s WHERE n_nationkey = 1", tableName)))
-                .hasRowsCount(1)
-                .contains(row(1));
+                .containsExactly(row(1));
         assertThat(query(format("SELECT count(*) FROM %s n JOIN %s n1 ON n.n_regionkey = n1.n_regionkey", tableName, tableName)))
-                .hasRowsCount(1)
-                .contains(row(125));
+                .containsExactly(row(125));
+    }
+
+    @Test(groups = {HIVE_CONNECTOR},
+            expectedExceptions = QueryExecutionException.class,
+            expectedExceptionsMessageRegExp = ".*does not match the declared bucket count.*")
+    public void testSelectAfterMultipleInsertsMultiBucketDisabled()
+            throws SQLException
+    {
+        String tableName = mutableTableInstanceOf(BUCKETED_NATION).getNameInDatabase();
+        populateDataToHiveTable(tableName, NATION.getName(), Optional.empty());
+        populateDataToHiveTable(tableName, NATION.getName(), Optional.empty());
+
+        query(format("SELECT count(*) FROM %s WHERE n_nationkey = 1", tableName));
     }
 
     @Test(groups = {HIVE_CONNECTOR})
@@ -101,42 +115,40 @@ public class TestHiveBucketedTables
         populateDataToHiveTable(tableName, NATION.getName(), Optional.empty());
         populateDataToHiveTable(tableName, NATION.getName(), Optional.empty());
 
+        enableMultiFileBucketing();
+
         assertThat(query(format("SELECT count(*) FROM %s WHERE n_nationkey = 1", tableName)))
-                .hasRowsCount(1)
-                .contains(row(2));
+                .containsExactly(row(2));
         assertThat(query(format("SELECT count(*) FROM %s WHERE n_regionkey = 1", tableName)))
-                .hasRowsCount(1)
-                .contains(row(10));
+                .containsExactly(row(10));
         assertThat(query(format("SELECT n_regionkey, count(*) FROM %s GROUP BY n_regionkey", tableName)))
                 .containsOnly(row(0, 10), row(1, 10), row(2, 10), row(3, 10), row(4, 10));
         assertThat(query(format("SELECT count(*) FROM %s n JOIN %s n1 ON n.n_regionkey = n1.n_regionkey", tableName, tableName)))
-                .hasRowsCount(1)
-                .contains(row(500));
+                .containsExactly(row(500));
     }
 
     @Test(groups = {HIVE_CONNECTOR})
-    public void testSelectForSortedTable()
+    public void testSelectAfterMultipleInsertsForSortedTable()
             throws SQLException
     {
         String tableName = mutableTableInstanceOf(BUCKETED_SORTED_NATION).getNameInDatabase();
         populateDataToHiveTable(tableName, NATION.getName(), Optional.empty());
         populateDataToHiveTable(tableName, NATION.getName(), Optional.empty());
 
+        enableMultiFileBucketing();
+
         assertThat(query(format("SELECT count(*) FROM %s WHERE n_nationkey = 1", tableName)))
-                .hasRowsCount(1)
-                .contains(row(2));
+                .containsExactly(row(2));
         assertThat(query(format("SELECT count(*) FROM %s WHERE n_regionkey = 1", tableName)))
-                .hasRowsCount(1)
-                .contains(row(10));
+                .containsExactly(row(10));
         assertThat(query(format("SELECT n_regionkey, count(*) FROM %s GROUP BY n_regionkey", tableName)))
                 .containsOnly(row(0, 10), row(1, 10), row(2, 10), row(3, 10), row(4, 10));
         assertThat(query(format("SELECT count(*) FROM %s n JOIN %s n1 ON n.n_regionkey = n1.n_regionkey", tableName, tableName)))
-                .hasRowsCount(1)
-                .contains(row(500));
+                .containsExactly(row(500));
     }
 
     @Test(groups = {HIVE_CONNECTOR})
-    public void testSelectForPartitionedTable()
+    public void testSelectAfterMultipleInsertsForPartitionedTable()
             throws SQLException
     {
         String tableName = mutableTableInstanceOf(BUCKETED_PARTITIONED_NATION).getNameInDatabase();
@@ -145,31 +157,38 @@ public class TestHiveBucketedTables
         populateDataToHiveTable(tableName, NATION.getName(), Optional.of("part_key = 'insert_1'"));
         populateDataToHiveTable(tableName, NATION.getName(), Optional.of("part_key = 'insert_2'"));
 
+        enableMultiFileBucketing();
+
         assertThat(query(format("SELECT count(*) FROM %s WHERE n_nationkey = 1", tableName)))
-                .hasRowsCount(1)
-                .contains(row(4));
+                .containsExactly(row(4));
         assertThat(query(format("SELECT count(*) FROM %s WHERE n_regionkey = 1", tableName)))
-                .hasRowsCount(1)
-                .contains(row(20));
+                .containsExactly(row(20));
         assertThat(query(format("SELECT count(*) FROM %s WHERE n_regionkey = 1 AND part_key = 'insert_1'", tableName)))
                 .hasRowsCount(1)
-                .contains(row(10));
+                .containsExactly(row(10));
         assertThat(query(format("SELECT n_regionkey, count(*) FROM %s WHERE part_key = 'insert_2' GROUP BY n_regionkey", tableName)))
                 .containsOnly(row(0, 10), row(1, 10), row(2, 10), row(3, 10), row(4, 10));
         assertThat(query(format("SELECT count(*) FROM %s n JOIN %s n1 ON n.n_regionkey = n1.n_regionkey", tableName, tableName)))
-                .hasRowsCount(1)
-                .contains(row(2000));
+                .containsExactly(row(2000));
         assertThat(query(format("SELECT count(*) FROM %s n JOIN %s n1 ON n.n_regionkey = n1.n_regionkey WHERE n.part_key = 'insert_1'", tableName, tableName)))
-                .hasRowsCount(1)
-                .contains(row(1000));
+                .containsExactly(row(1000));
+    }
+
+    private static void enableMultiFileBucketing()
+            throws SQLException
+    {
+        setSessionProperty(defaultQueryExecutor().getConnection(), "hive.multi_file_bucketing_enabled", "true");
     }
 
     private static void populateDataToHiveTable(String destination, String source, Optional<String> partition)
     {
-        // TODO: Make sure hive.enforce.bucketing is set before loading
-        onHive().executeQuery(format("INSERT INTO %s" +
+        String queryStatement = format("INSERT INTO %s" +
                         (partition.isPresent() ? format(" PARTITION (%s) ", partition.get()) : " ") +
                         "SELECT * FROM %s",
-                destination, source));
+                destination, source);
+
+        onHive().executeQuery("set hive.enforce.bucketing = true");
+        onHive().executeQuery("set hive.enforce.sorting = true");
+        onHive().executeQuery(queryStatement);
     }
 }
