@@ -12,39 +12,39 @@ Presto ODBC Driver Install Guide
 <http://teradata-presto.s3.amazonaws.com/odbc-1.1.3.1007/TeradataODBCDriverPrestoInstallGuide_1_1_3.pdf>`_
 
 
-ODBC for Mac
-************
+Version Compatibility
+---------------------
 
-*Requires*
+============================ ==========================
+Teradata Presto ODBC Version Compatible Presto Versions
+============================ ==========================
+1.1.4.1.1001                 0.152.1-t, 0.148-t.1.2
 
-* OS X 10.9 or 10.10
-* iODBC 3.52.7 or later
+1.1.3.1007                   0.148-t.1.2
 
-----
+1.1.0.1004                   0.141-t
 
-ODBC for Windows (32 & 64 bit)
-******************************
+1.0.0.1001                   0.127-t, 0.115-t, 0.101-t
+============================ ==========================
 
-*Requires*
+System Requirements
+-------------------
 
-* Microsoft ODBC Driver Manager
+============================= ==============================================
+Operating System              Driver Manager
+============================= ==============================================
+OS X 10.9, OS X 10.10         iODBC 3.52.7 or later
 
-----
+Windows 32 and 64             Microsoft ODBC Driver Manager
 
-ODBC for Linux (32 & 64 bit)
-****************************
-
-*Requires*
-
-* RedHat Enterprise Linux 6.x or or CentOS equivalent
-* iODBC 3.52.7 or later, unixODBC 2.3.0 or later
-
+RHEL 6.x, CentOS equivalent   iODBC 3.52.7 or later, unixODBC 2.3.0 or later
+============================= ==============================================
 
 Tableau Customizations
-**********************
+----------------------
 
 **Windows Only**
-The Teradata Presto ODBC driver is distributed with a Tableau Datasource Connection (TDC) file. The file is used to better the use of Presto and Tableau by customizing the SQL that Tableau sends to Presto via the driver. The TDC will not correct functionality, it will only inform Tableau of the best way to work with the Teradata Presto ODBC driver. The TDC file is included in the Presto Client Package download.
+The Teradata client distribution package comes with a Tableau Datasource Connection (TDC) file. The file is used to better the use of Presto and Tableau by customizing the SQL that Tableau sends to Presto via the driver. The TDC will not correct functionality, it will only inform Tableau of the best way to work with the Teradata Presto ODBC driver. The TDC file is included in the Presto Client Package download.
 
 After installing the ODBC driver on Windows, you should copy the TDC file to the location Tableau will look for it:
 ``C:\Users\<USER_NAME>\Documents\My Tableau Repository\Datasources``
