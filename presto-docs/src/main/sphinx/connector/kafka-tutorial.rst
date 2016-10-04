@@ -13,7 +13,7 @@ Installation
 ============
 
 This tutorial assumes familiarity with Presto and a working local Presto
-installation (see :doc:`/installation/deployment`). It will focus on
+installation. It will focus on
 setting up Apache Kafka and integrating it with Presto.
 
 Step 1: Install Apache Kafka

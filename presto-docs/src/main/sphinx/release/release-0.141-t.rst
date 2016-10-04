@@ -1,36 +1,72 @@
-==========================================
-Unsupported Features and Known Limitations
-==========================================
+===============
+Release 0.141-t
+===============
 
-Presto 148t is equivalent to Presto release 0.148, with some additional features. Below
-are documented unsupported features and known limitations.
+Presto 0.141-t is equivalent to Presto release 0.141, with some additional features.
+
+Prepared Statements
+-------------------
+Add support for Prepared statements and parameters via sql syntax.
+
+    * PREPARE
+    * DEALLOCATE PREPARE
+    * EXECUTE
+    * DESCRIBE INPUT
+    * DESCRIBE OUTPUT
+
+Regular Expressions
+-------------------
+Add support for running regular expression functions using the more efficent re2j-td library by setting the session
+variable ``regex_library`` to RE2J.  The memory footprint can be adjusted by setting ``re2j_dfa_states_limit``.
+Additionally, the number of times the re2j library falls back from its DFA algorithm to the NFA algorithm (due to
+hitting the states limit) before immediately starting with the NFA algorithm can be set with the ``re2j_dfa_retries``
+session variable.
+
+Kerberos Support
+----------------
+Add support for Presto to query from a Kerberized Hadoop cluster. The Hive connector provides additonal security options to support Hadoop clusters that have been configured to use Kerberos. When accessing HDFS, Presto can impersonate the end user who is running the query. This can be used with HDFS permissions and ACLs to provide additional security for data.
+
+EXPLAIN ANALYZE
+---------------
+Execute the statement and show the distributed execution plan of the statement along with the cost of each operation.
+
+DECIMAL
+-------
+DECIMAL is a fixed precision data type that has been added.
 
 Unsupported Functionality
-=========================
+-------------------------
 
-Some functionality from Presto 0.148 may work but is not officially supported by Teradata.
+Some functionality from Presto 0.141 may work but is not officially supported by Teradata.
 
-* The installation method as documented on `prestodb.io <https://prestodb.io/docs/0.148/installation/deployment.html>`_.
+* The installation method as documented on `prestodb.io <https://prestodb.io/docs/0.141/installation/deployment.html>`_.
 * Web Connector for Tableau
 * The following connectors:
-  * Cassandra Connector
-  * Kafka Connector
-  * Local File Connector
-  * MongoDB Connector
-  * Redis Connector
+
+  * Cassandra
+  * Kafka
+  * Redis
+  * Hive-hadoop1
+  * Hive-cdh4
 * Developing Plugins
 
+Beta Features
+-------------
+Decimal support is currently in Beta stage.
+
 SQL/DML/DDL Limitations
-=======================
+-----------------------
 
  * The SQL keyword ``end`` is used as a column name in ``system.runtime.queries``, so in order to query from that column, ``end`` must be wrapped in quotes
  * ``NATURAL JOIN`` is not supported
- * ``EXISTS`` and ``EXCEPT`` are not supported
+ * Correlated subqueries are not supported
+ * Non-equi joins are only supported for inner join -- e.g. ``"n_name" < "p_name"``
+ * ``EXISTS``, ``EXCEPT``, and ``INTERSECT`` are not supported
+ * ``ROLLUP``, ``CUBE``, ``GROUPING SETS`` are not supported
  * ``LIMIT ALL`` and ``OFFSET`` are not supported
- * Correlated Subqueries
 
 Hive Connector Limitations
-==========================
+--------------------------
 
 Teradata supports data stored in the following formats:
 
@@ -38,6 +74,21 @@ Teradata supports data stored in the following formats:
  * ORC
  * RCFILE
  * PARQUET
+
+Hive to Presto data type mapping
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Presto does not map Hive data types 1-to-1:
+
+ * All integral types are mapped to ``BIGINT``
+ * ``FLOAT`` and ``DOUBLE`` are mapped to ``DOUBLE``
+ * ``STRING`` and ``VARCHAR`` are mapped to ``VARCHAR``
+
+These mappings may be visible if column values are passed to Hive UDFs or through slight
+differences in mathematical operations.
+
+Because ``FLOAT`` values are mapped to ``DOUBLE``, the user may see unexpected results.
+For example, a Hive data file containing a ``FLOAT`` column with value ``123.345``, will
+be presented to the user as a double whose string representation is ``123.34500122070312``.
 
 TIMESTAMP limitations
 ^^^^^^^^^^^^^^^^^^^^^
@@ -73,15 +124,16 @@ Hive Parquet Issues
 PARQUET support in Hive imposes more limitations than the other file types.
 
  * ``DATE`` and ``BINARY`` datatypes are not supported
+ * Although``FLOAT`` column was mapped to ``DOUBLE`` through Presto the value for ``123.345`` was exposed as ``DOUBLE 123.345`` in Presto.
 
 
 PostgreSQL and MySQL Connectors Limitations
-===========================================
+-------------------------------------------
 
 Known Bugs
 ^^^^^^^^^^
-| PostgreSQL connector ``describe table`` reports ``Table has no supported column types`` inappropriately.
-| `https://github.com/facebook/presto/issues/4082 <https://github.com/facebook/presto/issues/4082>`_ 
+PostgreSQL connector ``describe table`` reports ``Table has no supported column types`` inappropriately.
+`https://github.com/facebook/presto/issues/4082 <https://github.com/facebook/presto/issues/4082>`_ 
 
 Security
 ^^^^^^^^
@@ -97,15 +149,15 @@ users.  These columns are not shown when ``describe table`` or ``select *`` SQL 
 
 CREATE TABLE
 ^^^^^^^^^^^^
-| ``CREATE TABLE (...)`` does not work, but ``CREATE TABLE AS SELECT`` does.
+``CREATE TABLE (...)`` does not work, but ``CREATE TABLE AS SELECT`` does.
 
 INSERT INTO
 ^^^^^^^^^^^
-| ``INSERT INTO`` is not supported
+``INSERT INTO`` is not supported
 
 DROP TABLE
 ^^^^^^^^^^
-| ``DROP TABLE`` is not supported.
+``DROP TABLE`` is not supported.
 
 Limited SQL push-down
 ^^^^^^^^^^^^^^^^^^^^^
@@ -119,6 +171,5 @@ MySQL catalog names are mapped to Presto schema names.
 
 
 Teradata JDBC Driver
-====================
+--------------------
 The Teradata JDBC driver does not support batch queries.
-
