@@ -176,6 +176,9 @@ Property Name                                      Description                  
 
 ``security.config-file``                           Path of config file to use when ``hive.security=file``.
                                                    See :ref:`hive-file-based-authorization` for details.
+
+``hive.multi-file-bucketing.enabled``              Enable support for multiple files per bucket for Hive        ``false``
+                                                   clustered tables. See :ref:`clustered-tables`
 ================================================== ============================================================ ==========
 
 Querying Hive Tables
@@ -222,6 +225,29 @@ Hive, this table can be described in Presto::
 This table can then be queried in Presto::
 
     SELECT * FROM hive.web.page_view;
+
+
+.. _clustered-tables:
+
+Clustered hive tables support
+-----------------------------
+
+By default presto supports only one data file per bucket per partition for clustered tables (Hive tables declared with ``CLUSTERED BY`` clause).
+If number of files does not match number of buckets exception would be thrown.
+
+To enable support for cases where there are more than one file per bucket, when multiple INSERTs are done to a single partition of the clustered table, you can use:
+
+ * ``hive.multi-file-bucketing.enabled`` config property
+ * ``multi_file_bucketing_enabled`` session property (using ``SET SESSION <connector_name>.multi_file_bucketing_enabled``)
+
+Config property changes behaviour globally and session property can be used on per query basis.
+The default value of session property is taken from config property.
+
+If support for multiple files per bucket is enabled Presto will group the files in partition directory.
+It will sort filenames lexicographically. Then it will treat part of filename up to first underscore character as bucket key.
+This pattern matches naming convention of files in directory when Hive is used to inject data into table.
+
+Presto will still validate if number of file groups matches number of buckets declared for table and fail if it does not.
 
 Hive Connector Limitations
 --------------------------
