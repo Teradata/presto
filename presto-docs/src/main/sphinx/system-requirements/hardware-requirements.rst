@@ -4,9 +4,14 @@ Hardware Requirements
 
 **Memory**
 
-It is recommended to allocate at least 16 GB of RAM per node for Presto.
+It is recommended to allocate at least 64 GB of RAM per node for Presto.
+
+**Network Bandwidth**
+
+It is recommended to have 10 Gigabit Ethernet between all the nodes in the cluster.
 
 **Other Recommendations**
+
 Presto can be installed on any normally configured Hadoop cluster. YARN should
 be configured to account for resources dedicated to Presto. For example, if a
 node has 64GB of RAM, perhaps you would normally allocate 60GB to YARN.  If you
