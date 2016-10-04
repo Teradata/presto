@@ -8,4 +8,6 @@ distributed over one or more heterogeneous data sources.
 .. toctree::
     :maxdepth: 1
 
+    overview/teradata-distribution
     overview/use-cases
+    
