@@ -38,6 +38,7 @@ import java.util.ArrayDeque;
 import java.util.Iterator;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static com.google.common.base.Preconditions.checkState;
@@ -63,16 +64,19 @@ public class BinaryFileSingleStreamSpiller
     @GuardedBy("output") // this variable is used in executor's threads as opposed to other variable
     private final SliceOutput output;
 
+    private final AtomicLong spilledBytes;
+
     @GuardedBy("this")
     private boolean outputClosed;
 
     @GuardedBy("this")
     private boolean closed;
 
-    public BinaryFileSingleStreamSpiller(BlockEncodingSerde blockEncodingSerde, ListeningExecutorService executor, Path spillPath)
+    public BinaryFileSingleStreamSpiller(BlockEncodingSerde blockEncodingSerde, ListeningExecutorService executor, Path spillPath, AtomicLong spilledBytes)
     {
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
         this.executor = requireNonNull(executor, "executor is null");
+        this.spilledBytes = requireNonNull(spilledBytes, "spilledBytes is null");
         try {
             targetFile = Files.createTempFile(spillPath, "presto-spill", ".bin");
             output = new OutputStreamSliceOutput(new BufferedOutputStream(new FileOutputStream(targetFile.toFile())));
@@ -108,7 +112,7 @@ public class BinaryFileSingleStreamSpiller
     {
         // don't synchronize on this, to prevent blocking whole class on the duration of spill
         synchronized (output) {
-            PagesSerde.writePages(blockEncodingSerde, output, page);
+            spilledBytes.addAndGet(PagesSerde.writePages(blockEncodingSerde, output, page));
         }
     }
 
@@ -116,7 +120,7 @@ public class BinaryFileSingleStreamSpiller
     {
         // don't synchronize on this, to prevent blocking whole class on the duration of spill
         synchronized (output) {
-            PagesSerde.writePages(blockEncodingSerde, output, pageIterator);
+            spilledBytes.addAndGet(PagesSerde.writePages(blockEncodingSerde, output, pageIterator));
         }
     }
 
