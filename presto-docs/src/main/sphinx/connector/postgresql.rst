@@ -11,7 +11,7 @@ Configuration
 -------------
 
 To configure the PostgreSQL connector, create a catalog properties file
-in ``etc/catalog`` named, for example, ``postgresql.properties``, to
+in ``/etc/opt/prestoadmin`` named, for example, ``postgresql.properties``, to
 mount the PostgreSQL connector as the ``postgresql`` catalog.
 Create the file with the following contents, replacing the
 connection properties as appropriate for your setup:
@@ -23,6 +23,8 @@ connection properties as appropriate for your setup:
     connection-user=root
     connection-password=secret
 
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+    
 Multiple PostgreSQL Databases or Servers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -31,7 +33,7 @@ a PostgreSQL server. Thus, if you have multiple PostgreSQL databases,
 or want to connect to multiple PostgreSQL servers, you must configure
 multiple instances of the PostgreSQL connector.
 
-To add another catalog, simply add another properties file to ``etc/catalog``
+To add another catalog, simply add another properties file to ``/etc/opt/prestoadmin``
 with a different name (making sure it ends in ``.properties``). For example,
 if you name the property file ``sales.properties``, Presto will create a
 catalog named ``sales`` using the configured connector.

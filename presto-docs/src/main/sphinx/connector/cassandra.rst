@@ -8,7 +8,7 @@ Configuration
 -------------
 
 To configure the Cassandra connector, create a catalog properties file
-``etc/catalog/cassandra.properties`` with the following contents,
+``/etc/opt/prestoadmin/connector/cassandra.properties`` with the following contents,
 replacing ``host1,host2`` with a comma-separated list of the Cassandra
 nodes used to discovery the cluster topology:
 
@@ -20,11 +20,13 @@ nodes used to discovery the cluster topology:
 You will also need to set ``cassandra.native-protocol-port`` if your
 Cassandra nodes are not using the default port (9042).
 
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+
 Multiple Cassandra Clusters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 You can have as many catalogs as you need, so if you have additional
-Cassandra clusters, simply add another properties file to ``etc/catalog``
+Cassandra clusters, simply add another properties file to ``/etc/opt/prestoadmin/connector``
 with a different name (making sure it ends in ``.properties``). For
 example, if you name the property file ``sales.properties``, Presto
 will create a catalog named ``sales`` using the configured connector.

@@ -17,7 +17,7 @@ Configuration
 -------------
 
 To configure the Kafka connector, create a catalog properties file
-``etc/catalog/kafka.properties`` with the following contents,
+``/etc/opt/prestoadmin/connector/kafka.properties`` with the following contents,
 replacing the properties as appropriate:
 
 .. code-block:: none
@@ -26,11 +26,13 @@ replacing the properties as appropriate:
     kafka.table-names=table1,table2
     kafka.nodes=host1:port,host2:port
 
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+    
 Multiple Kafka Clusters
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 You can have as many catalogs as you need, so if you have additional
-Kafka clusters, simply add another properties file to ``etc/catalog``
+Kafka clusters, simply add another properties file to ``/etc/opt/prestoadmin/connector``
 with a different name (making sure it ends in ``.properties``). For
 example, if you name the property file ``sales.properties``, Presto
 will create a catalog named ``sales`` using the configured connector.

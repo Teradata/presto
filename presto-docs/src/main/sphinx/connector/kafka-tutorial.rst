@@ -91,7 +91,7 @@ Step 3: Make the Kafka topics known to Presto
 ---------------------------------------------
 
 In your Presto installation, add a catalog properties file
-``etc/catalog/kafka.properties`` for the Kafka connector.
+``/etc/opt/prestoadmin/connector/kafka.properties`` for the Kafka connector.
 This file lists the Kafka nodes and topics:
 
 .. code-block:: none
@@ -415,7 +415,7 @@ Setup a live Twitter feed
 Create a tweets table on Presto
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Add the tweets table to the ``etc/catalog/kafka.properties`` file:
+Add the tweets table to the ``/etc/opt/prestoadmin/connector/kafka.properties`` file:
 
 .. code-block:: none
 

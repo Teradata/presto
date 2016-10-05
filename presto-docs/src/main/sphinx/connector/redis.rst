@@ -17,7 +17,7 @@ Configuration
 -------------
 
 To configure the Redis connector, create a catalog properties file
-``etc/catalog/redis.properties`` with the following content,
+``/etc/opt/prestoadmin/redis.properties`` with the following content,
 replacing the properties as appropriate:
 
 .. code-block:: none
@@ -26,11 +26,13 @@ replacing the properties as appropriate:
     redis.table-names=schema1.table1,schema1.table2
     redis.nodes=host:port
 
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+    
 Multiple Redis Servers
 ^^^^^^^^^^^^^^^^^^^^^^^
 
 You can have as many catalogs as you need, so if you have additional
-Redis servers, simply add another properties file to ``etc/catalog``
+Redis servers, simply add another properties file to ``/etc/opt/prestoadmin``
 with a different name (making sure it ends in ``.properties``).
 
 Configuration Properties
