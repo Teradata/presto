@@ -34,7 +34,8 @@ Configuration
 
 After a plugin that implements ``SystemAccessControl`` and
 ``SystemAccessControlFactory`` has been installed on the coordinator, it is
-configured using an ``etc/access-control.properties`` file. All of the properties
+configured using an ``/etc/presto/access-control.properties`` file, which should
+be distributed to all of the nodes in the cluster. All of the properties
 other than ``access-control.name`` are specific to the ``SystemAccessControl``
 implementation.
 

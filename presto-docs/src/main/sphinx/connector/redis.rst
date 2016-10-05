@@ -119,6 +119,8 @@ References a folder within Presto deployment that holds one or more JSON
 files (must end with ``.json``) which contain table description files.
 
 This property is optional; the default is ``etc/redis``.
+You must change this property to ``/etc/presto/redis`` to work with the Teradata
+distribution of Presto.
 
 ``redis.hide-internal-columns``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
