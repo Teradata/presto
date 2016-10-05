@@ -104,8 +104,7 @@ public class HashAggregationOperator
                             throw new UnsupportedOperationException();
                         }
 
-                        @Override
-                        public long getSpilledBytes()
+                        public long getTotalSpilledBytes()
                         {
                             return 0;
                         }
