@@ -163,3 +163,4 @@ Patches
 The following patches from 0.152.3 have been backported to 0.152.1-t.1:
 https://github.com/prestodb/presto/commit/667ccb8d88324361753155f5b53e6428474c7032
 https://github.com/prestodb/presto/commit/85d8ffd65ed13b5d87e1098c859babf3d172b276
+https://github.com/prestodb/presto/commit/d3d398e467a5a887edd03c7bdca1cece24e378f6
