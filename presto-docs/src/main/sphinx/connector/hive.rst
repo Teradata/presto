@@ -295,7 +295,7 @@ Clustered hive tables support
 By default presto supports only one data file per bucket per partition for clustered tables (Hive tables declared with ``CLUSTERED BY`` clause).
 If number of files does not match number of buckets exception would be thrown.
 
-The enable support for cases when multiple INSERTs where done to single partition of clustered user may use:
+To enable support for cases where there are more than one file per bucket, when multiple INSERTs are done to a single partition of the clustered table, you can use:
 
  * ``hive.multi-file-bucketing.enabled`` config property
  * ``multi_file_bucketing_enabled`` session property (using ``SET SESSION <connector_name>.multi_file_bucketing_enabled``)
