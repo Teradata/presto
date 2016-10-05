@@ -13,7 +13,7 @@ Installation
 ============
 
 This tutorial assumes familiarity with Presto and a working local Presto
-installation (see :doc:`/installation/deployment`). It will focus on
+installation. It will focus on
 setting up Apache Kafka and integrating it with Presto.
 
 Step 1: Install Apache Kafka
@@ -91,7 +91,7 @@ Step 3: Make the Kafka topics known to Presto
 ---------------------------------------------
 
 In your Presto installation, add a catalog properties file
-``etc/catalog/kafka.properties`` for the Kafka connector.
+``/etc/opt/prestoadmin/connector/kafka.properties`` for the Kafka connector.
 This file lists the Kafka nodes and topics:
 
 .. code-block:: none
@@ -100,6 +100,7 @@ This file lists the Kafka nodes and topics:
     kafka.nodes=localhost:9092
     kafka.table-names=tpch.customer,tpch.orders,tpch.lineitem,tpch.part,tpch.partsupp,tpch.supplier,tpch.nation,tpch.region
     kafka.hide-internal-columns=false
+    kafka.table-description-dir=/etc/presto/kafka
 
 Now start Presto:
 
@@ -191,11 +192,11 @@ Step 5: Add a topic decription file
 -----------------------------------
 
 The Kafka connector supports topic description files to turn raw data into
-table format. These files are located in the ``etc/kafka`` folder in the
-Presto installation and must end with ``.json``. It is recommended that
+table format. These files are located in the ``/etc/presto/kafka`` folder
+on all of the nodes in the Presto cluster and must end with ``.json``. It is recommended that
 the file name matches the table name but this is not necessary.
 
-Add the following file as ``etc/kafka/tpch.customer.json`` and restart Presto:
+Add the following file as ``/etc/presto/kafka/tpch.customer.json`` and restart Presto:
 
 .. code-block:: json
 
@@ -258,7 +259,7 @@ in eight bytes) onto a Presto ``BIGINT`` column.
 Step 6: Map all the values from the topic message onto columns
 --------------------------------------------------------------
 
-Update the ``etc/kafka/tpch.customer.json`` file to add fields for the
+Update the ``/etc/presto/kafka/tpch.customer.json`` file to add fields for the
 message and restart Presto. As the fields in the message are JSON, it uses
 the ``json`` data format. This is an example where different data formats
 are used for the key and the message.
@@ -415,7 +416,7 @@ Setup a live Twitter feed
 Create a tweets table on Presto
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Add the tweets table to the ``etc/catalog/kafka.properties`` file:
+Add the tweets table to the ``/etc/opt/prestoadmin/connector/kafka.properties`` file:
 
 .. code-block:: none
 
@@ -424,7 +425,7 @@ Add the tweets table to the ``etc/catalog/kafka.properties`` file:
     kafka.table-names=tpch.customer,tpch.orders,tpch.lineitem,tpch.part,tpch.partsupp,tpch.supplier,tpch.nation,tpch.region,tweets
     kafka.hide-internal-columns=false
 
-Add a topic definition file for the Twitter feed as ``etc/kafka/tweets.json``:
+Add a topic definition file for the Twitter feed as ``/etc/presto/kafka/tweets.json``:
 
 .. code-block:: json
 

@@ -35,7 +35,7 @@ Presto includes Hive connectors for multiple versions of Hadoop:
 * ``hive-hadoop2``: Apache Hadoop 2.x
 * ``hive-cdh5``: Cloudera CDH 5
 
-Create ``/etc/presto/catalog/hive.properties`` with the following contents
+Create ``/etc/opt/prestoadmin/connector/hive.properties`` with the following contents
 to mount the ``hive-hadoop2`` connector as the ``hive`` catalog,
 replacing ``hive-hadoop2`` with the proper connector for your version
 of Hadoop and ``example.net:9083`` with the correct host and port
@@ -46,6 +46,8 @@ for your Hive metastore Thrift service:
     connector.name=hive-hadoop2
     hive.metastore.uri=thrift://example.net:9083
 
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+    
 Multiple Hive Clusters
 ^^^^^^^^^^^^^^^^^^^^^^
 

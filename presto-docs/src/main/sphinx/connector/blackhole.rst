@@ -23,12 +23,14 @@ Configuration
 -------------
 
 To configure the Black Hole connector, create a catalog properties file
-``etc/catalog/blackhole.properties`` with the following contents:
+``/etc/opt/prestoadmin/connector/blackhole.properties`` with the following contents:
 
 .. code-block:: none
 
     connector.name=blackhole
 
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+    
 Examples
 --------
 

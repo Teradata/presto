@@ -10,15 +10,15 @@ Presto Documentation
     system-requirements
     getting-started
     sandbox-vms
-    server-installation-cluster-automated
     server-installation-cluster-manual
     server-installation-aws-emr-manual
+    server-installation-other
     client
     Presto Admin <installation/presto-admin/user-guide>
-    yarn
     security
     admin
     connector
+    community_connector
     functions
     language
     sql

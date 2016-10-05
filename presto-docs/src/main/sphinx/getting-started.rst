@@ -19,13 +19,10 @@ your environment.
 | CDH or HDP on a sandbox VM:
 | :doc:`Presto Installation on a Sandbox VM <sandbox-vms>`
 |
-| Automated installation on a server (cluster or YARN-based cluster):
-| :doc:`Presto Server Installation on a Cluster (Ambari) <server-installation-cluster-automated>`
-|
-| Manual installation on a server (cluster or YARN-based cluster):
+| Installation on a cluster:
 | :doc:`Presto Server Installation on a Cluster (Presto Admin and RPMs) <server-installation-cluster-manual>`
 |
-| Manual installation on AWS Cloud:
+| Installation on AWS Cloud:
 | :doc:`Presto Server Installation on an AWS EMR (Presto Admin and RPMs) <server-installation-aws-emr-manual>`
 |
 
@@ -43,7 +40,6 @@ Presto Client Software Installation
 .. toctree::
    :hidden:
    
-   installation/installation-ambari
    installation/installation-presto-admin
 
 
