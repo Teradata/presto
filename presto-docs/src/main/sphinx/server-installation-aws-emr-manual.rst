@@ -38,7 +38,6 @@ Install and manage Presto manually on an AWS EMR in the Amazon cloud.
 
 .. toctree::
     :maxdepth: 1
-    :numbered: 2	       
 	       
     Installing Presto Admin <installation/presto-admin/installation/presto-admin-installation.rst>
     Configuring Presto Admin <installation/presto-admin/installation/presto-admin-configuration.rst>
