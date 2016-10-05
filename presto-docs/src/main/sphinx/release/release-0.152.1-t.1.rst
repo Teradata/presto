@@ -6,48 +6,34 @@ Presto 0.152.1-t.1 is equivalent to Presto release 0.152.1, with some additional
 
 Security
 --------
-LDAP Authentication
+* LDAP Authentication
 
+  
 SQL
 ---
-Additional correlated Scalar Subqueries
-Additional prepared statement syntax: DESCRIBE INPUT and DESCRIBE OUTPUT
+* Support correlated scalar aggregation subqueries
+* Support correlated scalar subqueries
+* Additional prepared statement syntax: DESCRIBE INPUT and DESCRIBE OUTPUT
+
 
 Data Types
 ----------
-Additional Varchar(x) and Char(x) function implementations
-Additional Decimal functions implementations
+* Additional Varchar(x) and Char(x) function implementations
+* Additional Decimal functions implementations
 
 Documentation
 -------------
-Installation of Presto via Presto Admin
-Presto Tuning Guide
-
-Decimal
--------
-Faster Decimal implementation
+* Installation of Presto via Presto Admin
+* Presto Tuning Guide
 
 
-Join Filters
-------------
-Move certain filters in the WHERE clauses to be executed as part of the INNER JOIN rather than a filter after the join
-For example: ``SELECT * FROM t t1 JOIN t t2 ON t1.a = t2.a WHERE (t1.b+t2.b)*5 > 100000000``
-Code generation for joins with filters
-
-
-Window Functions
-----------------
-Merge non-identical windows (for the same `partition by` and `order by` but different frame)
-
-
-Regular Expressions
--------------------
-
-Add support for running regular expression functions using the more efficent re2j-td library by setting the session
-variable ``regex_library`` to RE2J.  The memory footprint can be adjusted by setting ``re2j_dfa_states_limit``.
-Additionally, the number of times the re2j library falls back from its DFA algorithm to the NFA algorithm (due to
-hitting the states limit) before immediately starting with the NFA algorithm can be set with the ``re2j_dfa_retries``
-session variable.
+Performance
+-----------
+* Faster Decimal implementation
+* Move certain filters in the WHERE clauses to be executed as part of the INNER JOIN rather than a filter after the join. For example: ``SELECT * FROM t t1 JOIN t t2 ON t1.a = t2.a WHERE (t1.b+t2.b)*5 > 100000000``
+* Code generation for joins with filters
+* Merge non-identical windows (for the same `partition by` and `order by` but different frame)
+* Add support for running regular expression functions using the more efficent re2j-td library by setting the session variable ``regex_library`` to RE2J.  The memory footprint can be adjusted by setting ``re2j_dfa_states_limit``. Additionally, the number of times the re2j library falls back from its DFA algorithm to the NFA algorithm (due to hitting the states limit) before immediately starting with the NFA algorithm can be set with the ``re2j_dfa_retries`` session variable.
 
 Unsupported Functionality
 -------------------------
@@ -57,6 +43,7 @@ Some functionality from Presto 0.152 may work but is not officially supported by
 * The installation method as documented on `prestodb.io <https://prestodb.io/docs/0.152/installation/deployment.html>`_.
 * Web Connector for Tableau
 * The following connectors:
+
   * Cassandra Connector
   * Kafka Connector
   * Local File Connector
@@ -159,8 +146,9 @@ MySQL catalog names are mapped to Presto schema names.
 
 
 Patches
-=======
+-------
 The following patches from 0.152.3 have been backported to 0.152.1-t.1:
-https://github.com/prestodb/presto/commit/667ccb8d88324361753155f5b53e6428474c7032
-https://github.com/prestodb/presto/commit/85d8ffd65ed13b5d87e1098c859babf3d172b276
-https://github.com/prestodb/presto/commit/d3d398e467a5a887edd03c7bdca1cece24e378f6
+
+* https://github.com/prestodb/presto/commit/667ccb8d88324361753155f5b53e6428474c7032
+* https://github.com/prestodb/presto/commit/85d8ffd65ed13b5d87e1098c859babf3d172b276
+* https://github.com/prestodb/presto/commit/d3d398e467a5a887edd03c7bdca1cece24e378f6
