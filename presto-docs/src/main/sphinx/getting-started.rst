@@ -19,10 +19,10 @@ your environment.
 | CDH or HDP on a sandbox VM:
 | :doc:`Presto Installation on a Sandbox VM <sandbox-vms>`
 |
-| Manual installation on a cluster:
+| Installation on a cluster:
 | :doc:`Presto Server Installation on a Cluster (Presto Admin and RPMs) <server-installation-cluster-manual>`
 |
-| Manual installation on AWS Cloud:
+| Installation on AWS Cloud:
 | :doc:`Presto Server Installation on an AWS EMR (Presto Admin and RPMs) <server-installation-aws-emr-manual>`
 |
 

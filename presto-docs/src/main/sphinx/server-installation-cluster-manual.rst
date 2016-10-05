@@ -21,8 +21,8 @@ System Requirements
   + YARN-based cluster: CDH 5.4 or HDP 2.2; both require Hadoop 2.6
   + Python 2.6 or 2.7
 
-Manual Installation on a Cluster
-*********************************
+Installation on a Cluster
+*************************
 
 Install and manage Presto manually using Presto Admin.
 

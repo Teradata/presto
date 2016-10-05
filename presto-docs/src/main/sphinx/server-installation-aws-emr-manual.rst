@@ -20,8 +20,8 @@ System Requirements
   + YARN-based cluster: CDH 5.4 or HDP 2.2; both require Hadoop 2.6
   + Python 2.6 or 2.7
 
-Manual Installation on an AWS EMR
-*********************************
+Installation on an AWS EMR
+**************************
 
 Install and manage Presto manually on an AWS EMR in the Amazon cloud.
 
