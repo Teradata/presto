@@ -122,6 +122,12 @@
         </artifact>
     </artifactSet>
 
+    <artifactSet to="plugin/tpcds">
+        <artifact id="${project.groupId}:presto-tpcds:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
     <artifactSet to="plugin/tpch">
         <artifact id="${project.groupId}:presto-tpch:zip:${project.version}">
             <unpack />
