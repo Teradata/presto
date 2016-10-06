@@ -1,0 +1,37 @@
+version: '2'
+services:
+
+  presto-master:
+    command: /docker/volumes/conf/docker/files/presto-launcher-wrapper.sh multinode-tls-master run
+    networks:
+      default:
+        aliases:
+         - presto-master.docker.cluster
+
+  presto-worker-1:
+    extends:
+      file: ../common/standard.yml
+      service: java-8-base
+    command: /docker/volumes/conf/docker/files/presto-launcher-wrapper.sh multinode-tls-worker-1 run
+    networks:
+      default:
+        aliases:
+         - presto-worker-1.docker.cluster
+    depends_on:
+      - presto-master
+    volumes_from:
+      - presto-master
+
+  presto-worker-2:
+    extends:
+      file: ../common/standard.yml
+      service: java-8-base
+    command: /docker/volumes/conf/docker/files/presto-launcher-wrapper.sh multinode-tls-worker-2 run
+    networks:
+      default:
+        aliases:
+         - presto-worker-2.docker.cluster
+    depends_on:
+      - presto-master
+    volumes_from:
+      - presto-master
