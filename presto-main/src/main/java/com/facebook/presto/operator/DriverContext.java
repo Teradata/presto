@@ -15,6 +15,7 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.execution.TaskId;
+import com.facebook.presto.memory.QueryContextVisitor;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
@@ -34,6 +35,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getFirst;
 import static com.google.common.collect.Iterables.getLast;
@@ -79,6 +81,7 @@ public class DriverContext
 
     private final AtomicLong memoryReservation = new AtomicLong();
     private final AtomicLong systemMemoryReservation = new AtomicLong();
+    private final AtomicLong revocableSystemMemoryReservation = new AtomicLong();
 
     private final List<OperatorContext> operatorContexts = new CopyOnWriteArrayList<>();
     private final boolean partitioned;
@@ -215,6 +218,13 @@ public class DriverContext
         return future;
     }
 
+    public ListenableFuture<?> reserveRevocableSystemMemory(long bytes)
+    {
+        ListenableFuture<?> future = pipelineContext.reserveRevocableSystemMemory(bytes);
+        revocableSystemMemoryReservation.getAndAdd(bytes);
+        return future;
+    }
+
     public boolean tryReserveMemory(long bytes)
     {
         if (pipelineContext.tryReserveMemory(bytes)) {
@@ -241,9 +251,20 @@ public class DriverContext
             return;
         }
         checkArgument(bytes >= 0, "bytes is negative");
-        checkArgument(bytes <= systemMemoryReservation.get(), "tried to free more memory than is reserved");
+        checkArgument(bytes <= systemMemoryReservation.get(), "tried to free more system memory than is reserved");
         pipelineContext.freeSystemMemory(bytes);
         systemMemoryReservation.getAndAdd(-bytes);
+    }
+
+    public void freeRevocableSystemMemory(long bytes)
+    {
+        if (bytes == 0) {
+            return;
+        }
+        checkArgument(bytes >= 0, "bytes is negative");
+        checkArgument(bytes <= revocableSystemMemoryReservation.get(), "tried to free more revocable system memory than is reserved");
+        pipelineContext.freeRevocableSystemMemory(bytes);
+        revocableSystemMemoryReservation.getAndAdd(-bytes);
     }
 
     @VisibleForTesting
@@ -387,6 +408,7 @@ public class DriverContext
                 elapsedTime.convertToMostSuccinctTimeUnit(),
                 succinctBytes(memoryReservation.get()),
                 succinctBytes(systemMemoryReservation.get()),
+                succinctBytes(revocableSystemMemoryReservation.get()),
                 new Duration(totalScheduledTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalCpuTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalUserTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
@@ -401,6 +423,18 @@ public class DriverContext
                 outputDataSize.convertToMostSuccinctDataSize(),
                 outputPositions,
                 ImmutableList.copyOf(transform(operatorContexts, OperatorContext::getOperatorStats)));
+    }
+
+    public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)
+    {
+        return visitor.visitDriverContext(this, context);
+    }
+
+    public <C, R> List<R> acceptChildren(QueryContextVisitor<C, R> visitor, C context)
+    {
+        return operatorContexts.stream()
+                .map(operatorContext -> operatorContext.accept(visitor, context))
+                .collect(toImmutableList());
     }
 
     public boolean isPartitioned()

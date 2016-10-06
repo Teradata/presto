@@ -49,6 +49,7 @@ import java.util.function.Supplier;
 import static com.facebook.presto.operator.Operator.NOT_BLOCKED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.util.concurrent.Futures.getUnchecked;
 import static java.util.Objects.requireNonNull;
 
 //
@@ -332,6 +333,16 @@ public class Driver
     {
         checkLockHeld("Lock must be held to call processInternal");
 
+        // revoke operators memory
+        // do this synchronously for now
+        for (int i = 0; i < operators.size() && !driverContext.isDone(); i++) {
+            Operator current = operators.get(i);
+            if (current.getOperatorContext().isSystemMemoryRevokingRequested()) {
+                getUnchecked(current.revokeMemory());
+                current.getOperatorContext().resetSystemMemoryRevokingRequested();
+            }
+        }
+
         try {
             if (!newSources.isEmpty()) {
                 processNewSources();
@@ -512,7 +523,11 @@ public class Driver
         if (blocked.isDone()) {
             blocked = operator.getOperatorContext().isWaitingForMemory();
         }
-        return blocked;
+        if (blocked.isDone()) {
+            blocked = operator.getOperatorContext().isWaitingForSystemRevocableMemory();
+        }
+
+        return firstFinishedFuture(ImmutableList.of(blocked, operator.getOperatorContext().getSystemMemoryRevokingRequestedFuture()));
     }
 
     private static Throwable addSuppressedException(Throwable inFlightException, Throwable newException, String message, Object... args)

@@ -15,6 +15,7 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.execution.TaskId;
+import com.facebook.presto.memory.QueryContextVisitor;
 import com.facebook.presto.util.ImmutableCollectors;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
@@ -41,6 +42,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.transform;
 import static io.airlift.units.DataSize.succinctBytes;
@@ -62,6 +64,7 @@ public class PipelineContext
 
     private final AtomicLong memoryReservation = new AtomicLong();
     private final AtomicLong systemMemoryReservation = new AtomicLong();
+    private final AtomicLong revocableSystemMemoryReservation = new AtomicLong();
 
     private final AtomicReference<DateTime> executionStartTime = new AtomicReference<>();
     private final AtomicReference<DateTime> lastExecutionStartTime = new AtomicReference<>();
@@ -229,6 +232,13 @@ public class PipelineContext
         return future;
     }
 
+    public synchronized ListenableFuture<?> reserveRevocableSystemMemory(long bytes)
+    {
+        ListenableFuture<?> future = taskContext.reserveRevocableMemory(bytes);
+        revocableSystemMemoryReservation.getAndAdd(bytes);
+        return future;
+    }
+
     public synchronized boolean tryReserveMemory(long bytes)
     {
         if (taskContext.tryReserveMemory(bytes)) {
@@ -249,9 +259,17 @@ public class PipelineContext
     public synchronized void freeSystemMemory(long bytes)
     {
         checkArgument(bytes >= 0, "bytes is negative");
-        checkArgument(bytes <= systemMemoryReservation.get(), "tried to free more memory than is reserved");
+        checkArgument(bytes <= systemMemoryReservation.get(), "tried to free more system memory than is reserved");
         taskContext.freeSystemMemory(bytes);
         systemMemoryReservation.getAndAdd(-bytes);
+    }
+
+    public synchronized void freeRevocableSystemMemory(long bytes)
+    {
+        checkArgument(bytes >= 0, "bytes is negative");
+        checkArgument(bytes <= revocableSystemMemoryReservation.get(), "tried to free more revocable system memory than is reserved");
+        taskContext.freeRevocableSystemMemory(bytes);
+        revocableSystemMemoryReservation.getAndAdd(-bytes);
     }
 
     public void moreMemoryAvailable()
@@ -424,7 +442,7 @@ public class PipelineContext
                 completedDrivers,
 
                 succinctBytes(memoryReservation.get()),
-                succinctBytes(systemMemoryReservation.get()),
+                succinctBytes(systemMemoryReservation.get() + revocableSystemMemoryReservation.get()),
 
                 queuedTime.snapshot(),
                 elapsedTime.snapshot(),
@@ -447,6 +465,18 @@ public class PipelineContext
 
                 ImmutableList.copyOf(operatorSummaries.values()),
                 drivers);
+    }
+
+    public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)
+    {
+        return visitor.visitPipelineContext(this, context);
+    }
+
+    public <C, R> List<R> acceptChildren(QueryContextVisitor<C, R> visitor, C context)
+    {
+        return drivers.stream()
+                .map(driver -> driver.accept(visitor, context))
+                .collect(toImmutableList());
     }
 
     private static <K, V> boolean compareAndSet(ConcurrentMap<K, V> map, K key, V oldValue, V newValue)
