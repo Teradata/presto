@@ -3,6 +3,8 @@ services:
 
   presto-master:
     command: /docker/volumes/conf/docker/files/presto-launcher-wrapper.sh multinode-tls-master run
+    ports:
+      - '7778:7778'
     networks:
       default:
         aliases:
