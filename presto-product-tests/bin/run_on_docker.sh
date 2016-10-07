@@ -173,6 +173,8 @@ shift 1
 PRESTO_SERVICES="presto-master"
 if [[ "$ENVIRONMENT" == "multinode" ]]; then
    PRESTO_SERVICES="${PRESTO_SERVICES} presto-worker"
+elif [[ "$ENVIRONMENT" == "multinode-tls" ]]; then
+   PRESTO_SERVICES="${PRESTO_SERVICES} presto-worker-1 presto-worker-2"
 fi
 
 CLI_ARGUMENTS="--server presto-master:8080"
