@@ -37,3 +37,7 @@ services:
       - presto-master
     volumes_from:
       - presto-master
+
+  application-runner:
+    volumes:
+      - ../../../conf/tempto/tempto-configuration-for-docker-tls.yaml:/docker/volumes/tempto/tempto-configuration-local.yaml
