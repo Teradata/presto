@@ -101,7 +101,8 @@ public class TestHiveClientConfig
                 .setHdfsImpersonationEnabled(false)
                 .setHdfsPrestoPrincipal(null)
                 .setHdfsPrestoKeytab(null)
-                .setMultiFileBucketingEnabled(false));
+                .setMultiFileBucketingEnabled(false)
+                .setEmptyBucketedPartitionsEnabled(false));
     }
 
     @Test
@@ -174,6 +175,7 @@ public class TestHiveClientConfig
                 .put("hive.hdfs.presto.principal", "presto@EXAMPLE.COM")
                 .put("hive.hdfs.presto.keytab", "/tmp/presto.keytab")
                 .put("hive.multi-file-bucketing.enabled", "true")
+                .put("hive.empty-bucketed-partitions.enabled", "true")
                 .build();
 
         HiveClientConfig expected = new HiveClientConfig()
@@ -242,7 +244,8 @@ public class TestHiveClientConfig
                 .setHdfsImpersonationEnabled(true)
                 .setHdfsPrestoPrincipal("presto@EXAMPLE.COM")
                 .setHdfsPrestoKeytab("/tmp/presto.keytab")
-                .setMultiFileBucketingEnabled(true);
+                .setMultiFileBucketingEnabled(true)
+                .setEmptyBucketedPartitionsEnabled(true);
 
         ConfigAssertions.assertFullMapping(properties, expected);
     }

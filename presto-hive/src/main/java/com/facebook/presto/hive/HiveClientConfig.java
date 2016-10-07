@@ -127,6 +127,7 @@ public class HiveClientConfig
     private String hdfsPrestoPrincipal;
     private String hdfsPrestoKeytab;
     private boolean multiFileBucketingEnabled = false;
+    private boolean emptyBucketedPartitionsEnabled = false;
 
     public int getMaxInitialSplits()
     {
@@ -1012,6 +1013,19 @@ public class HiveClientConfig
     public HiveClientConfig setMultiFileBucketingEnabled(boolean multiFileBucketingEnabled)
     {
         this.multiFileBucketingEnabled = multiFileBucketingEnabled;
+        return this;
+    }
+
+    public boolean isEmptyBucketedPartitionsEnabled()
+    {
+        return emptyBucketedPartitionsEnabled;
+    }
+
+    @Config("hive.empty-bucketed-partitions.enabled")
+    @ConfigDescription("Allow partitions without files for clustered table")
+    public HiveClientConfig setEmptyBucketedPartitionsEnabled(boolean emptyBucketedPartitionsEnabled)
+    {
+        this.emptyBucketedPartitionsEnabled = emptyBucketedPartitionsEnabled;
         return this;
     }
 }
