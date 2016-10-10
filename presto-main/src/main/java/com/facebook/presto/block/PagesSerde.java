@@ -64,12 +64,12 @@ public final class PagesSerde
         return new PagesReader(blockEncodingSerde, sliceInput);
     }
 
-    private static class PagesWriter
+    public static class PagesWriter
     {
         private final BlockEncodingSerde serde;
         private final SliceOutput output;
 
-        private PagesWriter(BlockEncodingSerde serde, SliceOutput output)
+        public PagesWriter(BlockEncodingSerde serde, SliceOutput output)
         {
             this.serde = requireNonNull(serde, "serde is null");
             this.output = requireNonNull(output, "output is null");
