@@ -48,7 +48,7 @@ script:
   - |
     test ! -v PRODUCT_TESTS ||
       presto-product-tests/bin/run_on_docker.sh \
-        multinode-tls -g smoke,cli,group-by,join -x quarantine
+        multinode-tls -g smoke,cli,group-by,join,tls -x quarantine
   - |
     test ! -v INTEGRATION_TESTS ||
       presto-hive-hadoop2/bin/run_on_docker.sh
