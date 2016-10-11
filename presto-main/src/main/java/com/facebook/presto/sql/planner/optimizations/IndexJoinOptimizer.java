@@ -179,7 +179,16 @@ public class IndexJoinOptimizer
             }
 
             if (leftRewritten != node.getLeft() || rightRewritten != node.getRight()) {
-                return new JoinNode(node.getId(), node.getType(), leftRewritten, rightRewritten, node.getCriteria(), node.getFilter(), node.getLeftHashSymbol(), node.getRightHashSymbol());
+                return new JoinNode(
+                        node.getId(),
+                        node.getType(),
+                        leftRewritten,
+                        rightRewritten,
+                        node.getCriteria(),
+                        node.getFilter(),
+                        node.getLeftHashSymbol(),
+                        node.getRightHashSymbol(),
+                        node.getMethod());
             }
             return node;
         }

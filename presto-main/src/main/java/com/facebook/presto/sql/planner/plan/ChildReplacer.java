@@ -134,14 +134,32 @@ public class ChildReplacer
     public PlanNode visitJoin(JoinNode node, List<PlanNode> newChildren)
     {
         checkArgument(newChildren.size() == 2, "expected newChildren to contain 2 nodes");
-        return new JoinNode(node.getId(), node.getType(), newChildren.get(0), newChildren.get(1), node.getCriteria(), node.getFilter(), node.getLeftHashSymbol(), node.getRightHashSymbol());
+        return new JoinNode(
+                node.getId(),
+                node.getType(),
+                newChildren.get(0),
+                newChildren.get(1),
+                node.getCriteria(),
+                node.getFilter(),
+                node.getLeftHashSymbol(),
+                node.getRightHashSymbol(),
+                node.getMethod());
     }
 
     @Override
     public PlanNode visitSemiJoin(SemiJoinNode node, List<PlanNode> newChildren)
     {
         checkArgument(newChildren.size() == 2, "expected newChildren to contain 2 nodes");
-        return new SemiJoinNode(node.getId(), newChildren.get(0), newChildren.get(1), node.getSourceJoinSymbol(), node.getFilteringSourceJoinSymbol(), node.getSemiJoinOutput(), node.getSourceHashSymbol(), node.getFilteringSourceHashSymbol());
+        return new SemiJoinNode(
+                node.getId(),
+                newChildren.get(0),
+                newChildren.get(1),
+                node.getSourceJoinSymbol(),
+                node.getFilteringSourceJoinSymbol(),
+                node.getSemiJoinOutput(),
+                node.getSourceHashSymbol(),
+                node.getFilteringSourceHashSymbol(),
+                node.getMethod());
     }
 
     @Override

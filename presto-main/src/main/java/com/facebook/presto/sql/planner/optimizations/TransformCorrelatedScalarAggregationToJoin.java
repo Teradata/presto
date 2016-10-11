@@ -188,6 +188,7 @@ public class TransformCorrelatedScalarAggregationToJoin
                     ImmutableList.of(),
                     joinExpression,
                     Optional.empty(),
+                    Optional.empty(),
                     Optional.empty());
 
             Optional<AggregationNode> aggregationNode = createAggregationNode(

@@ -197,7 +197,16 @@ public class PruneUnreferencedOutputs
             PlanNode left = context.rewrite(node.getLeft(), leftInputs);
             PlanNode right = context.rewrite(node.getRight(), rightInputs);
 
-            return new JoinNode(node.getId(), node.getType(), left, right, node.getCriteria(), node.getFilter(), node.getLeftHashSymbol(), node.getRightHashSymbol());
+            return new JoinNode(
+                    node.getId(),
+                    node.getType(),
+                    left,
+                    right,
+                    node.getCriteria(),
+                    node.getFilter(),
+                    node.getLeftHashSymbol(),
+                    node.getRightHashSymbol(),
+                    node.getMethod());
         }
 
         @Override
@@ -227,7 +236,8 @@ public class PruneUnreferencedOutputs
                     node.getFilteringSourceJoinSymbol(),
                     node.getSemiJoinOutput(),
                     node.getSourceHashSymbol(),
-                    node.getFilteringSourceHashSymbol());
+                    node.getFilteringSourceHashSymbol(),
+                    node.getMethod());
         }
 
         @Override

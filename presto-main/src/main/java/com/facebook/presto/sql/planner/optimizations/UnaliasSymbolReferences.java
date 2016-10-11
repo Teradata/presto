@@ -472,7 +472,16 @@ public class UnaliasSymbolReferences
             PlanNode left = context.rewrite(node.getLeft());
             PlanNode right = context.rewrite(node.getRight());
 
-            return new JoinNode(node.getId(), node.getType(), left, right, canonicalizeJoinCriteria(node.getCriteria()), node.getFilter().map(this::canonicalize), canonicalize(node.getLeftHashSymbol()), canonicalize(node.getRightHashSymbol()));
+            return new JoinNode(
+                    node.getId(),
+                    node.getType(),
+                    left,
+                    right,
+                    canonicalizeJoinCriteria(node.getCriteria()),
+                    node.getFilter().map(this::canonicalize),
+                    canonicalize(node.getLeftHashSymbol()),
+                    canonicalize(node.getRightHashSymbol()),
+                    node.getMethod());
         }
 
         @Override
@@ -481,7 +490,16 @@ public class UnaliasSymbolReferences
             PlanNode source = context.rewrite(node.getSource());
             PlanNode filteringSource = context.rewrite(node.getFilteringSource());
 
-            return new SemiJoinNode(node.getId(), source, filteringSource, canonicalize(node.getSourceJoinSymbol()), canonicalize(node.getFilteringSourceJoinSymbol()), canonicalize(node.getSemiJoinOutput()), canonicalize(node.getSourceHashSymbol()), canonicalize(node.getFilteringSourceHashSymbol()));
+            return new SemiJoinNode(
+                    node.getId(),
+                    source,
+                    filteringSource,
+                    canonicalize(node.getSourceJoinSymbol()),
+                    canonicalize(node.getFilteringSourceJoinSymbol()),
+                    canonicalize(node.getSemiJoinOutput()),
+                    canonicalize(node.getSourceHashSymbol()),
+                    canonicalize(node.getFilteringSourceHashSymbol()),
+                    node.getMethod());
         }
 
         @Override
