@@ -157,8 +157,17 @@ public class BindableAggregationFunction
         Annotation[][] annotations = method.getParameterAnnotations();
         String methodName = method.getDeclaringClass() + "." + method.getName();
 
-        // Start at 1 because 0 is the STATE
-        for (int i = 1; i < annotations.length; i++) {
+        checkArgument(annotations.length > 0, "At least @AggregationState argument is required for each of aggregation functions.");
+
+        int inputId = 0;
+        int i = 0;
+        if (annotations[0].length == 0) {
+            // Backward compatibility - first argument without annotations is interpreted as State argument
+            builder.add(new ParameterMetadata(STATE));
+            i++;
+        }
+
+        for (; i < annotations.length; i++) {
             Annotation baseTypeAnnotation = baseTypeAnnotation(annotations[i], methodName);
             if (baseTypeAnnotation instanceof SqlType) {
                 builder.add(fromSqlType(inputTypes.get(i - 1), isParameterBlock(annotations[i]), isParameterNullable(annotations[i]), methodName));

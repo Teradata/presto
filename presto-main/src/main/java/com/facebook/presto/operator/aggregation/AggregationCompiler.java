@@ -21,6 +21,7 @@ import com.facebook.presto.operator.aggregation.state.StateCompiler;
 import com.facebook.presto.spi.function.AccumulatorState;
 import com.facebook.presto.spi.function.AccumulatorStateSerializer;
 import com.facebook.presto.spi.function.AggregationFunction;
+import com.facebook.presto.spi.function.AggregationState;
 import com.facebook.presto.spi.function.CombineFunction;
 import com.facebook.presto.spi.function.Description;
 import com.facebook.presto.spi.function.InputFunction;
@@ -41,12 +42,14 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.Iterables.getOnlyElement;
 import static java.util.Objects.requireNonNull;
 
 public class AggregationCompiler
@@ -160,30 +163,31 @@ public class AggregationCompiler
 
     public static Method getCombineFunction(Class<?> clazz, Class<?> stateClass)
     {
-        for (Method method : findPublicStaticMethodsWithAnnotation(clazz, CombineFunction.class)) {
-            if (method.getParameterTypes()[0] == stateClass) {
-                return method;
-            }
-        }
-        throw new IllegalArgumentException(String.format("No method with @CombineFunction annotation found in class %s for %s", clazz.toGenericString(), stateClass.toGenericString()));
+        // Only include methods that match this state class
+        List<Method> combineFunctions = findPublicStaticMethodsWithAnnotation(clazz, CombineFunction.class).stream()
+                .filter(method -> method.getParameterTypes()[findAggregationStateParamId(method)] == stateClass)
+                .collect(toImmutableList());
+
+        checkArgument(combineFunctions.size() == 1, String.format("There must be exactly one @CombineFunction in class %s for the @AggregationState %s ", clazz.toGenericString(), stateClass.toGenericString()));
+        return getOnlyElement(combineFunctions);
     }
 
     private static List<Method> getOutputFunctions(Class<?> clazz, Class<?> stateClass)
     {
         // Only include methods that match this state class
-        List<Method> methods = findPublicStaticMethodsWithAnnotation(clazz, OutputFunction.class).stream()
-                .filter(method -> method.getParameterTypes()[0] == stateClass)
+        List<Method> outputFunctions = findPublicStaticMethodsWithAnnotation(clazz, OutputFunction.class).stream()
+                .filter(method -> method.getParameterTypes()[findAggregationStateParamId(method)] == stateClass)
                 .collect(toImmutableList());
 
-        checkArgument(!methods.isEmpty(), "Aggregation has no output functions");
-        return methods;
+        checkArgument(!outputFunctions.isEmpty(), "Aggregation has no output functions");
+        return outputFunctions;
     }
 
     private static List<Method> getInputFunctions(Class<?> clazz, Class<?> stateClass)
     {
         // Only include methods that match this state class
         List<Method> inputFunctions = findPublicStaticMethodsWithAnnotation(clazz, InputFunction.class).stream()
-                .filter(method -> method.getParameterTypes()[0] == stateClass)
+                .filter(method -> (method.getParameterTypes()[findAggregationStateParamId(method)] == stateClass))
                 .collect(toImmutableList());
 
         checkArgument(!inputFunctions.isEmpty(), "Aggregation has no input functions");
@@ -214,7 +218,8 @@ public class AggregationCompiler
         ImmutableSet.Builder<Class<?>> builder = ImmutableSet.builder();
         for (Method inputFunction : findPublicStaticMethodsWithAnnotation(clazz, InputFunction.class)) {
             checkArgument(inputFunction.getParameterTypes().length > 0, "Input function has no parameters");
-            Class<?> stateClass = inputFunction.getParameterTypes()[0];
+            Class<?> stateClass = findAggregationStateParamType(inputFunction);
+
             checkArgument(AccumulatorState.class.isAssignableFrom(stateClass), "stateClass is not a subclass of AccumulatorState");
             builder.add(stateClass);
         }
@@ -222,6 +227,35 @@ public class AggregationCompiler
         checkArgument(!stateClasses.isEmpty(), "No input functions found");
 
         return stateClasses;
+    }
+
+    private static Class<?> findAggregationStateParamType(Method inputFunction)
+    {
+        return inputFunction.getParameterTypes()[findAggregationStateParamId(inputFunction)];
+    }
+
+    private static int findAggregationStateParamId(Method inputFunction)
+    {
+        Optional<Integer> paramId = Optional.empty();
+        int currentParamId = 0;
+        for (Annotation[] annotations : inputFunction.getParameterAnnotations()) {
+            for (Annotation annotation : annotations) {
+                if (annotation instanceof AggregationState) {
+                    // no return here to make sure that there is only one @AggregationState argument.
+                    checkArgument(!paramId.isPresent(), "There can be only one @AggregationState argument per method");
+                    paramId = Optional.of(currentParamId);
+                }
+            }
+            currentParamId++;
+        }
+
+        if (paramId.isPresent()) {
+            return paramId.get();
+        }
+
+        // backward compatibility @AggregationState annotation didn't exists before
+        // some third party aggregates may assume that State will be first parameter
+        return 0;
     }
 
     private static String getDescription(AnnotatedElement base, AnnotatedElement override)
