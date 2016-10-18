@@ -69,7 +69,7 @@ public class FunctionListBuilder
         return this;
     }
 
-    public FunctionListBuilder aggregate(Class<?> aggregationDefinition)
+    public FunctionListBuilder aggregates(Class<?> aggregationDefinition)
     {
         functions.addAll(SqlAggregationFunction.createByAnnotations(aggregationDefinition));
         return this;
