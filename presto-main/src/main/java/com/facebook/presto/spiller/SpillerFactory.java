@@ -14,6 +14,7 @@
 
 package com.facebook.presto.spiller;
 
+import com.facebook.presto.operator.AbstractOperatorSpillContext;
 import com.facebook.presto.spi.type.Type;
 import org.weakref.jmx.Managed;
 
@@ -21,7 +22,7 @@ import java.util.List;
 
 public interface SpillerFactory
 {
-    Spiller create(List<Type> types);
+    Spiller create(List<Type> types, AbstractOperatorSpillContext operatorSpillContext);
 
     @Managed
     long getTotalSpilledBytes();
