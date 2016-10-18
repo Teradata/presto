@@ -247,7 +247,8 @@ public class ScalarImplementation
         }
     }
 
-    private interface ImplementationDependency
+    // FIXME This should be moved outside of scalar package
+    public interface ImplementationDependency
     {
         Object resolve(BoundVariables boundVariables, TypeManager typeManager, FunctionRegistry functionRegistry);
     }
@@ -417,7 +418,7 @@ public class ScalarImplementation
                     if (annotation instanceof LiteralParameter) {
                         checkArgument(literalParameters.contains(((LiteralParameter) annotation).value()), "Parameter injected by @LiteralParameter must be declared with @LiteralParameters on the method [%s]", method);
                     }
-                    dependencies.add(parseDependency(annotation));
+                    dependencies.add(parseDependency(annotation, literalParameters));
                 }
                 else {
                     checkArgument(!Stream.of(annotations).anyMatch(IsNull.class::isInstance), "Method [%s] has @IsNull parameter that does not follow a @SqlType parameter", method);
@@ -489,7 +490,7 @@ public class ScalarImplementation
                 if (annotation instanceof TypeParameter) {
                     checkArgument(typeParameters.contains(annotation), "Injected type parameters must be declared with @TypeParameter annotation on the constructor [%s]", constructor);
                 }
-                constructorDependencies.add(parseDependency(annotation));
+                constructorDependencies.add(parseDependency(annotation, literalParameters));
             }
             try {
                 return Optional.of(lookup().unreflectConstructor(constructor));
@@ -542,7 +543,8 @@ public class ScalarImplementation
             return methodHandle;
         }
 
-        private static List<TypeVariableConstraint> createTypeVariableConstraints(Iterable<TypeParameter> typeParameters, List<ImplementationDependency> dependencies)
+        // FIXME This should be moved outside of scalar package
+        public static List<TypeVariableConstraint> createTypeVariableConstraints(Iterable<TypeParameter> typeParameters, List<ImplementationDependency> dependencies)
         {
             Set<String> orderableRequired = new HashSet<>();
             Set<String> comparableRequired = new HashSet<>();
@@ -581,7 +583,8 @@ public class ScalarImplementation
             return typeVariableConstraints.build();
         }
 
-        private ImplementationDependency parseDependency(Annotation annotation)
+        // FIXME This should be moved outside of scalar package
+        public static ImplementationDependency parseDependency(Annotation annotation, Set<String> literalParameters)
         {
             if (annotation instanceof TypeParameter) {
                 return new TypeImplementationDependency(((TypeParameter) annotation).value());
@@ -610,7 +613,7 @@ public class ScalarImplementation
             throw new IllegalArgumentException("Unsupported annotation " + annotation.getClass().getSimpleName());
         }
 
-        private static boolean containsMetaParameter(Annotation[] annotations)
+        public static boolean containsMetaParameter(Annotation[] annotations)
         {
             for (Annotation annotation : annotations) {
                 if (isMetaParameter(annotation)) {
@@ -620,6 +623,7 @@ public class ScalarImplementation
             return false;
         }
 
+        // FIXME This should be moved outside of scalar package
         private static boolean isMetaParameter(Annotation annotation)
         {
             return annotation instanceof TypeParameter ||
