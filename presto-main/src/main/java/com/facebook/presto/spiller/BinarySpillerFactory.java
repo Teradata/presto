@@ -66,6 +66,6 @@ public class BinarySpillerFactory
     @Override
     public Spiller create(List<Type> types, AbstractOperatorSpillContext operatorSpillContext)
     {
-        return new BinaryFileSpiller(blockEncodingSerde, executor, spillPath, totalSpilledBytes);
+        return new BinaryFileSpiller(blockEncodingSerde, executor, spillPath, totalSpilledBytes, operatorSpillContext);
     }
 }
