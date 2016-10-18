@@ -99,7 +99,7 @@ public class HashAggregationOperator
                     new DataSize(0, MEGABYTE),
                     new SpillerFactory() {
                         @Override
-                        public Spiller create(List<Type> types)
+                        public Spiller create(List<Type> types, AbstractOperatorSpillContext operatorSpillContext)
                         {
                             throw new UnsupportedOperationException();
                         }
