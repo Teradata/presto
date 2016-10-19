@@ -14,11 +14,13 @@
 package com.facebook.presto.operator.spiller;
 
 import com.facebook.presto.block.BlockEncodingManager;
+import com.facebook.presto.operator.AbstractOperatorSpillContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spiller.BinarySpillerFactory;
+import com.facebook.presto.spiller.LocalSpillContext;
 import com.facebook.presto.spiller.Spiller;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
@@ -103,7 +105,7 @@ public class BenchmarkBinaryFileSpiller
                 throws ExecutionException, InterruptedException
         {
             pages = createInputPages();
-            readSpiller = spillerFactory.create(TYPES, bytes -> { });
+            readSpiller = spillerFactory.create(TYPES,  new LocalSpillContext(new TestOperatorSpillContext()));
             readSpiller.spill(pages.iterator()).get();
         }
 
@@ -155,7 +157,16 @@ public class BenchmarkBinaryFileSpiller
 
         public Spiller createSpiller()
         {
-            return spillerFactory.create(TYPES, bytes -> { });
+            return spillerFactory.create(TYPES, new LocalSpillContext(new TestOperatorSpillContext()));
+        }
+    }
+
+    public static class TestOperatorSpillContext
+        extends AbstractOperatorSpillContext
+    {
+        @Override
+        public void updateBytes(long bytes)
+        {
         }
     }
 }
