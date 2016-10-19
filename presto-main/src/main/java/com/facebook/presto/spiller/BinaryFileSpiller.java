@@ -14,7 +14,6 @@
 package com.facebook.presto.spiller;
 
 import com.facebook.presto.block.PagesSerde;
-import com.facebook.presto.operator.AbstractOperatorSpillContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
@@ -58,10 +57,9 @@ public class BinaryFileSpiller
     private final Closer closer = Closer.create();
     private final BlockEncodingSerde blockEncodingSerde;
     private final AtomicLong totalSpilledDataSize;
-    private final AbstractOperatorSpillContext operatorSpillContext;
+    private final LocalSpillContext localSpillContext;
 
     private final ListeningExecutorService executor;
-    private long spillerDataSize = 0L; // TODO: is there ever concurrent access to Spillers?
 
     private int spillsCount;
     private CompletableFuture<?> previousSpill = CompletableFuture.completedFuture(null);
@@ -71,12 +69,12 @@ public class BinaryFileSpiller
             ListeningExecutorService executor,
             Path spillPath,
             AtomicLong totalSpilledDataSize,
-            AbstractOperatorSpillContext operatorSpillContext)
+            LocalSpillContext localSpillContext)
     {
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
         this.executor = requireNonNull(executor, "executor is null");
         this.totalSpilledDataSize = requireNonNull(totalSpilledDataSize, "totalSpilledDataSize is null");
-        this.operatorSpillContext = operatorSpillContext;
+        this.localSpillContext = localSpillContext;
         try {
             this.targetDirectory = Files.createTempDirectory(spillPath, "presto-spill");
         }
@@ -101,11 +99,6 @@ public class BinaryFileSpiller
         try (SliceOutput output = new OutputStreamSliceOutput(new BufferedOutputStream(new FileOutputStream(spillPath.toFile())))) {
             PagesSerde.PagesWriter pagesWriter = new PagesSerde.PagesWriter(blockEncodingSerde, output);
             writePages(pagesWriter, pageIterator);
-
-            long pageSize = PagesSerde.writePages(blockEncodingSerde, output, pageIterator);
-            totalSpilledDataSize.addAndGet(pageSize);
-            spillerDataSize += pageSize;
-            operatorSpillContext.updateBytes(pageSize);
         }
         catch (RuntimeIOException | IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to spill pages", e);
@@ -117,11 +110,9 @@ public class BinaryFileSpiller
         while (pages.hasNext()) {
             Page page = pages.next();
             long pageSize = page.getSizeInBytes();
-            operatorSpillContext.updateBytes(pageSize);
-            pagesWriter.append(page);
-
-            spillerDataSize += pageSize;
+            localSpillContext.updateBytes(pageSize);
             totalSpilledDataSize.addAndGet(pageSize);
+            pagesWriter.append(page);
         }
     }
 
@@ -163,8 +154,7 @@ public class BinaryFileSpiller
                     e);
         }
         finally {
-            operatorSpillContext.updateBytes(-spillerDataSize);
-            spillerDataSize = 0;
+            localSpillContext.close();
         }
     }
 
