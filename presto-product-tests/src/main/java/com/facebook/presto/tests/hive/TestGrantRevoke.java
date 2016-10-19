@@ -19,10 +19,13 @@ import com.teradata.tempto.ProductTest;
 import com.teradata.tempto.query.QueryExecutor;
 import org.testng.annotations.Test;
 
+import java.util.Arrays;
+
 import static com.facebook.presto.tests.TestGroups.AUTHORIZATION;
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
 import static com.facebook.presto.tests.TestGroups.PROFILE_SPECIFIC_TESTS;
 import static com.facebook.presto.tests.utils.QueryExecutors.connectToPresto;
+import static com.teradata.tempto.assertions.QueryAssert.Row.row;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
 import static java.lang.String.format;
 
@@ -79,7 +82,21 @@ public class TestGrantRevoke
     }
 
     @Test(groups = {HIVE_CONNECTOR, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
-    public void testGrantRevokeAll()
+    public void testShowGrants()
+    {
+        aliceExecutor.executeQuery(format("GRANT SELECT ON %s TO bob WITH GRANT OPTION", tableName));
+        aliceExecutor.executeQuery(format("GRANT INSERT ON %s TO bob", tableName));
+
+        assertThat(bobExecutor.executeQuery(format("SHOW GRANTS ON %s", tableName)))
+                .contains(
+                        Arrays.asList(
+                                row("bob", "hive", "default", "alice_owned_table", "SELECT", Boolean.TRUE),
+                                row("bob", "hive", "default", "alice_owned_table", "INSERT", Boolean.FALSE)
+                        ));
+    }
+
+    @Test(groups = {HIVE_CONNECTOR, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
+    public void testAll()
     {
         aliceExecutor.executeQuery(format("GRANT ALL PRIVILEGES ON %s TO bob", tableName));
         assertThat(bobExecutor.executeQuery(format("INSERT INTO %s VALUES (4, 13)", tableName))).hasRowsCount(1);
@@ -89,6 +106,8 @@ public class TestGrantRevoke
 
         aliceExecutor.executeQuery(format("REVOKE ALL PRIVILEGES ON %s FROM bob", tableName));
         assertAccessDeniedOnAllOperationsOnTable(bobExecutor, tableName);
+
+        assertThat(bobExecutor.executeQuery(format("SHOW GRANTS ON %s", tableName))).hasNoRows();
     }
 
     private static void assertAccessDeniedOnAllOperationsOnTable(QueryExecutor queryExecutor, String tableName)
