@@ -329,15 +329,6 @@ public class HashAggregationOperator
     }
 
     @Override
-    public ListenableFuture<?> isBlocked()
-    {
-        if (aggregationBuilder != null) {
-            return toListenableFuture(aggregationBuilder.isBlocked());
-        }
-        return NOT_BLOCKED;
-    }
-
-    @Override
     public boolean needsInput()
     {
         if (finishing || outputIterator != null) {
