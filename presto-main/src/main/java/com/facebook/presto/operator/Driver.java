@@ -366,7 +366,8 @@ public class Driver
         for (int i = 0; i < operators.size() && !driverContext.isDone(); i++) {
             Operator current = operators.get(i);
             if (current.getOperatorContext().isSystemMemoryRevokingRequested()) {
-                getUnchecked(current.revokeMemory());
+                getUnchecked(current.startMemoryRevoke());
+                current.finishMemoryRevoke();
                 current.getOperatorContext().resetSystemMemoryRevokingRequested();
             }
         }
