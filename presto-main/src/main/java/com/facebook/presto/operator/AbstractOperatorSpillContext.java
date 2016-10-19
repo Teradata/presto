@@ -13,7 +13,14 @@
  */
 package com.facebook.presto.operator;
 
-public interface AbstractOperatorSpillContext
+import com.facebook.presto.spiller.LocalSpillContext;
+
+public abstract class AbstractOperatorSpillContext
 {
-    void updateBytes(long bytes);
+    public abstract void updateBytes(long bytes);
+
+    public LocalSpillContext newLocalSpillContext()
+    {
+        return new LocalSpillContext(this);
+    }
 }

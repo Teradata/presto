@@ -14,7 +14,6 @@
 
 package com.facebook.presto.spiller;
 
-import com.facebook.presto.operator.AbstractOperatorSpillContext;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
@@ -64,8 +63,8 @@ public class BinarySpillerFactory
     }
 
     @Override
-    public Spiller create(List<Type> types, AbstractOperatorSpillContext operatorSpillContext)
+    public Spiller create(List<Type> types, LocalSpillContext localSpillContext)
     {
-        return new BinaryFileSpiller(blockEncodingSerde, executor, spillPath, totalSpilledBytes, operatorSpillContext);
+        return new BinaryFileSpiller(blockEncodingSerde, executor, spillPath, totalSpilledBytes, localSpillContext);
     }
 }
