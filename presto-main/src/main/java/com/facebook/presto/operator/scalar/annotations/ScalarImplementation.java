@@ -610,9 +610,11 @@ public class ScalarImplementation
                                 .map(signature -> parseTypeSignature(signature, literalParameters))
                                 .collect(toImmutableList()));
             }
+
             throw new IllegalArgumentException("Unsupported annotation " + annotation.getClass().getSimpleName());
         }
 
+        // FIXME This should be moved outside of scalar package
         public static boolean containsMetaParameter(Annotation[] annotations)
         {
             for (Annotation annotation : annotations) {
@@ -624,7 +626,7 @@ public class ScalarImplementation
         }
 
         // FIXME This should be moved outside of scalar package
-        private static boolean isMetaParameter(Annotation annotation)
+        public static boolean isMetaParameter(Annotation annotation)
         {
             return annotation instanceof TypeParameter ||
                     annotation instanceof LiteralParameter ||
