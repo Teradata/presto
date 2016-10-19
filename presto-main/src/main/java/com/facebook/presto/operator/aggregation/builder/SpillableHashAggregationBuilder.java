@@ -116,15 +116,9 @@ public class SpillableHashAggregationBuilder
         return false;
     }
 
-    @Override
-    public CompletableFuture<?> isBlocked()
-    {
-        return spillInProgress;
-    }
-
     private boolean hasPreviousSpillCompletedSuccessfully()
     {
-        if (isBlocked().isDone()) {
+        if (spillInProgress.isDone()) {
             // check for exception from previous spill for early failure
             getFutureValue(spillInProgress);
             return true;
