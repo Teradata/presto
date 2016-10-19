@@ -40,22 +40,22 @@ public class TestSpillSpaceTracker
         assertEquals(spillSpaceTracker.getMaxBytes(), MAX_DATA_SIZE.toBytes());
         QueryId mockQueryId = new QueryId("test");
         long reservedBytes = new DataSize(5, MEGABYTE).toBytes();
-        spillSpaceTracker.reserve(mockQueryId, reservedBytes);
+        spillSpaceTracker.reserve(reservedBytes);
         assertEquals(spillSpaceTracker.getCurrentBytes(), reservedBytes);
 
         QueryId mockQueryId2 = new QueryId("test2");
         long otherReservedBytes = new DataSize(2, MEGABYTE).toBytes();
-        spillSpaceTracker.reserve(mockQueryId2, otherReservedBytes);
+        spillSpaceTracker.reserve(otherReservedBytes);
         assertEquals(spillSpaceTracker.getCurrentBytes(), (reservedBytes + otherReservedBytes));
 
-        spillSpaceTracker.reserve(mockQueryId, otherReservedBytes);
+        spillSpaceTracker.reserve(otherReservedBytes);
         assertEquals(spillSpaceTracker.getCurrentBytes(), (reservedBytes + 2 * otherReservedBytes));
 
-        spillSpaceTracker.free(mockQueryId, otherReservedBytes);
-        spillSpaceTracker.free(mockQueryId2, otherReservedBytes);
+        spillSpaceTracker.free(otherReservedBytes);
+        spillSpaceTracker.free(otherReservedBytes);
         assertEquals(spillSpaceTracker.getCurrentBytes(), reservedBytes);
 
-        spillSpaceTracker.free(mockQueryId, reservedBytes);
+        spillSpaceTracker.free(reservedBytes);
         assertEquals(spillSpaceTracker.getCurrentBytes(), 0);
     }
 
@@ -63,6 +63,6 @@ public class TestSpillSpaceTracker
     public void testSpillOutOfSpace()
     {
         assertEquals(spillSpaceTracker.getCurrentBytes(), 0);
-        spillSpaceTracker.reserve(new QueryId("test"), MAX_DATA_SIZE.toBytes() + 1);
+        spillSpaceTracker.reserve(MAX_DATA_SIZE.toBytes() + 1);
     }
 }

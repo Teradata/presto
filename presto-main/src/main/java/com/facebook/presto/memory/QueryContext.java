@@ -116,7 +116,7 @@ public class QueryContext
         if (spillUsed + bytes > maxSpill) {
             throw ExceededSpillLimitException.exceededPerQueryLocalLimit(succinctBytes(maxSpill));
         }
-        ListenableFuture<?> future = spillSpaceTracker.reserve(queryId, bytes);
+        ListenableFuture<?> future = spillSpaceTracker.reserve(bytes);
         spillUsed += bytes;
         return future;
     }
@@ -154,7 +154,7 @@ public class QueryContext
     {
         checkArgument(spillUsed - bytes >= 0, "tried to free more memory than is reserved");
         spillUsed -= bytes;
-        spillSpaceTracker.free(queryId, bytes);
+        spillSpaceTracker.free(bytes);
     }
 
     public synchronized void setMemoryPool(MemoryPool pool)
