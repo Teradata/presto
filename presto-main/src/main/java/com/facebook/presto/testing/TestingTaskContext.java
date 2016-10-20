@@ -44,11 +44,21 @@ public final class TestingTaskContext
 
     public static TaskContext createTaskContext(Executor executor, Session session, DataSize maxMemory)
     {
-        MemoryPool memoryPool = new MemoryPool(new MemoryPoolId("test"), new DataSize(1, GIGABYTE));
-        MemoryPool systemMemoryPool = new MemoryPool(new MemoryPoolId("testSystem"), new DataSize(1, GIGABYTE));
+        return createTaskContext(executor, session, maxMemory, new DataSize(1, GIGABYTE), new DataSize(1, GIGABYTE));
+    }
 
+    public static TaskContext createTaskContext(
+            Executor executor,
+            Session session,
+            DataSize maxMemory,
+            DataSize memoryPoolSize,
+            DataSize systemMemoryPoolSize)
+    {
+        MemoryPool memoryPool = new MemoryPool(new MemoryPoolId("test"), memoryPoolSize);
+        MemoryPool systemMemoryPool = new MemoryPool(new MemoryPoolId("testSystem"), systemMemoryPoolSize);
         SpillSpaceTracker spillSpaceTracker = new SpillSpaceTracker(new DataSize(1, GIGABYTE));
         QueryContext queryContext = new QueryContext(new QueryId("test_query"), maxMemory, memoryPool, systemMemoryPool, executor, new DataSize(1, GIGABYTE), spillSpaceTracker);
+
         return createTaskContext(queryContext, executor, session);
     }
 
