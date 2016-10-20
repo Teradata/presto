@@ -71,7 +71,7 @@ public class PrestoConnection
     private final AtomicReference<String> transactionId = new AtomicReference<>();
     private final QueryExecutor queryExecutor;
 
-    PrestoConnection(PrestoDriverUri uri, String user, QueryExecutor queryExecutor)
+    PrestoConnection(PrestoConnectionConfig uri, String user, QueryExecutor queryExecutor)
             throws SQLException
     {
         requireNonNull(uri, "uri is null");
