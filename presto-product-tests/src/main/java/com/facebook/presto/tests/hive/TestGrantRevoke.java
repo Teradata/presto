@@ -19,10 +19,13 @@ import com.teradata.tempto.ProductTest;
 import com.teradata.tempto.query.QueryExecutor;
 import org.testng.annotations.Test;
 
+import java.util.Arrays;
+
 import static com.facebook.presto.tests.TestGroups.AUTHORIZATION;
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
 import static com.facebook.presto.tests.TestGroups.PROFILE_SPECIFIC_TESTS;
 import static com.facebook.presto.tests.utils.QueryExecutors.connectToPresto;
+import static com.teradata.tempto.assertions.QueryAssert.Row.row;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
 import static java.lang.String.format;
 
@@ -68,6 +71,14 @@ public class TestGrantRevoke
         assertThat(() -> bobExecutor.executeQuery(format("DELETE FROM %s WHERE day=3", tableName))).
                 failsWithMessage(format("Access Denied: Cannot delete from table default.%s", tableName));
 
+        // test SHOW GRANTS
+        assertThat(bobExecutor.executeQuery(format("SHOW GRANTS ON %s", tableName)))
+                .contains(
+                        Arrays.asList(
+                                row("bob", "hive", "default", "alice_owned_table", "SELECT", Boolean.TRUE),
+                                row("bob", "hive", "default", "alice_owned_table", "INSERT", Boolean.FALSE)
+                        ));
+
         // test REVOKE
         aliceExecutor.executeQuery(format("REVOKE INSERT ON %s FROM bob", tableName));
         assertThat(() -> bobExecutor.executeQuery(format("INSERT INTO %s VALUES ('y', 5)", tableName))).
@@ -89,6 +100,8 @@ public class TestGrantRevoke
 
         aliceExecutor.executeQuery(format("REVOKE ALL PRIVILEGES ON %s FROM bob", tableName));
         assertAccessDeniedOnAllOperationsOnTable(bobExecutor, tableName);
+
+        assertThat(bobExecutor.executeQuery(format("SHOW GRANTS ON %s", tableName))).hasNoRows();
     }
 
     private static void assertAccessDeniedOnAllOperationsOnTable(QueryExecutor queryExecutor, String tableName)

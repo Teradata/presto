@@ -31,7 +31,8 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import com.facebook.presto.spi.security.Privilege;
+import com.facebook.presto.spi.security.GrantInfo;
+import com.facebook.presto.spi.security.PrivilegeInfo.Privilege;
 import io.airlift.slice.Slice;
 
 import java.util.Collection;
@@ -344,5 +345,13 @@ public interface ConnectorMetadata
     default void revokeTablePrivileges(ConnectorSession session, SchemaTableName tableName, Set<Privilege> privileges, String grantee, boolean grantOption)
     {
         throw new PrestoException(NOT_SUPPORTED, "This connector does not support revokes");
+    }
+
+    /**
+     * List table privileges granted to the specified grantee for the tables that have the specified prefix
+     */
+    default List<GrantInfo> listTablePrivileges(ConnectorSession session, SchemaTablePrefix prefix, String grantee)
+    {
+        return emptyList();
     }
 }

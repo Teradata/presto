@@ -14,6 +14,7 @@
 package com.facebook.presto.spi.security;
 
 import com.facebook.presto.spi.SchemaTableName;
+import com.facebook.presto.spi.security.PrivilegeInfo.Privilege;
 
 @Deprecated
 public interface ConnectorAccessControl

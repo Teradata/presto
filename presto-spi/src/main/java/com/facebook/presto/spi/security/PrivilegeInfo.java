@@ -13,7 +13,28 @@
  */
 package com.facebook.presto.spi.security;
 
-public enum Privilege
+public class PrivilegeInfo
 {
-    SELECT, DELETE, INSERT
+    public enum Privilege {
+        SELECT, DELETE, INSERT, UPDATE, OWNERSHIP;
+    }
+
+    private final Privilege privilege;
+    private final boolean grantOption;
+
+    public PrivilegeInfo(Privilege privilege, boolean grantOption)
+    {
+        this.privilege = privilege;
+        this.grantOption = grantOption;
+    }
+
+    public Privilege getPrivilege()
+    {
+        return privilege;
+    }
+
+    public boolean isGrantOption()
+    {
+        return grantOption;
+    }
 }

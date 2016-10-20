@@ -13,7 +13,8 @@
  */
 package com.facebook.presto.hive.metastore;
 
-import com.facebook.presto.spi.security.Privilege;
+import com.facebook.presto.spi.security.PrivilegeInfo;
+import com.facebook.presto.spi.security.PrivilegeInfo.Privilege;
 import com.google.common.collect.ImmutableSet;
 import org.apache.hadoop.hive.metastore.api.PrivilegeGrantInfo;
 
@@ -101,6 +102,23 @@ public class HivePrivilegeInfo
         return (getHivePrivilege().equals(hivePrivilegeInfo.getHivePrivilege()) &&
                 (isGrantOption() == hivePrivilegeInfo.isGrantOption() ||
                         (!isGrantOption() && hivePrivilegeInfo.isGrantOption())));
+    }
+
+    public PrivilegeInfo toPrivilegeInfo()
+    {
+        switch (getHivePrivilege()) {
+            case SELECT:
+                return new PrivilegeInfo(Privilege.SELECT, isGrantOption());
+            case INSERT:
+                return new PrivilegeInfo(Privilege.INSERT, isGrantOption());
+            case DELETE:
+                return new PrivilegeInfo(Privilege.DELETE, isGrantOption());
+            case UPDATE:
+                return new PrivilegeInfo(Privilege.UPDATE, isGrantOption());
+            case OWNERSHIP:
+                return new PrivilegeInfo(Privilege.OWNERSHIP, isGrantOption());
+        }
+        return null;
     }
 
     @Override

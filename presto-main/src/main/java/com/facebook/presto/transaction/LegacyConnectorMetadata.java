@@ -32,7 +32,8 @@ import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.SchemaTablePrefix;
 import com.facebook.presto.spi.connector.ConnectorMetadata;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import com.facebook.presto.spi.security.Privilege;
+import com.facebook.presto.spi.security.GrantInfo;
+import com.facebook.presto.spi.security.PrivilegeInfo.Privilege;
 import io.airlift.slice.Slice;
 
 import java.util.Collection;
@@ -44,6 +45,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static com.google.common.base.Preconditions.checkState;
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 public class LegacyConnectorMetadata
@@ -270,6 +272,12 @@ public class LegacyConnectorMetadata
     public void revokeTablePrivileges(ConnectorSession session, SchemaTableName tableName, Set<Privilege> privileges, String grantee, boolean grantOption)
     {
         metadata.revokeTablePrivileges(session, tableName, privileges, grantee, grantOption);
+    }
+
+    @Override
+    public List<GrantInfo> listTablePrivileges(ConnectorSession session, SchemaTablePrefix prefix, String grantee)
+    {
+        return emptyList();
     }
 
     private void setRollback(Runnable action)

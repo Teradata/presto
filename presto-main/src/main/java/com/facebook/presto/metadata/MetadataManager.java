@@ -37,7 +37,8 @@ import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.function.OperatorType;
 import com.facebook.presto.spi.predicate.NullableValue;
 import com.facebook.presto.spi.predicate.TupleDomain;
-import com.facebook.presto.spi.security.Privilege;
+import com.facebook.presto.spi.security.GrantInfo;
+import com.facebook.presto.spi.security.PrivilegeInfo.Privilege;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
@@ -100,6 +101,7 @@ import static com.google.common.collect.Iterables.transform;
 import static java.lang.String.format;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toSet;
 
 public class MetadataManager
         implements Metadata
@@ -710,6 +712,22 @@ public class MetadataManager
         checkArgument(entry != null, "Catalog %s does not exist", tableName.getCatalogName());
         ConnectorMetadata metadata = entry.getMetadata(session);
         metadata.revokeTablePrivileges(session.toConnectorSession(entry.getCatalog()), tableName.asSchemaTableName(), privileges, grantee, grantOption);
+    }
+
+    @Override
+    public List<GrantInfo> listTablePrivileges(Session session, QualifiedTablePrefix prefix, String grantee)
+    {
+        requireNonNull(prefix, "prefix is null");
+        SchemaTablePrefix tablePrefix = prefix.asSchemaTablePrefix();
+
+        Set<GrantInfo> grants = new LinkedHashSet<>();
+        for (ConnectorEntry entry : allConnectorsFor(prefix.getCatalogName())) {
+            ConnectorMetadata metadata = entry.getMetadata(session);
+            ConnectorSession connectorSession = session.toConnectorSession(entry.getCatalog());
+            grants.addAll(metadata.listTablePrivileges(connectorSession, tablePrefix, grantee).stream()
+                    .collect(toSet()));
+        }
+        return ImmutableList.copyOf(grants);
     }
 
     @Override
