@@ -115,6 +115,7 @@
         <module>presto-verifier</module>
         <module>presto-testing-server-launcher</module>
         <module>presto-plugin-toolkit</module>
+        <module>presto-sqlserver</module>
     </modules>
 
     <repositories>
@@ -334,6 +335,12 @@
                 <groupId>com.facebook.presto.hive</groupId>
                 <artifactId>hive-apache</artifactId>
                 <version>0.17</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-sqlserver</artifactId>
+                <version>${project.version}</version>
             </dependency>
 
             <dependency>
