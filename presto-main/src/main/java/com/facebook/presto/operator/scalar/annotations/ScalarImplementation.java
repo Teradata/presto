@@ -239,7 +239,7 @@ public class ScalarImplementation implements ParametricImplementation
         private final List<Class<?>> argumentNativeContainerTypes = new ArrayList<>();
         private final MethodHandle methodHandle;
         private final List<ImplementationDependency> dependencies = new ArrayList<>();
-        private final LinkedHashSet<TypeParameter> typeParameters = new LinkedHashSet<>();
+        private final Set<TypeParameter> typeParameters = new LinkedHashSet<>();
         private final Set<String> literalParameters = new HashSet<>();
         private final Map<String, Class<?>> specializedTypeParameters;
         private final Optional<MethodHandle> constructorMethodHandle;
