@@ -37,15 +37,12 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Primitives;
 
-import javax.annotation.Nullable;
-
 import java.lang.annotation.Annotation;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -250,7 +247,7 @@ public class ScalarImplementation implements ParametricImplementation
         {
             this.functionName = requireNonNull(functionName, "functionName is null");
             this.nullable = method.getAnnotation(SqlNullable.class) != null;
-            checkArgument(nullable || !containsLegacyNullable(method.getAnnotations()), "Method [%s] is annotated with @Nullable but not @SqlNullable", method);
+            checkArgument(nullable || !AnnotationHelpers.containsLegacyNullable(method.getAnnotations()), "Method [%s] is annotated with @Nullable but not @SqlNullable", method);
 
             Stream.of(method.getAnnotationsByType(TypeParameter.class))
                     .forEach(typeParameters::add);
@@ -318,7 +315,7 @@ public class ScalarImplementation implements ParametricImplementation
                             .findFirst()
                             .orElseThrow(() -> new IllegalArgumentException(format("Method [%s] is missing @SqlType annotation for parameter", method)));
                     boolean nullableArgument = Stream.of(annotations).anyMatch(SqlNullable.class::isInstance);
-                    checkArgument(nullableArgument || !containsLegacyNullable(annotations), "Method [%s] has parameter annotated with @Nullable but not @SqlNullable", method);
+                    checkArgument(nullableArgument || !AnnotationHelpers.containsLegacyNullable(annotations), "Method [%s] has parameter annotated with @Nullable but not @SqlNullable", method);
 
                     boolean hasNullFlag = false;
                     if (method.getParameterCount() > (i + 1)) {
@@ -326,7 +323,7 @@ public class ScalarImplementation implements ParametricImplementation
                         if (Stream.of(parameterAnnotations).anyMatch(IsNull.class::isInstance)) {
                             Class<?> isNullType = method.getParameterTypes()[i + 1];
 
-                            checkArgument(Stream.of(parameterAnnotations).filter(Parser::isPrestoAnnotation).allMatch(IsNull.class::isInstance), "Method [%s] has @IsNull parameter that has other annotations", method);
+                            checkArgument(Stream.of(parameterAnnotations).filter(AnnotationHelpers::isPrestoAnnotation).allMatch(IsNull.class::isInstance), "Method [%s] has @IsNull parameter that has other annotations", method);
                             checkArgument(isNullType == boolean.class, "Method [%s] has non-boolean parameter with @IsNull", method);
                             checkArgument((parameterType == Void.class) || !Primitives.isWrapperType(parameterType), "Method [%s] uses @IsNull following a parameter with boxed primitive type: %s", method, parameterType.getSimpleName());
 
@@ -458,22 +455,6 @@ public class ScalarImplementation implements ParametricImplementation
         public static ScalarImplementation parseImplementation(String functionName, Method method, Map<Set<TypeParameter>, Constructor<?>> constructors)
         {
             return new Parser(functionName, method, constructors).get();
-        }
-
-        private static boolean containsLegacyNullable(Annotation[] annotations)
-        {
-            return Arrays.stream(annotations)
-                    .map(Annotation::annotationType)
-                    .map(Class::getName)
-                    .anyMatch(name -> name.equals(Nullable.class.getName()));
-        }
-
-        private static boolean isPrestoAnnotation(Annotation annotation)
-        {
-            return ImplementationDependency.isImplementationDependencyAnnotation(annotation) ||
-                    annotation instanceof SqlType ||
-                    annotation instanceof SqlNullable ||
-                    annotation instanceof IsNull;
         }
     }
 }
