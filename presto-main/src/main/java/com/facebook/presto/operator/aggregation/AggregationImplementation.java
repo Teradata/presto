@@ -29,7 +29,7 @@ import static java.util.Objects.requireNonNull;
 
 public class AggregationImplementation implements ParametricImplementation
 {
-    public class AggregateNativeContainerType
+    public static class AggregateNativeContainerType
     {
         private final Class<?> javaType;
         private final boolean isBlockPosition;
