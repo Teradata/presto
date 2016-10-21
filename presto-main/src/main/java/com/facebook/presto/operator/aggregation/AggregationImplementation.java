@@ -121,9 +121,16 @@ public class AggregationImplementation implements ParametricImplementation
         this.combineDependencies = requireNonNull(combineDependencies, "combineDependencies cannot be null");
     }
 
+    @Override
     public Signature getSignature()
     {
         return signature;
+    }
+
+    @Override
+    public boolean hasSpecializedTypeParameters()
+    {
+        return false;
     }
 
     public Class<?> getDefinitionClass()
@@ -144,11 +151,6 @@ public class AggregationImplementation implements ParametricImplementation
     public Method getOutputFunction()
     {
         return outputFunction;
-    }
-
-    public boolean hasSpecializedTypeParameters()
-    {
-        return false;
     }
 
     public List<ImplementationDependency> getInputDependencies()

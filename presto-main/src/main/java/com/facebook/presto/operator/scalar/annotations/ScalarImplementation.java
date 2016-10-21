@@ -168,11 +168,13 @@ public class ScalarImplementation implements ParametricImplementation
         return true;
     }
 
+    @Override
     public boolean hasSpecializedTypeParameters()
     {
         return !specializedTypeParameters.isEmpty();
     }
 
+    @Override
     public Signature getSignature()
     {
         return signature;
