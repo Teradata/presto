@@ -177,7 +177,7 @@ public class AggregationCompiler
         List<ImplementationDependency> outputDependencies = parseImplementationDependencies(outputFunction);
         List<LongVariableConstraint> longVariableConstraints = parseLongVariableConstraints(inputFunction);
         List<TypeVariableConstraint> typeVariableConstraints = parseTypeVariableConstraints(inputFunction, inputDependencies);
-        List<Class<?>> signatureArgumentsTypes = parseSignatureArgumentsTypes(inputFunction);
+        List<AggregationImplementation.AggregateNativeContainerType> signatureArgumentsTypes = parseSignatureArgumentsTypes(inputFunction);
 
         List<TypeSignature> inputTypes = getInputTypesSignatures(inputFunction);
         TypeSignature outputType = TypeSignature.parseTypeSignature(outputFunction.getAnnotation(OutputFunction.class).value());
@@ -194,9 +194,9 @@ public class AggregationCompiler
         return new AggregationImplementation(signature, aggregationDefinition, stateClass, inputFunction, outputFunction, signatureArgumentsTypes, inputDependencies, combineDependencies, outputDependencies);
     }
 
-    private static List<Class<?>> parseSignatureArgumentsTypes(Method inputFunction)
+    private static List<AggregationImplementation.AggregateNativeContainerType> parseSignatureArgumentsTypes(Method inputFunction)
     {
-        ImmutableList.Builder<Class<?>> builder = ImmutableList.builder();
+        ImmutableList.Builder<AggregationImplementation.AggregateNativeContainerType> builder = ImmutableList.builder();
 
         int stateId = findAggregationStateParamId(inputFunction);
 
@@ -217,7 +217,7 @@ public class AggregationCompiler
                 continue;
             }
 
-            builder.add(inputFunction.getParameterTypes()[i]);
+            builder.add(new AggregationImplementation.AggregateNativeContainerType(inputFunction.getParameterTypes()[i], isParameterBlock(annotations)));
         }
 
         return builder.build();
