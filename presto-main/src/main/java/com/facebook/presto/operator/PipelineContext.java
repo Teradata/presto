@@ -223,6 +223,11 @@ public class PipelineContext
         return future;
     }
 
+    public synchronized ListenableFuture<?> reserveSpill(long bytes)
+    {
+        return taskContext.reserveSpill(bytes);
+    }
+
     public synchronized boolean tryReserveMemory(long bytes)
     {
         if (taskContext.tryReserveMemory(bytes)) {
@@ -246,6 +251,12 @@ public class PipelineContext
         checkArgument(bytes <= systemMemoryReservation.get(), "tried to free more memory than is reserved");
         taskContext.freeSystemMemory(bytes);
         systemMemoryReservation.getAndAdd(-bytes);
+    }
+
+    public synchronized void freeSpill(long bytes)
+    {
+        checkArgument(bytes >= 0, "bytes is negative");
+        taskContext.freeSpill(bytes);
     }
 
     public void moreMemoryAvailable()
