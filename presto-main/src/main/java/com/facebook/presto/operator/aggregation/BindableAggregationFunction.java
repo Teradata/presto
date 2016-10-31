@@ -24,7 +24,6 @@ import com.facebook.presto.operator.annotations.ImplementationDependency;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.function.AccumulatorStateFactory;
 import com.facebook.presto.spi.function.AccumulatorStateSerializer;
-import com.facebook.presto.spi.function.AggregationFunction;
 import com.facebook.presto.spi.function.AggregationState;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.type.Type;
@@ -59,7 +58,6 @@ import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.String.format;
 import static java.lang.invoke.MethodHandles.lookup;
-import static java.util.Objects.requireNonNull;
 
 public class BindableAggregationFunction
     extends SqlAggregationFunction
@@ -116,15 +114,12 @@ public class BindableAggregationFunction
         List<Type> inputTypes = boundSignature.getArgumentTypes().stream().map(x -> typeManager.getType(x)).collect(toImmutableList());
         Type outputType = typeManager.getType(boundSignature.getReturnType());
 
-        AggregationFunction aggregationAnnotation = definitionClass.getAnnotation(AggregationFunction.class);
-        requireNonNull(aggregationAnnotation, "aggregationAnnotation is null");
-
         DynamicClassLoader classLoader = new DynamicClassLoader(definitionClass.getClassLoader(), getClass().getClassLoader());
 
         AggregationMetadata metadata;
         AccumulatorStateSerializer<?> stateSerializer = getAccumulatorStateSerializer(variables, typeManager, functionRegistry, concreteImplementation, stateClass, stateSerializerFactory, classLoader);
         Type intermediateType = stateSerializer.getSerializedType();
-        Method combineFunction = AggregationFromAnnotationsParser.getCombineFunction(definitionClass, stateClass);
+        Method combineFunction = concreteImplementation.getCombineFunction();
         AccumulatorStateFactory<?> stateFactory = generateStateFactory(stateClass, classLoader);
 
         try {
