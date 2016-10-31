@@ -106,10 +106,12 @@ public class BindableAggregationFunction
             throw new PrestoException(FUNCTION_IMPLEMENTATION_MISSING, format("Unsupported type parameters (%s) for %s", variables, getSignature()));
         }
 
-        Class<?> definitionClass = implementation.get().getDefinitionClass();
-        Class<?> stateClass = implementation.get().getStateClass();
-        Method inputFunction = implementation.get().getInputFunction();
-        Method outputFunction = implementation.get().getOutputFunction();
+        AggregationImplementation concreteImplementation = implementation.get();
+        Class<?> definitionClass = concreteImplementation.getDefinitionClass();
+        Class<?> stateClass = concreteImplementation.getStateClass();
+        Method inputFunction = concreteImplementation.getInputFunction();
+        Method outputFunction = concreteImplementation.getOutputFunction();
+        Optional<Method> stateSerializerFactory = concreteImplementation.getStateSerializerFactory();
 
         List<Type> inputTypes = boundSignature.getArgumentTypes().stream().map(x -> typeManager.getType(x)).collect(toImmutableList());
         Type outputType = typeManager.getType(boundSignature.getReturnType());
@@ -120,25 +122,25 @@ public class BindableAggregationFunction
         DynamicClassLoader classLoader = new DynamicClassLoader(definitionClass.getClassLoader(), getClass().getClassLoader());
 
         AggregationMetadata metadata;
-        AccumulatorStateSerializer<?> stateSerializer = generateStateSerializer(stateClass, classLoader);
+        AccumulatorStateSerializer<?> stateSerializer = getAccumulatorStateSerializer(variables, typeManager, functionRegistry, concreteImplementation, stateClass, stateSerializerFactory, classLoader);
         Type intermediateType = stateSerializer.getSerializedType();
         Method combineFunction = AggregationFromAnnotationsParser.getCombineFunction(definitionClass, stateClass);
         AccumulatorStateFactory<?> stateFactory = generateStateFactory(stateClass, classLoader);
 
         try {
             MethodHandle inputHandle = lookup().unreflect(inputFunction);
-            for (ImplementationDependency dependency : implementation.get().getInputDependencies()) {
+            for (ImplementationDependency dependency : concreteImplementation.getInputDependencies()) {
                 inputHandle = inputHandle.bindTo(dependency.resolve(variables, typeManager, functionRegistry));
             }
 
             MethodHandle combineHandle = lookup().unreflect(combineFunction);
-            for (ImplementationDependency dependency : implementation.get().getCombineDependencies()) {
+            for (ImplementationDependency dependency : concreteImplementation.getCombineDependencies()) {
                 combineHandle = combineHandle.bindTo(dependency.resolve(variables, typeManager, functionRegistry));
             }
 
             // FIXME
             MethodHandle outputHandle = outputFunction == null ? null : lookup().unreflect(outputFunction);
-            for (ImplementationDependency dependency : implementation.get().getOutputDependencies()) {
+            for (ImplementationDependency dependency : concreteImplementation.getOutputDependencies()) {
                 outputHandle = outputHandle.bindTo(dependency.resolve(variables, typeManager, functionRegistry));
             }
 
@@ -165,6 +167,27 @@ public class BindableAggregationFunction
                 outputType,
                 details.isDecomposable(),
                 factory);
+    }
+
+    private AccumulatorStateSerializer<?> getAccumulatorStateSerializer(BoundVariables variables, TypeManager typeManager, FunctionRegistry functionRegistry, AggregationImplementation implementation, Class<?> stateClass, Optional<Method> stateSerializerFactory, DynamicClassLoader classLoader)
+    {
+        AccumulatorStateSerializer<?> stateSerializer;
+        if (stateSerializerFactory.isPresent()) {
+            try {
+                MethodHandle stateSerializerFactoryHandle = lookup().unreflect(stateSerializerFactory.get());
+                for (ImplementationDependency dependency : implementation.getStateSerializerFactoryDependencies()) {
+                    stateSerializerFactoryHandle = stateSerializerFactoryHandle.bindTo(dependency.resolve(variables, typeManager, functionRegistry));
+                }
+                stateSerializer = (AccumulatorStateSerializer<?>) stateSerializerFactoryHandle.invoke();
+            }
+            catch (Throwable e) {
+                throw Throwables.propagate(e);
+            }
+        }
+        else {
+            stateSerializer = generateStateSerializer(stateClass, classLoader);
+        }
+        return stateSerializer;
     }
 
     public InternalAggregationFunction specialize(BoundVariables variables, int arity, TypeManager typeManager)

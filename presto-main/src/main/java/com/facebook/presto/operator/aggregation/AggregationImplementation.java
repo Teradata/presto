@@ -103,22 +103,26 @@ public class AggregationImplementation implements ParametricImplementation
     private final Class<?> stateClass;
     private final Method inputFunction;
     private final Method outputFunction;
+    private final Optional<Method> stateSerializerFactory;
     private final List<AggregateNativeContainerType> argumentNativeContainerTypes;
     private final List<ImplementationDependency> inputDependencies;
     private final List<ImplementationDependency> combineDependencies;
     private final List<ImplementationDependency> outputDependencies;
+    private final List<ImplementationDependency> stateSerializerFactoryDependencies;
 
-    public AggregationImplementation(Signature signature, Class<?> definitionClass, Class<?> stateClass, Method inputFunction, Method outputFunction, List<AggregateNativeContainerType> argumentNativeContainerTypes, List<ImplementationDependency> inputDependencies, List<ImplementationDependency> combineDependencies, List<ImplementationDependency> outputDependencies)
+    public AggregationImplementation(Signature signature, Class<?> definitionClass, Class<?> stateClass, Method inputFunction, Method outputFunction, Optional<Method> stateSerializerFactory, List<AggregateNativeContainerType> argumentNativeContainerTypes, List<ImplementationDependency> inputDependencies, List<ImplementationDependency> combineDependencies, List<ImplementationDependency> outputDependencies, List<ImplementationDependency> stateSerializerFactoryDependencies)
     {
         this.signature = requireNonNull(signature, "signature cannot be null");
         this.definitionClass = requireNonNull(definitionClass, "definition class cannot be null");
         this.stateClass = requireNonNull(stateClass, "stateClass cannot be null");
         this.inputFunction = requireNonNull(inputFunction, "inputFunction cannot be null");
         this.outputFunction = requireNonNull(outputFunction, "outputFunction cannot be null");
+        this.stateSerializerFactory = stateSerializerFactory;
         this.argumentNativeContainerTypes = requireNonNull(argumentNativeContainerTypes, "argumentNativeContainerTypes cannot be null");
         this.inputDependencies = requireNonNull(inputDependencies, "inputDependencies cannot be null");
         this.outputDependencies = requireNonNull(outputDependencies, "outputDependencies cannot be null");
         this.combineDependencies = requireNonNull(combineDependencies, "combineDependencies cannot be null");
+        this.stateSerializerFactoryDependencies = stateSerializerFactoryDependencies;
     }
 
     @Override
@@ -168,6 +172,16 @@ public class AggregationImplementation implements ParametricImplementation
         return combineDependencies;
     }
 
+    public Optional<Method> getStateSerializerFactory()
+    {
+        return stateSerializerFactory;
+    }
+
+    public List<ImplementationDependency> getStateSerializerFactoryDependencies()
+    {
+        return stateSerializerFactoryDependencies;
+    }
+
     public boolean areTypesAssignable(Signature boundSignature, BoundVariables variables, TypeManager typeManager, FunctionRegistry functionRegistry)
     {
         checkState(argumentNativeContainerTypes.size() == boundSignature.getArgumentTypes().size(), "Number of argument assigned to AggregationImplementation is different than number parsed from annotations.");
@@ -196,11 +210,12 @@ public class AggregationImplementation implements ParametricImplementation
         {
         }
 
-        public static AggregationImplementation parseImplementation(Class<?> aggregationDefinition, AggregationHeader header, Class<?> stateClass, Method inputFunction, Method combineFunction, Method outputFunction)
+        public static AggregationImplementation parseImplementation(Class<?> aggregationDefinition, AggregationHeader header, Class<?> stateClass, Method inputFunction, Method combineFunction, Method outputFunction, Optional<Method> stateSerializerFactoryFunction)
         {
             List<ImplementationDependency> inputDependencies = parseImplementationDependencies(inputFunction);
             List<ImplementationDependency> combineDependencies = parseImplementationDependencies(combineFunction);
             List<ImplementationDependency> outputDependencies = parseImplementationDependencies(outputFunction);
+            List<ImplementationDependency> stateSerializerFactoryDependencies = stateSerializerFactoryFunction.isPresent() ? parseImplementationDependencies(stateSerializerFactoryFunction.get()) : ImmutableList.of();
             List<LongVariableConstraint> longVariableConstraints = parseLongVariableConstraints(inputFunction);
             List<TypeVariableConstraint> typeVariableConstraints = parseTypeVariableConstraints(inputFunction, inputDependencies);
             List<AggregateNativeContainerType> signatureArgumentsTypes = parseSignatureArgumentsTypes(inputFunction);
@@ -217,7 +232,7 @@ public class AggregationImplementation implements ParametricImplementation
                     inputTypes,
                     false);
 
-            return new AggregationImplementation(signature, aggregationDefinition, stateClass, inputFunction, outputFunction, signatureArgumentsTypes, inputDependencies, combineDependencies, outputDependencies);
+            return new AggregationImplementation(signature, aggregationDefinition, stateClass, inputFunction, outputFunction, stateSerializerFactoryFunction, signatureArgumentsTypes, inputDependencies, combineDependencies, outputDependencies, stateSerializerFactoryDependencies);
         }
 
         public static List<AggregateNativeContainerType> parseSignatureArgumentsTypes(Method inputFunction)
