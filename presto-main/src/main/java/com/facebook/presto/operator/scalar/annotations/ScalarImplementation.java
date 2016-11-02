@@ -53,6 +53,7 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
+import static com.facebook.presto.operator.ParametricFunctionHelpers.bindDependencies;
 import static com.facebook.presto.spi.StandardErrorCode.FUNCTION_IMPLEMENTATION_ERROR;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
@@ -120,18 +121,12 @@ public class ScalarImplementation implements ParametricImplementation
                 return Optional.empty();
             }
         }
-        MethodHandle methodHandle = this.methodHandle;
-        for (ImplementationDependency dependency : dependencies) {
-            methodHandle = methodHandle.bindTo(dependency.resolve(boundVariables, typeManager, functionRegistry));
-        }
-        MethodHandle constructor = null;
+        MethodHandle methodHandle = bindDependencies(this.methodHandle, dependencies, boundVariables, typeManager, functionRegistry);
+        Optional<MethodHandle> constructor = Optional.empty();
         if (this.constructor.isPresent()) {
-            constructor = this.constructor.get();
-            for (ImplementationDependency dependency : constructorDependencies) {
-                constructor = constructor.bindTo(dependency.resolve(boundVariables, typeManager, functionRegistry));
-            }
+            constructor = Optional.of(bindDependencies(this.constructor.get(), constructorDependencies, boundVariables, typeManager, functionRegistry));
         }
-        return Optional.of(new MethodHandleAndConstructor(methodHandle, Optional.ofNullable(constructor)));
+        return Optional.of(new MethodHandleAndConstructor(methodHandle, constructor));
     }
 
     private static Class<?> getNullAwareReturnType(Class<?> clazz, boolean nullable)
