@@ -23,7 +23,6 @@ import com.facebook.presto.operator.annotations.ImplementationDependency;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.function.IsNull;
-import com.facebook.presto.spi.function.LiteralParameters;
 import com.facebook.presto.spi.function.SqlNullable;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.function.TypeParameter;
@@ -44,7 +43,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -54,6 +52,7 @@ import java.util.stream.Stream;
 
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
 import static com.facebook.presto.operator.ParametricFunctionHelpers.bindDependencies;
+import static com.facebook.presto.operator.annotations.AnnotationHelpers.parseLiteralParameters;
 import static com.facebook.presto.spi.StandardErrorCode.FUNCTION_IMPLEMENTATION_ERROR;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
@@ -62,7 +61,6 @@ import static java.lang.String.format;
 import static java.lang.invoke.MethodHandles.lookup;
 import static java.lang.invoke.MethodHandles.permuteArguments;
 import static java.lang.reflect.Modifier.isStatic;
-import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 
 public class ScalarImplementation implements ParametricImplementation
@@ -234,7 +232,7 @@ public class ScalarImplementation implements ParametricImplementation
         private final MethodHandle methodHandle;
         private final List<ImplementationDependency> dependencies = new ArrayList<>();
         private final Set<TypeParameter> typeParameters = new LinkedHashSet<>();
-        private final Set<String> literalParameters = new HashSet<>();
+        private final Set<String> literalParameters;
         private final Map<String, Class<?>> specializedTypeParameters;
         private final Optional<MethodHandle> constructorMethodHandle;
         private final List<ImplementationDependency> constructorDependencies = new ArrayList<>();
@@ -249,10 +247,7 @@ public class ScalarImplementation implements ParametricImplementation
             Stream.of(method.getAnnotationsByType(TypeParameter.class))
                     .forEach(typeParameters::add);
 
-            LiteralParameters literalParametersAnnotation = method.getAnnotation(LiteralParameters.class);
-            if (literalParametersAnnotation != null) {
-                literalParameters.addAll(asList(literalParametersAnnotation.value()));
-            }
+            literalParameters = parseLiteralParameters(method);
 
             SqlType returnType = method.getAnnotation(SqlType.class);
             checkArgument(returnType != null, format("Method [%s] is missing @SqlType annotation", method));
