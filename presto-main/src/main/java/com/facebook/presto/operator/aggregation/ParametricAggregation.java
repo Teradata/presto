@@ -44,13 +44,13 @@ import static com.facebook.presto.spi.StandardErrorCode.FUNCTION_IMPLEMENTATION_
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static java.lang.String.format;
 
-public class BindableAggregationFunction
-    extends SqlAggregationFunction
+public class ParametricAggregation
+        extends SqlAggregationFunction
 {
     AggregationHeader details;
     ParametricImplementations<AggregationImplementation> implementations;
 
-    public BindableAggregationFunction(Signature signature,
+    public ParametricAggregation(Signature signature,
             AggregationHeader details,
             ParametricImplementations implementations)
     {
