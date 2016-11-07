@@ -59,12 +59,12 @@ import static com.facebook.presto.spi.function.OperatorType.NOT_EQUAL;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
 import static com.google.common.base.Preconditions.checkArgument;
 
-public class AnnotationHelpers
+public class FunctionsParserHelper
 {
     private static final Set<OperatorType> COMPARABLE_TYPE_OPERATORS = ImmutableSet.of(EQUAL, NOT_EQUAL, HASH_CODE);
     private static final Set<OperatorType> ORDERABLE_TYPE_OPERATORS = ImmutableSet.of(LESS_THAN, LESS_THAN_OR_EQUAL, GREATER_THAN, GREATER_THAN_OR_EQUAL, BETWEEN);
 
-    private AnnotationHelpers()
+    private FunctionsParserHelper()
     {}
 
     public static boolean containsAnnotation(Annotation[] annotations, Predicate<Annotation> predicate)

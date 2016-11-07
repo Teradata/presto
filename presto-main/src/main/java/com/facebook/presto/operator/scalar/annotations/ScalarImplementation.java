@@ -18,7 +18,7 @@ import com.facebook.presto.metadata.FunctionRegistry;
 import com.facebook.presto.metadata.LongVariableConstraint;
 import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.operator.ParametricImplementation;
-import com.facebook.presto.operator.annotations.AnnotationHelpers;
+import com.facebook.presto.operator.annotations.FunctionsParserHelper;
 import com.facebook.presto.operator.annotations.ImplementationDependency;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
@@ -52,7 +52,7 @@ import java.util.stream.Stream;
 
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
 import static com.facebook.presto.operator.ParametricFunctionHelpers.bindDependencies;
-import static com.facebook.presto.operator.annotations.AnnotationHelpers.parseLiteralParameters;
+import static com.facebook.presto.operator.annotations.FunctionsParserHelper.parseLiteralParameters;
 import static com.facebook.presto.operator.annotations.ImplementationDependency.getImplementationDependencyAnnotation;
 import static com.facebook.presto.operator.annotations.ImplementationDependency.validateImplementationDependencyAnnotation;
 import static com.facebook.presto.spi.StandardErrorCode.FUNCTION_IMPLEMENTATION_ERROR;
@@ -244,7 +244,7 @@ public class ScalarImplementation implements ParametricImplementation
         {
             this.functionName = requireNonNull(functionName, "functionName is null");
             this.nullable = method.getAnnotation(SqlNullable.class) != null;
-            checkArgument(nullable || !AnnotationHelpers.containsLegacyNullable(method.getAnnotations()), "Method [%s] is annotated with @Nullable but not @SqlNullable", method);
+            checkArgument(nullable || !FunctionsParserHelper.containsLegacyNullable(method.getAnnotations()), "Method [%s] is annotated with @Nullable but not @SqlNullable", method);
 
             Stream.of(method.getAnnotationsByType(TypeParameter.class))
                     .forEach(typeParameters::add);
@@ -306,7 +306,7 @@ public class ScalarImplementation implements ParametricImplementation
                             .findFirst()
                             .orElseThrow(() -> new IllegalArgumentException(format("Method [%s] is missing @SqlType annotation for parameter", method)));
                     boolean nullableArgument = Stream.of(annotations).anyMatch(SqlNullable.class::isInstance);
-                    checkArgument(nullableArgument || !AnnotationHelpers.containsLegacyNullable(annotations), "Method [%s] has parameter annotated with @Nullable but not @SqlNullable", method);
+                    checkArgument(nullableArgument || !FunctionsParserHelper.containsLegacyNullable(annotations), "Method [%s] has parameter annotated with @Nullable but not @SqlNullable", method);
 
                     boolean hasNullFlag = false;
                     if (method.getParameterCount() > (i + 1)) {
@@ -314,7 +314,7 @@ public class ScalarImplementation implements ParametricImplementation
                         if (Stream.of(parameterAnnotations).anyMatch(IsNull.class::isInstance)) {
                             Class<?> isNullType = method.getParameterTypes()[i + 1];
 
-                            checkArgument(Stream.of(parameterAnnotations).filter(AnnotationHelpers::isPrestoAnnotation).allMatch(IsNull.class::isInstance), "Method [%s] has @IsNull parameter that has other annotations", method);
+                            checkArgument(Stream.of(parameterAnnotations).filter(FunctionsParserHelper::isPrestoAnnotation).allMatch(IsNull.class::isInstance), "Method [%s] has @IsNull parameter that has other annotations", method);
                             checkArgument(isNullType == boolean.class, "Method [%s] has non-boolean parameter with @IsNull", method);
                             checkArgument((parameterType == Void.class) || !Primitives.isWrapperType(parameterType), "Method [%s] uses @IsNull following a parameter with boxed primitive type: %s", method, parameterType.getSimpleName());
 
@@ -361,7 +361,7 @@ public class ScalarImplementation implements ParametricImplementation
             checkArgument(constructor != null, "Method [%s] is an instance method and requires a public constructor to be declared with %s type parameters", method, typeParameters);
             for (int i = 0; i < constructor.getParameterCount(); i++) {
                 Annotation[] annotations = constructor.getParameterAnnotations()[i];
-                checkArgument(AnnotationHelpers.containsImplementationDependencyAnnotation(annotations), "Constructors may only have meta parameters [%s]", constructor);
+                checkArgument(FunctionsParserHelper.containsImplementationDependencyAnnotation(annotations), "Constructors may only have meta parameters [%s]", constructor);
                 checkArgument(annotations.length == 1, "Meta parameters may only have a single annotation [%s]", constructor);
                 Annotation annotation = annotations[0];
                 if (annotation instanceof TypeParameter) {
@@ -425,7 +425,7 @@ public class ScalarImplementation implements ParametricImplementation
             Signature signature = new Signature(
                     functionName,
                     SCALAR,
-                    AnnotationHelpers.createTypeVariableConstraints(typeParameters, dependencies),
+                    FunctionsParserHelper.createTypeVariableConstraints(typeParameters, dependencies),
                     longVariableConstraints,
                     returnType,
                     argumentTypes,
