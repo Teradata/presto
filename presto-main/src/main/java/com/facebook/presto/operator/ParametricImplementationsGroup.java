@@ -31,7 +31,7 @@ import static java.util.Objects.requireNonNull;
  * similar to partial template specialization from C++ allowing more optimized implementations to be provided for specific types.
  * @param <T> type of implementation details
  */
-public class ParametricImplementations<T extends ParametricImplementation>
+public class ParametricImplementationsGroup<T extends ParametricImplementation>
 {
     // These are implementations for concrete types (they have no unbound type parameters), and have the highest priority when picking an implementation
     private final Map<Signature, T> exactImplementations;
@@ -42,7 +42,7 @@ public class ParametricImplementations<T extends ParametricImplementation>
 
     private final Signature signature;
 
-    public ParametricImplementations(Map<Signature, T> exactImplementations,
+    public ParametricImplementationsGroup(Map<Signature, T> exactImplementations,
             List<T> specializedImplementations,
             List<T> genericImplementations,
             Signature signature)
@@ -53,9 +53,9 @@ public class ParametricImplementations<T extends ParametricImplementation>
         this.signature = requireNonNull(signature, "signature cannot be null");
     }
 
-    public static <T extends ParametricImplementation> ParametricImplementations<T> of(T... implementations)
+    public static <T extends ParametricImplementation> ParametricImplementationsGroup<T> of(T... implementations)
     {
-        ParametricImplementations.Builder<T> builder = builder();
+        ParametricImplementationsGroup.Builder<T> builder = builder();
         for (T implementation : implementations) {
             builder.addImplementation(implementation);
         }
@@ -95,12 +95,12 @@ public class ParametricImplementations<T extends ParametricImplementation>
 
         private Builder() {}
 
-        public ParametricImplementations<T> build()
+        public ParametricImplementationsGroup<T> build()
         {
             Map<Signature, T> exactImplementations = this.exactImplementations.build();
             List<T> specializedImplementations = this.specializedImplementations.build();
             List<T> genericImplementations = this.genericImplementations.build();
-            return new ParametricImplementations<T>(exactImplementations,
+            return new ParametricImplementationsGroup<T>(exactImplementations,
                     specializedImplementations,
                     genericImplementations,
                     determineGenericSignature(exactImplementations, specializedImplementations, genericImplementations));
