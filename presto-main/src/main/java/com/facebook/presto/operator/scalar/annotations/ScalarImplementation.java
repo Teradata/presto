@@ -29,7 +29,6 @@ import com.facebook.presto.spi.function.TypeParameter;
 import com.facebook.presto.spi.function.TypeParameterSpecialization;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
-import com.facebook.presto.type.Constraint;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -52,7 +51,9 @@ import java.util.stream.Stream;
 
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
 import static com.facebook.presto.operator.ParametricFunctionHelpers.bindDependencies;
+import static com.facebook.presto.operator.annotations.FunctionsParserHelper.createTypeVariableConstraints;
 import static com.facebook.presto.operator.annotations.FunctionsParserHelper.parseLiteralParameters;
+import static com.facebook.presto.operator.annotations.FunctionsParserHelper.parseLongVariableConstraints;
 import static com.facebook.presto.operator.annotations.ImplementationDependency.getImplementationDependencyAnnotation;
 import static com.facebook.presto.operator.annotations.ImplementationDependency.validateImplementationDependencyAnnotation;
 import static com.facebook.presto.spi.StandardErrorCode.FUNCTION_IMPLEMENTATION_ERROR;
@@ -238,7 +239,7 @@ public class ScalarImplementation implements ParametricImplementation
         private final Map<String, Class<?>> specializedTypeParameters;
         private final Optional<MethodHandle> constructorMethodHandle;
         private final List<ImplementationDependency> constructorDependencies = new ArrayList<>();
-        private final List<LongVariableConstraint> longVariableConstraints = new ArrayList<>();
+        private final List<LongVariableConstraint> longVariableConstraints;
 
         private Parser(String functionName, Method method, Map<Set<TypeParameter>, Constructor<?>> constructors)
         {
@@ -263,9 +264,7 @@ public class ScalarImplementation implements ParametricImplementation
                 checkArgument(!nullable, "Method [%s] annotated with @SqlNullable has primitive return type %s", method, actualReturnType.getSimpleName());
             }
 
-            Stream.of(method.getAnnotationsByType(Constraint.class))
-                    .map(annotation -> new LongVariableConstraint(annotation.variable(), annotation.expression()))
-                    .forEach(longVariableConstraints::add);
+            longVariableConstraints = parseLongVariableConstraints(method);
 
             this.specializedTypeParameters = getDeclaredSpecializedTypeParameters(method);
 
@@ -425,7 +424,7 @@ public class ScalarImplementation implements ParametricImplementation
             Signature signature = new Signature(
                     functionName,
                     SCALAR,
-                    FunctionsParserHelper.createTypeVariableConstraints(typeParameters, dependencies),
+                    createTypeVariableConstraints(typeParameters, dependencies),
                     longVariableConstraints,
                     returnType,
                     argumentTypes,

@@ -21,6 +21,7 @@ import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.metadata.TypeVariableConstraint;
 import com.facebook.presto.operator.ParametricImplementation;
 import com.facebook.presto.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType;
+import com.facebook.presto.operator.annotations.FunctionsParserHelper;
 import com.facebook.presto.operator.annotations.ImplementationDependency;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.block.Block;
@@ -30,7 +31,6 @@ import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.function.TypeParameter;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
-import com.facebook.presto.type.Constraint;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 
@@ -42,7 +42,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Stream;
 
 import static com.facebook.presto.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.BLOCK_INDEX;
 import static com.facebook.presto.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.STATE;
@@ -220,8 +219,108 @@ public class AggregationImplementation implements ParametricImplementation
 
     public static final class Parser
     {
-        private Parser(String name, Method inputMethod, Method combineMethod, Method outputMethod) // TODO Add constructors support
+        private final Class<?> aggregationDefinition;
+        private final Class<?> stateClass;
+        private final MethodHandle inputHandle;
+        private final MethodHandle outputHandle;
+        private final MethodHandle combineHandle;
+        private final Optional<MethodHandle> stateSerializerFactoryHandle;
+        private final List<AggregateNativeContainerType> argumentNativeContainerTypes;
+        private final List<ImplementationDependency> inputDependencies;
+        private final List<ImplementationDependency> combineDependencies;
+        private final List<ImplementationDependency> outputDependencies;
+        private final List<ImplementationDependency> stateSerializerFactoryDependencies;
+        private final List<ParameterType> parameterMetadataTypes;
+
+        private final List<LongVariableConstraint> longVariableConstraints;
+        private final List<TypeVariableConstraint> typeVariableConstraints;
+        private final List<TypeSignature> inputTypes;
+        private final TypeSignature returnType;
+
+        private final AggregationHeader header;
+        private final Set<String> literalParameters;
+        private final List<TypeParameter> typeParameters;
+
+        private Parser(Class<?> aggregationDefinition,
+                AggregationHeader header,
+                Class<?> stateClass,
+                Method inputFunction,
+                Method outputFunction,
+                Method combineFunction,
+                Optional<Method> stateSerializerFactoryFunction)
         {
+            // rewrite data passed directly
+            this.aggregationDefinition = aggregationDefinition;
+            this.header = header;
+            this.stateClass = stateClass;
+
+            // parse declared literal and type parameters
+            // it is required to declare all literal and type parameters in input function
+            literalParameters = parseLiteralParameters(inputFunction);
+            typeParameters = Arrays.asList(inputFunction.getAnnotationsByType(TypeParameter.class));
+
+            // parse dependencies
+            inputDependencies = parseImplementationDependencies(inputFunction);
+            outputDependencies = parseImplementationDependencies(outputFunction);
+            combineDependencies = parseImplementationDependencies(combineFunction);
+            stateSerializerFactoryDependencies = stateSerializerFactoryFunction.map(function -> parseImplementationDependencies(function)).orElse(ImmutableList.of());
+
+            // parse metadata types
+            parameterMetadataTypes = parseParameterMetadataTypes(inputFunction);
+
+            // parse constraints
+            longVariableConstraints = FunctionsParserHelper.parseLongVariableConstraints(inputFunction);
+            typeVariableConstraints = createTypeVariableConstraints(typeParameters, inputDependencies);
+
+            // parse native types of arguments
+            argumentNativeContainerTypes = parseSignatureArgumentsTypes(inputFunction);
+
+            // determine TypeSignatures of function declaration
+            inputTypes = getInputTypesSignatures(inputFunction);
+            returnType = parseTypeSignature(outputFunction.getAnnotation(OutputFunction.class).value(), literalParameters);
+
+            // unreflect methods for further use
+            try {
+                if (stateSerializerFactoryFunction.isPresent()) {
+                    stateSerializerFactoryHandle = Optional.of(lookup().unreflect(stateSerializerFactoryFunction.get()));
+                }
+                else {
+                    stateSerializerFactoryHandle = Optional.empty();
+                }
+
+                inputHandle = lookup().unreflect(inputFunction);
+                combineHandle = lookup().unreflect(combineFunction);
+                outputHandle = lookup().unreflect(outputFunction);
+            }
+            catch (IllegalAccessException e) {
+                throw Throwables.propagate(e);
+            }
+        }
+
+        private AggregationImplementation get()
+        {
+            Signature signature = new Signature(
+                    header.getName(),
+                    FunctionKind.AGGREGATE,
+                    typeVariableConstraints,
+                    longVariableConstraints,
+                    returnType,
+                    inputTypes,
+                    false);
+
+            return new AggregationImplementation(signature,
+                    aggregationDefinition,
+                    stateClass,
+                    inputHandle,
+                    outputHandle,
+                    combineHandle,
+                    stateSerializerFactoryHandle,
+                    argumentNativeContainerTypes,
+                    inputDependencies,
+                    combineDependencies,
+                    outputDependencies,
+                    stateSerializerFactoryDependencies,
+                    parameterMetadataTypes);
         }
 
         public static AggregationImplementation parseImplementation(Class<?> aggregationDefinition,
@@ -232,50 +331,7 @@ public class AggregationImplementation implements ParametricImplementation
                 Method combineFunction,
                 Optional<Method> stateSerializerFactoryFunction)
         {
-            List<ImplementationDependency> inputDependencies = parseImplementationDependencies(inputFunction);
-            List<ImplementationDependency> outputDependencies = parseImplementationDependencies(outputFunction);
-            List<ImplementationDependency> combineDependencies = parseImplementationDependencies(combineFunction);
-            List<ImplementationDependency> stateSerializerFactoryDependencies = stateSerializerFactoryFunction.map(function -> parseImplementationDependencies(function)).orElse(ImmutableList.of());
-            List<LongVariableConstraint> longVariableConstraints = parseLongVariableConstraints(inputFunction);
-            List<TypeVariableConstraint> typeVariableConstraints = parseTypeVariableConstraints(inputFunction, inputDependencies);
-            List<AggregateNativeContainerType> signatureArgumentsTypes = parseSignatureArgumentsTypes(inputFunction);
-            List<ParameterType> parameterTypes = parseParameterMetadataTypes(inputFunction);
-
-            List<TypeSignature> inputTypes = getInputTypesSignatures(inputFunction);
-            TypeSignature outputType = TypeSignature.parseTypeSignature(outputFunction.getAnnotation(OutputFunction.class).value());
-
-            Signature signature = new Signature(
-                    header.getName(),
-                    FunctionKind.AGGREGATE,
-                    typeVariableConstraints,
-                    longVariableConstraints,
-                    outputType,
-                    inputTypes,
-                    false);
-
-            try {
-                Optional<MethodHandle> stateSerializerFactoryFunctionHandle = Optional.empty();
-                if (stateSerializerFactoryFunction.isPresent()) {
-                    stateSerializerFactoryFunctionHandle = Optional.of(lookup().unreflect(stateSerializerFactoryFunction.get()));
-                }
-
-                return new AggregationImplementation(signature,
-                        aggregationDefinition,
-                        stateClass,
-                        lookup().unreflect(inputFunction),
-                        lookup().unreflect(outputFunction),
-                        lookup().unreflect(combineFunction),
-                        stateSerializerFactoryFunctionHandle,
-                        signatureArgumentsTypes,
-                        inputDependencies,
-                        combineDependencies,
-                        outputDependencies,
-                        stateSerializerFactoryDependencies,
-                        parameterTypes);
-            }
-            catch (IllegalAccessException e) {
-                throw Throwables.propagate(e);
-            }
+            return new Parser(aggregationDefinition, header, stateClass, inputFunction, outputFunction, combineFunction, stateSerializerFactoryFunction).get();
         }
 
         private static List<ParameterType> parseParameterMetadataTypes(Method method)
@@ -366,20 +422,12 @@ public class AggregationImplementation implements ParametricImplementation
             return builder.build();
         }
 
-        public static List<TypeVariableConstraint> parseTypeVariableConstraints(Method inputFunction, List<ImplementationDependency> dependencies)
-        {
-            return createTypeVariableConstraints(Arrays.asList(inputFunction.getAnnotationsByType(TypeParameter.class)), dependencies);
-        }
-
-        public static List<ImplementationDependency> parseImplementationDependencies(Method inputFunction)
+        public List<ImplementationDependency> parseImplementationDependencies(Method inputFunction)
         {
             ImmutableList.Builder<ImplementationDependency> builder = ImmutableList.builder();
-            List<TypeParameter> typeParameters = Arrays.asList(inputFunction.getAnnotationsByType(TypeParameter.class));
-            Set<String> literalParameters = parseLiteralParameters(inputFunction);
 
-            for (int i = 0; i < inputFunction.getParameterCount(); i++) {
-                Class<?> parameterType = inputFunction.getParameterTypes()[i];
-                Parameter parameter = inputFunction.getParameters()[i];
+            for (Parameter parameter : inputFunction.getParameters()) {
+                Class<?> parameterType = parameter.getType();
 
                 // Skip injected parameters
                 if (parameterType == ConnectorSession.class) {
@@ -395,13 +443,6 @@ public class AggregationImplementation implements ParametricImplementation
             return builder.build();
         }
 
-        public static List<LongVariableConstraint> parseLongVariableConstraints(Method inputFunction)
-        {
-            return Stream.of(inputFunction.getAnnotationsByType(Constraint.class))
-                    .map(annotation -> new LongVariableConstraint(annotation.variable(), annotation.expression()))
-                    .collect(toImmutableList());
-        }
-
         public static boolean isParameterNullable(Annotation[] annotations)
         {
             return containsAnnotation(annotations, annotation -> annotation instanceof NullablePosition);
@@ -412,11 +453,9 @@ public class AggregationImplementation implements ParametricImplementation
             return containsAnnotation(annotations, annotation -> annotation instanceof BlockPosition);
         }
 
-        public static List<TypeSignature> getInputTypesSignatures(Method inputFunction)
+        public List<TypeSignature> getInputTypesSignatures(Method inputFunction)
         {
-            // FIXME Literal parameters should be part of class annotations.
             ImmutableList.Builder<TypeSignature> builder = ImmutableList.builder();
-            Set<String> literalParameters = parseLiteralParameters(inputFunction);
 
             Annotation[][] parameterAnnotations = inputFunction.getParameterAnnotations();
             for (Annotation[] annotations : parameterAnnotations) {
