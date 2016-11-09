@@ -31,26 +31,29 @@ import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
 public class BinarySpillerFactory
-        extends SpillerFactoryWithStats
+    implements SpillerFactory
 {
     public static final String SPILLER_THREAD_NAME_PREFIX = "binary-spiller";
 
     private final ListeningExecutorService executor;
     private final BlockEncodingSerde blockEncodingSerde;
     private final Path spillPath;
+    private final SpillerStats spillerStats;
 
     @Inject
-    public BinarySpillerFactory(BlockEncodingSerde blockEncodingSerde, FeaturesConfig featuresConfig)
+    public BinarySpillerFactory(BlockEncodingSerde blockEncodingSerde, SpillerStats spillerStats, FeaturesConfig featuresConfig)
     {
         this(createExecutorServiceOfSize(requireNonNull(featuresConfig, "featuresConfig is null").getSpillerThreads()),
                 blockEncodingSerde,
+                spillerStats,
                 requireNonNull(featuresConfig, "featuresConfig is null").getSpillerSpillPath());
     }
 
-    public BinarySpillerFactory(ListeningExecutorService executor, BlockEncodingSerde blockEncodingSerde, Path spillPath)
+    public BinarySpillerFactory(ListeningExecutorService executor, BlockEncodingSerde blockEncodingSerde, SpillerStats spillerStats, Path spillPath)
     {
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
         this.executor = requireNonNull(executor, "executor is null");
+        this.spillerStats = requireNonNull(spillerStats, "spillerStats can not be null");
         this.spillPath = requireNonNull(spillPath, "spillPath is null");
         this.spillPath.toFile().mkdirs();
     }
@@ -65,6 +68,6 @@ public class BinarySpillerFactory
     @Override
     public Spiller create(List<Type> types, LocalSpillContext localSpillContext)
     {
-        return new BinaryFileSpiller(blockEncodingSerde, executor, spillPath, totalSpilledBytes, localSpillContext);
+        return new BinaryFileSpiller(blockEncodingSerde, executor, spillPath, spillerStats, localSpillContext);
     }
 }

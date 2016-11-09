@@ -22,6 +22,7 @@ import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spiller.BinarySpillerFactory;
 import com.facebook.presto.spiller.LocalSpillContext;
 import com.facebook.presto.spiller.Spiller;
+import com.facebook.presto.spiller.SpillerStats;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -89,7 +90,8 @@ public class BenchmarkBinaryFileSpiller
     public static class BenchmarkData
     {
         private final ListeningExecutorService executor = MoreExecutors.newDirectExecutorService();
-        private final BinarySpillerFactory spillerFactory = new BinarySpillerFactory(executor, BLOCK_ENCODING_MANAGER, SPILL_PATH);
+        private final SpillerStats spillerStats = new SpillerStats();
+        private final BinarySpillerFactory spillerFactory = new BinarySpillerFactory(executor, BLOCK_ENCODING_MANAGER, spillerStats, SPILL_PATH);
 
         @Param({"10000"})
         private int rowsPerPage = 10000;
