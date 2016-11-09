@@ -22,7 +22,4 @@ import java.util.List;
 public interface SpillerFactory
 {
     Spiller create(List<Type> types, LocalSpillContext localSpillContext);
-
-    @Managed
-    long getTotalSpilledBytes();
 }
