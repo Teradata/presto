@@ -14,30 +14,33 @@
 package com.facebook.presto.spiller;
 
 import com.facebook.presto.spi.Page;
+import com.google.common.collect.Iterators;
 
 import java.io.Closeable;
 import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
 
-@ThreadSafe
 public interface SingleStreamSpiller
         extends Closeable
 {
     /**
      * Initiate spilling of pages stream. Returns completed future once spilling has finished.
+     * Next spill can be initiated as soon as previous one completes.
      */
     CompletableFuture<?> spill(Iterator<Page> page);
 
     /**
      * Initiate spilling of single page. Returns completed future once spilling has finished.
+     * Next spill can be initiated as soon as previous one completes.
      */
-    CompletableFuture<?> spill(Page page);
+    default CompletableFuture<?> spill(Page page)
+    {
+        return spill(Iterators.forArray(page));
+    }
 
     /**
      * Returns list of previously spilled Pages as a single stream. Pages are in the same order
-     * as they were spilled as long as new spill requests are scheduled after previous request
-     * completed. In other words, when calling spill methods simultaneously order of the execution
-     * is not guaranteed.
+     * as they were spilled. Method requires the issued spill request to be completed.
      */
     Iterator<Page> getSpilledPages();
 
