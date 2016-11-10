@@ -52,9 +52,10 @@ public class TestFeaturesConfig
                 .setRe2JDfaRetries(5)
                 .setSpillEnabled(false)
                 .setOperatorMemoryLimitBeforeSpill(DataSize.valueOf("4MB"))
-                .setSpillerSpillPath(Paths.get(System.getProperty("java.io.tmpdir"), "presto", "spills").toString())
+                .setSpillerSpillPaths(Paths.get(System.getProperty("java.io.tmpdir"), "presto", "spills").toString())
                 .setSpillerThreads(4)
-                .setOptimizeMixedDistinctAggregations(false));
+                .setOptimizeMixedDistinctAggregations(false)
+                .setSpillMinimumFreeSpaceThreshold(0.9));
     }
 
     @Test
@@ -79,8 +80,9 @@ public class TestFeaturesConfig
                 .put("re2j.dfa-retries", "42")
                 .put("experimental.spill-enabled", "true")
                 .put("experimental.operator-memory-limit-before-spill", "100MB")
-                .put("experimental.spiller-spill-path", "/tmp/custom/spill/path")
+                .put("experimental.spiller-spill-path", "/tmp/custom/spill/path1,/tmp/custom/spill/path2")
                 .put("experimental.spiller-threads", "42")
+                .put("experimental.spiller-minimum-free-space-threshold", "0.8")
                 .build();
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
                 .put("experimental.resource-groups-enabled", "true")
@@ -101,8 +103,9 @@ public class TestFeaturesConfig
                 .put("re2j.dfa-retries", "42")
                 .put("experimental.spill-enabled", "true")
                 .put("experimental.operator-memory-limit-before-spill", "100MB")
-                .put("experimental.spiller-spill-path", "/tmp/custom/spill/path")
+                .put("experimental.spiller-spill-path", "/tmp/custom/spill/path1,/tmp/custom/spill/path2")
                 .put("experimental.spiller-threads", "42")
+                .put("experimental.spiller-minimum-free-space-threshold", "0.8")
                 .build();
 
         FeaturesConfig expected = new FeaturesConfig()
@@ -124,8 +127,9 @@ public class TestFeaturesConfig
                 .setRe2JDfaRetries(42)
                 .setSpillEnabled(true)
                 .setOperatorMemoryLimitBeforeSpill(DataSize.valueOf("100MB"))
-                .setSpillerSpillPath("/tmp/custom/spill/path")
-                .setSpillerThreads(42);
+                .setSpillerSpillPaths("/tmp/custom/spill/path1,/tmp/custom/spill/path2")
+                .setSpillerThreads(42)
+                .setSpillMinimumFreeSpaceThreshold(0.8);
 
         assertFullMapping(properties, expected);
         assertDeprecatedEquivalence(FeaturesConfig.class, properties, propertiesLegacy);
