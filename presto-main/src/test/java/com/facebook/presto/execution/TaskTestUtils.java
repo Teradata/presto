@@ -31,7 +31,8 @@ import com.facebook.presto.operator.index.IndexJoinLookupStats;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.spiller.BinarySpillerFactory;
+import com.facebook.presto.spiller.BinaryFileSingleStreamSpillerFactory;
+import com.facebook.presto.spiller.GenericSpillerFactory;
 import com.facebook.presto.spiller.SpillerStats;
 import com.facebook.presto.split.PageSinkManager;
 import com.facebook.presto.split.PageSourceManager;
@@ -130,7 +131,7 @@ public final class TaskTestUtils
                 new IndexJoinLookupStats(),
                 new CompilerConfig(),
                 new TaskManagerConfig(),
-                new BinarySpillerFactory(new BlockEncodingManager(metadata.getTypeManager()), new SpillerStats(), new FeaturesConfig()));
+                new GenericSpillerFactory(new BinaryFileSingleStreamSpillerFactory(new BlockEncodingManager(metadata.getTypeManager()), new SpillerStats(), new FeaturesConfig())));
     }
 
     public static TaskInfo updateTask(SqlTask sqlTask, List<TaskSource> taskSources, OutputBuffers outputBuffers)
