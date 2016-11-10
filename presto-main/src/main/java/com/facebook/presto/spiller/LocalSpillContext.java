@@ -15,7 +15,10 @@ package com.facebook.presto.spiller;
 
 import com.facebook.presto.operator.AbstractOperatorSpillContext;
 
+import java.io.Closeable;
+
 public class LocalSpillContext
+    implements Closeable
 {
     private final AbstractOperatorSpillContext operatorSpillContext;
     private long spilledBytes;
@@ -31,6 +34,7 @@ public class LocalSpillContext
         spilledBytes += bytes;
     }
 
+    @Override
     public void close()
     {
         operatorSpillContext.updateBytes(-spilledBytes);
