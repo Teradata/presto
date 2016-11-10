@@ -45,7 +45,7 @@ public class TestBinaryFileSpiller
     private static final List<Type> TYPES = ImmutableList.of(BIGINT, VARCHAR, DOUBLE, BIGINT);
     private final BlockEncodingSerde blockEncodingSerde = new BlockEncodingManager(new TypeRegistry(ImmutableSet.of(BIGINT, DOUBLE, VARBINARY)));
     private final SpillerStats spillerStats = new SpillerStats();
-    private final BinarySpillerFactory factory = new BinarySpillerFactory(blockEncodingSerde, spillerStats, new FeaturesConfig());
+    private final SpillerFactory factory = new GenericSpillerFactory(new BinaryFileSingleStreamSpillerFactory(blockEncodingSerde, spillerStats, new FeaturesConfig()));
 
     @Test
     public void testFileSpiller()
