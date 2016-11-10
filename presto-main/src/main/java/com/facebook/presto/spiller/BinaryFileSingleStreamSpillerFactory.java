@@ -17,6 +17,7 @@ package com.facebook.presto.spiller;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.Inject;
@@ -25,38 +26,50 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
-import java.util.function.Supplier;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 
-public class BinarySpillerFactory
-    implements SpillerFactory
+public class BinaryFileSingleStreamSpillerFactory
+        implements SingleStreamSpillerFactory
 {
     public static final String SPILLER_THREAD_NAME_PREFIX = "binary-spiller";
 
     private final ListeningExecutorService executor;
     private final BlockEncodingSerde blockEncodingSerde;
-    private final Path spillPath;
+    private final List<Path> spillPaths;
     private final SpillerStats spillerStats;
+    private final double minimumFreeSpaceThreshold;
+    private int roundRobinIndex;
 
     @Inject
-    public BinarySpillerFactory(BlockEncodingSerde blockEncodingSerde, SpillerStats spillerStats, FeaturesConfig featuresConfig)
+    public BinaryFileSingleStreamSpillerFactory(BlockEncodingSerde blockEncodingSerde, SpillerStats spillerStats, FeaturesConfig featuresConfig)
     {
         this(createExecutorServiceOfSize(requireNonNull(featuresConfig, "featuresConfig is null").getSpillerThreads()),
                 blockEncodingSerde,
                 spillerStats,
-                requireNonNull(featuresConfig, "featuresConfig is null").getSpillerSpillPaths().get(0));
+                requireNonNull(featuresConfig, "featuresConfig is null").getSpillerSpillPaths(),
+                requireNonNull(featuresConfig, "featuresConfig is null").getSpillMinimumFreeSpaceThreshold());
     }
 
-    public BinarySpillerFactory(ListeningExecutorService executor, BlockEncodingSerde blockEncodingSerde, SpillerStats spillerStats, Path spillPath)
+    public BinaryFileSingleStreamSpillerFactory(
+            ListeningExecutorService executor,
+            BlockEncodingSerde blockEncodingSerde,
+            SpillerStats spillerStats,
+            List<Path> spillPaths,
+            double minimumFreeSpaceThreshold)
     {
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
         this.executor = requireNonNull(executor, "executor is null");
         this.spillerStats = requireNonNull(spillerStats, "spillerStats can not be null");
-        this.spillPath = requireNonNull(spillPath, "spillPath is null");
-        this.spillPath.toFile().mkdirs();
+        requireNonNull(spillPaths, "spillPaths is null");
+        checkArgument(spillPaths.size() >= 1, "At least one spill path required");
+        this.spillPaths = ImmutableList.copyOf(spillPaths);
+        spillPaths.forEach(path -> path.toFile().mkdirs());
+        this.minimumFreeSpaceThreshold = requireNonNull(minimumFreeSpaceThreshold, "minimumFreeSpaceThreshold can not be null");
+        this.roundRobinIndex = 0;
     }
 
     private static ListeningExecutorService createExecutorServiceOfSize(int nThreads)
@@ -67,8 +80,26 @@ public class BinarySpillerFactory
     }
 
     @Override
-    public Spiller create(List<Type> types, Supplier<LocalSpillContext> localSpillContextSupplier)
+    public SingleStreamSpiller create(List<Type> types, LocalSpillContext localSpillContext)
     {
-        return new BinaryFileSpiller(blockEncodingSerde, executor, spillPath, spillerStats, localSpillContextSupplier);
+        return new BinaryFileSingleStreamSpiller(blockEncodingSerde, executor, getNextSpillPath(), spillerStats, localSpillContext);
+    }
+
+    private synchronized Path getNextSpillPath()
+    {
+        int spillPathsCount = spillPaths.size();
+        for (int i = 0; i < spillPathsCount; ++i) {
+            Path path = spillPaths.get((roundRobinIndex + i) % spillPathsCount);
+            if (hasEnoughDiskSpace(path)) {
+                roundRobinIndex = (roundRobinIndex + i + 1) % spillPathsCount;
+                return path;
+            }
+        }
+        throw new RuntimeException("No free space available for spill");
+    }
+
+    private boolean hasEnoughDiskSpace(Path path)
+    {
+        return path.toFile().getFreeSpace() > path.toFile().getTotalSpace() * (1.0 - minimumFreeSpaceThreshold);
     }
 }
