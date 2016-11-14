@@ -26,7 +26,6 @@ import com.facebook.presto.spi.function.IsNull;
 import com.facebook.presto.spi.function.SqlNullable;
 import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.function.TypeParameter;
-import com.facebook.presto.spi.function.TypeParameterSpecialization;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
 import com.google.common.collect.ImmutableList;
@@ -41,7 +40,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -52,6 +50,7 @@ import java.util.stream.Stream;
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
 import static com.facebook.presto.operator.ParametricFunctionHelpers.bindDependencies;
 import static com.facebook.presto.operator.annotations.FunctionsParserHelper.createTypeVariableConstraints;
+import static com.facebook.presto.operator.annotations.FunctionsParserHelper.getDeclaredSpecializedTypeParameters;
 import static com.facebook.presto.operator.annotations.FunctionsParserHelper.parseLiteralParameters;
 import static com.facebook.presto.operator.annotations.FunctionsParserHelper.parseLongVariableConstraints;
 import static com.facebook.presto.operator.annotations.ImplementationDependency.getImplementationDependencyAnnotation;
@@ -266,7 +265,7 @@ public class ScalarImplementation implements ParametricImplementation
 
             longVariableConstraints = parseLongVariableConstraints(method);
 
-            this.specializedTypeParameters = getDeclaredSpecializedTypeParameters(method);
+            this.specializedTypeParameters = getDeclaredSpecializedTypeParameters(method, typeParameters);
 
             parseArguments(method);
 
@@ -374,23 +373,6 @@ public class ScalarImplementation implements ParametricImplementation
             catch (IllegalAccessException e) {
                 throw new PrestoException(FUNCTION_IMPLEMENTATION_ERROR, e);
             }
-        }
-
-        private Map<String, Class<?>> getDeclaredSpecializedTypeParameters(Method method)
-        {
-            Map<String, Class<?>> specializedTypeParameters = new HashMap<>();
-            TypeParameterSpecialization[] typeParameterSpecializations = method.getAnnotationsByType(TypeParameterSpecialization.class);
-            ImmutableSet<String> typeParameterNames = typeParameters.stream()
-                    .map(TypeParameter::value)
-                    .collect(toImmutableSet());
-            for (TypeParameterSpecialization specialization : typeParameterSpecializations) {
-                checkArgument(typeParameterNames.contains(specialization.name()), "%s does not match any declared type parameters (%s) [%s]", specialization.name(), typeParameters, method);
-                Class<?> existingSpecialization = specializedTypeParameters.get(specialization.name());
-                checkArgument(existingSpecialization == null || existingSpecialization.equals(specialization.nativeContainerType()),
-                        "%s has conflicting specializations %s and %s [%s]", specialization.name(), existingSpecialization, specialization.nativeContainerType(), method);
-                specializedTypeParameters.put(specialization.name(), specialization.nativeContainerType());
-            }
-            return specializedTypeParameters;
         }
 
         private MethodHandle getMethodHandle(Method method)
