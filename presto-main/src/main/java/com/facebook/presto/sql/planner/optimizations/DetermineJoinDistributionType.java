@@ -15,6 +15,7 @@ package com.facebook.presto.sql.planner.optimizations;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolAllocator;
@@ -27,7 +28,7 @@ import com.facebook.presto.sql.planner.plan.SimplePlanRewriter;
 import java.util.Map;
 import java.util.Optional;
 
-import static com.facebook.presto.SystemSessionProperties.isDistributedJoinEnabled;
+import static com.facebook.presto.SystemSessionProperties.getJoinDistributionType;
 import static com.facebook.presto.sql.planner.optimizations.ScalarQueryUtil.isScalar;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.FULL;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
@@ -137,6 +138,11 @@ public class DetermineJoinDistributionType
             }
 
             return SemiJoinNode.DistributionType.REPLICATED;
+        }
+
+        private static boolean isDistributedJoinEnabled(Session session)
+        {
+            return !getJoinDistributionType(session).equals(FeaturesConfig.JoinDistributionType.REPLICATED);
         }
     }
 }
