@@ -16,11 +16,17 @@ package com.facebook.presto.cost;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.metadata.Metadata;
+import com.facebook.presto.metadata.TableLayout;
 import com.facebook.presto.metadata.TableLayoutHandle;
 import com.facebook.presto.metadata.TableLayoutResult;
+import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.Constraint;
+import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.statistics.Estimate;
 import com.facebook.presto.spi.statistics.TableStatistics;
+import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.planner.DomainTranslator;
+import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.plan.EnforceSingleRowNode;
 import com.facebook.presto.sql.planner.plan.ExchangeNode;
 import com.facebook.presto.sql.planner.plan.FilterNode;
@@ -32,6 +38,8 @@ import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.facebook.presto.sql.planner.plan.SemiJoinNode;
 import com.facebook.presto.sql.planner.plan.TableScanNode;
 import com.facebook.presto.sql.planner.plan.ValuesNode;
+import com.facebook.presto.sql.tree.BooleanLiteral;
+import com.facebook.presto.sql.tree.Expression;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
@@ -55,7 +63,7 @@ public class CoefficientBasedCostCalculator
         implements CostCalculator
 {
     private static final Double FILTER_COEFFICIENT = 0.5;
-    private static final Double JOIN_MATCHING_COEEFICIENT = 2.0;
+    private static final Double JOIN_MATCHING_COEFFICIENT = 2.0;
 
     // todo some computation for outputSizeInBytes
 
@@ -68,9 +76,9 @@ public class CoefficientBasedCostCalculator
     }
 
     @Override
-    public Map<PlanNode, PlanNodeCost> calculateCostForPlan(Session session, PlanNode planNode)
+    public Map<PlanNode, PlanNodeCost> calculateCostForPlan(Session session, Map<Symbol, Type> types, PlanNode planNode)
     {
-        Visitor visitor = new Visitor(session);
+        Visitor visitor = new Visitor(session, types);
         HashMap<PlanNode, PlanNodeCost> costMap = new HashMap<>();
         planNode.accept(visitor, costMap);
         return ImmutableMap.copyOf(costMap);
@@ -80,10 +88,12 @@ public class CoefficientBasedCostCalculator
             extends PlanVisitor<Map<PlanNode, PlanNodeCost>, Void>
     {
         private final Session session;
+        private final Map<Symbol, Type> types;
 
-        public Visitor(Session session)
+        public Visitor(Session session, Map<Symbol, Type> types)
         {
             this.session = session;
+            this.types = types;
         }
 
         @Override
@@ -104,10 +114,18 @@ public class CoefficientBasedCostCalculator
         @Override
         public Void visitFilter(FilterNode node, Map<PlanNode, PlanNodeCost> context)
         {
-            visitChildren(node, context);
+            boolean fullyEnforced = false;
+            if (node.getSource() instanceof TableScanNode && !((TableScanNode) node.getSource()).getLayout().isPresent()) {
+                 fullyEnforced = visitTableScan((TableScanNode) node.getSource(), context, node.getPredicate());
+            }
+            else {
+                visitChildren(node, context);
+            }
+
             PlanNodeCost sourceCost = context.get(node.getSource());
+            final double filterCoefficient = fullyEnforced ? 1.0 : FILTER_COEFFICIENT;
             PlanNodeCost filterCost = sourceCost
-                    .mapOutputRowCount(value -> value * FILTER_COEFFICIENT);
+                    .mapOutputRowCount(value -> value * filterCoefficient);
             context.put(node, filterCost);
             return null;
         }
@@ -127,7 +145,7 @@ public class CoefficientBasedCostCalculator
 
             PlanNodeCost.Builder joinCost = PlanNodeCost.builder();
             if (!leftCost.getOutputRowCount().isValueUnknown() && !rightCost.getOutputRowCount().isValueUnknown()) {
-                double joinOutputRowCount = Math.min(leftCost.getOutputRowCount().getValue(), rightCost.getOutputRowCount().getValue()) * JOIN_MATCHING_COEEFICIENT;
+                double joinOutputRowCount = Math.min(leftCost.getOutputRowCount().getValue(), rightCost.getOutputRowCount().getValue()) * JOIN_MATCHING_COEFFICIENT;
                 joinCost.setOutputRowCount(new Estimate(joinOutputRowCount));
             }
 
@@ -160,17 +178,32 @@ public class CoefficientBasedCostCalculator
         @Override
         public Void visitTableScan(TableScanNode node, Map<PlanNode, PlanNodeCost> context)
         {
-            Optional<TableLayoutHandle> layout;
+            visitTableScan(node, context, BooleanLiteral.TRUE_LITERAL);
+            return null;
+        }
+
+        /**
+         * Return true if whole predicate has been enforced
+         */
+        private boolean visitTableScan(TableScanNode node, Map<PlanNode, PlanNodeCost> context, Expression predicate)
+        {
+            boolean fullyEnforced = false;
+            Optional<TableLayoutHandle> layoutHandle = Optional.empty();
             if (node.getLayout().isPresent()) {
-                layout = Optional.of(node.getLayout().get());
+                layoutHandle = Optional.of(node.getLayout().get());
             }
             else {
-                layout = getDefaultLayout(node);
+                List<TableLayoutResult> layoutCandidates = getLayouts(node, predicate);
+                if (!layoutCandidates.isEmpty()) {
+                    TableLayout layout = layoutCandidates.get(0).getLayout();
+                    layoutHandle = Optional.of(layout.getHandle());
+                    fullyEnforced = layoutCandidates.get(0).getUnenforcedConstraint().isNone();
+                }
             }
             PlanNodeCost.Builder tableScanCost = PlanNodeCost.builder();
 
-            if (layout.isPresent()) {
-                TableStatistics tableStatistics = metadata.getTableStatistics(session, node.getTable(), layout.get());
+            if (layoutHandle.isPresent()) {
+                TableStatistics tableStatistics = metadata.getTableStatistics(session, node.getTable(), layoutHandle.get());
                 tableScanCost.setOutputRowCount(tableStatistics.getRowCount());
             }
             else {
@@ -178,21 +211,25 @@ public class CoefficientBasedCostCalculator
             }
 
             context.put(node, tableScanCost.build());
-            return null;
+            return fullyEnforced;
         }
 
-        private Optional<TableLayoutHandle> getDefaultLayout(TableScanNode node)
+        private List<TableLayoutResult> getLayouts(TableScanNode node, Expression predicate)
         {
-            List<TableLayoutResult> layouts = metadata.getLayouts(
+            DomainTranslator.ExtractionResult decomposedPredicate = DomainTranslator.fromPredicate(
+                    metadata,
+                    session,
+                    predicate,
+                    types);
+
+            TupleDomain<ColumnHandle> simplifiedConstraint = decomposedPredicate.getTupleDomain()
+                    .transform(node.getAssignments()::get)
+                    .intersect(node.getCurrentConstraint());
+
+            return metadata.getLayouts(
                     session, node.getTable(),
-                    new Constraint<>(node.getCurrentConstraint(), bindings -> true),
+                    new Constraint<>(simplifiedConstraint, bindings -> true),
                     Optional.of(ImmutableSet.copyOf(node.getAssignments().values())));
-            if (layouts.isEmpty()) {
-                return Optional.empty();
-            }
-            else {
-                return Optional.of(layouts.get(0).getLayout().getHandle());
-            }
         }
 
         @Override
@@ -222,7 +259,7 @@ public class CoefficientBasedCostCalculator
         {
             visitChildren(node, context);
             PlanNodeCost sourceStatitics = context.get(node.getSource());
-            PlanNodeCost semiJoinCost = sourceStatitics.mapOutputRowCount(rowCount -> rowCount * JOIN_MATCHING_COEEFICIENT);
+            PlanNodeCost semiJoinCost = sourceStatitics.mapOutputRowCount(rowCount -> rowCount * JOIN_MATCHING_COEFFICIENT);
             context.put(node, semiJoinCost);
             return null;
         }
