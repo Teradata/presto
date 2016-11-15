@@ -36,7 +36,7 @@ To enable SSL/TLS for Presto internal communication, do the following:
 
 .. code-block:: none
 
-    node.external-address=<node-domain>
+    node.external-address=<node-fqdn>
 
 3. Generate a Java Keystore File. Every Presto node must be able to connect to
    any other node within the same cluster. It is possible to create unique
@@ -82,7 +82,19 @@ To enable SSL/TLS for Presto internal communication, do the following:
     http-server.https.keystore.path=<keystore path>
     http-server.https.keystore.key=<keystore password>
 
-6. Configure the internal HTTP client to use the Java keystore file.
+6. Change the discovery uri to HTTPS.
+
+.. code-block:: none
+
+    discovery.uri=https://<coordinator-fqdn>:<https port>
+
+7. Configure the internal HTTP client to require HTTPS communication.
+
+.. code-block:: none
+
+    http-client.https.required=true
+
+8. Configure the internal HTTP client to use the Java keystore file.
 
 .. code-block:: none
 
