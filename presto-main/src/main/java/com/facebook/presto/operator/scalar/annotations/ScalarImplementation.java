@@ -28,6 +28,7 @@ import com.facebook.presto.spi.function.SqlType;
 import com.facebook.presto.spi.function.TypeParameter;
 import com.facebook.presto.spi.type.TypeManager;
 import com.facebook.presto.spi.type.TypeSignature;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -198,6 +199,12 @@ public class ScalarImplementation implements ParametricImplementation
     public List<ImplementationDependency> getDependencies()
     {
         return dependencies;
+    }
+
+    @VisibleForTesting
+    public List<ImplementationDependency> getConstructorDependencies()
+    {
+        return constructorDependencies;
     }
 
     public static final class MethodHandleAndConstructor
