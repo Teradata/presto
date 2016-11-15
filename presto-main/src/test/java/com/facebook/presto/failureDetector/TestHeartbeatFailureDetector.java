@@ -14,6 +14,7 @@
 package com.facebook.presto.failureDetector;
 
 import com.facebook.presto.execution.QueryManagerConfig;
+import com.facebook.presto.server.InternalHttpClientConfigurationModule;
 import com.google.inject.Binder;
 import com.google.inject.Injector;
 import com.google.inject.Key;
@@ -46,6 +47,7 @@ public class TestHeartbeatFailureDetector
             throws Exception
     {
         Bootstrap app = new Bootstrap(
+                new InternalHttpClientConfigurationModule(),
                 new TestingNodeModule(),
                 new TestingJmxModule(),
                 new TestingDiscoveryModule(),

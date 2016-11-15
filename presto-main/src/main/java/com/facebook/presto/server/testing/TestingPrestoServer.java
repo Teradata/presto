@@ -29,6 +29,7 @@ import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.security.AccessControlManager;
 import com.facebook.presto.server.GracefulShutdownHandler;
+import com.facebook.presto.server.InternalHttpClientConfigurationModule;
 import com.facebook.presto.server.PluginManager;
 import com.facebook.presto.server.ServerMainModule;
 import com.facebook.presto.server.ShutdownAction;
@@ -190,6 +191,7 @@ public class TestingPrestoServer
         }
 
         ImmutableList.Builder<Module> modules = ImmutableList.<Module>builder()
+                .add(new InternalHttpClientConfigurationModule())
                 .add(new TestingNodeModule(Optional.ofNullable(environment)))
                 .add(new TestingHttpServerModule(parseInt(coordinator ? coordinatorPort : "0")))
                 .add(new JsonModule())

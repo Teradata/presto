@@ -17,8 +17,21 @@ import io.airlift.configuration.Config;
 
 public class InternalHttpClientConfiguration
 {
+    private boolean httpsRequired;
     private String keyStorePath;
     private String keyStorePassword;
+
+    public boolean isHttpsRequired()
+    {
+        return httpsRequired;
+    }
+
+    @Config("http-client.https.required")
+    public InternalHttpClientConfiguration setHttpsRequired(boolean httpsRequired)
+    {
+        this.httpsRequired = httpsRequired;
+        return this;
+    }
 
     public String getKeyStorePath()
     {

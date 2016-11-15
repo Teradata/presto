@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.failureDetector;
 
+import com.facebook.presto.server.InternalHttpClientConfiguration;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
@@ -57,7 +58,6 @@ import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.http.client.Request.Builder.prepareHead;
-import static java.util.Arrays.asList;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newSingleThreadScheduledExecutor;
 
@@ -69,6 +69,7 @@ public class HeartbeatFailureDetector
     private final ServiceSelector selector;
     private final HttpClient httpClient;
     private final NodeInfo nodeInfo;
+    private final boolean httpsRequired;
 
     private final ScheduledExecutorService executor = newSingleThreadScheduledExecutor(daemonThreadsNamed("failure-detector"));
 
@@ -88,7 +89,8 @@ public class HeartbeatFailureDetector
             @ServiceType("presto") ServiceSelector selector,
             @ForFailureDetector HttpClient httpClient,
             FailureDetectorConfig config,
-            NodeInfo nodeInfo)
+            NodeInfo nodeInfo,
+            InternalHttpClientConfiguration internalHttpClientConfiguration)
     {
         requireNonNull(selector, "selector is null");
         requireNonNull(httpClient, "httpClient is null");
@@ -99,6 +101,7 @@ public class HeartbeatFailureDetector
         this.selector = selector;
         this.httpClient = httpClient;
         this.nodeInfo = nodeInfo;
+        this.httpsRequired = internalHttpClientConfiguration.isHttpsRequired();
 
         this.failureRatioThreshold = config.getFailureRatioThreshold();
         this.heartbeat = config.getHeartbeatInterval();
@@ -218,16 +221,15 @@ public class HeartbeatFailureDetector
         }
     }
 
-    private static URI getHttpUri(ServiceDescriptor descriptor)
+    private URI getHttpUri(ServiceDescriptor descriptor)
     {
-        for (String type : asList("http-external", "https-external")) {
-            String url = descriptor.getProperties().get(type);
-            if (url != null) {
-                try {
-                    return new URI(url);
-                }
-                catch (URISyntaxException ignored) {
-                }
+        String type = httpsRequired ? "https-external" : "http-external";
+        String url = descriptor.getProperties().get(type);
+        if (url != null) {
+            try {
+                return new URI(url);
+            }
+            catch (URISyntaxException ignored) {
             }
         }
         return null;
