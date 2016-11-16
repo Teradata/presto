@@ -27,7 +27,6 @@ the session property ``join_distribution_type``
 
 When ``join-distribution-type`` is set to ``partitioned``, partitioned distribution is used. When it is set to ``replicated``, replicated distribution is used.
 
-When the property is set to ``automatic``, the optimizer will choose which type of join to use based on the size of the join inputs. If the size of the right input
-is less than 10% of ``query.max-memory-per-node``, Presto will perform a replicated join. If the right input is not small enough or there is insufficient information
-to determine its size, a partitioned join is performed. If ``join-reordering-enabled`` is set to ``true``, then Presto will look at both the left input and the right
-input when determining the join distribution type. If either is small enough, it will take the smaller of the two and replicate it.
+When the property is set to ``automatic``, the optimizer will choose which type of join to use based on the size of the join inputs. If the size of either input input
+is less than 10% of ``query.max-memory-per-node``, Presto will perform a replicate the smaller of the two tables. If neither input is small enough or there is
+insufficient information to determine their size, a partitioned join is performed.
