@@ -18,6 +18,9 @@ import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.ExpressionTreeRewriter;
+import com.facebook.presto.sql.tree.FunctionCall;
+import com.facebook.presto.sql.tree.GroupingOperation;
+import com.facebook.presto.sql.tree.QuerySpecification;
 import com.google.common.collect.ImmutableMap;
 
 import java.util.List;
@@ -77,6 +80,11 @@ class PlanBuilder
     public Symbol translate(Expression expression)
     {
         return translations.get(expression);
+    }
+
+    public FunctionCall rewriteGroupingOperationToFunctionCall(GroupingOperation expression, QuerySpecification node)
+    {
+        return translations.rewriteGroupingOperationToFunctionCall(expression, node);
     }
 
     public Expression rewrite(Expression expression)

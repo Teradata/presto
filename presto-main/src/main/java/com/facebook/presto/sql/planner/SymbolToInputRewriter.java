@@ -17,12 +17,16 @@ import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.ExpressionRewriter;
 import com.facebook.presto.sql.tree.ExpressionTreeRewriter;
 import com.facebook.presto.sql.tree.FieldReference;
+import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.SymbolReference;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
+import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
 public class SymbolToInputRewriter
@@ -43,5 +47,19 @@ public class SymbolToInputRewriter
         Preconditions.checkArgument(channel != null, "Cannot resolve symbol %s", node.getName());
 
         return new FieldReference(channel);
+    }
+
+    @Override
+    public Expression rewriteFunctionCall(FunctionCall node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
+    {
+        if (node.getName().toString().equals("grouping")) {
+            Symbol groupId = new Symbol("groupid");
+            checkState(symbolToChannelMapping.containsKey(groupId), "grouping operation requires an available groupid channel");
+            List<Expression> arguments = Arrays.asList(new FieldReference(symbolToChannelMapping.get(groupId)), node.getArguments().get(1), node.getArguments().get(2));
+            return new FunctionCall(node.getName(), arguments);
+        }
+        else {
+            return rewriteExpression(node, context, treeRewriter);
+        }
     }
 }

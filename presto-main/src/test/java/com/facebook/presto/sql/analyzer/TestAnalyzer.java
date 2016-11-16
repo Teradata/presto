@@ -63,7 +63,7 @@ import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.AMBIGUOUS_ATTRIBUTE;
-import static com.facebook.presto.sql.analyzer.SemanticErrorCode.CANNOT_HAVE_AGGREGATIONS_OR_WINDOWS;
+import static com.facebook.presto.sql.analyzer.SemanticErrorCode.CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.CATALOG_NOT_SPECIFIED;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.COLUMN_NAME_NOT_SPECIFIED;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.COLUMN_TYPE_UNKNOWN;
@@ -71,6 +71,7 @@ import static com.facebook.presto.sql.analyzer.SemanticErrorCode.DUPLICATE_COLUM
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.DUPLICATE_RELATION;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.INVALID_LITERAL;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.INVALID_ORDINAL;
+import static com.facebook.presto.sql.analyzer.SemanticErrorCode.INVALID_PROCEDURE_ARGUMENTS;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.INVALID_SCHEMA_NAME;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.INVALID_WINDOW_FRAME;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.MISMATCHED_COLUMN_ALIASES;
@@ -238,18 +239,26 @@ public class TestAnalyzer
     public void testAggregationsNotAllowed()
             throws Exception
     {
-        assertFails(CANNOT_HAVE_AGGREGATIONS_OR_WINDOWS, "SELECT * FROM t1 WHERE sum(a) > 1");
-        assertFails(CANNOT_HAVE_AGGREGATIONS_OR_WINDOWS, "SELECT * FROM t1 GROUP BY sum(a)");
-        assertFails(CANNOT_HAVE_AGGREGATIONS_OR_WINDOWS, "SELECT * FROM t1 JOIN t2 ON sum(t1.a) = t2.a");
+        assertFails(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, "SELECT * FROM t1 WHERE sum(a) > 1");
+        assertFails(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, "SELECT * FROM t1 GROUP BY sum(a)");
+        assertFails(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, "SELECT * FROM t1 JOIN t2 ON sum(t1.a) = t2.a");
     }
 
     @Test
     public void testWindowsNotAllowed()
             throws Exception
     {
-        assertFails(CANNOT_HAVE_AGGREGATIONS_OR_WINDOWS, "SELECT * FROM t1 WHERE foo() over () > 1");
-        assertFails(CANNOT_HAVE_AGGREGATIONS_OR_WINDOWS, "SELECT * FROM t1 GROUP BY rank() over ()");
-        assertFails(CANNOT_HAVE_AGGREGATIONS_OR_WINDOWS, "SELECT * FROM t1 JOIN t2 ON sum(t1.a) over () = t2.a");
+        assertFails(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, "SELECT * FROM t1 WHERE foo() over () > 1");
+        assertFails(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, "SELECT * FROM t1 GROUP BY rank() over ()");
+        assertFails(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, "SELECT * FROM t1 JOIN t2 ON sum(t1.a) over () = t2.a");
+    }
+
+    @Test
+    public void testGroupingNotAllowed()
+    {
+        assertFails(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, "SELECT a, b, sum(c) FROM t1 WHERE grouping(a, b) GROUP BY GROUPING SETS ((a), (a, b))");
+        assertFails(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, "SELECT a, b, sum(c) FROM t1 GROUP BY grouping(a, b)");
+        assertFails(CANNOT_HAVE_AGGREGATIONS_WINDOWS_OR_GROUPING, "SELECT t1.a, t1.b FROM t1 JOIN t2 ON grouping(t1.a, t1.b) > t2.a");
     }
 
     @Test
@@ -802,6 +811,14 @@ public class TestAnalyzer
         assertFails(MUST_BE_AGGREGATE_OR_GROUP_BY, "SELECT CASE WHEN a = 1 THEN 'a' ELSE 'b' END, count(*) FROM t1");
         assertFails(MUST_BE_AGGREGATE_OR_GROUP_BY, "SELECT CASE WHEN true THEN a ELSE 0 END, count(*) FROM t1");
         assertFails(MUST_BE_AGGREGATE_OR_GROUP_BY, "SELECT CASE WHEN true THEN 0 ELSE a END, count(*) FROM t1");
+    }
+
+    @Test
+    public void testGroupingWithWrongColumnsAndNoGroupBy()
+            throws Exception
+    {
+        assertFails(INVALID_PROCEDURE_ARGUMENTS, "SELECT a, SUM(b), GROUPING(a, b, c, d) FROM t1 GROUP BY GROUPING SETS ((a, b), (c))");
+        assertFails(INVALID_PROCEDURE_ARGUMENTS, "SELECT a, SUM(b), GROUPING(a, b) FROM t1");
     }
 
     @Test

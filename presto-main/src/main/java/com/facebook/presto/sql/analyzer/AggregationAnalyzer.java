@@ -32,6 +32,7 @@ import com.facebook.presto.sql.tree.ExpressionTreeRewriter;
 import com.facebook.presto.sql.tree.Extract;
 import com.facebook.presto.sql.tree.FieldReference;
 import com.facebook.presto.sql.tree.FunctionCall;
+import com.facebook.presto.sql.tree.GroupingOperation;
 import com.facebook.presto.sql.tree.IfExpression;
 import com.facebook.presto.sql.tree.InListExpression;
 import com.facebook.presto.sql.tree.InPredicate;
@@ -66,6 +67,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.facebook.presto.sql.analyzer.SemanticErrorCode.INVALID_PROCEDURE_ARGUMENTS;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.MUST_BE_AGGREGATE_OR_GROUP_BY;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.NESTED_AGGREGATION;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.NESTED_WINDOW;
@@ -495,6 +497,22 @@ class AggregationAnalyzer
         {
             checkArgument(node.getPosition() < parameters.size(), "Invalid parameter number %s, max values is %s", node.getPosition(), parameters.size() - 1);
             return process(parameters.get(node.getPosition()), context);
+        }
+
+        public Boolean visitGroupingOperation(GroupingOperation node, Void context)
+        {
+            List<Expression> argumentsNotInGroupBy = node.getGroupingColumns().stream()
+                    .filter((argument) -> !expressions.contains(argument))
+                    .collect(toImmutableList());
+            if (!argumentsNotInGroupBy.isEmpty()) {
+                throw new SemanticException(
+                        INVALID_PROCEDURE_ARGUMENTS,
+                        node,
+                        "The following GROUPING() argument(s) '%s' is (are) not in the query's GROUP BY columns '%s'",
+                        argumentsNotInGroupBy,
+                        expressions);
+            }
+            return true;
         }
 
         @Override

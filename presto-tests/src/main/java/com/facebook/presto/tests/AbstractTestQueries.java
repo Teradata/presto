@@ -1620,6 +1620,76 @@ public abstract class AbstractTestQueries
     }
 
     @Test
+    public void testGrouping()
+            throws Exception
+    {
+        assertQuery("" +
+            "SELECT a, b, sum(c), grouping(a, b) + grouping(a)\n" +
+            "FROM (VALUES\n" +
+            "      ('h', 'j', 11),\n" +
+            "      ('k', 'l', 7)\n" +
+            "      ) AS t (a, b, c)\n" +
+            "GROUP BY GROUPING SETS ( (a), (b))\n" +
+            "ORDER BY grouping(b) ASC",
+            "VALUES (NULL, 'j', 11, 3),\n" +
+                    "(NULL, 'l', 7, 3),\n" +
+                    "('h', NULL, 11, 1),\n" +
+                    "('k', NULL, 7, 1)");
+
+        assertQuery("" +
+            "SELECT a, b, sum(c), grouping(a, b)\n" +
+            "FROM (VALUES\n" +
+            "      ('h', 'j', 11),\n" +
+            "      ('k', 'l', 7)\n" +
+            "      ) AS t (a, b, c)\n" +
+            "GROUP BY a, b",
+            "VALUES ('k', 'l', 7, 0),\n" +
+                   "('h', 'j', 11, 0)");
+
+        assertQuery("" +
+            "SELECT a, b, sum(c), grouping(a, b)\n" +
+            "FROM (VALUES\n" +
+            "      ('h', 'j', 11),\n" +
+            "      ('k', 'l', 7)\n" +
+            "      ) AS t (a, b, c)\n" +
+            "GROUP BY GROUPING SETS ( (a), (b))\n" +
+            "HAVING grouping(a, b) > 1",
+            "VALUES (NULL, 'j', 11, 2),\n" +
+                   "(NULL, 'l', 7, 2)");
+    }
+
+    @Test
+    public void testGroupingInWindowFunction()
+            throws Exception
+    {
+        assertQuery("" +
+            "SELECT genre, sub_genre, sum(listeners), grouping(genre) + grouping(sub_genre),\n" +
+                "rank() OVER (PARTITION BY grouping(genre) + grouping(sub_genre) ORDER BY genre ASC) as r\n" +
+            "FROM (VALUES\n" +
+                "('Rock', 'Hard Rock', 322),\n" +
+                "('Rock', 'Classic Rock', 788),\n" +
+                "('Rock', 'Heavy Metal', 182),\n" +
+                "('Electronic', 'Techno', 437),\n" +
+                "('Electronic', 'House', 987),\n" +
+                "('Classical', 'Avant-garde', 231),\n" +
+                "('Classical', 'Baroque', 559)\n" +
+            ") as t (genre, sub_genre, listeners)" +
+            "GROUP BY rollup(genre, sub_genre) ORDER BY r, genre, sub_genre NULLS FIRST",
+            "VALUES ('Classical', NULL, 790, 1, 1),\n" +
+                   "('Classical', 'Avant-garde', 231, 0, 1),\n" +
+                   "('Classical', 'Baroque', 559, 0, 1),\n" +
+                   "(NULL, NULL, 3506, 2, 1),\n" +
+                   "('Electronic', NULL, 1424, 1, 2),\n" +
+                   "('Electronic', 'House', 987, 0, 3),\n" +
+                   "('Electronic', 'Techno', 437, 0, 3),\n" +
+                   "('Rock', NULL, 1292, 1, 3),\n" +
+                   "('Rock', 'Classic Rock', 788, 0, 5),\n" +
+                   "('Rock', 'Hard Rock', 322, 0, 5),\n" +
+                   "('Rock', 'Heavy Metal', 182, 0, 5)\n"
+        );
+    }
+
+    @Test
     public void testIntersect()
     {
         assertQuery(
