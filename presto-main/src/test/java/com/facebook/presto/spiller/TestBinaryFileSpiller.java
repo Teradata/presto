@@ -15,7 +15,7 @@ package com.facebook.presto.spiller;
 
 import com.facebook.presto.RowPagesBuilder;
 import com.facebook.presto.block.BlockEncodingManager;
-import com.facebook.presto.operator.spiller.BenchmarkBinaryFileSpiller;
+import com.facebook.presto.operator.spiller.TestOperatorSpillContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.BlockBuilderStatus;
@@ -44,13 +44,14 @@ public class TestBinaryFileSpiller
 {
     private static final List<Type> TYPES = ImmutableList.of(BIGINT, VARCHAR, DOUBLE, BIGINT);
     private final BlockEncodingSerde blockEncodingSerde = new BlockEncodingManager(new TypeRegistry(ImmutableSet.of(BIGINT, DOUBLE, VARBINARY)));
-    private final BinarySpillerFactory factory = new BinarySpillerFactory(blockEncodingSerde, new FeaturesConfig());
+    private final SpillerStats spillerStats = new SpillerStats();
+    private final SpillerFactory factory = new GenericSpillerFactory(new BinaryFileSingleStreamSpillerFactory(blockEncodingSerde, spillerStats, new FeaturesConfig()));
 
     @Test
     public void testFileSpiller()
             throws Exception
     {
-        try (Spiller spiller = factory.create(TYPES, new LocalSpillContext(new BenchmarkBinaryFileSpiller.TestOperatorSpillContext()))) {
+        try (Spiller spiller = factory.create(TYPES, new LocalSpillContext(new TestOperatorSpillContext()))) {
             testSimpleSpiller(spiller);
         }
     }
@@ -71,7 +72,7 @@ public class TestBinaryFileSpiller
 
         Page page = new Page(col1.build(), col2.build(), col3.build());
 
-        try (Spiller spiller = factory.create(TYPES,  new LocalSpillContext(new BenchmarkBinaryFileSpiller.TestOperatorSpillContext()))) {
+        try (Spiller spiller = factory.create(TYPES,  new LocalSpillContext(new TestOperatorSpillContext()))) {
             testSpiller(types, spiller, ImmutableList.of(page));
         }
     }
@@ -97,13 +98,13 @@ public class TestBinaryFileSpiller
     private void testSpiller(List<Type> types, Spiller spiller, List<Page>... spills)
             throws ExecutionException, InterruptedException
     {
-        long spilledBytesBefore = factory.getTotalSpilledBytes();
+        long spilledBytesBefore = spillerStats.getTotalSpilledBytes();
         long spilledBytes = 0;
         for (List<Page> spill : spills) {
             spilledBytes += spill.stream().mapToLong(Page::getSizeInBytes).sum();
             spiller.spill(spill.iterator()).get();
         }
-        assertEquals(factory.getTotalSpilledBytes() - spilledBytesBefore, spilledBytes);
+        assertEquals(spillerStats.getTotalSpilledBytes() - spilledBytesBefore, spilledBytes);
 
         List<Iterator<Page>> actualSpills = spiller.getSpills();
         assertEquals(actualSpills.size(), spills.length);

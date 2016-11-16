@@ -11,21 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.spiller;
 
-import org.weakref.jmx.Managed;
+package com.facebook.presto.operator.spiller;
 
-import java.util.concurrent.atomic.AtomicLong;
+import com.facebook.presto.operator.AbstractOperatorSpillContext;
 
-public abstract class SpillerFactoryWithStats
-        implements SpillerFactory
+public class TestOperatorSpillContext
+    extends AbstractOperatorSpillContext
 {
-    protected final AtomicLong totalSpilledBytes = new AtomicLong();
-
     @Override
-    @Managed
-    public long getTotalSpilledBytes()
+    public void updateBytes(long bytes)
     {
-        return totalSpilledBytes.get();
     }
 }

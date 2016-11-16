@@ -13,6 +13,8 @@
  */
 package com.facebook.presto.sql.analyzer;
 
+import com.google.common.base.Preconditions;
+import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
@@ -26,6 +28,7 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import static com.facebook.presto.sql.analyzer.RegexLibrary.JONI;
+import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 
 @DefunctConfig({
         "resource-group-manager",
@@ -63,8 +66,9 @@ public class FeaturesConfig
     private RegexLibrary regexLibrary = JONI;
     private boolean spillEnabled;
     private DataSize operatorMemoryLimitBeforeSpill = new DataSize(4, DataSize.Unit.MEGABYTE);
-    private Path spillerSpillPath = Paths.get(System.getProperty("java.io.tmpdir"), "presto", "spills");
+    private List<Path> spillerSpillPaths = ImmutableList.of(Paths.get(System.getProperty("java.io.tmpdir"), "presto", "spills"));
     private int spillerThreads = 4;
+    private double spillMinimumFreeSpaceThreshold = 0.9;
 
     public boolean isResourceGroupsEnabled()
     {
@@ -276,15 +280,17 @@ public class FeaturesConfig
         return this;
     }
 
-    public Path getSpillerSpillPath()
+    public List<Path> getSpillerSpillPaths()
     {
-        return spillerSpillPath;
+        return spillerSpillPaths;
     }
 
     @Config("experimental.spiller-spill-path")
-    public FeaturesConfig setSpillerSpillPath(String spillPath)
+    public FeaturesConfig setSpillerSpillPaths(String spillPaths)
     {
-        this.spillerSpillPath = Paths.get(spillPath);
+        List<String> spillPathsSplit = ImmutableList.copyOf(Splitter.on(",").trimResults().omitEmptyStrings().split(spillPaths));
+        Preconditions.checkArgument(spillPathsSplit.size() >= 1, "At least one path required for experimental.spiller-spill-path config property");
+        this.spillerSpillPaths = spillPathsSplit.stream().map(path -> Paths.get(path)).collect(toImmutableList());
         return this;
     }
 
@@ -297,6 +303,18 @@ public class FeaturesConfig
     public FeaturesConfig setSpillerThreads(int spillerThreads)
     {
         this.spillerThreads = spillerThreads;
+        return this;
+    }
+
+    public double getSpillMinimumFreeSpaceThreshold()
+    {
+        return spillMinimumFreeSpaceThreshold;
+    }
+
+    @Config("experimental.spiller-minimum-free-space-threshold")
+    public FeaturesConfig setSpillMinimumFreeSpaceThreshold(double spillMinimumFreeSpaceThreshold)
+    {
+        this.spillMinimumFreeSpaceThreshold = spillMinimumFreeSpaceThreshold;
         return this;
     }
 

@@ -11,32 +11,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.presto.spiller;
 
-import com.facebook.presto.operator.AbstractOperatorSpillContext;
+import org.weakref.jmx.Managed;
 
-import java.io.Closeable;
+import java.util.concurrent.atomic.AtomicLong;
 
-public class LocalSpillContext
-    implements Closeable
+public class SpillerStats
 {
-    private final AbstractOperatorSpillContext operatorSpillContext;
-    private long spilledBytes;
+    protected final AtomicLong totalSpilledBytes = new AtomicLong();
 
-    public LocalSpillContext(AbstractOperatorSpillContext operatorSpillContext)
+    @Managed
+    public long getTotalSpilledBytes()
     {
-        this.operatorSpillContext = operatorSpillContext;
+        return totalSpilledBytes.get();
     }
 
-    public void updateBytes(long bytes)
+    public void addToTotalSpilledBytes(long delta)
     {
-        operatorSpillContext.updateBytes(bytes);
-        spilledBytes += bytes;
-    }
-
-    @Override
-    public void close()
-    {
-        operatorSpillContext.updateBytes(-spilledBytes);
+        totalSpilledBytes.addAndGet(delta);
     }
 }

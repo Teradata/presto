@@ -14,14 +14,16 @@
 package com.facebook.presto.operator.spiller;
 
 import com.facebook.presto.block.BlockEncodingManager;
-import com.facebook.presto.operator.AbstractOperatorSpillContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.spiller.BinarySpillerFactory;
+import com.facebook.presto.spiller.BinaryFileSingleStreamSpillerFactory;
+import com.facebook.presto.spiller.GenericSpillerFactory;
 import com.facebook.presto.spiller.LocalSpillContext;
 import com.facebook.presto.spiller.Spiller;
+import com.facebook.presto.spiller.SpillerFactory;
+import com.facebook.presto.spiller.SpillerStats;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -89,7 +91,9 @@ public class BenchmarkBinaryFileSpiller
     public static class BenchmarkData
     {
         private final ListeningExecutorService executor = MoreExecutors.newDirectExecutorService();
-        private final BinarySpillerFactory spillerFactory = new BinarySpillerFactory(executor, BLOCK_ENCODING_MANAGER, SPILL_PATH);
+        private final SpillerStats spillerStats = new SpillerStats();
+        private final SpillerFactory spillerFactory = new GenericSpillerFactory(
+                new BinaryFileSingleStreamSpillerFactory(executor, BLOCK_ENCODING_MANAGER, spillerStats, ImmutableList.of(SPILL_PATH), 0.0));
 
         @Param({"10000"})
         private int rowsPerPage = 10000;
@@ -158,15 +162,6 @@ public class BenchmarkBinaryFileSpiller
         public Spiller createSpiller()
         {
             return spillerFactory.create(TYPES, new LocalSpillContext(new TestOperatorSpillContext()));
-        }
-    }
-
-    public static class TestOperatorSpillContext
-        extends AbstractOperatorSpillContext
-    {
-        @Override
-        public void updateBytes(long bytes)
-        {
         }
     }
 }
