@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 
 import static com.facebook.presto.RowPagesBuilder.rowPagesBuilder;
 import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
@@ -540,7 +541,7 @@ public class TestHashAggregationOperator
             implements SpillerFactory
     {
         @Override
-        public Spiller create(List<Type> types, LocalSpillContext localSpillContext)
+        public Spiller create(List<Type> types, Supplier<LocalSpillContext> localSpillContextSupplier)
         {
             return new Spiller()
             {
@@ -571,7 +572,7 @@ public class TestHashAggregationOperator
             implements SpillerFactory
     {
         @Override
-        public Spiller create(List<Type> types, LocalSpillContext localSpillContext)
+        public Spiller create(List<Type> types, Supplier<LocalSpillContext> localSpillContextSupplier)
         {
             return new Spiller() {
                 @Override

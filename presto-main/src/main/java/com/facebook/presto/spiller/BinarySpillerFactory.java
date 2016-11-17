@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
+import java.util.function.Supplier;
 
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static java.util.Objects.requireNonNull;
@@ -66,8 +67,8 @@ public class BinarySpillerFactory
     }
 
     @Override
-    public Spiller create(List<Type> types, LocalSpillContext localSpillContext)
+    public Spiller create(List<Type> types, Supplier<LocalSpillContext> localSpillContextSupplier)
     {
-        return new BinaryFileSpiller(blockEncodingSerde, executor, spillPath, spillerStats, localSpillContext);
+        return new BinaryFileSpiller(blockEncodingSerde, executor, spillPath, spillerStats, localSpillContextSupplier);
     }
 }
