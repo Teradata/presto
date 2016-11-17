@@ -4,29 +4,29 @@ Partitioned and Replicated Joins
 
 Background
 ----------
-Presto can perform two types of distributed joins: partitioned and replicated.
+Presto can perform two types of distributed joins: repartitioned and replicated. In a repartitioned join, both inputs to a join get hash partitioned
+across the nodes of the cluster. In a replicated join, one of the inputs is distributed to all of the nodes on the cluster that have data from the
+other input.
 
-In a partitioned join, both inputs to a join get hash partitioned across the nodes of the cluster. This distribution type is good for larger inputs,
-as it requires less memory on each node. However, it can be much slower than replicated joins because it can require more data to be transferred
-over the network.
+Repartitioned joins are good for larger inputs, as they need less memory on each node and allow Presto to handle larger joins overall. However,
+they can be much slower than replicated joins because they typically require more data to be transferred over the network.
 
-In a replicated join, the input on the right side is distributed to all of the nodes on the cluster containing data from the input on the left.
-This can be much faster than partitioned joins if the right input is small enough (especially if it is much smaller than the left input),
-but if it is too large, the query can run out of memory.
+Replicated joins can be much faster than repartitioned joins if the replicated table is small enough (especially if it is much smaller than the other input).
+But, if the replicated input is too large, the query can run out of memory.
 
 Optimizer 
 ---------
-The choice between replicated and partitioned joins is controlled by the property ``join-distribution-type``. Its possible values are
+The choice between replicated and repartitioned joins is controlled by the property ``join-distribution-type``. Its possible values are
 ``partitioned``, ``replicated``, and ``automatic``. The default value is ``partitioned``. The property can also be set per session using
-the session property ``join_distribution_type``
+the session property ``join_distribution_type``.
 
-.. note:: The choice between partitioned and replicated joins was previously controlled by the ``distributed-joins-enabled`` property, which defaulted to ``true``,
-    meaning partitioned. That property is now deprecated. For compatibility with legacy configurations, we still look at ``distributed-joins-enabled`` if
-    ``join-distribution-type`` is set to the default value of ``partitioned``. In that case, if ``distributed-joins-enabled`` is ``false``, we will perform a
-    replicated join.
+.. code-block:: sql
+
+    SET SESSION join_distribution_type = automatic;
 
 When ``join-distribution-type`` is set to ``partitioned``, partitioned distribution is used. When it is set to ``replicated``, replicated distribution is used.
+In ``replicated`` mode, it is always the right input to the join that gets replicated.
 
-When the property is set to ``automatic``, the optimizer will choose which type of join to use based on the size of the join inputs. If the size of either input input
-is less than 10% of ``query.max-memory-per-node``, Presto will perform a replicate the smaller of the two tables. If neither input is small enough or there is
-insufficient information to determine their size, a partitioned join is performed.
+When the property is set to ``automatic``, the optimizer will choose which type of join to use based on the size of the join inputs. If the size of either
+input to the join is less than 10% of ``query.max-memory-per-node``, Presto will replicate the smaller of the inputs. If neither input is small enough
+or there is insufficient information to determine their size, a repartitioned join is performed.
