@@ -15,11 +15,11 @@
 package com.facebook.presto.spiller;
 
 import com.facebook.presto.spi.type.Type;
-import org.weakref.jmx.Managed;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 public interface SpillerFactory
 {
-    Spiller create(List<Type> types, LocalSpillContext localSpillContext);
+    Spiller create(List<Type> types, Supplier<LocalSpillContext> localSpillContextSupplier);
 }

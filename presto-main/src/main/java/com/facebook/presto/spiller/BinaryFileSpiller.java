@@ -39,6 +39,7 @@ import java.nio.file.Paths;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -68,12 +69,12 @@ public class BinaryFileSpiller
             ListeningExecutorService executor,
             Path spillPath,
             SpillerStats spillerStats,
-            LocalSpillContext localSpillContext)
+            Supplier<LocalSpillContext> localSpillContextSupplier)
     {
         this.blockEncodingSerde = requireNonNull(blockEncodingSerde, "blockEncodingSerde is null");
         this.executor = requireNonNull(executor, "executor is null");
         this.spillerStats = requireNonNull(spillerStats, "spillerStats is null");
-        this.localSpillContext = localSpillContext;
+        this.localSpillContext = localSpillContextSupplier.get();
         try {
             this.targetDirectory = Files.createTempDirectory(spillPath, "presto-spill");
         }
