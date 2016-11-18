@@ -679,25 +679,9 @@ public class ThriftHiveMetastore
                     .stopOnIllegalExceptions()
                     .run("grantTablePrivileges", stats.getGrantTablePrivileges().wrap(() -> {
                         try (HiveMetastoreClient metastoreClient = clientProvider.createMetastoreClient()) {
-                            PrincipalType principalType;
-
-                            if (metastoreClient.getRoleNames().contains(grantee)) {
-                                principalType = ROLE;
-                            }
-                            else {
-                                principalType = USER;
-                            }
-
-                            ImmutableList.Builder<HiveObjectPrivilege> privilegeBagBuilder = ImmutableList.builder();
-                            for (PrivilegeGrantInfo privilegeGrantInfo : privilegesToGrant) {
-                                privilegeBagBuilder.add(
-                                        new HiveObjectPrivilege(new HiveObjectRef(HiveObjectType.TABLE, databaseName, tableName, null, null),
-                                                grantee,
-                                                principalType,
-                                                privilegeGrantInfo));
-                            }
-                            // TODO: Check whether the user/role exists in the hive metastore.
-                            metastoreClient.grantPrivileges(new PrivilegeBag(privilegeBagBuilder.build()));
+                            metastoreClient.grantPrivileges(
+                                    buildPrivilegeBag(metastoreClient, databaseName, tableName, grantee, privilegesToGrant)
+                            );
                         }
                         return null;
                     }));
@@ -732,26 +716,9 @@ public class ThriftHiveMetastore
                     .stopOnIllegalExceptions()
                     .run("revokeTablePrivileges", stats.getRevokeTablePrivileges().wrap(() -> {
                         try (HiveMetastoreClient metastoreClient = clientProvider.createMetastoreClient()) {
-                            PrincipalType principalType;
-
-                            if (metastoreClient.getRoleNames().contains(grantee)) {
-                                principalType = ROLE;
-                            }
-                            else {
-                                principalType = USER;
-                            }
-
-                            ImmutableList.Builder<HiveObjectPrivilege> privilegeBagBuilder = ImmutableList.builder();
-                            for (PrivilegeGrantInfo privilegeGrantInfo : privilegesToRevoke) {
-                                privilegeBagBuilder.add(
-                                        new HiveObjectPrivilege(
-                                                new HiveObjectRef(HiveObjectType.TABLE, databaseName, tableName, null, null),
-                                                grantee,
-                                                principalType,
-                                                privilegeGrantInfo));
-                            }
-                            // TODO: Check whether the user/role exists in the hive metastore.
-                            metastoreClient.revokePrivileges(new PrivilegeBag(privilegeBagBuilder.build()));
+                            metastoreClient.revokePrivileges(
+                                    buildPrivilegeBag(metastoreClient, databaseName, tableName, grantee, privilegesToRevoke)
+                            );
                         }
                         return null;
                     }));
@@ -764,6 +731,41 @@ public class ThriftHiveMetastore
                 Thread.currentThread().interrupt();
             }
             throw Throwables.propagate(e);
+        }
+    }
+
+    private PrivilegeBag buildPrivilegeBag(HiveMetastoreClient metastoreClient,
+                                                     String databaseName,
+                                                     String tableName,
+                                                     String grantee,
+                                                     Set<PrivilegeGrantInfo> privilegeGrantInfos)
+    {
+        PrincipalType principalType;
+        String principalName;
+
+        try {
+            if (metastoreClient.getRoleNames().contains(grantee.toLowerCase())) {
+                principalType = ROLE;
+                principalName = grantee.toLowerCase(); // Hive metastore API requires role names to be in lowercase.
+            }
+            else {
+                principalType = USER;
+                principalName = grantee;
+            }
+
+            ImmutableList.Builder<HiveObjectPrivilege> privilegeBagBuilder = ImmutableList.builder();
+            for (PrivilegeGrantInfo privilegeGrantInfo : privilegeGrantInfos) {
+                privilegeBagBuilder.add(
+                        new HiveObjectPrivilege(
+                                new HiveObjectRef(HiveObjectType.TABLE, databaseName, tableName, null, null),
+                                principalName,
+                                principalType,
+                                privilegeGrantInfo));
+            }
+            return new PrivilegeBag(privilegeBagBuilder.build());
+        }
+        catch (TException e) {
+            throw new PrestoException(HIVE_METASTORE_ERROR, e);
         }
     }
 
