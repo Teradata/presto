@@ -110,6 +110,17 @@ public class TestGrantRevoke
         assertThat(bobExecutor.executeQuery(format("SHOW GRANTS ON %s", tableName))).hasNoRows();
     }
 
+    @Test(groups = {HIVE_CONNECTOR, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
+    public void testPublic()
+    {
+        aliceExecutor.executeQuery(format("GRANT SELECT ON %s TO PUBLIC", tableName));
+        assertThat(bobExecutor.executeQuery(format("SELECT * FROM %s", tableName))).hasNoRows();
+        aliceExecutor.executeQuery(format("REVOKE SELECT ON %s FROM PUBLIC", tableName));
+        assertThat(() -> bobExecutor.executeQuery(format("SELECT * FROM %s", tableName))).
+                failsWithMessage(format("Access Denied: Cannot select from table default.%s", tableName));
+        assertThat(aliceExecutor.executeQuery(format("SELECT * FROM %s", tableName))).hasNoRows();
+    }
+
     private static void assertAccessDeniedOnAllOperationsOnTable(QueryExecutor queryExecutor, String tableName)
     {
         assertThat(() -> queryExecutor.executeQuery(format("SELECT * FROM %s", tableName))).
@@ -119,6 +130,4 @@ public class TestGrantRevoke
         assertThat(() -> queryExecutor.executeQuery(format("DELETE FROM %s WHERE day=3", tableName))).
                 failsWithMessage(format("Access Denied: Cannot delete from table default.%s", tableName));
     }
-
-    //TODO: test PUBLIC: This will require adding users such as alice and bob to the hive metastore
 }
