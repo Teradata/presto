@@ -14,12 +14,22 @@
 
 package com.facebook.presto.spiller;
 
-import com.facebook.presto.spi.type.Type;
+import org.weakref.jmx.Managed;
 
-import java.util.List;
-import java.util.function.Supplier;
+import java.util.concurrent.atomic.AtomicLong;
 
-public interface SpillerFactory
+public class SpillerStats
 {
-    Spiller create(List<Type> types, Supplier<LocalSpillContext> localSpillContextSupplier);
+    protected final AtomicLong totalSpilledBytes = new AtomicLong();
+
+    @Managed
+    public long getTotalSpilledBytes()
+    {
+        return totalSpilledBytes.get();
+    }
+
+    public void addToTotalSpilledBytes(long delta)
+    {
+        totalSpilledBytes.addAndGet(delta);
+    }
 }

@@ -11,15 +11,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package com.facebook.presto.operator;
 
-package com.facebook.presto.spiller;
+import com.facebook.presto.spiller.LocalSpillContext;
 
-import com.facebook.presto.spi.type.Type;
-
-import java.util.List;
-import java.util.function.Supplier;
-
-public interface SpillerFactory
+public abstract class AbstractOperatorSpillContext
 {
-    Spiller create(List<Type> types, Supplier<LocalSpillContext> localSpillContextSupplier);
+    public abstract void updateBytes(long bytes);
+
+    public LocalSpillContext newLocalSpillContext()
+    {
+        return new LocalSpillContext(this);
+    }
 }

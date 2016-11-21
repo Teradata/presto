@@ -25,9 +25,9 @@ import com.facebook.presto.spi.block.BlockBuilderStatus;
 import com.facebook.presto.spi.block.PageBuilderStatus;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spiller.LocalSpillContext;
 import com.facebook.presto.spiller.Spiller;
 import com.facebook.presto.spiller.SpillerFactory;
-import com.facebook.presto.spiller.SpillerFactoryWithStats;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Step;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.facebook.presto.testing.MaterializedResult;
@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 
 import static com.facebook.presto.RowPagesBuilder.rowPagesBuilder;
 import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
@@ -537,10 +538,10 @@ public class TestHashAggregationOperator
     }
 
     private static class DummySpillerFactory
-            extends SpillerFactoryWithStats
+            implements SpillerFactory
     {
         @Override
-        public Spiller create(List<Type> types)
+        public Spiller create(List<Type> types, Supplier<LocalSpillContext> localSpillContextSupplier)
         {
             return new Spiller()
             {
@@ -568,10 +569,10 @@ public class TestHashAggregationOperator
     }
 
     private static class FailingSpillerFactory
-            extends SpillerFactoryWithStats
+            implements SpillerFactory
     {
         @Override
-        public Spiller create(List<Type> types)
+        public Spiller create(List<Type> types, Supplier<LocalSpillContext> localSpillContextSupplier)
         {
             return new Spiller() {
                 @Override
