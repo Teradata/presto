@@ -17,13 +17,12 @@ import com.facebook.presto.Session;
 import com.facebook.presto.spi.block.SortOrder;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.planner.Plan;
-import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.assertions.ExpectedWindowNodeSpecification;
 import com.facebook.presto.sql.planner.assertions.PlanAssert;
 import com.facebook.presto.sql.planner.assertions.PlanMatchPattern;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.WindowNode;
 import com.facebook.presto.sql.tree.FrameBound;
-import com.facebook.presto.sql.tree.SymbolReference;
 import com.facebook.presto.sql.tree.WindowFrame;
 import com.facebook.presto.testing.LocalQueryRunner;
 import com.facebook.presto.tpch.TpchConnectorFactory;
@@ -33,17 +32,15 @@ import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
-import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.any;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.anyNot;
-import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.anySymbolReference;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.functionCall;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.join;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.project;
-import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.symbolReferenceStem;
-import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.symbolStem;
+import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.tableScan;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.window;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 
@@ -51,20 +48,35 @@ public class TestMergeWindows
 {
     private final LocalQueryRunner queryRunner;
 
-    private final Symbol suppkey;
-    private final Symbol orderkey;
-    private final Symbol shipdate;
-    private final Symbol quantity;
+    private final String quantitySymbolAlias = "Q";
+    private final String discountSymbolAlias = "D";
+    private final String extendedSymbolAlias = "E";
+    private final String suppkeySymbolAlias = "SK";
+    private final String shipdateSymbolAlias = "SD";
+    private final String orderkeySymbolAlias = "O";
 
-    private final SymbolReference quantityReference;
-    private final SymbolReference discountReference;
-    private final SymbolReference extendedpriceReference;
+    private final PlanMatchPattern tableScanFromLineitem = tableScan("lineitem")
+            .withSymbol("quantity", quantitySymbolAlias)
+            .withSymbol("discount", discountSymbolAlias)
+            .withSymbol("suppkey", suppkeySymbolAlias)
+            .withSymbol("orderkey", orderkeySymbolAlias);
 
-    private final Optional<WindowFrame> commonFrame;
-    private final Optional<WindowFrame> defaultFrame;
+    private final Optional<WindowFrame> rowsUnboundedPrecedingCurrentRowFrame = Optional.of(new WindowFrame(
+            WindowFrame.Type.ROWS,
+            new FrameBound(FrameBound.Type.UNBOUNDED_PRECEDING),
+            Optional.of(new FrameBound(FrameBound.Type.CURRENT_ROW))));
 
-    private final WindowNode.Specification specificationA;
-    private final WindowNode.Specification specificationB;
+    private final Optional<WindowFrame> noFrame = Optional.empty();
+
+    private final ExpectedWindowNodeSpecification partitionBySuppkeyOrderByOrderkey = windowSpecification(
+            ImmutableList.of(suppkeySymbolAlias),
+            ImmutableList.of(orderkeySymbolAlias),
+            ImmutableMap.of(orderkeySymbolAlias, SortOrder.ASC_NULLS_LAST));
+
+    private final ExpectedWindowNodeSpecification partitionByOrderkeyOrderByShipdate = windowSpecification(
+            ImmutableList.of(orderkeySymbolAlias),
+            ImmutableList.of(shipdateSymbolAlias),
+            ImmutableMap.of(shipdateSymbolAlias, SortOrder.ASC_NULLS_LAST));
 
     public TestMergeWindows()
     {
@@ -75,39 +87,13 @@ public class TestMergeWindows
 
         queryRunner.createCatalog(queryRunner.getDefaultSession().getCatalog().get(),
                 new TpchConnectorFactory(1),
-                ImmutableMap.<String, String>of());
-
-        commonFrame = Optional.of(new WindowFrame(
-                WindowFrame.Type.ROWS,
-                new FrameBound(FrameBound.Type.UNBOUNDED_PRECEDING),
-                Optional.of(new FrameBound(FrameBound.Type.CURRENT_ROW))));
-
-        defaultFrame = Optional.empty();
-
-        suppkey = new Symbol("suppkey");
-        orderkey = new Symbol("orderkey");
-        shipdate = new Symbol("shipdate");
-        quantity = new Symbol("quantity");
-
-        quantityReference = new SymbolReference("quantity");
-        discountReference = new SymbolReference("discount");
-        extendedpriceReference = new SymbolReference("extendedprice");
-
-        specificationA = new WindowNode.Specification(
-                ImmutableList.of(suppkey),
-                ImmutableList.of(orderkey),
-                ImmutableMap.of(orderkey, SortOrder.ASC_NULLS_LAST));
-
-        specificationB = new WindowNode.Specification(
-                ImmutableList.of(orderkey),
-                ImmutableList.of(shipdate),
-                ImmutableMap.of(shipdate, SortOrder.ASC_NULLS_LAST));
+                ImmutableMap.of());
     }
 
     /**
      * There are two types of tests in here, and they answer two different
      * questions about MergeWindows (MW):
-     *
+     * <p>
      * 1) Is MW working as it's supposed to be? The tests running the minimal
      * set of optimizers can tell us this.
      * 2) Has some other optimizer changed the plan in such a way that MW no
@@ -115,7 +101,7 @@ public class TestMergeWindows
      * that MW sees cannot be optimized by MW? The test running the full set
      * of optimizers answers this, though it isn't actually meaningful unless
      * we know the answer to question 1 is "yes".
-     *
+     * <p>
      * The tests that use only the minimal set of optimizers are closer to true
      * "unit" tests in that they verify the behavior of MW with as few
      * external dependencies as possible. Those dependencies to include the
@@ -125,7 +111,7 @@ public class TestMergeWindows
      * 1) The tests are more self-maintaining.
      * 2) They're a lot easier to read.
      * 3) It's a lot less typing.
-     *
+     * <p>
      * The test that runs with all of the optimzers acts as an integration test
      * and ensures that MW is effective when run with the complete set of
      * optimizers.
@@ -135,22 +121,29 @@ public class TestMergeWindows
     {
         @Language("SQL") String sql = "SELECT " +
                 "SUM(quantity) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_A, " +
-                "SUM(quantity) OVER (PARTITION BY orderkey ORDER BY shipdate ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_B, " +
-                "SUM(discount) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_discount_A " +
+                "AVG(quantity) OVER (PARTITION BY orderkey ORDER BY shipdate ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_B, " +
+                "MIN(discount) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_discount_A " +
                 "FROM lineitem";
 
         PlanMatchPattern pattern =
                 anyTree(
-                        window(specificationA,
+                        window(
+                                partitionBySuppkeyOrderByOrderkey,
                                 ImmutableList.of(
-                                functionCall("sum", commonFrame, quantityReference),
-                                functionCall("sum", commonFrame, discountReference)),
+                                        functionCall("SUM", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias),
+                                        functionCall("MIN", rowsUnboundedPrecedingCurrentRowFrame, discountSymbolAlias)),
                                 anyTree(
-                                        window(specificationB,
+                                        window(
+                                                partitionByOrderkeyOrderByShipdate,
                                                 ImmutableList.of(
-                                                functionCall("sum", commonFrame, quantityReference)),
+                                                        functionCall("AVG", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias)),
                                                 anyNot(WindowNode.class,
-                                                        anyTree())))));
+                                                                tableScan("lineitem")
+                                                                        .withSymbol("quantity", quantitySymbolAlias)
+                                                                        .withSymbol("discount", discountSymbolAlias)
+                                                                        .withSymbol("suppkey", suppkeySymbolAlias)
+                                                                        .withSymbol("orderkey", orderkeySymbolAlias)
+                                                                        .withSymbol("shipdate", shipdateSymbolAlias))))));
 
         Plan actualPlan = queryRunner.inTransaction(transactionSession -> queryRunner.createPlan(transactionSession, sql));
         queryRunner.inTransaction(transactionSession -> {
@@ -164,20 +157,22 @@ public class TestMergeWindows
     {
         @Language("SQL") String sql = "SELECT " +
                 "SUM(quantity) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_A, " +
-                "SUM(quantity) OVER (PARTITION BY orderkey ORDER BY shipdate ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_B, " +
-                "SUM(discount) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_discount_A " +
+                "AVG(quantity) OVER (PARTITION BY orderkey ORDER BY shipdate ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_B, " +
+                "MAX(discount) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_discount_A " +
                 "FROM lineitem";
 
         assertUnitPlan(sql,
                 anyTree(
-                        window(specificationB,
+                        window(
+                                partitionByOrderkeyOrderByShipdate,
                                 ImmutableList.of(
-                                functionCall("sum", commonFrame, quantityReference)),
-                                window(specificationA,
+                                        functionCall("AVG", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias)),
+                                window(
+                                        partitionBySuppkeyOrderByOrderkey,
                                         ImmutableList.of(
-                                        functionCall("sum", commonFrame, quantityReference),
-                                        functionCall("sum", commonFrame, discountReference)),
-                                        anyNot(WindowNode.class)))));
+                                                functionCall("SUM", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias),
+                                                functionCall("MAX", rowsUnboundedPrecedingCurrentRowFrame, discountSymbolAlias)),
+                                        tableScanFromLineitem))));
     }
 
     @Test
@@ -191,15 +186,18 @@ public class TestMergeWindows
 
         assertUnitPlan(sql,
                 anyTree(
-                        window(specificationA,
-                                ImmutableList.of(functionCall("sum", commonFrame, discountReference)),
-                                window(specificationB,
-                                        ImmutableList.of(functionCall("lag", commonFrame, quantityReference, anySymbolReference(), anySymbolReference())),
+                        window(
+                                partitionBySuppkeyOrderByOrderkey,
+                                ImmutableList.of(functionCall("sum", rowsUnboundedPrecedingCurrentRowFrame, discountSymbolAlias)),
+                                window(
+                                        partitionByOrderkeyOrderByShipdate,
+                                        ImmutableList.of(functionCall("lag", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias, "ANY_1", "ANY_2")),
                                         project(
-                                                window(specificationA,
+                                                window(
+                                                        partitionBySuppkeyOrderByOrderkey,
                                                         ImmutableList.of(
-                                                        functionCall("sum", commonFrame, quantityReference)),
-                                                        any()))))));
+                                                                functionCall("sum", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias)),
+                                                        tableScanFromLineitem))))));
     }
 
     @Test
@@ -213,46 +211,54 @@ public class TestMergeWindows
 
         assertUnitPlan(sql,
                 anyTree(
-                        window(specificationA,
+                        window(
+                                partitionBySuppkeyOrderByOrderkey,
                                 ImmutableList.of(
-                                functionCall("sum", commonFrame, discountReference),
-                                functionCall("lag", commonFrame, quantityReference, anySymbolReference(), anySymbolReference())),
+                                        functionCall("sum", rowsUnboundedPrecedingCurrentRowFrame, discountSymbolAlias),
+                                        functionCall("lag", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias, "ANY_1", "ANY_2")),
                                 project(
-                                        window(specificationA,
+                                        window(
+                                                partitionBySuppkeyOrderByOrderkey,
                                                 ImmutableList.of(
-                                                functionCall("sum", commonFrame, quantityReference)),
-                                                any())))));
+                                                        functionCall("sum", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias)),
+                                                tableScanFromLineitem)))));
     }
 
     @Test
     public void testIdenticalWindowSpecificationsDefaultFrame()
     {
-        WindowNode.Specification specificationC = new WindowNode.Specification(
-                ImmutableList.of(suppkey),
-                ImmutableList.of(orderkey),
-                ImmutableMap.of(orderkey, SortOrder.ASC_NULLS_LAST));
+        ExpectedWindowNodeSpecification partitionBySuppkeyOrderByOrderkey = windowSpecification(
+                ImmutableList.of(suppkeySymbolAlias),
+                ImmutableList.of(orderkeySymbolAlias),
+                ImmutableMap.of(orderkeySymbolAlias, SortOrder.ASC_NULLS_LAST));
 
-        WindowNode.Specification specificationD = new WindowNode.Specification(
-                ImmutableList.of(orderkey),
-                ImmutableList.of(shipdate),
-                ImmutableMap.of(shipdate, SortOrder.ASC_NULLS_LAST));
+        ExpectedWindowNodeSpecification partitionByOrderkeyOrderByShipdate = windowSpecification(
+                ImmutableList.of(orderkeySymbolAlias),
+                ImmutableList.of(shipdateSymbolAlias),
+                ImmutableMap.of(shipdateSymbolAlias, SortOrder.ASC_NULLS_LAST));
 
         @Language("SQL") String sql = "SELECT " +
-                "SUM(quantity) OVER (PARTITION By suppkey ORDER BY orderkey), " +
+                "AVG(quantity) OVER (PARTITION By suppkey ORDER BY orderkey), " +
                 "SUM(quantity) OVER (PARTITION BY orderkey ORDER BY shipdate), " +
-                "SUM(discount) OVER (PARTITION BY suppkey ORDER BY orderkey) " +
+                "MIN(discount) OVER (PARTITION BY suppkey ORDER BY orderkey) " +
                 "FROM lineitem";
 
         assertUnitPlan(sql,
                 anyTree(
-                        window(specificationD,
+                        window(
+                                partitionByOrderkeyOrderByShipdate,
                                 ImmutableList.of(
-                                functionCall("sum", defaultFrame, quantityReference)),
-                                window(specificationC,
+                                        functionCall("sum", noFrame, quantitySymbolAlias)),
+                                window(partitionBySuppkeyOrderByOrderkey,
                                         ImmutableList.of(
-                                        functionCall("sum", defaultFrame, quantityReference),
-                                        functionCall("sum", defaultFrame, discountReference)),
-                                        anyNot(WindowNode.class)))));
+                                                functionCall("avg", noFrame, quantitySymbolAlias),
+                                                functionCall("min", noFrame, discountSymbolAlias)),
+                                        tableScanFromLineitem))));
+    }
+
+    private static ExpectedWindowNodeSpecification windowSpecification(List<String> partitionByAliases, List<String> orderByAliases, Map<String, SortOrder> orderings)
+    {
+        return new ExpectedWindowNodeSpecification(partitionByAliases, orderByAliases, orderings);
     }
 
     @Test
@@ -263,10 +269,10 @@ public class TestMergeWindows
                 new FrameBound(FrameBound.Type.UNBOUNDED_PRECEDING),
                 Optional.of(new FrameBound(FrameBound.Type.CURRENT_ROW))));
 
-        WindowNode.Specification specificationC = new WindowNode.Specification(
-                ImmutableList.of(suppkey),
-                ImmutableList.of(orderkey),
-                ImmutableMap.of(orderkey, SortOrder.ASC_NULLS_LAST));
+        ExpectedWindowNodeSpecification partitionBySuppkeyOrderByOrderkey = windowSpecification(
+                ImmutableList.of(suppkeySymbolAlias),
+                ImmutableList.of(orderkeySymbolAlias),
+                ImmutableMap.of(orderkeySymbolAlias, SortOrder.ASC_NULLS_LAST));
 
         Optional<WindowFrame> frameD = Optional.of(new WindowFrame(
                 WindowFrame.Type.ROWS,
@@ -276,46 +282,48 @@ public class TestMergeWindows
         @Language("SQL") String sql = "SELECT " +
                 "SUM(quantity) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_C, " +
                 "AVG(quantity) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) avg_quantity_D, " +
-                "SUM(discount) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_discount_C " +
+                "MIN(discount) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_discount_C " +
                 "FROM lineitem";
 
         assertUnitPlan(sql,
                 anyTree(
-                        window(specificationC,
+                        window(
+                                partitionBySuppkeyOrderByOrderkey,
                                 ImmutableList.of(
-                                functionCall("avg", frameD, quantityReference),
-                                functionCall("sum", frameC, discountReference),
-                                functionCall("sum", frameC, quantityReference)),
-                                any())));
+                                        functionCall("AVG", frameD, quantitySymbolAlias),
+                                        functionCall("MIN", frameC, discountSymbolAlias),
+                                        functionCall("SUM", frameC, quantitySymbolAlias)),
+                                tableScanFromLineitem)));
     }
 
     @Test
     public void testMergeDifferentFramesWithDefault()
     {
-        Optional<WindowFrame> frameD = Optional.of(new WindowFrame(
+        Optional<WindowFrame> rowsCurrentRowUnboundedFollowingFrame = Optional.of(new WindowFrame(
                 WindowFrame.Type.ROWS,
                 new FrameBound(FrameBound.Type.CURRENT_ROW),
                 Optional.of(new FrameBound(FrameBound.Type.UNBOUNDED_FOLLOWING))));
 
-        WindowNode.Specification specificationD = new WindowNode.Specification(
-                ImmutableList.of(suppkey),
-                ImmutableList.of(orderkey),
-                ImmutableMap.of(orderkey, SortOrder.ASC_NULLS_LAST));
+        ExpectedWindowNodeSpecification partitionBySuppkeyOrderByOrderkey = windowSpecification(
+                ImmutableList.of(suppkeySymbolAlias),
+                ImmutableList.of(orderkeySymbolAlias),
+                ImmutableMap.of(orderkeySymbolAlias, SortOrder.ASC_NULLS_LAST));
 
         @Language("SQL") String sql = "SELECT " +
                 "SUM(quantity) OVER (PARTITION BY suppkey ORDER BY orderkey) sum_quantity_C, " +
                 "AVG(quantity) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING) avg_quantity_D, " +
-                "SUM(discount) OVER (PARTITION BY suppkey ORDER BY orderkey) sum_discount_C " +
+                "MIN(discount) OVER (PARTITION BY suppkey ORDER BY orderkey) sum_discount_C " +
                 "FROM lineitem";
 
         assertUnitPlan(sql,
                 anyTree(
-                        window(specificationD,
+                        window(
+                                partitionBySuppkeyOrderByOrderkey,
                                 ImmutableList.of(
-                                functionCall("avg", frameD, quantityReference),
-                                functionCall("sum", defaultFrame, discountReference),
-                                functionCall("sum", defaultFrame, quantityReference)),
-                                any())));
+                                        functionCall("AVG", rowsCurrentRowUnboundedFollowingFrame, quantitySymbolAlias),
+                                        functionCall("MIN", noFrame, discountSymbolAlias),
+                                        functionCall("SUM", noFrame, quantitySymbolAlias)),
+                                tableScanFromLineitem)));
     }
 
     @Test
@@ -335,46 +343,72 @@ public class TestMergeWindows
                 ")" +
                 "SELECT * FROM foo, bar WHERE foo.a = bar.b";
 
-        Symbol orderkeyC = symbolStem("orderkey");
-        Symbol quantityC = symbolStem("quantity");
-        Symbol shipdateC = symbolStem("shipdate");
+        ExpectedWindowNodeSpecification partitionByOrderkeyOrderByShipdateQuantity = windowSpecification(
+                ImmutableList.of(orderkeySymbolAlias),
+                ImmutableList.of(shipdateSymbolAlias, quantitySymbolAlias),
+                ImmutableMap.of(
+                        shipdateSymbolAlias, SortOrder.ASC_NULLS_LAST,
+                        quantitySymbolAlias, SortOrder.DESC_NULLS_LAST));
 
-        WindowNode.Specification specificationC = new WindowNode.Specification(
-                ImmutableList.of(orderkeyC),
-                ImmutableList.of(shipdateC, quantityC),
-                ImmutableMap.of(shipdateC, SortOrder.ASC_NULLS_LAST, quantityC, SortOrder.DESC_NULLS_LAST));
+        ExpectedWindowNodeSpecification partitionByOrderkeyOrderByShipdate2Quantity2 = windowSpecification(
+                ImmutableList.of("O2"),
+                ImmutableList.of("SD2", "Q2"),
+                ImmutableMap.of(
+                        "SD2", SortOrder.ASC_NULLS_LAST,
+                        "Q2", SortOrder.DESC_NULLS_LAST));
 
         assertUnitPlan(sql,
                 anyTree(
                         join(JoinNode.Type.INNER, ImmutableList.of(),
-                                any(
-                                        window(specificationC, ImmutableList.of(functionCall("sum", commonFrame, symbolReferenceStem("discount"))),
-                                                anyTree())),
-                                any(
-                                        window(specificationC, ImmutableList.of(functionCall("avg", commonFrame, symbolReferenceStem("quantity"))),
-                                                anyTree())))));
+                                project(
+                                        window(
+                                                partitionByOrderkeyOrderByShipdateQuantity,
+                                                ImmutableList.of(functionCall("SUM", rowsUnboundedPrecedingCurrentRowFrame, discountSymbolAlias)),
+                                                anyNot(WindowNode.class,
+                                                        tableScan("lineitem")
+                                                                .withSymbol("quantity", quantitySymbolAlias)
+                                                                .withSymbol("discount", discountSymbolAlias)
+                                                                .withSymbol("suppkey", suppkeySymbolAlias)
+                                                                .withSymbol("orderkey", orderkeySymbolAlias)
+                                                                .withSymbol("shipdate", shipdateSymbolAlias)))),
+                                project(
+                                        window(
+                                                partitionByOrderkeyOrderByShipdate2Quantity2,
+                                                ImmutableList.of(functionCall("AVG", rowsUnboundedPrecedingCurrentRowFrame, "Q2")),
+                                                anyNot(WindowNode.class,
+                                                        tableScan("lineitem")
+                                                                .withSymbol("quantity", "Q2")
+                                                                .withSymbol("shipdate", "SD2")
+                                                                .withSymbol("orderkey", "O2")))))));
     }
 
     @Test
     public void testNotMergeDifferentPartition()
     {
         @Language("SQL") String sql = "SELECT " +
-                "SUM(extendedprice) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_extendedprice_A, " +
-                "SUM(quantity) over (PARTITION BY quantity ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_C " +
+                "MAX(extendedprice) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_extendedprice_A, " +
+                "MIN(quantity) over (PARTITION BY quantity ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_C " +
                 "FROM lineitem";
 
-        WindowNode.Specification specificationC = new WindowNode.Specification(
-                ImmutableList.of(quantity),
-                ImmutableList.of(orderkey),
-                ImmutableMap.of(orderkey, SortOrder.ASC_NULLS_LAST));
+        ExpectedWindowNodeSpecification specificationC = windowSpecification(
+                ImmutableList.of(quantitySymbolAlias),
+                ImmutableList.of(orderkeySymbolAlias),
+                ImmutableMap.of(orderkeySymbolAlias, SortOrder.ASC_NULLS_LAST));
 
         assertUnitPlan(sql,
                 anyTree(
-                        window(specificationC, ImmutableList.of(
-                                functionCall("sum", commonFrame, quantityReference)),
-                                window(specificationA, ImmutableList.of(
-                                        functionCall("sum", commonFrame, extendedpriceReference)),
-                                        anyNot(WindowNode.class)))));
+                        window(
+                                specificationC,
+                                ImmutableList.of(
+                                        functionCall("MIN", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias)),
+                                window(
+                                        partitionBySuppkeyOrderByOrderkey,
+                                        ImmutableList.of(
+                                                functionCall("MAX", rowsUnboundedPrecedingCurrentRowFrame, extendedSymbolAlias)),
+                                        tableScan("lineitem")
+                                                .withSymbol("quantity", quantitySymbolAlias)
+                                                .withSymbol("suppkey", suppkeySymbolAlias)
+                                                .withSymbol("orderkey", orderkeySymbolAlias)))));
     }
 
     @Test
@@ -382,21 +416,28 @@ public class TestMergeWindows
     {
         @Language("SQL") String sql = "SELECT " +
                 "SUM(extendedprice) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_extendedprice_A, " +
-                "SUM(quantity) OVER (PARTITION BY suppkey ORDER BY quantity ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_C " +
+                "MAX(quantity) OVER (PARTITION BY suppkey ORDER BY quantity ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_C " +
                 "FROM lineitem";
 
-        WindowNode.Specification specificationC = new WindowNode.Specification(
-                ImmutableList.of(suppkey),
-                ImmutableList.of(quantity),
-                ImmutableMap.of(quantity, SortOrder.ASC_NULLS_LAST));
+        ExpectedWindowNodeSpecification specificationC = windowSpecification(
+                ImmutableList.of(suppkeySymbolAlias),
+                ImmutableList.of(quantitySymbolAlias),
+                ImmutableMap.of(quantitySymbolAlias, SortOrder.ASC_NULLS_LAST));
 
         assertUnitPlan(sql,
                 anyTree(
-                        window(specificationC, ImmutableList.of(
-                                functionCall("sum", commonFrame, quantityReference)),
-                                window(specificationA, ImmutableList.of(
-                                        functionCall("sum", commonFrame, extendedpriceReference)),
-                                        anyNot(WindowNode.class)))));
+                        window(
+                                specificationC,
+                                ImmutableList.of(
+                                        functionCall("MAX", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias)),
+                                window(
+                                        partitionBySuppkeyOrderByOrderkey,
+                                        ImmutableList.of(
+                                                functionCall("SUM", rowsUnboundedPrecedingCurrentRowFrame, extendedSymbolAlias)),
+                                        tableScan("lineitem")
+                                                .withSymbol("quantity", quantitySymbolAlias)
+                                                .withSymbol("suppkey", suppkeySymbolAlias)
+                                                .withSymbol("orderkey", orderkeySymbolAlias)))));
     }
 
     @Test
@@ -404,47 +445,55 @@ public class TestMergeWindows
     {
         @Language("SQL") String sql = "SELECT " +
                 "SUM(extendedprice) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_extendedprice_A, " +
-                "SUM(quantity) over (PARTITION BY suppkey ORDER BY orderkey DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_C, " +
-                "SUM(discount) over (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_discount_A " +
+                "MAX(quantity) over (PARTITION BY suppkey ORDER BY orderkey DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_C, " +
+                "MIN(discount) over (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_discount_A " +
                 "FROM lineitem";
 
-        WindowNode.Specification specificationC = new WindowNode.Specification(
-                ImmutableList.of(suppkey),
-                ImmutableList.of(orderkey),
-                ImmutableMap.of(orderkey, SortOrder.DESC_NULLS_LAST));
+        ExpectedWindowNodeSpecification specificationC = windowSpecification(
+                ImmutableList.of(suppkeySymbolAlias),
+                ImmutableList.of(orderkeySymbolAlias),
+                ImmutableMap.of(orderkeySymbolAlias, SortOrder.DESC_NULLS_LAST));
 
         assertUnitPlan(sql,
                 anyTree(
-                        window(specificationC, ImmutableList.of(
-                                functionCall("sum", commonFrame, quantityReference)),
-                                window(specificationA, ImmutableList.of(
-                                        functionCall("sum", commonFrame, extendedpriceReference),
-                                        functionCall("sum", commonFrame, discountReference)),
-                                        anyNot(WindowNode.class)))));
+                        window(
+                                specificationC,
+                                ImmutableList.of(
+                                        functionCall("MAX", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias)),
+                                window(
+                                        partitionBySuppkeyOrderByOrderkey,
+                                        ImmutableList.of(
+                                                functionCall("SUM", rowsUnboundedPrecedingCurrentRowFrame, extendedSymbolAlias),
+                                                functionCall("MIN", rowsUnboundedPrecedingCurrentRowFrame, discountSymbolAlias)),
+                                        tableScanFromLineitem))));
     }
 
     @Test
     public void testNotMergeDifferentNullOrdering()
     {
         @Language("SQL") String sql = "SELECT " +
-                "SUM(extendedprice) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_extendedprice_A, " +
+                "AVG(extendedprice) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_extendedprice_A, " +
                 "SUM(quantity) OVER (PARTITION BY suppkey ORDER BY orderkey NULLS FIRST ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_quantity_C, " +
-                "SUM(discount) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_discount_A " +
+                "MIN(discount) OVER (PARTITION BY suppkey ORDER BY orderkey ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum_discount_A " +
                 "FROM lineitem";
 
-        WindowNode.Specification specificationC = new WindowNode.Specification(
-                ImmutableList.of(suppkey),
-                ImmutableList.of(orderkey),
-                ImmutableMap.of(orderkey, SortOrder.ASC_NULLS_FIRST));
+        ExpectedWindowNodeSpecification parititionBySuppkeyOrderByOrderkey = windowSpecification(
+                ImmutableList.of(suppkeySymbolAlias),
+                ImmutableList.of(orderkeySymbolAlias),
+                ImmutableMap.of(orderkeySymbolAlias, SortOrder.ASC_NULLS_FIRST));
 
         assertUnitPlan(sql,
                 anyTree(
-                        window(specificationC, ImmutableList.of(
-                                functionCall("sum", commonFrame, quantityReference)),
-                                window(specificationA, ImmutableList.of(
-                                        functionCall("sum", commonFrame, extendedpriceReference),
-                                        functionCall("sum", commonFrame, discountReference)),
-                                        anyNot(WindowNode.class)))));
+                        window(
+                                parititionBySuppkeyOrderByOrderkey,
+                                ImmutableList.of(
+                                        functionCall("SUM", rowsUnboundedPrecedingCurrentRowFrame, quantitySymbolAlias)),
+                                window(
+                                        partitionBySuppkeyOrderByOrderkey,
+                                        ImmutableList.of(
+                                                functionCall("AVG", rowsUnboundedPrecedingCurrentRowFrame, extendedSymbolAlias),
+                                                functionCall("MIN", rowsUnboundedPrecedingCurrentRowFrame, discountSymbolAlias)),
+                                        tableScanFromLineitem))));
     }
 
     private void assertUnitPlan(@Language("SQL") String sql, PlanMatchPattern pattern)
@@ -463,10 +512,10 @@ public class TestMergeWindows
                 .setDistributedIndexJoinsEnabled(false)
                 .setOptimizeHashGeneration(true);
         List<PlanOptimizer> optimizers = ImmutableList.of(
-                        new UnaliasSymbolReferences(),
-                        new PruneIdentityProjections(),
-                        new MergeWindows(),
-                        new PruneUnreferencedOutputs());
+                new UnaliasSymbolReferences(),
+                new PruneIdentityProjections(),
+                new MergeWindows(),
+                new PruneUnreferencedOutputs());
         return queryRunner.createPlan(transactionSession, sql, featuresConfig, optimizers);
     }
 }

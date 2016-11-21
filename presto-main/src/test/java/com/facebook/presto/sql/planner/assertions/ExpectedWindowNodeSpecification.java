@@ -1,0 +1,71 @@
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.facebook.presto.sql.planner.assertions;
+
+import com.facebook.presto.spi.block.SortOrder;
+import com.google.common.collect.ImmutableList;
+
+import java.util.List;
+import java.util.Map;
+
+import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.util.stream.Collectors.joining;
+
+public class ExpectedWindowNodeSpecification
+{
+    private final List<String> partitionByAliases;
+    private final List<String> orderByAliases;
+    private final Map<String, SortOrder> orderings;
+
+    public ExpectedWindowNodeSpecification(List<String> partitionByAliases, List<String> orderByAliases, Map<String, SortOrder> orderings)
+    {
+        this.partitionByAliases = partitionByAliases;
+        this.orderByAliases = orderByAliases;
+        this.orderings = orderings;
+        checkArgument(orderings.keySet().containsAll(orderByAliases));
+    }
+
+    public List<String> getPartitionByAliases()
+    {
+        return partitionByAliases;
+    }
+
+    public List<String> getOrderByAliases()
+    {
+        return orderByAliases;
+    }
+
+    public Map<String, SortOrder> getOrderings()
+    {
+        return orderings;
+    }
+
+    @Override
+    public String toString()
+    {
+        ImmutableList.Builder<String> toStringParts = ImmutableList.builder();
+        if (!partitionByAliases.isEmpty()) {
+            toStringParts.add("PARTITION BY " + partitionByAliases);
+        }
+        if (!orderings.isEmpty()) {
+            toStringParts.add("ORDER BY " + orderings.entrySet().stream()
+                    .map(entry -> entry.getKey() + " " + entry.getValue())
+                    .collect(toImmutableList())
+                    .toString());
+        }
+        return toStringParts.build().stream().collect(joining(", "));
+    }
+}

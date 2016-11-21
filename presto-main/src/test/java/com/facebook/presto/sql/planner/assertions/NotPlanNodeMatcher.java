@@ -17,7 +17,6 @@ import com.facebook.presto.Session;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 
-import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
 final class NotPlanNodeMatcher implements Matcher
@@ -38,8 +37,6 @@ final class NotPlanNodeMatcher implements Matcher
     @Override
     public String toString()
     {
-        return toStringHelper(this)
-                .add("excludedNodeClass", excludedNodeClass)
-                .toString();
+        return "not " + excludedNodeClass.getSimpleName();
     }
 }
