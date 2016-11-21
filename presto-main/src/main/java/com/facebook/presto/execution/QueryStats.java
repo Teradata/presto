@@ -73,6 +73,8 @@ public class QueryStats
     private final DataSize outputDataSize;
     private final long outputPositions;
 
+    private final DataSize spilledDataSize;
+
     @VisibleForTesting
     public QueryStats()
     {
@@ -108,6 +110,7 @@ public class QueryStats
         this.processedInputPositions = 0;
         this.outputDataSize = null;
         this.outputPositions = 0;
+        this.spilledDataSize = null;
     }
 
     @JsonCreator
@@ -151,7 +154,8 @@ public class QueryStats
             @JsonProperty("processedInputPositions") long processedInputPositions,
 
             @JsonProperty("outputDataSize") DataSize outputDataSize,
-            @JsonProperty("outputPositions") long outputPositions)
+            @JsonProperty("outputPositions") long outputPositions,
+            @JsonProperty("spilledDataSize") DataSize spilledDataSize)
     {
         this.createTime = requireNonNull(createTime, "createTime is null");
         this.executionStartTime = executionStartTime;
@@ -202,6 +206,8 @@ public class QueryStats
         this.outputDataSize = requireNonNull(outputDataSize, "outputDataSize is null");
         checkArgument(outputPositions >= 0, "outputPositions is negative");
         this.outputPositions = outputPositions;
+
+        this.spilledDataSize = spilledDataSize;
     }
 
     @JsonProperty
@@ -404,5 +410,11 @@ public class QueryStats
     public long getOutputPositions()
     {
         return outputPositions;
+    }
+
+    @JsonProperty
+    public DataSize getSpilledDataSize()
+    {
+        return spilledDataSize;
     }
 }

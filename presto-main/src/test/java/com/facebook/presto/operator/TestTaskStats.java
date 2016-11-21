@@ -64,7 +64,8 @@ public class TestTaskStats
             new DataSize(22, BYTE),
             23,
 
-            ImmutableList.of(TestPipelineStats.EXPECTED));
+            ImmutableList.of(TestPipelineStats.EXPECTED),
+            new DataSize(24, BYTE));
 
     @Test
     public void testJson()
@@ -114,5 +115,6 @@ public class TestTaskStats
 
         assertEquals(actual.getPipelines().size(), 1);
         assertExpectedPipelineStats(actual.getPipelines().get(0));
+        assertEquals(actual.getSpilledDataSize(), new DataSize(24, BYTE));
     }
 }

@@ -207,11 +207,13 @@ public class PlanPrinter
         // are collected from the leaf stages.
         Map<PlanNodeId, Long> outputPositions = new HashMap<>();
         Map<PlanNodeId, Long> outputBytes = new HashMap<>();
+        Map<PlanNodeId, Long> spilledBytes = new HashMap<>();
         Map<PlanNodeId, Long> wallMillis = new HashMap<>();
 
         for (PipelineStats pipelineStats : taskStats.getPipelines()) {
             Map<PlanNodeId, Long> pipelineOutputPositions = new HashMap<>();
             Map<PlanNodeId, Long> pipelineOutputBytes = new HashMap<>();
+            Map<PlanNodeId, Long> pipelineSpilledBytes = new HashMap<>();
 
             List<OperatorStats> operatorSummaries = pipelineStats.getOperatorSummaries();
             for (int i = 0; i < operatorSummaries.size(); i++) {
@@ -230,25 +232,27 @@ public class PlanPrinter
                     pipelineOutputPositions.put(planNodeId, operatorStats.getOutputPositions());
                     pipelineOutputBytes.put(planNodeId, operatorStats.getOutputDataSize().toBytes());
                 }
+                pipelineSpilledBytes.put(planNodeId, operatorStats.getSpilledDataSize().toBytes());
             }
 
             for (Map.Entry<PlanNodeId, Long> entry : pipelineOutputPositions.entrySet()) {
                 outputBytes.merge(entry.getKey(), pipelineOutputBytes.get(entry.getKey()), Long::sum);
                 outputPositions.merge(entry.getKey(), entry.getValue(), Long::sum);
+                spilledBytes.merge(entry.getKey(), pipelineSpilledBytes.get(entry.getKey()), Long::sum);
             }
         }
 
         List<PlanNodeStats> stats = new ArrayList<>();
         for (Map.Entry<PlanNodeId, Long> entry : wallMillis.entrySet()) {
             if (outputPositions.containsKey(entry.getKey())) {
-                stats.add(new PlanNodeStats(entry.getKey(), new Duration(entry.getValue(), MILLISECONDS), outputPositions.get(entry.getKey()), succinctDataSize(outputBytes.get(entry.getKey()), BYTE)));
+                stats.add(new PlanNodeStats(entry.getKey(), new Duration(entry.getValue(), MILLISECONDS), succinctBytes(spilledBytes.get(entry.getKey())), outputPositions.get(entry.getKey()), succinctDataSize(outputBytes.get(entry.getKey()), BYTE)));
             }
             else {
                 // It's possible there will be no output stats because all the pipelines that we observed were non-output.
                 // For example in a query like SELECT * FROM a JOIN b ON c = d LIMIT 1
                 // It's possible to observe stats after the build starts, but before the probe does
                 // and therefore only have wall time, but no output stats
-                stats.add(new PlanNodeStats(entry.getKey(), new Duration(entry.getValue(), MILLISECONDS)));
+                stats.add(new PlanNodeStats(entry.getKey(), new Duration(entry.getValue(), MILLISECONDS), succinctBytes(spilledBytes.get(entry.getKey()))));
             }
         }
         return stats;
@@ -273,12 +277,16 @@ public class PlanPrinter
 
         if (stageStats.isPresent()) {
             builder.append(indentString(1))
-                    .append(format("Cost: CPU %s, Input %d (%s), Output %d (%s)\n",
+                    .append(format("Cost: CPU %s, Input %d (%s), Output %d (%s)",
                             stageStats.get().getTotalCpuTime(),
                             stageStats.get().getProcessedInputPositions(),
                             stageStats.get().getProcessedInputDataSize(),
                             stageStats.get().getOutputPositions(),
                             stageStats.get().getOutputDataSize()));
+            if (isNonZero(stageStats.get().getSpilledDataSize())) {
+                builder.append(", Spilled " + stageStats.get().getSpilledDataSize());
+            }
+            builder.append("\n");
         }
 
         PartitioningScheme partitioningScheme = fragment.getPartitioningScheme();
@@ -321,6 +329,11 @@ public class PlanPrinter
         }
 
         return builder.toString();
+    }
+
+    private static boolean isNonZero(DataSize dataSize)
+    {
+        return dataSize != null && dataSize.getValue() != 0;
     }
 
     public static String graphvizLogicalPlan(PlanNode plan, Map<Symbol, Type> types)
@@ -384,7 +397,11 @@ public class PlanPrinter
             outputString = "unknown";
         }
         output.append(indentString(indent))
-                .append(format("Cost: %s, Output: %s\n", fractionString, outputString));
+                .append(format("Cost: %s, Output: %s", fractionString, outputString));
+        if (isNonZero(stats.getSpilledDataSize())) {
+            output.append(", Spilled: " + stats.getSpilledDataSize());
+        }
+        output.append("\n");
     }
 
     private static String indentString(int indent)
@@ -1061,23 +1078,26 @@ public class PlanPrinter
         private final Duration wallTime;
         private final Optional<Long> outputPositions;
         private final Optional<DataSize> outputDataSize;
+        private final DataSize spilledDataSize;
 
-        public PlanNodeStats(PlanNodeId planNodeId, Duration wallTime)
+        public PlanNodeStats(PlanNodeId planNodeId, Duration wallTime, DataSize spilledDataSize)
         {
-            this(planNodeId, wallTime, Optional.empty(), Optional.empty());
+            this(planNodeId, wallTime, spilledDataSize, Optional.empty(), Optional.empty());
+            spilledDataSize = spilledDataSize;
         }
 
-        public PlanNodeStats(PlanNodeId planNodeId, Duration wallTime, long outputPositions, DataSize outputDataSize)
+        public PlanNodeStats(PlanNodeId planNodeId, Duration wallTime, DataSize spilledDataSize, long outputPositions, DataSize outputDataSize)
         {
-            this(planNodeId, wallTime, Optional.of(outputPositions), Optional.of(outputDataSize));
+            this(planNodeId, wallTime, spilledDataSize, Optional.of(outputPositions), Optional.of(outputDataSize));
         }
 
-        private PlanNodeStats(PlanNodeId planNodeId, Duration wallTime, Optional<Long> outputPositions, Optional<DataSize> outputDataSize)
+        private PlanNodeStats(PlanNodeId planNodeId, Duration wallTime, DataSize spilledDataSize, Optional<Long> outputPositions, Optional<DataSize> outputDataSize)
         {
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
             this.wallTime = requireNonNull(wallTime, "wallTime is null");
             this.outputPositions = outputPositions;
             this.outputDataSize = outputDataSize;
+            this.spilledDataSize = spilledDataSize;
         }
 
         public PlanNodeId getPlanNodeId()
@@ -1098,6 +1118,11 @@ public class PlanPrinter
         public Optional<DataSize> getOutputDataSize()
         {
             return outputDataSize;
+        }
+
+        public DataSize getSpilledDataSize()
+        {
+            return spilledDataSize;
         }
 
         public static PlanNodeStats merge(PlanNodeStats planNodeStats1, PlanNodeStats planNodeStats2)
@@ -1126,6 +1151,7 @@ public class PlanPrinter
             return new PlanNodeStats(
                     planNodeStats1.getPlanNodeId(),
                     new Duration(planNodeStats1.getWallTime().toMillis() + planNodeStats2.getWallTime().toMillis(), MILLISECONDS),
+                    succinctBytes(planNodeStats1.getSpilledDataSize().toBytes() + planNodeStats2.getSpilledDataSize().toBytes()),
                     outputPositions,
                     outputDataSize);
         }

@@ -223,6 +223,8 @@ public class StageStateMachine
         boolean fullyBlocked = true;
         Set<BlockedReason> blockedReasons = new HashSet<>();
 
+        long spilledBytes = 0;
+
         for (TaskInfo taskInfo : taskInfos) {
             TaskState taskState = taskInfo.getTaskStatus().getState();
             if (taskState.isDone()) {
@@ -259,6 +261,7 @@ public class StageStateMachine
 
             outputDataSize += taskStats.getOutputDataSize().toBytes();
             outputPositions += taskStats.getOutputPositions();
+            spilledBytes += taskStats.getSpilledDataSize().toBytes();
         }
 
         StageStats stageStats = new StageStats(
@@ -291,7 +294,8 @@ public class StageStateMachine
                 succinctBytes(processedInputDataSize),
                 processedInputPositions,
                 succinctBytes(outputDataSize),
-                outputPositions);
+                outputPositions,
+                succinctBytes(spilledBytes));
 
         ExecutionFailureInfo failureInfo = null;
         if (state == FAILED) {

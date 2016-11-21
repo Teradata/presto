@@ -58,7 +58,8 @@ public class TestOperatorStats
             new DataSize(18, BYTE),
             new DataSize(19, BYTE),
             Optional.empty(),
-            "20");
+            "20",
+            new DataSize(21, BYTE));
 
     public static final OperatorStats MERGEABLE = new OperatorStats(
             41,
@@ -89,7 +90,8 @@ public class TestOperatorStats
             new DataSize(18, BYTE),
             new DataSize(19, BYTE),
             Optional.empty(),
-            new LongMergeable(20));
+            new LongMergeable(20),
+            new DataSize(21, BYTE));
 
     @Test
     public void testJson()
@@ -131,6 +133,7 @@ public class TestOperatorStats
         assertEquals(actual.getMemoryReservation(), new DataSize(18, BYTE));
         assertEquals(actual.getSystemMemoryReservation(), new DataSize(19, BYTE));
         assertEquals(actual.getInfo(), "20");
+        assertEquals(actual.getSpilledDataSize(), new DataSize(21, BYTE));
     }
 
     @Test
@@ -164,6 +167,7 @@ public class TestOperatorStats
         assertEquals(actual.getMemoryReservation(), new DataSize(3 * 18, BYTE));
         assertEquals(actual.getSystemMemoryReservation(), new DataSize(3 * 19, BYTE));
         assertEquals(actual.getInfo(), null);
+        assertEquals(actual.getSpilledDataSize(), new DataSize(3 * 21, BYTE));
     }
 
     @Test
@@ -197,6 +201,7 @@ public class TestOperatorStats
         assertEquals(actual.getMemoryReservation(), new DataSize(3 * 18, BYTE));
         assertEquals(actual.getSystemMemoryReservation(), new DataSize(3 * 19, BYTE));
         assertEquals(actual.getInfo(), new LongMergeable(20 * 3));
+        assertEquals(actual.getSpilledDataSize(), new DataSize(3 * 21, BYTE));
     }
 
     private static class LongMergeable

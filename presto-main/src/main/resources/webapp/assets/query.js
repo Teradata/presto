@@ -1160,6 +1160,14 @@ var QueryDetail = React.createClass({
                                                 { formatDataSizeBytes(query.queryStats.cumulativeMemory / 1000.0, "") + " seconds" }
                                             </td>
                                         </tr>
+                                        <tr>
+                                            <td className="info-title">
+                                                Spilled Data
+                                            </td>
+                                            <td className="info-text">
+                                                { query.queryStats.spilledDataSize }
+                                            </td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>

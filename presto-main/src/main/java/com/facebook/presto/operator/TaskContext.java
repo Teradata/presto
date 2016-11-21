@@ -78,6 +78,8 @@ public class TaskContext
     @GuardedBy("cumulativeMemoryLock")
     private long lastTaskStatCallNanos = 0;
 
+    private final AtomicLong spilledBytes = new AtomicLong();
+
     public TaskContext(QueryContext queryContext,
             TaskStateMachine taskStateMachine,
             Executor executor,
@@ -167,6 +169,7 @@ public class TaskContext
     public synchronized ListenableFuture<?> reserveSpill(long bytes)
     {
         checkArgument(bytes >= 0, "bytes is negative");
+        spilledBytes.getAndAdd(bytes);
         return queryContext.reserveSpill(bytes);
     }
 
@@ -390,6 +393,7 @@ public class TaskContext
                 processedInputPositions,
                 succinctBytes(outputDataSize),
                 outputPositions,
-                pipelineStats);
+                pipelineStats,
+                succinctBytes(spilledBytes.get()));
     }
 }

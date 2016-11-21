@@ -62,7 +62,8 @@ public class TestStageStats
             22,
 
             new DataSize(23, BYTE),
-            24);
+            24,
+            new DataSize(25, BYTE));
 
     @Test
     public void testJson()
@@ -109,6 +110,7 @@ public class TestStageStats
 
         assertEquals(actual.getOutputDataSize(), new DataSize(23, BYTE));
         assertEquals(actual.getOutputPositions(), 24);
+        assertEquals(actual.getSpilledDataSize(), new DataSize(25, BYTE));
     }
 
     private static DistributionSnapshot getTestDistribution(int count)

@@ -62,6 +62,8 @@ public class OperatorStats
     private final DataSize systemMemoryReservation;
     private final Optional<BlockedReason> blockedReason;
 
+    private final DataSize spilledDataSize;
+
     private final Object info;
 
     @JsonCreator
@@ -95,7 +97,9 @@ public class OperatorStats
             @JsonProperty("systemMemoryReservation") DataSize systemMemoryReservation,
             @JsonProperty("blockedReason") Optional<BlockedReason> blockedReason,
 
-            @JsonProperty("info") Object info)
+            @JsonProperty("info") Object info,
+
+            @JsonProperty("spilledDataSize") DataSize spilledDataSize)
     {
         checkArgument(operatorId >= 0, "operatorId is negative");
         this.operatorId = operatorId;
@@ -128,6 +132,8 @@ public class OperatorStats
         this.memoryReservation = requireNonNull(memoryReservation, "memoryReservation is null");
         this.systemMemoryReservation = requireNonNull(systemMemoryReservation, "systemMemoryReservation is null");
         this.blockedReason = blockedReason;
+
+        this.spilledDataSize = spilledDataSize;
 
         this.info = info;
     }
@@ -270,6 +276,12 @@ public class OperatorStats
         return blockedReason;
     }
 
+    @JsonProperty
+    public DataSize getSpilledDataSize()
+    {
+        return spilledDataSize;
+    }
+
     @Nullable
     @JsonProperty
     public Object getInfo()
@@ -308,7 +320,7 @@ public class OperatorStats
         long memoryReservation = this.memoryReservation.toBytes();
         long systemMemoryReservation = this.systemMemoryReservation.toBytes();
         Optional<BlockedReason> blockedReason = this.blockedReason;
-
+        long spilledBytes = this.spilledDataSize.toBytes();
         Mergeable<?> base = null;
         if (info instanceof Mergeable) {
             base = (Mergeable<?>) info;
@@ -342,6 +354,8 @@ public class OperatorStats
             if (operator.getBlockedReason().isPresent()) {
                 blockedReason = operator.getBlockedReason();
             }
+
+            spilledBytes += operator.getSpilledDataSize().toBytes();
 
             Object info = operator.getInfo();
             if (base != null && info != null && base.getClass() == info.getClass()) {
@@ -379,7 +393,9 @@ public class OperatorStats
                 succinctBytes(systemMemoryReservation),
                 blockedReason,
 
-                base);
+                base,
+
+                succinctBytes(spilledBytes));
     }
 
     public static <T extends Mergeable<T>> Mergeable<?> mergeInfo(Object base, Object other)

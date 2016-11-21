@@ -68,6 +68,8 @@ public class StageStats
     private final DataSize outputDataSize;
     private final long outputPositions;
 
+    private final DataSize spilledDataSize;
+
     @VisibleForTesting
     public StageStats()
     {
@@ -97,6 +99,7 @@ public class StageStats
         this.processedInputPositions = 0;
         this.outputDataSize = null;
         this.outputPositions = 0;
+        this.spilledDataSize = null;
     }
 
     @JsonCreator
@@ -134,7 +137,8 @@ public class StageStats
             @JsonProperty("processedInputPositions") long processedInputPositions,
 
             @JsonProperty("outputDataSize") DataSize outputDataSize,
-            @JsonProperty("outputPositions") long outputPositions)
+            @JsonProperty("outputPositions") long outputPositions,
+            @JsonProperty("spilledDataSize") DataSize spilledDataSize)
     {
         this.schedulingComplete = schedulingComplete;
         this.getSplitDistribution = requireNonNull(getSplitDistribution, "getSplitDistribution is null");
@@ -179,6 +183,8 @@ public class StageStats
         this.outputDataSize = requireNonNull(outputDataSize, "outputDataSize is null");
         checkArgument(outputPositions >= 0, "outputPositions is negative");
         this.outputPositions = outputPositions;
+
+        this.spilledDataSize = spilledDataSize;
     }
 
     @JsonProperty
@@ -335,5 +341,11 @@ public class StageStats
     public long getOutputPositions()
     {
         return outputPositions;
+    }
+
+    @JsonProperty
+    public DataSize getSpilledDataSize()
+    {
+        return spilledDataSize;
     }
 }

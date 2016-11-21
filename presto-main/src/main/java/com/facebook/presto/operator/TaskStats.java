@@ -71,6 +71,8 @@ public class TaskStats
 
     private final List<PipelineStats> pipelines;
 
+    private final DataSize spilledDataSize;
+
     public TaskStats(DateTime createTime, DateTime endTime)
     {
         this(createTime,
@@ -101,7 +103,8 @@ public class TaskStats
                 0,
                 new DataSize(0, BYTE),
                 0,
-                ImmutableList.<PipelineStats>of());
+                ImmutableList.<PipelineStats>of(),
+                new DataSize(0, BYTE));
     }
 
     @JsonCreator
@@ -141,7 +144,9 @@ public class TaskStats
             @JsonProperty("outputDataSize") DataSize outputDataSize,
             @JsonProperty("outputPositions") long outputPositions,
 
-            @JsonProperty("pipelines") List<PipelineStats> pipelines)
+            @JsonProperty("pipelines") List<PipelineStats> pipelines,
+
+            @JsonProperty("spilledDataSize") DataSize spilledDataSize)
     {
         this.createTime = requireNonNull(createTime, "createTime is null");
         this.firstStartTime = firstStartTime;
@@ -190,6 +195,8 @@ public class TaskStats
         this.outputPositions = outputPositions;
 
         this.pipelines = ImmutableList.copyOf(requireNonNull(pipelines, "pipelines is null"));
+
+        this.spilledDataSize = spilledDataSize;
     }
 
     @JsonProperty
@@ -370,6 +377,12 @@ public class TaskStats
         return runningPartitionedDrivers;
     }
 
+    @JsonProperty
+    public DataSize getSpilledDataSize()
+    {
+        return spilledDataSize;
+    }
+
     public TaskStats summarize()
     {
         return new TaskStats(
@@ -401,6 +414,7 @@ public class TaskStats
                 processedInputPositions,
                 outputDataSize,
                 outputPositions,
-                ImmutableList.<PipelineStats>of());
+                ImmutableList.<PipelineStats>of(),
+                spilledDataSize);
     }
 }

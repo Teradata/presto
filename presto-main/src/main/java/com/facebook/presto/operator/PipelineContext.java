@@ -84,6 +84,7 @@ public class PipelineContext
     private final CounterStat outputPositions = new CounterStat();
 
     private final ConcurrentMap<Integer, OperatorStats> operatorSummaries = new ConcurrentHashMap<>();
+    private final AtomicLong spilledBytes = new AtomicLong();
 
     public PipelineContext(TaskContext taskContext, Executor executor, boolean inputPipeline, boolean outputPipeline)
     {
@@ -225,6 +226,7 @@ public class PipelineContext
 
     public synchronized ListenableFuture<?> reserveSpill(long bytes)
     {
+        spilledBytes.getAndAdd(bytes);
         return taskContext.reserveSpill(bytes);
     }
 
@@ -451,7 +453,9 @@ public class PipelineContext
                 outputPositions,
 
                 ImmutableList.copyOf(operatorSummaries.values()),
-                drivers);
+                drivers,
+
+                succinctBytes(spilledBytes.get()));
     }
 
     private static <K, V> boolean compareAndSet(ConcurrentMap<K, V> map, K key, V oldValue, V newValue)
