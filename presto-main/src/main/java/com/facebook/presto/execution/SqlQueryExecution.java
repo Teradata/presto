@@ -237,6 +237,9 @@ public final class SqlQueryExecution
                 // analyze query
                 PlanRoot plan = analyzeQuery();
 
+                checkState(connectors != null, "Analysis must happen before query starts");
+                metadata.beginQuery(getSession(), connectors);
+
                 // plan distribution of query
                 planDistribution(plan);
 
@@ -250,8 +253,6 @@ public final class SqlQueryExecution
                 SqlQueryScheduler scheduler = queryScheduler.get();
 
                 if (!stateMachine.isDone()) {
-                    checkState(connectors != null, "Analysis must happen before query starts");
-                    metadata.beginQuery(getSession(), connectors);
                     scheduler.start();
                 }
             }
