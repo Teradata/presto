@@ -37,6 +37,8 @@ import java.util.Iterator;
 import java.util.concurrent.CompletableFuture;
 
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
+import static com.facebook.presto.spiller.BinaryFileSingleStreamSpillerFactory.SPILL_FILE_PREFIX;
+import static com.facebook.presto.spiller.BinaryFileSingleStreamSpillerFactory.SPILL_FILE_SUFFIX;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
@@ -66,7 +68,7 @@ public class BinaryFileSingleStreamSpiller
         this.spillerStats = requireNonNull(spillerStats, "spillerStats is null");
         this.localSpillContext = requireNonNull(localSpillContext, "localSpillContext can not be null");
         try {
-            targetFileName = Files.createTempFile(spillPath, "spill", ".bin");
+            targetFileName = Files.createTempFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX);
         }
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create spill file", e);
