@@ -45,6 +45,7 @@ import static com.facebook.presto.spiller.BinaryFileSingleStreamSpillerFactory.S
 import static com.google.common.util.concurrent.Futures.getUnchecked;
 import static org.testng.Assert.assertEquals;
 
+@Test(singleThreaded = true)
 public class TestBinaryFileSingleStreamSpillerFactory
 {
     private final Closer closer = Closer.create();
