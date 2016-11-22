@@ -42,6 +42,7 @@ import java.util.concurrent.Executors;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spiller.BinaryFileSingleStreamSpillerFactory.SPILL_FILE_PREFIX;
 import static com.facebook.presto.spiller.BinaryFileSingleStreamSpillerFactory.SPILL_FILE_SUFFIX;
+import static com.google.common.util.concurrent.Futures.getUnchecked;
 import static org.testng.Assert.assertEquals;
 
 public class TestBinaryFileSingleStreamSpillerFactory
@@ -92,7 +93,7 @@ public class TestBinaryFileSingleStreamSpillerFactory
         List<SingleStreamSpiller> spillers = new ArrayList<>();
         for (int i = 0; i < 10; ++i) {
             SingleStreamSpiller singleStreamSpiller = spillerFactory.create(types, localSpillContext);
-            singleStreamSpiller.spill(page);
+            getUnchecked(singleStreamSpiller.spill(page));
             spillers.add(singleStreamSpiller);
         }
         assertEquals(FileUtils.listFiles(spillPath1).size(), 5);
