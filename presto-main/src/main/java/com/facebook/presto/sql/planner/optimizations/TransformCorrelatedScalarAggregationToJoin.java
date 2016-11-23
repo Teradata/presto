@@ -16,6 +16,7 @@ package com.facebook.presto.sql.planner.optimizations;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.metadata.FunctionRegistry;
+import com.facebook.presto.metadata.GlobalProperties;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.spi.type.BigintType;
@@ -107,7 +108,8 @@ public class TransformCorrelatedScalarAggregationToJoin
             Session session,
             Map<Symbol, Type> types,
             SymbolAllocator symbolAllocator,
-            PlanNodeIdAllocator idAllocator)
+            PlanNodeIdAllocator idAllocator,
+            GlobalProperties globalProperties)
     {
         return rewriteWith(new Rewriter(idAllocator, symbolAllocator, metadata), plan, null);
     }

@@ -16,6 +16,7 @@ package com.facebook.presto.tests;
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.CoefficientBasedCostCalculator;
 import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.metadata.GlobalProperties;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.security.AccessDeniedException;
 import com.facebook.presto.spi.type.Type;
@@ -294,7 +295,8 @@ public abstract class AbstractTestQueryFramework
                 queryRunner.getAccessControl(),
                 sqlParser,
                 costCalculator,
-                ImmutableMap.of());
+                ImmutableMap.of(),
+                new GlobalProperties());
     }
 
     protected static void skipTestUnless(boolean requirement)

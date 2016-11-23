@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.sql.planner.optimizations;
 
+import com.facebook.presto.metadata.GlobalProperties;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.DependencyExtractor;
@@ -108,7 +109,8 @@ public class TestSimplifyExpressions
                 TEST_SESSION,
                 booleanSymbolTypeMapFor(expression),
                 new SymbolAllocator(),
-                planNodeIdAllocator);
+                planNodeIdAllocator,
+                new GlobalProperties());
         return simplifiedNode.getPredicate();
     }
 

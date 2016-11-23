@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.planner.optimizations;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.metadata.GlobalProperties;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
@@ -69,7 +70,8 @@ public class MergeWindows
             Session session,
             Map<Symbol, Type> types,
             SymbolAllocator symbolAllocator,
-            PlanNodeIdAllocator idAllocator)
+            PlanNodeIdAllocator idAllocator,
+            GlobalProperties globalProperties)
     {
         // ImmutableListMultimap preserves order of window nodes
         return SimplePlanRewriter.rewriteWith(new Rewriter(), plan, ImmutableListMultimap.of());

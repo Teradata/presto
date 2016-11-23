@@ -20,6 +20,7 @@ import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 
 import java.util.List;
+import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
@@ -29,11 +30,18 @@ final class JoinMatcher
 {
     private final JoinNode.Type joinType;
     private final List<AliasPair> equiCriteria;
+    private final Optional<JoinNode.DistributionType> distributionType;
 
     JoinMatcher(JoinNode.Type joinType, List<AliasPair> equiCriteria)
     {
+        this(joinType, equiCriteria, Optional.empty());
+    }
+
+    JoinMatcher(JoinNode.Type joinType, List<AliasPair> equiCriteria, Optional<JoinNode.DistributionType> distributionType)
+    {
         this.joinType = requireNonNull(joinType, "joinType is null");
         this.equiCriteria = requireNonNull(equiCriteria, "equiCriteria is null");
+        this.distributionType = distributionType;
     }
 
     @Override
@@ -43,6 +51,9 @@ final class JoinMatcher
             JoinNode joinNode = (JoinNode) node;
             if (joinNode.getType() != joinType) {
                 return false;
+            }
+            if (distributionType.isPresent() && !joinNode.getDistributionType().equals(distributionType)) {
+                    return false;
             }
             if (joinNode.getCriteria().size() == equiCriteria.size()) {
                 int i = 0;

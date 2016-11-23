@@ -15,6 +15,7 @@
 package com.facebook.presto.sql.planner.optimizations;
 
 import com.facebook.presto.metadata.FunctionKind;
+import com.facebook.presto.metadata.GlobalProperties;
 import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.spi.type.StandardTypes;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
@@ -67,7 +68,7 @@ public class TestCountConstantOptimizer
                         Optional.empty(),
                         Optional.empty());
 
-        assertTrue(((AggregationNode) optimizer.optimize(eligiblePlan, TEST_SESSION, ImmutableMap.of(), new SymbolAllocator(), new PlanNodeIdAllocator()))
+        assertTrue(((AggregationNode) optimizer.optimize(eligiblePlan, TEST_SESSION, ImmutableMap.of(), new SymbolAllocator(), new PlanNodeIdAllocator(), new GlobalProperties()))
                 .getAggregations()
                 .get(countAggregationSymbol)
                 .getArguments()
@@ -87,7 +88,7 @@ public class TestCountConstantOptimizer
                         Optional.empty(),
                         Optional.empty());
 
-        assertFalse(((AggregationNode) optimizer.optimize(ineligiblePlan, TEST_SESSION, ImmutableMap.of(), new SymbolAllocator(), new PlanNodeIdAllocator()))
+        assertFalse(((AggregationNode) optimizer.optimize(ineligiblePlan, TEST_SESSION, ImmutableMap.of(), new SymbolAllocator(), new PlanNodeIdAllocator(), new GlobalProperties()))
                 .getAggregations()
                 .get(countAggregationSymbol)
                 .getArguments()

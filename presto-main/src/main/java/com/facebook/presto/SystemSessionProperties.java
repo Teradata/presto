@@ -39,8 +39,8 @@ import static java.lang.String.format;
 public final class SystemSessionProperties
 {
     public static final String OPTIMIZE_HASH_GENERATION = "optimize_hash_generation";
-    public static final String DISTRIBUTED_JOIN = "distributed_join";
     public static final String DISTRIBUTED_INDEX_JOIN = "distributed_index_join";
+    public static final String JOIN_DISTRIBUTION_TYPE = "join_distribution_type";
     public static final String HASH_PARTITION_COUNT = "hash_partition_count";
     public static final String PREFER_STREAMING_OPERATORS = "prefer_streaming_operators";
     public static final String TASK_WRITER_COUNT = "task_writer_count";
@@ -91,14 +91,14 @@ public final class SystemSessionProperties
                         featuresConfig.isOptimizeHashGeneration(),
                         false),
                 booleanSessionProperty(
-                        DISTRIBUTED_JOIN,
-                        "Use a distributed join instead of a broadcast join",
-                        featuresConfig.isDistributedJoinsEnabled(),
-                        false),
-                booleanSessionProperty(
                         DISTRIBUTED_INDEX_JOIN,
                         "Distribute index joins on join keys instead of executing inline",
                         featuresConfig.isDistributedIndexJoinsEnabled(),
+                        false),
+                stringSessionProperty(
+                        JOIN_DISTRIBUTION_TYPE,
+                        "What join method to use. Options are repartitioned, replicated, and automatic",
+                        featuresConfig.getJoinDistributionType(),
                         false),
                 integerSessionProperty(
                         HASH_PARTITION_COUNT,
@@ -271,11 +271,6 @@ public final class SystemSessionProperties
         return session.getSystemProperty(OPTIMIZE_HASH_GENERATION, Boolean.class);
     }
 
-    public static boolean isDistributedJoinEnabled(Session session)
-    {
-        return session.getSystemProperty(DISTRIBUTED_JOIN, Boolean.class);
-    }
-
     public static boolean isDistributedIndexJoinEnabled(Session session)
     {
         return session.getSystemProperty(DISTRIBUTED_INDEX_JOIN, Boolean.class);
@@ -393,5 +388,10 @@ public final class SystemSessionProperties
         DataSize memoryLimitBeforeSpill = session.getSystemProperty(OPERATOR_MEMORY_LIMIT_BEFORE_SPILL, DataSize.class);
         checkArgument(memoryLimitBeforeSpill.toBytes() >= 0, "%s must be positive", OPERATOR_MEMORY_LIMIT_BEFORE_SPILL);
         return memoryLimitBeforeSpill;
+    }
+
+    public static String getJoinDistributionType(Session session)
+    {
+        return session.getSystemProperty(JOIN_DISTRIBUTION_TYPE, String.class);
     }
 }
