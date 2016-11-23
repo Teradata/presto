@@ -18,44 +18,27 @@ import com.facebook.presto.cost.PlanNodeCost;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 
-import static com.facebook.presto.sql.planner.assertions.MatchResult.match;
-import static com.google.common.base.MoreObjects.toStringHelper;
-import static com.google.common.base.Preconditions.checkState;
 import static java.util.Objects.requireNonNull;
 
-final class PlanNodeMatcher
+public class PlanCostMatcher
         implements Matcher
 {
-    private final Class<? extends PlanNode> nodeClass;
+    private final PlanNodeCost expectedCost;
 
-    public PlanNodeMatcher(Class<? extends PlanNode> nodeClass)
+    PlanCostMatcher(PlanNodeCost expectedCost)
     {
-        this.nodeClass = requireNonNull(nodeClass, "nodeClass is null");
+        this.expectedCost = requireNonNull(expectedCost, "expectedCost is null");
     }
 
     @Override
     public boolean shapeMatches(PlanNode node)
     {
-        return node.getClass().equals(nodeClass);
+        return true;
     }
 
     @Override
     public MatchResult detailMatches(PlanNode node, PlanNodeCost cost, Session session, Metadata metadata, SymbolAliases symbolAliases)
     {
-        checkState(shapeMatches(node), "Plan testing framework error: shapeMatches returned false in detailMatches in %s", this.getClass().getName());
-        return match();
-    }
-
-    @Override
-    public String toString()
-    {
-        return toStringHelper(this)
-                .add("nodeClass", nodeClass)
-                .toString();
-    }
-
-    public Class<? extends PlanNode> getNodeClass()
-    {
-        return nodeClass;
+        return new MatchResult(expectedCost.equals(cost));
     }
 }

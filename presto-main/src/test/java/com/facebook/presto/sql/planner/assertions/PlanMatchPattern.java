@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.planner.assertions;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.PlanNodeCost;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.block.SortOrder;
 import com.facebook.presto.spi.predicate.Domain;
@@ -284,12 +285,12 @@ public final class PlanMatchPattern
         return states.build();
     }
 
-    MatchResult detailMatches(PlanNode node, Session session, Metadata metadata, SymbolAliases symbolAliases)
+    MatchResult detailMatches(PlanNode node, PlanNodeCost planNodeCost, Session session, Metadata metadata, SymbolAliases symbolAliases)
     {
         SymbolAliases.Builder newAliases = SymbolAliases.builder();
 
         for (Matcher matcher : matchers) {
-            MatchResult matchResult = matcher.detailMatches(node, session, metadata, symbolAliases);
+            MatchResult matchResult = matcher.detailMatches(node, planNodeCost, session, metadata, symbolAliases);
             if (!matchResult.isMatch()) {
                 return NO_MATCH;
             }
@@ -313,6 +314,12 @@ public final class PlanMatchPattern
     public PlanMatchPattern withAlias(Optional<String> alias, RvalueMatcher matcher)
     {
         matchers.add(new Alias(alias, matcher));
+        return this;
+    }
+
+    public PlanMatchPattern withCost(PlanNodeCost cost)
+    {
+        matchers.add(new PlanCostMatcher(cost));
         return this;
     }
 
