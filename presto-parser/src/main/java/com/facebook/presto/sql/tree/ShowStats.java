@@ -13,30 +13,48 @@
  */
 package com.facebook.presto.sql.tree;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
+
 import java.util.Objects;
 import java.util.Optional;
 
+import static com.facebook.presto.sql.QueryUtil.simpleQuery;
 import static com.google.common.base.MoreObjects.toStringHelper;
 
 public class ShowStats
         extends Statement
 {
-    private final QualifiedName table;
+    private final Query query;
 
+    @VisibleForTesting
     public ShowStats(QualifiedName table)
     {
         this(Optional.empty(), table);
     }
 
-    public ShowStats(NodeLocation location, QualifiedName table)
+    @VisibleForTesting
+    public ShowStats(Query query)
     {
-        this(Optional.of(location), table);
+        this(Optional.empty(), query);
     }
 
-    private ShowStats(Optional<NodeLocation> location, QualifiedName table)
+    public ShowStats(Optional<NodeLocation> location, QualifiedName table)
+    {
+        this(location, createFakeSpecification(location, table));
+    }
+
+    public ShowStats(Optional<NodeLocation> location, Query query)
     {
         super(location);
-        this.table = table;
+        this.query = query;
+    }
+
+    private static Query createFakeSpecification(Optional<NodeLocation> location, QualifiedName name)
+    {
+        Select select = new Select(location, false, ImmutableList.of(new AllColumns()));
+        Relation relation = new Table(name);
+        return simpleQuery(select, relation);
     }
 
     @Override
@@ -48,7 +66,7 @@ public class ShowStats
     @Override
     public int hashCode()
     {
-        return Objects.hash(table);
+        return Objects.hash(query);
     }
 
     @Override
@@ -61,19 +79,19 @@ public class ShowStats
             return false;
         }
         ShowStats o = (ShowStats) obj;
-        return Objects.equals(table, o.table);
+        return Objects.equals(query, o.query);
     }
 
     @Override
     public String toString()
     {
         return toStringHelper(this)
-                .add("table", table)
+                .add("query", query)
                 .toString();
     }
 
-    public QualifiedName getTable()
+    public Query getQuery()
     {
-        return table;
+        return query;
     }
 }
