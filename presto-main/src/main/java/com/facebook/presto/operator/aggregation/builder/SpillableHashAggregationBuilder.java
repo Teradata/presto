@@ -192,7 +192,7 @@ public class SpillableHashAggregationBuilder
         hashAggregationBuilder.setOutputPartial();
 
         if (!spiller.isPresent()) {
-            spiller = Optional.of(spillerFactory.create(hashAggregationBuilder.buildTypes()));
+            spiller = Optional.of(spillerFactory.create(hashAggregationBuilder.buildTypes(), () -> operatorContext.getSpillContext().newLocalSpillContext()));
         }
         long spillMemoryUsage = getSizeInMemory();
 

@@ -15,11 +15,27 @@
 package com.facebook.presto.spiller;
 
 import com.facebook.presto.spi.type.Type;
+import com.google.inject.Inject;
 
 import java.util.List;
 import java.util.function.Supplier;
 
-public interface SpillerFactory
+import static java.util.Objects.requireNonNull;
+
+public class GenericSpillerFactory
+    implements SpillerFactory
 {
-    Spiller create(List<Type> types, Supplier<LocalSpillContext> localSpillContextSupplier);
+    private final SingleStreamSpillerFactory singleStreamSpillerFactory;
+
+    @Inject
+    public GenericSpillerFactory(SingleStreamSpillerFactory singleStreamSpillerFactory)
+    {
+        this.singleStreamSpillerFactory = requireNonNull(singleStreamSpillerFactory, "singleStreamSpillerFactory can not be null");
+    }
+
+    @Override
+    public Spiller create(List<Type> types, Supplier<LocalSpillContext> localSpillContextSupplier)
+    {
+        return new GenericSpiller(types, localSpillContextSupplier, singleStreamSpillerFactory);
+    }
 }
