@@ -15,8 +15,8 @@ Presto Documentation
     language
     sql
     migration
+    optimizer
     develop
     release
-    statistics
 
 .. Note: If "release" is not the last item, the CSS must be updated.
