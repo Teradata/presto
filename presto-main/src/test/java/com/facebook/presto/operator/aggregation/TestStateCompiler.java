@@ -15,7 +15,6 @@ package com.facebook.presto.operator.aggregation;
 
 import com.facebook.presto.operator.aggregation.state.LongState;
 import com.facebook.presto.operator.aggregation.state.NullableLongState;
-import com.facebook.presto.operator.aggregation.state.StateCompiler;
 import com.facebook.presto.operator.aggregation.state.VarianceState;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
@@ -27,6 +26,8 @@ import com.facebook.presto.spi.type.BooleanType;
 import com.facebook.presto.spi.type.VarcharType;
 import org.testng.annotations.Test;
 
+import static com.facebook.presto.operator.aggregation.state.StateCompiler.generateStateFactory;
+import static com.facebook.presto.operator.aggregation.state.StateCompiler.generateStateSerializer;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static org.testng.Assert.assertEquals;
 
@@ -35,10 +36,8 @@ public class TestStateCompiler
     @Test
     public void testPrimitiveNullableLongSerialization()
     {
-        StateCompiler compiler = new StateCompiler();
-
-        AccumulatorStateFactory<NullableLongState> factory = compiler.generateStateFactory(NullableLongState.class);
-        AccumulatorStateSerializer<NullableLongState> serializer = compiler.generateStateSerializer(NullableLongState.class);
+        AccumulatorStateFactory<NullableLongState> factory = generateStateFactory(NullableLongState.class);
+        AccumulatorStateSerializer<NullableLongState> serializer = generateStateSerializer(NullableLongState.class);
         NullableLongState state = factory.createSingleState();
         NullableLongState deserializedState = factory.createSingleState();
 
@@ -63,10 +62,8 @@ public class TestStateCompiler
     @Test
     public void testPrimitiveLongSerialization()
     {
-        StateCompiler compiler = new StateCompiler();
-
-        AccumulatorStateFactory<LongState> factory = compiler.generateStateFactory(LongState.class);
-        AccumulatorStateSerializer<LongState> serializer = compiler.generateStateSerializer(LongState.class);
+        AccumulatorStateFactory<LongState> factory = generateStateFactory(LongState.class);
+        AccumulatorStateSerializer<LongState> serializer = generateStateSerializer(LongState.class);
         LongState state = factory.createSingleState();
         LongState deserializedState = factory.createSingleState();
 
@@ -85,18 +82,15 @@ public class TestStateCompiler
     @Test
     public void testGetSerializedType()
     {
-        StateCompiler compiler = new StateCompiler();
-        AccumulatorStateSerializer<LongState> serializer = compiler.generateStateSerializer(LongState.class);
+        AccumulatorStateSerializer<LongState> serializer = generateStateSerializer(LongState.class);
         assertEquals(serializer.getSerializedType(), BIGINT);
     }
 
     @Test
     public void testPrimitiveBooleanSerialization()
     {
-        StateCompiler compiler = new StateCompiler();
-
-        AccumulatorStateFactory<BooleanState> factory = compiler.generateStateFactory(BooleanState.class);
-        AccumulatorStateSerializer<BooleanState> serializer = compiler.generateStateSerializer(BooleanState.class);
+        AccumulatorStateFactory<BooleanState> factory = generateStateFactory(BooleanState.class);
+        AccumulatorStateSerializer<BooleanState> serializer = generateStateSerializer(BooleanState.class);
         BooleanState state = factory.createSingleState();
         BooleanState deserializedState = factory.createSingleState();
 
@@ -113,10 +107,8 @@ public class TestStateCompiler
     @Test
     public void testPrimitiveByteSerialization()
     {
-        StateCompiler compiler = new StateCompiler();
-
-        AccumulatorStateFactory<ByteState> factory = compiler.generateStateFactory(ByteState.class);
-        AccumulatorStateSerializer<ByteState> serializer = compiler.generateStateSerializer(ByteState.class);
+        AccumulatorStateFactory<ByteState> factory = generateStateFactory(ByteState.class);
+        AccumulatorStateSerializer<ByteState> serializer = generateStateSerializer(ByteState.class);
         ByteState state = factory.createSingleState();
         ByteState deserializedState = factory.createSingleState();
 
@@ -133,10 +125,8 @@ public class TestStateCompiler
     @Test
     public void testVarianceStateSerialization()
     {
-        StateCompiler compiler = new StateCompiler();
-
-        AccumulatorStateFactory<VarianceState> factory = compiler.generateStateFactory(VarianceState.class);
-        AccumulatorStateSerializer<VarianceState> serializer = compiler.generateStateSerializer(VarianceState.class);
+        AccumulatorStateFactory<VarianceState> factory = generateStateFactory(VarianceState.class);
+        AccumulatorStateSerializer<VarianceState> serializer = generateStateSerializer(VarianceState.class);
         VarianceState singleState = factory.createSingleState();
         VarianceState deserializedState = factory.createSingleState();
 
@@ -158,10 +148,8 @@ public class TestStateCompiler
     @Test
     public void testComplexSerialization()
     {
-        StateCompiler compiler = new StateCompiler();
-
-        AccumulatorStateFactory<TestComplexState> factory = compiler.generateStateFactory(TestComplexState.class);
-        AccumulatorStateSerializer<TestComplexState> serializer = compiler.generateStateSerializer(TestComplexState.class);
+        AccumulatorStateFactory<TestComplexState> factory = generateStateFactory(TestComplexState.class);
+        AccumulatorStateSerializer<TestComplexState> serializer = generateStateSerializer(TestComplexState.class);
         TestComplexState singleState = factory.createSingleState();
         TestComplexState deserializedState = factory.createSingleState();
 

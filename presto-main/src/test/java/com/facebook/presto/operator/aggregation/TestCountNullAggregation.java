@@ -37,7 +37,7 @@ public class TestCountNullAggregation
     @BeforeClass
     public void setup()
     {
-        functionRegistry.addFunctions(new FunctionListBuilder().aggregate(CountNull.class).getFunctions());
+        functionRegistry.addFunctions(new FunctionListBuilder().aggregates(CountNull.class).getFunctions());
     }
 
     @Override

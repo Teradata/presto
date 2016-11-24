@@ -23,7 +23,6 @@ import com.facebook.presto.operator.aggregation.state.NullableBooleanState;
 import com.facebook.presto.operator.aggregation.state.NullableDoubleState;
 import com.facebook.presto.operator.aggregation.state.NullableLongState;
 import com.facebook.presto.operator.aggregation.state.SliceState;
-import com.facebook.presto.operator.aggregation.state.StateCompiler;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.function.AccumulatorState;
@@ -42,6 +41,8 @@ import static com.facebook.presto.operator.aggregation.AggregationMetadata.Param
 import static com.facebook.presto.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.BLOCK_INPUT_CHANNEL;
 import static com.facebook.presto.operator.aggregation.AggregationMetadata.ParameterMetadata.ParameterType.STATE;
 import static com.facebook.presto.operator.aggregation.AggregationUtils.generateAggregationName;
+import static com.facebook.presto.operator.aggregation.state.StateCompiler.generateStateFactory;
+import static com.facebook.presto.operator.aggregation.state.StateCompiler.generateStateSerializer;
 import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.facebook.presto.util.Reflection.methodHandle;
@@ -69,8 +70,6 @@ public class ArbitraryAggregationFunction
     private static final MethodHandle SLICE_COMBINE_FUNCTION = methodHandle(ArbitraryAggregationFunction.class, "combine", SliceState.class, SliceState.class);
     private static final MethodHandle BOOLEAN_COMBINE_FUNCTION = methodHandle(ArbitraryAggregationFunction.class, "combine", NullableBooleanState.class, NullableBooleanState.class);
     private static final MethodHandle BLOCK_COMBINE_FUNCTION = methodHandle(ArbitraryAggregationFunction.class, "combine", BlockState.class, BlockState.class);
-
-    private static final StateCompiler compiler = new StateCompiler();
 
     protected ArbitraryAggregationFunction()
     {
@@ -108,28 +107,28 @@ public class ArbitraryAggregationFunction
 
         if (type.getJavaType() == long.class) {
             stateInterface = NullableLongState.class;
-            stateSerializer = compiler.generateStateSerializer(stateInterface, classLoader);
+            stateSerializer = generateStateSerializer(stateInterface, classLoader);
             inputFunction = LONG_INPUT_FUNCTION;
             combineFunction = LONG_COMBINE_FUNCTION;
             outputFunction = LONG_OUTPUT_FUNCTION;
         }
         else if (type.getJavaType() == double.class) {
             stateInterface = NullableDoubleState.class;
-            stateSerializer = compiler.generateStateSerializer(stateInterface, classLoader);
+            stateSerializer = generateStateSerializer(stateInterface, classLoader);
             inputFunction = DOUBLE_INPUT_FUNCTION;
             combineFunction = DOUBLE_COMBINE_FUNCTION;
             outputFunction = DOUBLE_OUTPUT_FUNCTION;
         }
         else if (type.getJavaType() == Slice.class) {
             stateInterface = SliceState.class;
-            stateSerializer = compiler.generateStateSerializer(stateInterface, classLoader);
+            stateSerializer = generateStateSerializer(stateInterface, classLoader);
             inputFunction = SLICE_INPUT_FUNCTION;
             combineFunction = SLICE_COMBINE_FUNCTION;
             outputFunction = SLICE_OUTPUT_FUNCTION;
         }
         else if (type.getJavaType() == boolean.class) {
             stateInterface = NullableBooleanState.class;
-            stateSerializer = compiler.generateStateSerializer(stateInterface, classLoader);
+            stateSerializer = generateStateSerializer(stateInterface, classLoader);
             inputFunction = BOOLEAN_INPUT_FUNCTION;
             combineFunction = BOOLEAN_COMBINE_FUNCTION;
             outputFunction = BOOLEAN_OUTPUT_FUNCTION;
@@ -153,7 +152,7 @@ public class ArbitraryAggregationFunction
                 outputFunction.bindTo(type),
                 stateInterface,
                 stateSerializer,
-                compiler.generateStateFactory(stateInterface, classLoader),
+                generateStateFactory(stateInterface, classLoader),
                 type);
 
         GenericAccumulatorFactoryBinder factory = new AccumulatorCompiler().generateAccumulatorFactoryBinder(metadata, classLoader);
