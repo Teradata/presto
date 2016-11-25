@@ -99,15 +99,15 @@ For partitioned tables partitions specification must be used.
 Assuming table ``t`` has two partitioning keys ``a`` and ``b``, following command should be used
 to update table statistics for all partitions::
 
-        ANALYZE TABLE t PARTITION (a, b) COMPUTE STATISTICS FOR COLUMNS``
+        ANALYZE TABLE t PARTITION (a, b) COMPUTE STATISTICS FOR COLUMNS
 
 It is also possible to update statistics for just subset of partitions.
 This command will update statistics for all partitions for which partitioning key ``a`` is equal to ``1``::
 
-        ANALYZE TABLE t PARTITION (a=1, b) COMPUTE STATISTICS FOR COLUMNS``
+        ANALYZE TABLE t PARTITION (a=1, b) COMPUTE STATISTICS FOR COLUMNS
 
 And this command will update stats for just one partition::
 
-        ANALYZE TABLE t PARTITION (a=1, b=5) COMPUTE STATISTICS FOR COLUMNS``
+        ANALYZE TABLE t PARTITION (a=1, b=5) COMPUTE STATISTICS FOR COLUMNS
 
 For documentation of Hive statistics mechanism see https://cwiki.apache.org/confluence/display/Hive/StatsDev
