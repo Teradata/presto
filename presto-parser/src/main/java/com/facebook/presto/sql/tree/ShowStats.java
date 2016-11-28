@@ -41,7 +41,7 @@ public class ShowStats
 
     public ShowStats(Optional<NodeLocation> location, QualifiedName table)
     {
-        this(location, createFakeSpecification(location, table));
+        this(location, createFakeQuery(location, table));
     }
 
     public ShowStats(Optional<NodeLocation> location, Query query)
@@ -50,7 +50,7 @@ public class ShowStats
         this.query = query;
     }
 
-    private static Query createFakeSpecification(Optional<NodeLocation> location, QualifiedName name)
+    private static Query createFakeQuery(Optional<NodeLocation> location, QualifiedName name)
     {
         Select select = new Select(location, false, ImmutableList.of(new AllColumns()));
         Relation relation = new Table(name);

@@ -30,7 +30,6 @@ import com.facebook.presto.sql.analyzer.SemanticException;
 import com.facebook.presto.sql.planner.DomainTranslator;
 import com.facebook.presto.sql.planner.Plan;
 import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.optimizations.PlanNodeSearcher;
 import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.TableScanNode;
 import com.facebook.presto.sql.tree.Expression;
@@ -57,14 +56,12 @@ import static com.facebook.presto.sql.QueryUtil.selectList;
 import static com.facebook.presto.sql.QueryUtil.simpleQuery;
 import static com.facebook.presto.sql.QueryUtil.unaliasedName;
 import static com.facebook.presto.sql.analyzer.SemanticErrorCode.MISSING_TABLE;
+import static com.facebook.presto.sql.planner.optimizations.PlanNodeSearcher.searchFrom;
 import static com.facebook.presto.sql.rewrite.ShowColumnStatsRewriteResultBuilder.buildColumnsNames;
 import static com.facebook.presto.sql.rewrite.ShowColumnStatsRewriteResultBuilder.buildSelectItems;
 import static com.facebook.presto.sql.rewrite.ShowColumnStatsRewriteResultBuilder.buildStatisticsRows;
 import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
-import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.Iterables.getOnlyElement;
 import static java.util.Collections.unmodifiableList;
 import static java.util.Objects.requireNonNull;
 
@@ -213,15 +210,13 @@ public class ShowStatsRewriter
 
     private static Optional<TableScanNode> findTableScanNode(Plan plan)
     {
-        List<TableScanNode> scanNodes = PlanNodeSearcher.searchFrom(plan.getRoot()).where(TableScanNode.class::isInstance).findAll();
-        checkState(scanNodes.size() <= 1, "There must be max of 1 table scan nodes in SHOW STATS SELECT clause");
-        return getOnlyElement(scanNodes.stream().map(Optional::of).collect(toImmutableList()), Optional.empty());
+        TableScanNode scanNode = searchFrom(plan.getRoot()).where(TableScanNode.class::isInstance).findOnlyElement(null);
+        return Optional.ofNullable(scanNode);
     }
 
     private static Expression findFilterExpression(Plan plan)
     {
-        List<FilterNode> filterNodes = PlanNodeSearcher.searchFrom(plan.getRoot()).where(TableScanNode.class::isInstance).findAll();
-        checkState(filterNodes.size() <= 1, "There must be max of 1 table filter nodes in SHOW STATS SELECT clause");
-        return getOnlyElement(filterNodes.stream().map(FilterNode::getPredicate).collect(toImmutableList()), TRUE_LITERAL);
+        FilterNode filterNode = searchFrom(plan.getRoot()).where(TableScanNode.class::isInstance).findOnlyElement(null);
+        return Optional.ofNullable(filterNode).map(FilterNode::getPredicate).orElse(TRUE_LITERAL);
     }
 }
