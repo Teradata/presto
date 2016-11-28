@@ -28,6 +28,6 @@ FROM
       AND ("time_dim"."t_hour" BETWEEN 19 AND (19 + 1))
       AND ("household_demographics"."hd_dep_count" = 6)
       AND ("web_page"."wp_char_count" BETWEEN 5000 AND 5200)
-)  "pt"
+)  pt
 ORDER BY "am_pm_ratio" ASC
 LIMIT 100
