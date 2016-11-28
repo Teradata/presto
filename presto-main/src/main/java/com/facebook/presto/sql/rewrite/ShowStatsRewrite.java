@@ -38,6 +38,7 @@ import com.facebook.presto.sql.tree.AstVisitor;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Node;
 import com.facebook.presto.sql.tree.QualifiedName;
+import com.facebook.presto.sql.tree.Query;
 import com.facebook.presto.sql.tree.QuerySpecification;
 import com.facebook.presto.sql.tree.SelectItem;
 import com.facebook.presto.sql.tree.ShowStats;
@@ -126,6 +127,12 @@ public class ShowStatsRewrite
                             resultColumnNames));
         }
 
+        @Override
+        protected Node visitNode(Node node, Void context)
+        {
+            return node;
+        }
+
         private Optional<TableLayoutHandle> getTableLayoutHandle(ShowStats node, TableHandle tableHandle)
         {
             Optional<TableLayoutHandle> handle = findTableLayoutHandleWithWhere(node);
@@ -153,7 +160,7 @@ public class ShowStatsRewrite
                 return Optional.empty();
             }
 
-            Plan plan = queryExplainer.getLogicalPlan(session, node.getQuery(), parameters);
+            Plan plan = queryExplainer.getLogicalPlan(session, new Query(Optional.empty(), specification, ImmutableList.of(), Optional.empty()), parameters);
             Map<Symbol, Type> types = plan.getTypes();
 
             Optional<TableScanNode> scanNode = findTableScanNode(plan);
@@ -232,7 +239,7 @@ public class ShowStatsRewrite
 
         private static Expression findFilterExpression(Plan plan)
         {
-            FilterNode filterNode = searchFrom(plan.getRoot()).where(TableScanNode.class::isInstance).findOnlyElement(null);
+            FilterNode filterNode = searchFrom(plan.getRoot()).where(FilterNode.class::isInstance).findOnlyElement(null);
             return Optional.ofNullable(filterNode).map(FilterNode::getPredicate).orElse(TRUE_LITERAL);
         }
     }
