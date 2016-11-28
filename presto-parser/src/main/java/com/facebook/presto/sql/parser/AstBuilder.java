@@ -690,10 +690,10 @@ class AstBuilder
             if (selectItem instanceof AllColumns) {
                 continue;
             }
-            check(selectItem instanceof SingleColumn, "Only SingleColumn and AllColumn selects are supported by SHOW STATS SELECT clause", context.querySpecification().selectItem(selectId));
+            check(selectItem instanceof SingleColumn, "Only * and column references are supported by SHOW STATS SELECT clause", context.querySpecification().selectItem(selectId));
 
             SingleColumn columnSelect = (SingleColumn) selectItem;
-            check(columnSelect.getExpression() instanceof QualifiedNameReference, "Only FieldReference is allowed on SELECT list of SHOW STATS SELECT clause", context.querySpecification().selectItem(selectId));
+            check(columnSelect.getExpression() instanceof QualifiedNameReference, "Only * and column references are supported by SHOW STATS SELECT clause", context.querySpecification().selectItem(selectId));
 
             selectId++;
         }
@@ -712,7 +712,7 @@ class AstBuilder
 
     void validateShowStatsWhereExpression(Expression expression, ParserRuleContext context)
     {
-        check(ALLOWED_SHOW_STATS_WHERE_EXPRESSION_TYPES.stream().anyMatch(clazz -> clazz.isInstance(expression)), "Only Literals, FieldReferences, Comparisons, And, Ors and Not expression are allowed in WHERE of SHOW STATS SELECT clause", context);
+        check(ALLOWED_SHOW_STATS_WHERE_EXPRESSION_TYPES.stream().anyMatch(clazz -> clazz.isInstance(expression)), "Only literals, column references, comparators and logical operators are allowed in WHERE of SHOW STATS SELECT clause", context);
 
         if (expression instanceof NotExpression) {
             validateShowStatsWhereExpression(((NotExpression) expression).getValue(), context);

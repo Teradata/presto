@@ -103,6 +103,7 @@ public class ShowStatsRewrite
             QuerySpecification specification = (QuerySpecification) node.getQuery().getQueryBody();
 
             checkArgument(specification.getFrom().isPresent());
+            checkArgument(specification.getFrom().get() instanceof Table);
             Table table = (Table) specification.getFrom().get();
             TableHandle tableHandle = getTableHandle(node, table.getName());
             Optional<TableLayoutHandle> tableLayoutHandle = getTableLayoutHandle(node, tableHandle);
