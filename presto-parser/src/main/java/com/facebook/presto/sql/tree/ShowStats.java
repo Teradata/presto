@@ -52,7 +52,8 @@ public class ShowStats
 
     private static Query createFakeQuery(Optional<NodeLocation> location, QualifiedName name)
     {
-        Select select = new Select(location, false, ImmutableList.of(new AllColumns()));
+        Select select = location.map(l -> new Select(l, false, ImmutableList.of(new AllColumns())))
+                                .orElse(new Select(false, ImmutableList.of(new AllColumns())));
         Relation relation = new Table(name);
         return simpleQuery(select, relation);
     }

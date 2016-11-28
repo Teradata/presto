@@ -38,7 +38,7 @@ public class Select
         this(Optional.of(location), distinct, selectItems);
     }
 
-    public Select(Optional<NodeLocation> location, boolean distinct, List<SelectItem> selectItems)
+    private Select(Optional<NodeLocation> location, boolean distinct, List<SelectItem> selectItems)
     {
         super(location);
         this.distinct = distinct;

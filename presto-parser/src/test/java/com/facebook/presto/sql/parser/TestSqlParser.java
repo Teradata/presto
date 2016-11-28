@@ -139,7 +139,6 @@ import static com.facebook.presto.sql.tree.ArithmeticUnaryExpression.negative;
 import static com.facebook.presto.sql.tree.ArithmeticUnaryExpression.positive;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.LESS_THAN;
-import static com.facebook.presto.sql.tree.LogicalBinaryExpression.Type.OR;
 import static java.lang.String.format;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.nCopies;
@@ -493,13 +492,13 @@ public class TestSqlParser
     public void testPrecedenceAndAssociativity()
             throws Exception
     {
-        assertExpression("1 AND 2 OR 3", new LogicalBinaryExpression(OR,
+        assertExpression("1 AND 2 OR 3", new LogicalBinaryExpression(LogicalBinaryExpression.Type.OR,
                 new LogicalBinaryExpression(LogicalBinaryExpression.Type.AND,
                         new LongLiteral("1"),
                         new LongLiteral("2")),
                 new LongLiteral("3")));
 
-        assertExpression("1 OR 2 AND 3", new LogicalBinaryExpression(OR,
+        assertExpression("1 OR 2 AND 3", new LogicalBinaryExpression(LogicalBinaryExpression.Type.OR,
                 new LongLiteral("1"),
                 new LogicalBinaryExpression(LogicalBinaryExpression.Type.AND,
                         new LongLiteral("2"),
@@ -509,7 +508,7 @@ public class TestSqlParser
                 new NotExpression(new LongLiteral("1")),
                 new LongLiteral("2")));
 
-        assertExpression("NOT 1 OR 2", new LogicalBinaryExpression(OR,
+        assertExpression("NOT 1 OR 2", new LogicalBinaryExpression(LogicalBinaryExpression.Type.OR,
                 new NotExpression(new LongLiteral("1")),
                 new LongLiteral("2")));
 
@@ -1683,7 +1682,7 @@ public class TestSqlParser
                     createShowStats(qualifiedName,
                             ImmutableList.of(new AllColumns()),
                             Optional.of(
-                                    new LogicalBinaryExpression(OR,
+                                    new LogicalBinaryExpression(LogicalBinaryExpression.Type.OR,
                                         new ComparisonExpression(GREATER_THAN,
                                                 new QualifiedNameReference(QualifiedName.of("field")),
                                                 new LongLiteral("0")),
@@ -1698,7 +1697,7 @@ public class TestSqlParser
     private ShowStats createShowStats(QualifiedName name, List<SelectItem> selects, Optional<Expression> where)
     {
         return new ShowStats(
-                simpleQuery(new Select(Optional.empty(), false, selects),
+                simpleQuery(new Select(false, selects),
                             new Table(name),
                             where,
                             ImmutableList.of()));

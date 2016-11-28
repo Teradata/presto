@@ -53,7 +53,6 @@ import com.facebook.presto.sql.tree.LongLiteral;
 import com.facebook.presto.sql.tree.Node;
 import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.Query;
-import com.facebook.presto.sql.tree.QuerySpecification;
 import com.facebook.presto.sql.tree.Relation;
 import com.facebook.presto.sql.tree.SelectItem;
 import com.facebook.presto.sql.tree.ShowCatalogs;
@@ -63,7 +62,6 @@ import com.facebook.presto.sql.tree.ShowFunctions;
 import com.facebook.presto.sql.tree.ShowPartitions;
 import com.facebook.presto.sql.tree.ShowSchemas;
 import com.facebook.presto.sql.tree.ShowSession;
-import com.facebook.presto.sql.tree.ShowStats;
 import com.facebook.presto.sql.tree.ShowTables;
 import com.facebook.presto.sql.tree.SimpleGroupBy;
 import com.facebook.presto.sql.tree.SingleColumn;
@@ -119,8 +117,6 @@ import static com.facebook.presto.sql.tree.ShowCreate.Type.TABLE;
 import static com.facebook.presto.sql.tree.ShowCreate.Type.VIEW;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 import static com.facebook.presto.util.Types.checkType;
-import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static java.lang.String.format;
@@ -480,16 +476,6 @@ final class ShowQueriesRewrite
                     return "scalar";
             }
             throw new IllegalArgumentException("Unsupported function kind: " + kind);
-        }
-
-        @Override
-        protected Node visitShowStats(ShowStats node, Void context)
-        {
-            checkArgument(node.getQuery().getQueryBody() instanceof QuerySpecification);
-            checkState(queryExplainer.isPresent(), "Query explainer must be provided for SHOW STATS SELECT");
-
-            ShowStatsRewriter rewriter = new ShowStatsRewriter(metadata, session, parameters, queryExplainer.get());
-            return rewriter.rewrite(node);
         }
 
         @Override
