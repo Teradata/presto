@@ -1,9 +1,9 @@
 -- database: presto_tpcds; groups: tpcds; requires: com.teradata.tempto.fulfillment.table.hive.tpcds.ImmutableTpcdsTablesRequirements
 SELECT
-  "cc_call_center_id" "call_center"
-, "cc_name" "call_center_name"
-, "cc_manager" "manager"
-, "sum"("cr_net_loss") "returns_loss"
+  "cc_call_center_id" "Call_Center"
+, "cc_name" "Call_Center_Name"
+, "cc_manager" "Manager"
+, "sum"("cr_net_loss") "Returns_Loss"
 FROM
   call_center
 , catalog_returns
