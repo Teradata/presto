@@ -45,7 +45,6 @@ SELECT
 , "sum"("nov_net") "nov_net"
 , "sum"("dec_net") "dec_net"
 FROM
-  (
 (
       SELECT
         "w_warehouse_name"
@@ -94,7 +93,7 @@ FROM
          AND ("t_time" BETWEEN 30838 AND (30838 + 28800))
          AND ("sm_carrier" IN ('DHL                 '      , 'BARIAN              '))
       GROUP BY "w_warehouse_name", "w_warehouse_sq_ft", "w_city", "w_county", "w_state", "w_country", "d_year"
-   ) UNION ALL (
+   UNION ALL
       SELECT
         "w_warehouse_name"
       , "w_warehouse_sq_ft"
@@ -142,7 +141,7 @@ FROM
          AND ("t_time" BETWEEN 30838 AND (30838 + 28800))
          AND ("sm_carrier" IN ('DHL                 '      , 'BARIAN              '))
       GROUP BY "w_warehouse_name", "w_warehouse_sq_ft", "w_city", "w_county", "w_state", "w_country", "d_year"
-   ) )  x
+   )  x
 GROUP BY "w_warehouse_name", "w_warehouse_sq_ft", "w_city", "w_county", "w_state", "w_country", "ship_carriers", "year"
 ORDER BY "w_warehouse_name" ASC
 LIMIT 100
