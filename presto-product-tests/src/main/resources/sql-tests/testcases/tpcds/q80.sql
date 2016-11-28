@@ -4,7 +4,7 @@ WITH
    SELECT
      "s_store_id" "store_id"
    , "sum"("ss_ext_sales_price") "sales"
-   , "sum"(COALESCE("sr_return_amt", 0)) "RETURNS"
+   , "sum"(COALESCE("sr_return_amt", 0)) "returns"
    , "sum"(("ss_net_profit" - COALESCE("sr_net_loss", 0))) "profit"
    FROM
      (store_sales
@@ -27,7 +27,7 @@ WITH
    SELECT
      "cp_catalog_page_id" "catalog_page_id"
    , "sum"("cs_ext_sales_price") "sales"
-   , "sum"(COALESCE("cr_return_amount", 0)) "RETURNS"
+   , "sum"(COALESCE("cr_return_amount", 0)) "returns"
    , "sum"(("cs_net_profit" - COALESCE("cr_net_loss", 0))) "profit"
    FROM
      (catalog_sales
@@ -50,7 +50,7 @@ WITH
    SELECT
      "web_site_id"
    , "sum"("ws_ext_sales_price") "sales"
-   , "sum"(COALESCE("wr_return_amt", 0)) "RETURNS"
+   , "sum"(COALESCE("wr_return_amt", 0)) "returns"
    , "sum"(("ws_net_profit" - COALESCE("wr_net_loss", 0))) "profit"
    FROM
      (web_sales
@@ -73,7 +73,7 @@ SELECT
   "channel"
 , "id"
 , "sum"("sales") "sales"
-, "sum"("returns") "RETURNS"
+, "sum"("returns") "returns"
 , "sum"("profit") "profit"
 FROM
   (
