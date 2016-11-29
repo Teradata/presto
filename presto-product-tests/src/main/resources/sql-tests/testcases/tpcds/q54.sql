@@ -61,7 +61,7 @@ UNION ALL       SELECT
    GROUP BY "c_customer_sk"
 ) 
 , segments AS (
-   SELECT CAST(("revenue" / 50) AS BIGINT) "segment"
+   SELECT CAST(("revenue" / 50) AS INTEGER) "segment"
    FROM
      my_revenue
 ) 
