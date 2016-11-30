@@ -17,27 +17,23 @@ import com.google.common.collect.ImmutableList;
 import com.teradata.tempto.fulfillment.table.jdbc.RelationalDataSource;
 import com.teradata.tempto.internal.fulfillment.table.cassandra.CassandraTableDefinition;
 
-import java.sql.JDBCType;
 import java.sql.Timestamp;
 import java.util.List;
 
 import static com.facebook.presto.tests.cassandra.TestConstants.CONNECTOR_NAME;
 import static com.facebook.presto.tests.cassandra.TestConstants.KEY_SPACE;
-import static java.sql.JDBCType.TIMESTAMP;
-import static java.sql.JDBCType.VARCHAR;
 
 public class MultiColumnKeyTableDefinition
 {
     private MultiColumnKeyTableDefinition() {}
 
-    public static final ImmutableList<JDBCType> MULTI_COLUMN_KEY_TYPES = ImmutableList.of(VARCHAR, VARCHAR, VARCHAR, TIMESTAMP);
     private static final String MULTI_COLUMN_KEY_DDL =
             "CREATE TABLE %NAME% (" +
                     "user_id text, " +
                     "key text, " +
                     "updated_at timestamp, " +
                     "value text, " +
-                    "PRIMARY KEY (user_id, key));";
+                    "PRIMARY KEY (user_id, key, updated_at));";
     private static final String MULTI_COLUMN_KEY_TABLE_NAME = "multicolumnkey";
 
     public static final CassandraTableDefinition CASSANDRA_MULTI_COLUMN_KEY;

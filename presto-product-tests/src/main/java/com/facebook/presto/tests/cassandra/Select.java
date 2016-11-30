@@ -21,7 +21,6 @@ import com.teradata.tempto.configuration.Configuration;
 import com.teradata.tempto.query.QueryResult;
 import org.testng.annotations.Test;
 
-import java.math.BigInteger;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 
@@ -193,5 +192,27 @@ public class Select
                                 "abc", String.valueOf(Long.MAX_VALUE)),
                         row("def", null, null, null, null, null, null, null, null, null, null, null,
                                 null, null, null, null, null, null, null));
+    }
+
+    @Test(groups = CASSANDRA)
+    public void testNationJoinNation()
+            throws SQLException
+    {
+        String tableName = format("%s.%s.%s", CONNECTOR_NAME, KEY_SPACE, CASSANDRA_NATION.getName());
+        String sql = format(
+                "SELECT n1.n_name, n2.n_regionkey FROM %s n1 JOIN " +
+                        "%s n2 ON n1.n_nationkey = n2.n_regionkey " +
+                        "WHERE n1.n_nationkey=3",
+                tableName,
+                tableName);
+        QueryResult queryResult = onPresto()
+                .executeQuery(sql);
+
+        assertThat(queryResult).containsOnly(
+                row("CANADA", 3),
+                row("CANADA", 3),
+                row("CANADA", 3),
+                row("CANADA", 3),
+                row("CANADA", 3));
     }
 }

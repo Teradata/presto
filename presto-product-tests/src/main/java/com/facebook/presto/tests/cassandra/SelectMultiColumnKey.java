@@ -62,7 +62,7 @@ public class SelectMultiColumnKey
             throws SQLException
     {
         String sql = format(
-                "SELECT value FROM %s.%s.%s WHERE user_id = 'Alice' and key = 'a1'",
+                "SELECT value FROM %s.%s.%s WHERE user_id = 'Alice' and key = 'a1' and updated_at = TIMESTAMP '2015-01-01 01:01:01'",
                 CONNECTOR_NAME,
                 KEY_SPACE,
                 CASSANDRA_MULTI_COLUMN_KEY.getName());
@@ -77,7 +77,7 @@ public class SelectMultiColumnKey
             throws SQLException
     {
         String sql = format(
-                "SELECT value FROM %s.%s.%s WHERE user_id = 'Alice' and key < 'b'",
+                "SELECT value FROM %s.%s.%s WHERE user_id = 'Alice' and key < 'b' and updated_at >= TIMESTAMP '2015-01-01 01:01:01'",
                 CONNECTOR_NAME,
                 KEY_SPACE,
                 CASSANDRA_MULTI_COLUMN_KEY.getName());
@@ -100,5 +100,36 @@ public class SelectMultiColumnKey
                 .executeQuery(sql);
 
         assertThat(queryResult).hasNoRows();
+    }
+
+    @Test(groups = CASSANDRA)
+    public void testSelectWithFilterOnPrefixOfClusteringKey()
+            throws SQLException
+    {
+        String sql = format(
+                "SELECT value FROM %s.%s.%s WHERE user_id = 'Bob' and key = 'b1'",
+                CONNECTOR_NAME,
+                KEY_SPACE,
+                CASSANDRA_MULTI_COLUMN_KEY.getName());
+        QueryResult queryResult = onPresto()
+                .executeQuery(sql);
+
+        assertThat(queryResult).containsOnly(row("Test value 2"));
+    }
+
+    @Test(groups = CASSANDRA)
+    public void testSelectWithFilterOnSecondClusteringKey()
+            throws SQLException
+    {
+        // Since update_at is the second clustering key, this forces a full table scan.
+        String sql = format(
+                "SELECT value FROM %s.%s.%s WHERE user_id = 'Bob' and updated_at = TIMESTAMP '2014-02-02 03:04:05'",
+                CONNECTOR_NAME,
+                KEY_SPACE,
+                CASSANDRA_MULTI_COLUMN_KEY.getName());
+        QueryResult queryResult = onPresto()
+                .executeQuery(sql);
+
+        assertThat(queryResult).containsOnly(row("Test value 2"));
     }
 }
