@@ -95,11 +95,24 @@ public final class SystemSessionProperties
                         "Distribute index joins on join keys instead of executing inline",
                         featuresConfig.isDistributedIndexJoinsEnabled(),
                         false),
-                stringSessionProperty(
+                new PropertyMetadata<>(
                         JOIN_DISTRIBUTION_TYPE,
                         "What join method to use. Options are repartitioned, replicated, and automatic",
+                        VARCHAR,
+                        String.class,
                         featuresConfig.getJoinDistributionType(),
-                        false),
+                        false,
+                        value -> {
+                            String distributionType = (String) value;
+                            if (!FeaturesConfig.JoinDistributionType.AVAILABLE_OPTIONS.contains(distributionType)) {
+                                throw new PrestoException(
+                                        StandardErrorCode.INVALID_SESSION_PROPERTY,
+                                        format("Value %s is not valid for join-distribution-type.", distributionType));
+                            }
+                            return distributionType;
+                        },
+                        value -> value
+                ),
                 integerSessionProperty(
                         HASH_PARTITION_COUNT,
                         "Number of partitions for distributed joins and aggregations",
