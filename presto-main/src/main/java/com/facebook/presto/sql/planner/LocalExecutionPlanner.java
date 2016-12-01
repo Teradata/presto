@@ -141,6 +141,7 @@ import com.facebook.presto.sql.tree.BooleanLiteral;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.SymbolReference;
+import com.facebook.presto.util.maps.IdentityLinkedHashMap;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -163,7 +164,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -1010,7 +1010,7 @@ public class LocalExecutionPlanner
                 rewrittenProjections.add(symbolToInputRewriter.rewrite(projectionExpressions.get(symbol)));
             }
 
-            IdentityHashMap<Expression, Type> expressionTypes = getExpressionTypesFromInput(
+            IdentityLinkedHashMap<Expression, Type> expressionTypes = getExpressionTypesFromInput(
                     context.getSession(),
                     metadata,
                     sqlParser,
@@ -1114,7 +1114,7 @@ public class LocalExecutionPlanner
             }
         }
 
-        private RowExpression toRowExpression(Expression expression, IdentityHashMap<Expression, Type> types)
+        private RowExpression toRowExpression(Expression expression, IdentityLinkedHashMap<Expression, Type> types)
         {
             return SqlToRowExpressionTranslator.translate(expression, SCALAR, types, metadata.getFunctionRegistry(), metadata.getTypeManager(), session, true);
         }
@@ -1163,7 +1163,7 @@ public class LocalExecutionPlanner
             PageBuilder pageBuilder = new PageBuilder(outputTypes);
             for (List<Expression> row : node.getRows()) {
                 pageBuilder.declarePosition();
-                IdentityHashMap<Expression, Type> expressionTypes = getExpressionTypes(
+                IdentityLinkedHashMap<Expression, Type> expressionTypes = getExpressionTypes(
                         context.getSession(),
                         metadata,
                         sqlParser,
@@ -1552,7 +1552,7 @@ public class LocalExecutionPlanner
 
             Expression rewrittenFilter = new SymbolToInputRewriter(joinSourcesLayout).rewrite(filterExpression);
 
-            IdentityHashMap<Expression, Type> expressionTypes = getExpressionTypesFromInput(
+            IdentityLinkedHashMap<Expression, Type> expressionTypes = getExpressionTypesFromInput(
                     session,
                     metadata,
                     sqlParser,
