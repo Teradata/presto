@@ -189,10 +189,7 @@ public class CoefficientBasedCostCalculator
         {
             boolean fullyEnforced = false;
             Optional<TableLayoutHandle> layoutHandle = Optional.empty();
-            if (node.getLayout().isPresent()) {
-                layoutHandle = Optional.of(node.getLayout().get());
-            }
-            else {
+            {
                 List<TableLayoutResult> layoutCandidates = getLayouts(node, predicate);
                 if (!layoutCandidates.isEmpty()) {
                     TableLayout layout = layoutCandidates.get(0).getLayout();
