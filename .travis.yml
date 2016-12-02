@@ -22,6 +22,10 @@ cache:
   directories:
     - $HOME/.m2/repository
 
+cache:
+  directories:
+    - /var/lib/docker/aufs
+
 services:
   - docker
 
@@ -84,6 +88,9 @@ script:
 before_cache:
   # Make the cache stable between builds by removing build output
   - rm -rf $HOME/.m2/repository/com/facebook
+
+before_cache:
+  - rm -rf /var/lib/docker/aufs/mnt
 
 notifications:
   slack:
