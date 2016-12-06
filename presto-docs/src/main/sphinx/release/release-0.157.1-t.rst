@@ -4,7 +4,6 @@ Release 0.157.1-t
 
 Presto 0.157.1-t is equivalent to Presto release 0.157.1, with some additional features and patches.
 
- 
 SQL
 ---
 * Support correlated scalar aggregation subqueries
@@ -19,6 +18,21 @@ Data Types
 Security
 --------
 * LDAP Authentication
+
+    LDAP Authentication functionality in 0.157.1-t is same as 0.152.1-t, but the server properties have been renamed. The new properties and the only ones supported now are:
+
+
+========================================== ================================================= =================================================
+Property                                   Example usage in Active Directory                 Example usage in OpenLDAP
+========================================== ================================================= =================================================
+``http-server.authentication.type``        LDAP                                              LDAP
+``authentication.ldap.url``                ldaps://ldapserver:636                            ldaps://ldapserver:636
+``authentication.ldap.user-bind-pattern``  ${USER}@domain.com                                uid=${USER},ou=Asia,dc=domain,dc=com
+``authentication.ldap.user-base-dn``       ou=Asia,dc=domain,dc=com                          ou=Asia,dc=domain,dc=com
+``authentication.ldap.group-auth-pattern`` (&(objectClass=person)(sAMAccountName=${USER})    (&(objectClass=inetOrgPerson)(uid=${USER})
+                                           (memberof=cn=group,ou=America,dc=domain,dc=com))  (memberof=cn=group,ou=America,dc=domain,dc=com))
+========================================== ================================================= =================================================
+
 * SHOW GRANTS support for Hive connector
 
 Performance
