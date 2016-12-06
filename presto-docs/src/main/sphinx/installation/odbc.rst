@@ -7,25 +7,17 @@ drivers. The ODBC drivers are available for Windows, Mac, and Linux. The
 drivers are available for free download from
 https://www.teradata.com/presto.
 
-For detailed Presto ODBC documentation, please see the `Teradata
-Presto ODBC Driver Install Guide
-<http://teradata-presto.s3.amazonaws.com/ odbc-1.1.4.1011/TeradataODBCDriverPrestoInstallGuide_1_1_4.pdf>`_
+============================ ========================== =======================================
+Teradata Presto ODBC Version Compatible Presto Versions Documentation
+============================ ========================== =======================================
+1.1.4                        0.152.1-t.x, 0.148-t.x     `Teradata Presto ODBC 1.1.4 Documention <http://teradata-presto.s3.amazonaws.com/odbc-1.1.4.1011/TeradataODBCDriverPrestoInstallGuide_1_1_4.pdf>`_
 
+1.1.3                        0.148-t.x                  `Teradata Presto ODBC 1.1.3 Documention <http://teradata-presto.s3.amazonaws.com/odbc-1.1.3.1007/TeradataODBCDriverPrestoInstallGuide_1_1_3.pdf>`_
 
-Version Compatibility
----------------------
+1.1.0                        0.141-t                    `Teradata Presto ODBC 1.1.0 Documention <http://teradata-presto.s3.amazonaws.com/odbc-1.1.0.1004/TeradataODBCDriverPrestoInstallGuide.pdf>`_
 
-============================ ==========================
-Teradata Presto ODBC Version Compatible Presto Versions
-============================ ==========================
-1.1.4.1.1001                 0.152.1-t.x, 0.148-t.x
-
-1.1.3.1007                   0.148-t.x
-
-1.1.0.1004                   0.141-t
-
-1.0.0.1001                   0.127-t, 0.115-t, 0.101-t
-============================ ==========================
+1.0.0                        0.127-t, 0.115-t, 0.101-t  `Teradata Presto ODBC 1.0.0 Documention <http://teradata-presto.s3.amazonaws.com/odbc-1.0.0.1001/TeradataODBCDriverPrestoInstallGuide.pdf>`_
+============================ ========================== =======================================
 
 System Requirements
 -------------------
