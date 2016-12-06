@@ -12,7 +12,7 @@ Authorization
 
 You can enable authorization checks for the :doc:`/connector/hive` by setting
 the ``hive.security`` property in the Hive catalog properties file. This
-property must be one of the following values:
+property must have one of the following values:
 
 ================================================== ============================================================
 Property Value                                     Description
@@ -38,6 +38,8 @@ Property Value                                     Description
                                                    To alter these privileges, use the :doc:`/sql/grant` and
                                                    :doc:`/sql/revoke` commands.
 ================================================== ============================================================
+
+Ensure that authentication has been enabled when enabling authorization checks.
 
 Authentication
 ==============
