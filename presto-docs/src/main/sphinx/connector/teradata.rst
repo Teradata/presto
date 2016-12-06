@@ -29,9 +29,7 @@ enabling a business user to quickly and interactively query between
 systems.
 
 Teradata also provides a Teradata-to-Presto QueryGrid connector, to allow
-querying data in Presto from Teradata.
-
-Click `here <http://www.teradata.com/Resources/Datasheets/QueryGrid-and-Presto-Enabling-faster-more-scalable-interactive-querying-of-Hadoop/>`_ for more information about the Presto Teradata QueryGrid Connectors
+querying data in Presto from Teradata. See :doc:`QueryGrid <../querygrid>`.
 
 Contact **presto@teradata.com** for more information to obtain an evaluation of the Presto Teradata QueryGrid Connectors.
 
