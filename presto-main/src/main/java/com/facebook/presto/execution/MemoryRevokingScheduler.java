@@ -19,33 +19,44 @@ import com.facebook.presto.memory.QueryContext;
 import com.facebook.presto.memory.TraversingQueryContextVisitor;
 import com.facebook.presto.operator.OperatorContext;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
+import io.airlift.log.Logger;
 
 import javax.inject.Inject;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static java.util.Objects.requireNonNull;
 
 public class MemoryRevokingScheduler
 {
+    private static final Logger LOG = Logger.get(MemoryRevokingScheduler.class);
+
     private static final Ordering<SqlTask> ORDER_BY_CREATE_TIME = Ordering.natural().onResultOf(task -> task.getTaskInfo().getStats().getCreateTime());
-    private final MemoryPool memoryPool;
+    private final List<MemoryPool> memoryPools;
 
     @Inject
     public MemoryRevokingScheduler(LocalMemoryManager localMemoryManager)
     {
-        this(requireNonNull(localMemoryManager, "localMemoryManager can not be null").getPool(LocalMemoryManager.GENERAL_POOL));
+        requireNonNull(localMemoryManager, "localMemoryManager can not be null");
+        memoryPools = ImmutableList.of(localMemoryManager.getPool(LocalMemoryManager.GENERAL_POOL), localMemoryManager.getPool(LocalMemoryManager.RESERVED_POOL));
     }
 
     @VisibleForTesting
     MemoryRevokingScheduler(MemoryPool memoryPool)
     {
-        this.memoryPool = requireNonNull(memoryPool, "memoryPool can not be null");
+        this.memoryPools = ImmutableList.of(requireNonNull(memoryPool, "memoryPool can not be null"));
     }
 
     public void requestMemoryRevokingIfNeeded(Collection<SqlTask> sqlTasks)
+    {
+        memoryPools.forEach(memoryPool -> requestMemoryRevokingIfNeeded(sqlTasks, memoryPool));
+    }
+
+    private void requestMemoryRevokingIfNeeded(Collection<SqlTask> sqlTasks, MemoryPool memoryPool)
     {
         long freeBytes = memoryPool.getFreeBytes();
         if (freeBytes > 0) {
@@ -54,7 +65,7 @@ public class MemoryRevokingScheduler
 
         long remainingBytesToRevoke = -freeBytes;
         remainingBytesToRevoke -= getMemoryAlreadyBeingRevoked(sqlTasks);
-        requestRevoking(remainingBytesToRevoke, sqlTasks);
+        requestRevoking(remainingBytesToRevoke, sqlTasks, memoryPool);
     }
 
     private long getMemoryAlreadyBeingRevoked(Collection<SqlTask> sqlTasks)
@@ -76,7 +87,7 @@ public class MemoryRevokingScheduler
         return memoryAlreadyBeingRevoked.get();
     }
 
-    private void requestRevoking(long remainingBytesToRevoke, Collection<SqlTask> sqlTasks)
+    private void requestRevoking(long remainingBytesToRevoke, Collection<SqlTask> sqlTasks, MemoryPool memoryPool)
     {
         AtomicLong remainingBytesToRevokeAtomic = new AtomicLong(remainingBytesToRevoke);
         sqlTasks.stream()
@@ -87,6 +98,10 @@ public class MemoryRevokingScheduler
                     @Override
                     public Void visitQueryContext(QueryContext queryContext, AtomicLong remainingBytesToRevoke)
                     {
+                        if (queryContext.getMemoryPool() != memoryPool) {
+                            return null;
+                        }
+
                         if (remainingBytesToRevoke.get() < 0) {
                             // exit immediately if no work needs to be done
                             return null;
