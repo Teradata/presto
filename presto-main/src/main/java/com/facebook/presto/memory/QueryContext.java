@@ -185,9 +185,9 @@ public class QueryContext
             return;
         }
         MemoryPool originalPool = memoryPool;
-        long originalReserved = reserved;
+        long originalReserved = reserved + revocableReserved;
         memoryPool = pool;
-        ListenableFuture<?> future = pool.reserve(queryId, reserved);
+        ListenableFuture<?> future = pool.reserve(queryId, originalReserved);
         Futures.addCallback(future, new FutureCallback<Object>() {
             @Override
             public void onSuccess(Object result)
