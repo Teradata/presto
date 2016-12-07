@@ -117,6 +117,7 @@ public class MemoryRevokingScheduler
                             if (operatorRevocableBytes > 0 && !operatorContext.isMemoryRevokingRequested()) {
                                 operatorContext.requestMemoryRevoking();
                                 remainingBytesToRevoke.addAndGet(-operatorRevocableBytes);
+                                LOG.info("(%s)requested revoking %s; remaining %s", memoryPool.getId(), operatorRevocableBytes, remainingBytesToRevoke.get());
                             }
                         }
                         return null;
