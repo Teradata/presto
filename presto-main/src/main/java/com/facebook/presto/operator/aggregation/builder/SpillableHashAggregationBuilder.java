@@ -56,6 +56,8 @@ public class SpillableHashAggregationBuilder
     private Optional<MergeHashSort> mergeHashSort = Optional.empty();
     private CompletableFuture<?> spillInProgress = CompletableFuture.completedFuture(null);
     private final LocalMemoryContext memoryContext;
+    // todo get rid of that and only use revocable memory
+    private long emptyHashAggregationBuilderSize = 0;
 
     public SpillableHashAggregationBuilder(
             List<AccumulatorFactory> accumulatorFactories,
@@ -98,7 +100,8 @@ public class SpillableHashAggregationBuilder
     public void updateMemory()
     {
         checkState(spillInProgress.isDone());
-        operatorContext.setRevocableMemoryReservation(hashAggregationBuilder.getSizeInMemory());
+        operatorContext.setMemoryReservation(emptyHashAggregationBuilderSize);
+        operatorContext.setRevocableMemoryReservation(hashAggregationBuilder.getSizeInMemory() - emptyHashAggregationBuilderSize);
     }
 
     public long getSizeInMemory()
@@ -266,5 +269,6 @@ public class SpillableHashAggregationBuilder
                 hashChannel,
                 operatorContext,
                 DataSize.succinctBytes(0));
+        this.emptyHashAggregationBuilderSize = this.hashAggregationBuilder.getSizeInMemory();
     }
 }
