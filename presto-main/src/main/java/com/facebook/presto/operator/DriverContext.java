@@ -177,8 +177,12 @@ public class DriverContext
 
     public void failed(Throwable cause)
     {
+        if (!finished.compareAndSet(false, true)) {
+            // already finished
+            return;
+        }
+
         pipelineContext.failed(cause);
-        finished.set(true);
 
         freeMemory(memoryReservation.get());
         freeRevocableMemory(revocableMemoryReservation.get());
