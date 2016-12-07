@@ -18,6 +18,7 @@ import com.facebook.presto.memory.MemoryPool;
 import com.facebook.presto.memory.QueryContext;
 import com.facebook.presto.memory.TraversingQueryContextVisitor;
 import com.facebook.presto.operator.OperatorContext;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
@@ -37,18 +38,24 @@ public class MemoryRevokingScheduler
 
     private static final Ordering<SqlTask> ORDER_BY_CREATE_TIME = Ordering.natural().onResultOf(task -> task.getTaskInfo().getStats().getCreateTime());
     private final List<MemoryPool> memoryPools;
+    private final double memoryRevokingThreshold;
+    private final double memoryRevokingTarget;
 
     @Inject
-    public MemoryRevokingScheduler(LocalMemoryManager localMemoryManager)
+    public MemoryRevokingScheduler(LocalMemoryManager localMemoryManager, FeaturesConfig config)
     {
         requireNonNull(localMemoryManager, "localMemoryManager can not be null");
-        memoryPools = ImmutableList.of(localMemoryManager.getPool(LocalMemoryManager.GENERAL_POOL), localMemoryManager.getPool(LocalMemoryManager.RESERVED_POOL));
+        this.memoryPools = ImmutableList.of(localMemoryManager.getPool(LocalMemoryManager.GENERAL_POOL), localMemoryManager.getPool(LocalMemoryManager.RESERVED_POOL));
+        this.memoryRevokingThreshold = config.getMemoryRevokingThreshold();
+        this.memoryRevokingTarget = config.getMemoryRevokingTarget();
     }
 
     @VisibleForTesting
-    MemoryRevokingScheduler(MemoryPool memoryPool)
+    MemoryRevokingScheduler(MemoryPool memoryPool, double memoryRevokingThreshold, double memoryRevokingTarget)
     {
-        this.memoryPools = ImmutableList.of(requireNonNull(memoryPool, "memoryPool can not be null"));
+        this.memoryPools = ImmutableList.of(memoryPool);
+        this.memoryRevokingThreshold = memoryRevokingThreshold;
+        this.memoryRevokingTarget = memoryRevokingTarget;
     }
 
     public void requestMemoryRevokingIfNeeded(Collection<SqlTask> sqlTasks)
@@ -59,11 +66,11 @@ public class MemoryRevokingScheduler
     private void requestMemoryRevokingIfNeeded(Collection<SqlTask> sqlTasks, MemoryPool memoryPool)
     {
         long freeBytes = memoryPool.getFreeBytes();
-        if (freeBytes > 0) {
+        if (freeBytes > memoryPool.getMaxBytes() * (1.0 - memoryRevokingThreshold)) {
             return;
         }
 
-        long remainingBytesToRevoke = -freeBytes;
+        long remainingBytesToRevoke = (long) (-freeBytes + (memoryPool.getMaxBytes() * (1.0 - memoryRevokingTarget)));
         remainingBytesToRevoke -= getMemoryAlreadyBeingRevoked(sqlTasks);
         requestRevoking(remainingBytesToRevoke, sqlTasks, memoryPool);
     }
