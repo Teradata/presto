@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.connector.jmx;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.configuration.Config;
@@ -41,7 +42,28 @@ public class JmxConnectorConfig
     @Config("jmx.dump-tables")
     public JmxConnectorConfig setDumpTables(String tableNames)
     {
-        this.dumpTables = ImmutableSet.copyOf(Splitter.on(',').omitEmptyStrings().trimResults().split(tableNames));
+        ImmutableSet.Builder<String> dupTables = ImmutableSet.builder();
+        String tableName = "";
+        Iterable<String> parts = Splitter.on(',').omitEmptyStrings().split(tableNames);
+        for (String part : parts) {
+            tableName = tableName + part;
+            if (!tableName.endsWith("\\")) {
+                dupTables.add(tableName.trim());
+                tableName = "";
+            }
+            else {
+                tableName = tableName.substring(0, tableName.length() - 1);
+                tableName = tableName + ",";
+            }
+        }
+        this.dumpTables = dupTables.build();
+        return this;
+    }
+
+    @VisibleForTesting
+    JmxConnectorConfig setDumpTables(Set<String> tableNames)
+    {
+        this.dumpTables = ImmutableSet.copyOf(tableNames);
         return this;
     }
 
