@@ -16,7 +16,6 @@ package com.facebook.presto.memory;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.memory.MemoryPoolId;
 import com.facebook.presto.spi.memory.MemoryPoolInfo;
-import com.google.common.collect.ImmutableMap;
 import org.weakref.jmx.Managed;
 
 import javax.annotation.concurrent.GuardedBy;
@@ -30,6 +29,7 @@ import java.util.Objects;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static java.util.Objects.requireNonNull;
 
+// todo handle revocable memory
 @ThreadSafe
 public class ClusterMemoryPool
 {
@@ -39,7 +39,10 @@ public class ClusterMemoryPool
     private long totalDistributedBytes;
 
     @GuardedBy("this")
-    private long freeDistributedBytes;
+    private long reservedDistributedBytes;
+
+    @GuardedBy("this")
+    private long reservedRevocableDistributedBytes;
 
     @GuardedBy("this")
     private int nodes;
@@ -54,6 +57,9 @@ public class ClusterMemoryPool
     @GuardedBy("this")
     private final Map<QueryId, Long> queryMemoryReservations = new HashMap<>();
 
+    @GuardedBy("this")
+    private final Map<QueryId, Long> queryMemoryRevocableReservations = new HashMap<>();
+
     public ClusterMemoryPool(MemoryPoolId id)
     {
         this.id = requireNonNull(id, "id is null");
@@ -61,7 +67,7 @@ public class ClusterMemoryPool
 
     public synchronized MemoryPoolInfo getInfo()
     {
-        return new MemoryPoolInfo(totalDistributedBytes, freeDistributedBytes, ImmutableMap.copyOf(queryMemoryReservations));
+        return new MemoryPoolInfo(totalDistributedBytes, reservedDistributedBytes, reservedRevocableDistributedBytes, queryMemoryReservations, queryMemoryRevocableReservations);
     }
 
     public MemoryPoolId getId()
@@ -78,7 +84,19 @@ public class ClusterMemoryPool
     @Managed
     public synchronized long getFreeDistributedBytes()
     {
-        return freeDistributedBytes;
+        return totalDistributedBytes - reservedDistributedBytes - reservedRevocableDistributedBytes;
+    }
+
+    @Managed
+    public synchronized long getReservedDistributedBytes()
+    {
+        return reservedDistributedBytes;
+    }
+
+    @Managed
+    public synchronized long getReservedRevocableDistributedBytes()
+    {
+        return reservedRevocableDistributedBytes;
     }
 
     @Managed
@@ -104,12 +122,18 @@ public class ClusterMemoryPool
         return queryMemoryReservations;
     }
 
+    public synchronized Map<QueryId, Long> getQueryMemoryRevocableReservations()
+    {
+        return queryMemoryRevocableReservations;
+    }
+
     public synchronized void update(List<MemoryInfo> memoryInfos, int assignedQueries)
     {
         nodes = 0;
         blockedNodes = 0;
         totalDistributedBytes = 0;
-        freeDistributedBytes = 0;
+        reservedDistributedBytes = 0;
+        reservedRevocableDistributedBytes = 0;
         this.assignedQueries = assignedQueries;
         this.queryMemoryReservations.clear();
 
@@ -121,9 +145,13 @@ public class ClusterMemoryPool
                     blockedNodes++;
                 }
                 totalDistributedBytes += poolInfo.getMaxBytes();
-                freeDistributedBytes += poolInfo.getFreeBytes();
+                reservedDistributedBytes += poolInfo.getReservedBytes();
+                reservedRevocableDistributedBytes += poolInfo.getReservedRevocableBytes();
                 for (Map.Entry<QueryId, Long> entry : poolInfo.getQueryMemoryReservations().entrySet()) {
                     queryMemoryReservations.merge(entry.getKey(), entry.getValue(), Long::sum);
+                }
+                for (Map.Entry<QueryId, Long> entry : poolInfo.getQueryMemoryRevocableReservations().entrySet()) {
+                    queryMemoryRevocableReservations.merge(entry.getKey(), entry.getValue(), Long::sum);
                 }
             }
         }
@@ -154,7 +182,9 @@ public class ClusterMemoryPool
         return toStringHelper(this)
                 .add("id", id)
                 .add("totalDistributedBytes", totalDistributedBytes)
-                .add("freeDistributedBytes", freeDistributedBytes)
+                .add("freeDistributedBytes", getFreeDistributedBytes())
+                .add("reservedDistributedBytes", reservedDistributedBytes)
+                .add("reservedRevocableDistributedBytes", reservedRevocableDistributedBytes)
                 .add("nodes", nodes)
                 .add("blockedNodes", blockedNodes)
                 .add("assignedQueries", assignedQueries)
