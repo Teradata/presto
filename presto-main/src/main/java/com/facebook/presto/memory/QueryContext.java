@@ -108,7 +108,7 @@ public class QueryContext
     public synchronized ListenableFuture<?> reserveRevocableMemory(long bytes)
     {
         checkArgument(bytes >= 0, "bytes is negative");
-        ListenableFuture<?> future = memoryPool.reserve(queryId, bytes);
+        ListenableFuture<?> future = memoryPool.reserveRevocable(queryId, bytes);
         revocableReserved += bytes;
         return future;
     }
@@ -159,7 +159,7 @@ public class QueryContext
         checkArgument(bytes >= 0, "bytes is negative");
         checkArgument(revocableReserved - bytes >= 0, "tried to free more revocable memory than is reserved");
         revocableReserved -= bytes;
-        memoryPool.free(queryId, bytes);
+        memoryPool.freeRevocable(queryId, bytes);
     }
 
     public synchronized void freeSystemMemory(long bytes)
