@@ -141,7 +141,7 @@ public class ClusterMemoryPool
             MemoryPoolInfo poolInfo = info.getPools().get(id);
             if (poolInfo != null) {
                 nodes++;
-                if (poolInfo.getFreeBytes() <= 0) {
+                if (poolInfo.getFreeBytes() + poolInfo.getReservedRevocableBytes() <= 0) {
                     blockedNodes++;
                 }
                 totalDistributedBytes += poolInfo.getMaxBytes();
