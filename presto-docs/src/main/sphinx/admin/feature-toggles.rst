@@ -12,7 +12,7 @@ Config Properties
 +---------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
 |Name of property           | Default value | Description                                                                                                                                                |
 +===========================+===============+=======================================================================================================+++==================================================+
-|optimizer.reorder-windows  | true          |Allow reordering windows in order to put those with the same partitioning next to each other. This may sometimes allow minimizing number of repartitionings.|
+|optimizer.reorder-windows  | false         |Allow reordering windows in order to put those with the same partitioning next to each other. This may sometimes allow minimizing number of repartitionings.|
 +---------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
 |experimental.spill-enabled | true          |Try spilling memory to disk to avoid exceeding memory limits for the query. See :ref:`this section<spilling-toggle>` for a more detailed description.       |
 +---------------------------+---------------+------------------------------------------------------------------------------------------------------------------------------------------------------------+
