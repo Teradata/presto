@@ -15,6 +15,7 @@ package com.facebook.presto.spiller;
 
 import com.facebook.presto.RowPagesBuilder;
 import com.facebook.presto.block.BlockEncodingManager;
+import com.facebook.presto.memory.AggregatedMemoryContext;
 import com.facebook.presto.operator.spiller.TestOperatorSpillContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.BlockBuilder;
@@ -46,12 +47,13 @@ public class TestBinaryFileSpiller
     private final BlockEncodingSerde blockEncodingSerde = new BlockEncodingManager(new TypeRegistry(ImmutableSet.of(BIGINT, DOUBLE, VARBINARY)));
     private final SpillerStats spillerStats = new SpillerStats();
     private final SpillerFactory factory = new GenericSpillerFactory(new BinaryFileSingleStreamSpillerFactory(blockEncodingSerde, spillerStats, new FeaturesConfig()));
+    private final AggregatedMemoryContext memoryContext = new AggregatedMemoryContext();
 
     @Test
     public void testFileSpiller()
             throws Exception
     {
-        try (Spiller spiller = factory.create(TYPES, () -> new LocalSpillContext(new TestOperatorSpillContext()))) {
+        try (Spiller spiller = factory.create(TYPES, () -> new LocalSpillContext(new TestOperatorSpillContext()), memoryContext)) {
             testSimpleSpiller(spiller);
         }
     }
@@ -72,7 +74,7 @@ public class TestBinaryFileSpiller
 
         Page page = new Page(col1.build(), col2.build(), col3.build());
 
-        try (Spiller spiller = factory.create(TYPES,  () ->new LocalSpillContext(new TestOperatorSpillContext()))) {
+        try (Spiller spiller = factory.create(TYPES, () -> new LocalSpillContext(new TestOperatorSpillContext()), memoryContext)) {
             testSpiller(types, spiller, ImmutableList.of(page));
         }
     }
@@ -100,14 +102,18 @@ public class TestBinaryFileSpiller
     {
         long spilledBytesBefore = spillerStats.getTotalSpilledBytes();
         long spilledBytes = 0;
+
+        assertEquals(memoryContext.getBytes(), 0);
         for (List<Page> spill : spills) {
             spilledBytes += spill.stream().mapToLong(Page::getSizeInBytes).sum();
             spiller.spill(spill.iterator()).get();
         }
         assertEquals(spillerStats.getTotalSpilledBytes() - spilledBytesBefore, spilledBytes);
+        assertEquals(memoryContext.getBytes(), 0);
 
         List<Iterator<Page>> actualSpills = spiller.getSpills();
         assertEquals(actualSpills.size(), spills.length);
+        assertEquals(memoryContext.getBytes(), spills.length * BinaryFileSingleStreamSpiller.BUFFER_SIZE);
 
         for (int i = 0; i < actualSpills.size(); i++) {
             List<Page> actualSpill = ImmutableList.copyOf(actualSpills.get(i));
@@ -118,5 +124,7 @@ public class TestBinaryFileSpiller
                 assertPageEquals(types, actualSpill.get(j), expectedSpill.get(j));
             }
         }
+        spiller.close();
+        assertEquals(memoryContext.getBytes(), 0);
     }
 }
