@@ -13,11 +13,12 @@
  */
 package com.facebook.presto.spiller;
 
+import com.facebook.presto.memory.LocalMemoryContext;
 import com.facebook.presto.spi.type.Type;
 
 import java.util.List;
 
 public interface SingleStreamSpillerFactory
 {
-    SingleStreamSpiller create(List<Type> types, LocalSpillContext localSpillContext);
+    SingleStreamSpiller create(List<Type> types, LocalSpillContext localSpillContext, LocalMemoryContext memoryContext);
 }
