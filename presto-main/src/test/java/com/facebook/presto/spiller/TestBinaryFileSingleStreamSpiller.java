@@ -15,6 +15,8 @@
 package com.facebook.presto.spiller;
 
 import com.facebook.presto.block.BlockEncodingManager;
+import com.facebook.presto.memory.AggregatedMemoryContext;
+import com.facebook.presto.memory.LocalMemoryContext;
 import com.facebook.presto.operator.PageAssertions;
 import com.facebook.presto.operator.spiller.TestOperatorSpillContext;
 import com.facebook.presto.spi.Page;
@@ -66,13 +68,18 @@ public class TestBinaryFileSingleStreamSpiller
         BlockEncodingSerde blockEncodingSerde = new BlockEncodingManager(new TypeRegistry(ImmutableSet.copyOf(TYPES)));
         SpillerStats spillerStats = new SpillerStats();
         LocalSpillContext localSpillContext = new LocalSpillContext(new TestOperatorSpillContext());
-        BinaryFileSingleStreamSpiller spiller = new BinaryFileSingleStreamSpiller(blockEncodingSerde, executor, spillPath.toPath(), spillerStats, localSpillContext);
+        LocalMemoryContext memoryContext = new AggregatedMemoryContext().newLocalMemoryContext();
+        BinaryFileSingleStreamSpiller spiller = new BinaryFileSingleStreamSpiller(blockEncodingSerde, executor, spillPath.toPath(), spillerStats, localSpillContext, memoryContext);
 
         Page page = buildPage();
 
+        assertEquals(memoryContext.getBytes(), 0);
         spiller.spill(page).get();
         spiller.spill(Iterators.forArray(page, page, page)).get();
         assertEquals(1, FileUtils.listFiles(spillPath).size());
+
+        // for spilling memory should be accounted only during spill() method is executing
+        assertEquals(memoryContext.getBytes(), 0);
 
         ImmutableList<Page> spilledPages = ImmutableList.copyOf(spiller.getSpilledPages());
 
@@ -81,8 +88,10 @@ public class TestBinaryFileSingleStreamSpiller
             PageAssertions.assertPageEquals(TYPES, page, spilledPages.get(i));
         }
 
+        assertEquals(memoryContext.getBytes(), BinaryFileSingleStreamSpiller.BUFFER_SIZE);
         spiller.close();
         assertEquals(0, FileUtils.listFiles(spillPath).size());
+        assertEquals(memoryContext.getBytes(), 0);
     }
 
     private Page buildPage()

@@ -14,6 +14,7 @@
 
 package com.facebook.presto.spiller;
 
+import com.facebook.presto.memory.AggregatedMemoryContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.type.Type;
 import com.google.common.io.Closer;
@@ -36,7 +37,7 @@ public class GenericSpiller
         implements Spiller
 {
     private final Supplier<LocalSpillContext> localSpillContextSupplier;
-
+    private final AggregatedMemoryContext memoryContext;
     private final SingleStreamSpillerFactory singleStreamSpillerFactory;
     private final List<Type> types;
     private final Closer closer;
@@ -47,10 +48,12 @@ public class GenericSpiller
     public GenericSpiller(
             List<Type> types,
             Supplier<LocalSpillContext> localSpillContextSupplier,
+            AggregatedMemoryContext memoryContext,
             SingleStreamSpillerFactory singleStreamSpillerFactory)
     {
         this.types = requireNonNull(types, "types can not be null");
         this.localSpillContextSupplier = localSpillContextSupplier;
+        this.memoryContext = requireNonNull(memoryContext, "memoryContext can not be null");
         this.singleStreamSpillerFactory = requireNonNull(singleStreamSpillerFactory, "singleStreamSpillerFactory can not be null");
         this.singleStreamSpillers = new ArrayList<>();
         this.closer = Closer.create();
@@ -60,7 +63,7 @@ public class GenericSpiller
     public CompletableFuture<?> spill(Iterator<Page> pageIterator)
     {
         checkNoSpillInProgress();
-        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, localSpillContextSupplier.get());
+        SingleStreamSpiller singleStreamSpiller = singleStreamSpillerFactory.create(types, localSpillContextSupplier.get(), memoryContext.newLocalMemoryContext());
         closer.register(singleStreamSpiller);
         singleStreamSpillers.add(singleStreamSpiller);
         previousSpill = singleStreamSpiller.spill(pageIterator);
