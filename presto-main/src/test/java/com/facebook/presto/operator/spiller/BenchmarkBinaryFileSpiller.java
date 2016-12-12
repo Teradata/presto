@@ -93,7 +93,7 @@ public class BenchmarkBinaryFileSpiller
         private final ListeningExecutorService executor = MoreExecutors.newDirectExecutorService();
         private final SpillerStats spillerStats = new SpillerStats();
         private final SpillerFactory spillerFactory = new GenericSpillerFactory(
-                new BinaryFileSingleStreamSpillerFactory(executor, BLOCK_ENCODING_MANAGER, spillerStats, ImmutableList.of(SPILL_PATH), 0.0));
+                new BinaryFileSingleStreamSpillerFactory(executor, BLOCK_ENCODING_MANAGER, spillerStats, ImmutableList.of(SPILL_PATH), 1.0));
 
         @Param({"10000"})
         private int rowsPerPage = 10000;
