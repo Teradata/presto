@@ -58,8 +58,8 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 @State(Scope.Thread)
 @OutputTimeUnit(SECONDS)
 @Fork(3)
-@Warmup(iterations = 5, time = 500, timeUnit = TimeUnit.MILLISECONDS)
-@Measurement(iterations = 10, time = 500, timeUnit = TimeUnit.MILLISECONDS)
+@Warmup(iterations = 10, time = 500, timeUnit = TimeUnit.MILLISECONDS)
+@Measurement(iterations = 20, time = 500, timeUnit = TimeUnit.MILLISECONDS)
 public class BenchmarkBinaryFileSpiller
 {
     private static final List<Type> TYPES = ImmutableList.of(BIGINT, BIGINT, DOUBLE, createUnboundedVarcharType(), DOUBLE);

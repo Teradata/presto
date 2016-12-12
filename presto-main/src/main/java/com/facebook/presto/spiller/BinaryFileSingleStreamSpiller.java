@@ -100,7 +100,7 @@ public class BinaryFileSingleStreamSpiller
 
     private void writePages(Iterator<Page> pageIterator)
     {
-        try (SliceOutput output = new OutputStreamSliceOutput(new BufferedOutputStream(new FileOutputStream(targetFileName.toFile(), true)))) {
+        try (SliceOutput output = new OutputStreamSliceOutput(new FileOutputStream(targetFileName.toFile(), true))) {
             PagesSerde.PagesWriter pagesWriter = new PagesSerde.PagesWriter(blockEncodingSerde, output);
             writePages(pagesWriter, pageIterator);
         }
@@ -123,7 +123,7 @@ public class BinaryFileSingleStreamSpiller
     private Iterator<Page> readPages()
     {
         try {
-            InputStream input = new BufferedInputStream(new FileInputStream(targetFileName.toFile()));
+            InputStream input = new FileInputStream(targetFileName.toFile());
             closer.register(input);
             return PagesSerde.readPages(blockEncodingSerde, new InputStreamSliceInput(input));
         }
