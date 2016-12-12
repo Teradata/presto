@@ -283,6 +283,14 @@ Optimizer properties
  * **Description:** Parallelize writes when using UNION ALL in queries that write data. This improves the speed of writing output tables in UNION ALL queries because these writes do not require additional synchronization when collecting results. Enabling this optimization can improve UNION ALL speed when write speed is not yet saturated. However it may slow down queries in an already heavily loaded system. This can also be specified on a per-query basis using the ``push_table_write_through_union`` session property.
 
 
+``optimizer.reorder-windows``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ * **Type:** ``Boolean``
+ * **Default value:** ``true``
+ * **Description:** Allow reordering windows in order to put those with the same partitioning next to each other. This may sometimes allow minimizing number of repartitionings. This can also be specified on a per-query basis using the ``reorder_windows`` session property.
+
+
 .. _tuning-pref-query:
 
 Query execution properties
