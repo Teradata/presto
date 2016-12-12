@@ -74,7 +74,7 @@ public class BinaryFileSingleStreamSpiller
         this.executor = requireNonNull(executor, "executor is null");
         this.spillerStats = requireNonNull(spillerStats, "spillerStats is null");
         this.memoryContext = requireNonNull(memoryContext, "memoryContext can not be null");
-        this.localSpillContext = localSpillContext;
+        this.localSpillContext = requireNonNull(localSpillContext, "localSpillContext can not be null");
         try {
             targetFileName = Files.createTempFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX);
         }
