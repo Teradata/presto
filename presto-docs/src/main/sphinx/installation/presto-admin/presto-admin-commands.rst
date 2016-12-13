@@ -2,6 +2,92 @@
 Presto-Admin Commands
 =====================
 
+.. _catalog-add:
+
+***********
+catalog add
+***********
+::
+
+    presto-admin catalog add [<name>]
+
+This command is used to deploy catalog configurations to the Presto cluster.
+`Catalog configurations <https://prestodb.io/docs/current/connector.html>`_ are
+kept in the configuration directory ``~/.prestoadmin/catalog``
+
+To add a catalog using ``presto-admin``, first create a configuration file in
+``~/.prestoadmin/catalog``. The file should be named ``<name>.properties`` and
+contain the configuration for that catalog.
+
+Use the optional ``name`` argument to add a particular catalog to your
+cluster. To deploy all catalogs in the catalog configuration directory,
+leave the name argument out.
+
+In order to query using the newly added catalog, you need to restart the
+Presto server (see `server restart`_): ::
+
+    presto-admin server restart
+
+Example
+-------
+To add a catalog for the jmx connector, create a file
+``~/.prestoadmin/catalog/jmx.properties`` with the content
+``connector.name=jmx``.
+Then run: ::
+
+    ./presto-admin catalog add jmx
+    ./presto-admin server restart
+
+If you have two catalog configurations in the catalog directory, for example
+``jmx.properties`` and ``dummy.properties``, and would like to deploy both at
+once, you could run ::
+
+    ./presto-admin catalog add
+    ./presto-admin server restart
+
+Adding a Custom Connector
+-------------------------
+In order to install a catalog for a custom connector not included with Presto, the
+jar must be added to the Presto plugin location using the ``plugin add_jar`` command
+before running the ``catalog add`` command.
+
+Example: ::
+
+   ./presto-admin plugin add_jar my_connector.jar my_connector
+   ./presto-admin catalog add my_connector
+   ./presto-admin server restart
+
+The ``add_jar`` command assumes the default plugin location of
+``/usr/lib/presto/lib/plugin`` (see `plugin add_jar`_).  As with the default
+connectors, a ``my_connector.properties`` file must be created. Refer to the
+custom connector's documentation for the properties to specify.
+
+The ``plugin add_jar`` command works with both jars and directories containing jars.
+
+**************
+catalog remove
+**************
+::
+
+    presto-admin catalog remove <name>
+
+The catalog remove command is used to remove a catalog from your presto
+cluster configuration. Running the command will remove the catalog from all
+nodes in the Presto cluster. Additionally, it will remove the local
+configuration file for the catalog.
+
+In order for the change to take effect, you will need to restart services. ::
+
+    presto-admin server restart
+
+
+Example
+-------
+For example: To remove the catalog for the jmx connector, run ::
+
+    ./presto-admin catalog remove jmx
+    ./presto-admin server restart
+
 .. _collect-logs:
 
 ************
@@ -12,14 +98,14 @@ collect logs
     presto-admin collect logs
 
 This command gathers Presto server logs and launcher logs from the ``/var/log/presto/`` directory across the cluster along with the
-``/var/log/prestoadmin/presto-admin.log`` and creates a tar file. The final tar output will be saved at ``/tmp/presto-debug-logs.tar.bz2``.
+``~/.prestoadmin/log/presto-admin.log`` and creates a tar file. The final tar output will be saved at ``/tmp/presto-debug-logs.tar.bz2``.
 
 
 Example
 -------
 ::
 
-    sudo ./presto-admin collect logs
+    ./presto-admin collect logs
 
 .. _collect-query-info:
 
@@ -37,7 +123,7 @@ Example
 -------
 ::
 
-    sudo ./presto-admin collect query_info 20150525_234711_00000_7qwaz
+    ./presto-admin collect query_info 20150525_234711_00000_7qwaz
 
 .. _collect-system-info:
 
@@ -52,15 +138,15 @@ This command gathers various system specific information from the cluster. The i
 The gathered information includes:
 
  * Node specific information from Presto like node uri, last response time, recent failures, recent requests made to the node, etc.
- * List of connectors configured
- * Connector configuration files
+ * List of catalogs configured
+ * Catalog configuration files
  * Other system specific information like OS information, Java version, ``presto-admin`` version and Presto server version
 
 Example
 -------
 ::
 
-    sudo ./presto-admin collect system_info
+    ./presto-admin collect system_info
 
 
 .. _configuration-deploy-label:
@@ -76,9 +162,12 @@ This command deploys `Presto configuration files <https://prestodb.io/docs/curre
 onto the cluster. ``presto-admin`` uses different configuration directories for
 worker and coordinator configurations so that you can easily create different
 configurations for your coordinator and worker nodes. Create a
-``/etc/opt/prestoadmin/coordinator`` directory for your coordinator
-configurations and a ``/etc/opt/prestoadmin/workers`` directory for your
-workers configuration.  Place the configuration files for the coordinator
+``~/.prestoadmin/coordinator`` directory for your coordinator
+configurations and a ``~/.prestoadmin/workers`` directory for your
+workers configuration. If you have the ``presto-admin`` configuration
+directory path set using the environment variable ``PRESTO_ADMIN_CONFIG_DIR``
+then the coordinator and worker configuration directories must be created
+under ``$PRESTO_ADMIN_CONFIG_DIR``.  Place the configuration files for the coordinator
 and workers in their respective directories. The optional ``coordinator`` or ``workers``
 argument tells ``presto-admin`` to only deploy the coordinator or workers
 configurations. To deploy both configurations at once, don't specify either
@@ -92,7 +181,7 @@ the ``/etc/presto`` directory on your Presto cluster:
 * jvm.config
 * log.properties (if it exists)
 
-.. NOTE:: This command will not deploy the configurations for connectors.  To deploy connector configurations run `connector add`_
+.. NOTE:: This command will not deploy the configurations for catalogs.  To deploy catalog configurations run `catalog add`_
 
 If the coordinator is also a worker, it will get the coordinator configuration.
 The deployed configuration files will overwrite the existing configurations on
@@ -108,10 +197,10 @@ configurations:
     node.data-dir=/var/lib/presto/data
     node.launcher-log-file=/var/log/presto/launcher.log
     node.server-log-file=/var/log/presto/server.log
-    plugin.config-dir=/etc/presto/catalog
+    catalog.config-dir=/etc/presto/catalog
     plugin.dir=/usr/lib/presto/lib/plugin
 
-.. NOTE:: Do not change the value of plugin.config-dir=/etc/presto/catalog as it is necessary for presto to be able to find the catalog directory when Presto has been installed by RPM.
+.. NOTE:: Do not change the value of catalog.config-dir=/etc/presto/catalog as it is necessary for Presto to be able to find the catalog directory when Presto has been installed by RPM.
 
 *jvm.config* ::
 
@@ -119,6 +208,7 @@ configurations:
     -Xmx16G
     -XX:-UseBiasedLocking
     -XX:+UseG1GC
+    -XX:G1HeapRegionSize=32M
     -XX:+ExplicitGCInvokesConcurrent
     -XX:+HeapDumpOnOutOfMemoryError
     -XX:+UseGCOverheadLimit
@@ -155,7 +245,7 @@ Example
 -------
 If you want to change the jvm configuration on the coordinator and the
 ``node.environment`` property from ``node.properties`` on all nodes, add the
-following ``jvm.config`` to ``/etc/opt/prestoadmin/coordinator``
+following ``jvm.config`` to ``~/.prestoadmin/coordinator``
 
 .. code-block:: none
 
@@ -163,6 +253,7 @@ following ``jvm.config`` to ``/etc/opt/prestoadmin/coordinator``
     -Xmx16G
     -XX:-UseBiasedLocking
     -XX:+UseG1GC
+    -XX:G1HeapRegionSize=32M
     -XX:+ExplicitGCInvokesConcurrent
     -XX:+HeapDumpOnOutOfMemoryError
     -XX:+UseGCOverheadLimit
@@ -170,18 +261,18 @@ following ``jvm.config`` to ``/etc/opt/prestoadmin/coordinator``
     -XX:ReservedCodeCacheSize=512M
 
 Further, add the following ``node.properties`` to
-``/etc/opt/prestoadmin/coordinator`` and ``/etc/opt/prestoadmin/workers``: ::
+``~/.prestoadmin/coordinator`` and ``~/.prestoadmin/workers``: ::
 
     node.environment=test
     node.data-dir=/var/lib/presto/data
     node.launcher-log-file=/var/log/presto/launcher.log
     node.server-log-file=/var/log/presto/server.log
-    plugin.config-dir=/etc/presto/catalog
+    catalog.config-dir=/etc/presto/catalog
     plugin.dir=/usr/lib/presto/lib/plugin
 
 Then run: ::
 
-    sudo ./presto-admin configuration deploy
+    ./presto-admin configuration deploy
 
 This will distribute to the coordinator a default ``config.properties``, the new
 ``jvm.config`` and ``node.properties``.  The workers will
@@ -190,7 +281,7 @@ receive the default ``config.properties`` and ``jvm.config``, and the same
 
 If instead you just want to update the coordinator configuration, run: ::
 
-    sudo ./presto-admin configuration deploy coordinator
+    ./presto-admin configuration deploy coordinator
 
 This will leave the workers configuration as it was, but update the
 coordinator's configuration
@@ -210,93 +301,7 @@ Example
 -------
 ::
 
-    sudo ./presto-admin configuration show node
-
-.. _connector-add:
-
-*************
-connector add
-*************
-::
-
-    presto-admin connector add [<name>]
-
-This command is used to deploy connector configurations to the Presto cluster.
-`Connector configurations <https://prestodb.io/docs/current/connector.html>`_ are
-kept in the configuration directory ``/etc/opt/prestoadmin/connectors``
-
-To add a connector using ``presto-admin``, first create a configuration file in
-``/etc/opt/prestoadmin/connectors``. The file should be named
-``<name>.properties`` and contain the configuration for that connector.
-
-Use the optional ``name`` argument to add a particular connector to your
-cluster. To deploy all connectors in the connectors configuration directory,
-leave the name argument out.
-
-In order to query using the newly added connector, you need to restart the
-Presto server (see `server restart`_): ::
-
-    presto-admin server restart
-
-Example
--------
-To add the jmx connector, create a file
-``/etc/opt/prestoadmin/connectors/jmx.properties`` with the content
-``connector.name=jmx``.
-Then run: ::
-
-    sudo ./presto-admin connector add jmx
-    sudo ./presto-admin server restart
-
-If you have two connectors in the configuration directory, for example
-``jmx.properties`` and ``dummy.properties``, and would like to deploy both at
-once, you could run ::
-
-    sudo ./presto-admin connector add
-    sudo ./presto-admin server restart
-
-Adding a Custom Connector
--------------------------
-In order to install a custom connector not included with Presto, the jar must be
-added to the Presto plugin location using the ``plugin add_jar`` command before
-running the ``connector add`` command.
-
-Example: ::
-
-   sudo ./presto-admin plugin add_jar my_connector.jar my_connector
-   sudo ./presto-admin connector add my_connector
-   sudo ./presto-admin server restart
-
-The ``add_jar`` command assumes the default plugin location of
-``/usr/lib/presto/lib/plugin`` (see `plugin add_jar`_).  As with the default
-connectors, a ``my_connector.properties`` file must be created. Refer to the
-custom connector's documentation for the properties to specify.
-
-The ``plugin add_jar`` command works with both jars and directories containing jars.
-
-****************
-connector remove
-****************
-::
-
-    presto-admin connector remove <name>
-
-The connector remove command is used to remove a connector from your presto
-cluster configuration. Running the command will remove the connector from all
-nodes in the Presto cluster. Additionally, it will remove the local
-configuration file for the connector.
-
-In order for the change to take effect, you will need to restart services. ::
-
-    presto-admin server restart
-
-
-Example
--------
-For example: To remove the jmx connector, run ::
-
-    sudo ./presto-admin connector remove jmx
-    sudo ./presto-admin server restart
+    ./presto-admin configuration show node
 
 
 ***************
@@ -307,7 +312,7 @@ package install
 
     presto-admin package install local_path [--nodeps]
 
-This command copies any rpm from ``local_path`` to all the nodes in the cluster and installs it. Similar to ``server install`` the cluster topology is obtained from the file ``/etc/opt/prestoadmin/config.json``. If this file is missing, then the command prompts for user input to get the topology information.
+This command copies any rpm from ``local_path`` to all the nodes in the cluster and installs it. Similar to ``server install`` the cluster topology is obtained from the file ``~/.prestoadmin/config.json``. If this file is missing, then the command prompts for user input to get the topology information.
 
 This command takes an optional ``--nodeps`` flag which indicates if the rpm installed should ignore checking any package dependencies.
 
@@ -317,7 +322,7 @@ Example
 -------
 ::
 
-    sudo ./presto-admin package install /tmp/jdk-8u45-linux-x64.rpm
+    ./presto-admin package install /tmp/jdk-8u45-linux-x64.rpm
 
 
 *****************
@@ -329,7 +334,7 @@ package uninstall
     presto-admin package uninstall rpm_package_name [--nodeps]
 
 This command uninstalls an rpm package from all the nodes in the cluster. Similar to ``server uninstall`` the cluster
-topology is obtained from the file ``/etc/opt/prestoadmin/config.json``. If this file is missing, then the command
+topology is obtained from the file ``~/.prestoadmin/config.json``. If this file is missing, then the command
 prompts for user input to get the topology information.
 
 This command takes an optional ``--nodeps`` flag which indicates if the rpm installed should ignore checking any package
@@ -341,7 +346,7 @@ Example
 -------
 ::
 
-    sudo ./presto-admin package uninstall jdk
+    ./presto-admin package uninstall jdk
 
 
 **************
@@ -360,8 +365,8 @@ Example
 -------
 ::
 
-    sudo ./presto-admin plugin add_jar connector.jar my_connector
-    sudo ./presto-admin plugin add_jar connector.jar my_connector /my/plugin/dir
+    ./presto-admin plugin add_jar connector.jar my_connector
+    ./presto-admin plugin add_jar connector.jar my_connector /my/plugin/dir
 
 The first example will deploy connector.jar to
 ``/usr/lib/presto/lib/plugin/my_connector/connector.jar``
@@ -382,8 +387,8 @@ Example
 -------
 ::
 
-    sudo ./presto-admin script run /my/local/script.sh
-    sudo ./presto-admin script run /my/local/script.sh /remote/dir
+    ./presto-admin script run /my/local/script.sh
+    ./presto-admin script run /my/local/script.sh /remote/dir
 
 
 .. _server-install-label:
@@ -405,13 +410,17 @@ For forms that require the rpm to be downloaded, if a local copy is found with a
 Rpms downloaded using a version number or 'latest' come from Maven Central.
 This command fails if it cannot find or download the requested presto-server rpm.
 
-After successfully finding the rpm, this command copies the presto-server rpm to all the nodes in the cluster, installs it, deploys the general presto configuration along with tpch connector configuration.
-The topology used to configure the nodes are obtained from ``/etc/opt/prestoadmin/config.json``. See :ref:`presto-admin-configuration-label` on how to configure your cluster using config.json. If this file is missing, then the command prompts for user input to get the topology information.
+After successfully finding the rpm, this command copies the presto-server rpm to all the nodes in the cluster,
+installs it, deploys the general presto configuration along with tpch connector configuration.
+The topology used to configure the nodes are obtained from ``~/.prestoadmin/config.json``. See :ref:`presto-admin-configuration-label` on how to configure your cluster using config.json. If this file is missing, then the command prompts for user input to get the topology information.
 
-The general configurations for Presto's coordinator and workers are taken from the directories ``/etc/opt/prestoadmin/coordinator`` and ``/etc/opt/prestoadmin/workers`` respectively. If these directories or any required configuration files are absent when you run ``server install``, a default configuration will be deployed. See `configuration deploy`_ for details.
+The general configurations for Presto's coordinator and workers are taken from the directories ``~/.prestoadmin/coordinator`` and ``~/.prestoadmin/workers`` respectively. If these directories or any required configuration files are absent when you run ``server install``, a default configuration will be deployed. See `configuration deploy`_ for details.
 
-The connectors directory ``/etc/opt/prestoadmin/connectors/`` should contain the configuration files for any catalogs that you would like to connect to in your Presto cluster.
-The ``server install`` command will configure the cluster with all the connectors in the directory. If the directory does not exist or is empty prior to ``server install``, then by default the tpch connector is configured. See `connector add`_ on how to add connector configuration files after installation.
+The catalog directory ``~/.prestoadmin/catalog/`` should contain the configuration files for any catalogs that you would
+like to connect to in your Presto cluster.
+The ``server install`` command will configure the cluster with all the catalogs in the directory. If the directory does
+not exist or is empty prior to ``server install``, then by default the tpch connector is configured. See `catalog add`_
+on how to add catalog configuration files after installation.
 
 This command takes an optional ``--nodeps`` flag which indicates if the rpm installed should ignore checking any package dependencies.
 
@@ -421,10 +430,10 @@ Example
 -------
 ::
 
-    sudo ./presto-admin server install /tmp/presto.rpm
-    sudo ./presto-admin server install 0.148
-    sudo ./presto-admin server install http://search.maven.org/remotecontent?filepath=com/facebook/presto/presto-server-rpm/0.150/presto-server-rpm-0.150.rpm
-    sudo ./presto-admin server install latest
+    ./presto-admin server install /tmp/presto.rpm
+    ./presto-admin server install 0.148
+    ./presto-admin server install http://search.maven.org/remotecontent?filepath=com/facebook/presto/presto-server-rpm/0.150/presto-server-rpm-0.150.rpm
+    ./presto-admin server install latest
 
 **Standalone RPM Install**
 
@@ -450,7 +459,7 @@ Example
 -------
 ::
 
-    sudo ./presto-admin server restart
+    ./presto-admin server restart
 
 
 .. _server-start-label:
@@ -468,7 +477,7 @@ Example
 -------
 ::
 
-    sudo ./presto-admin server start
+    ./presto-admin server start
 
 
 .. _server-status:
@@ -488,13 +497,13 @@ The status output will have the following information:
     * node uri
     * Presto version installed
     * node is active/inactive
-    * connectors deployed
+    * catalogs deployed
 
 Example
 -------
 ::
 
-    sudo ./presto-admin server status
+    ./presto-admin server status
 
 
 ***********
@@ -510,7 +519,7 @@ Example
 -------
 ::
 
-    sudo ./presto-admin server stop
+    ./presto-admin server stop
 
 
 ****************
@@ -529,7 +538,7 @@ Example
 -------
 ::
 
-    sudo ./presto-admin server uninstall
+    ./presto-admin server uninstall
 
 
 **************
@@ -549,7 +558,7 @@ This command can also be used to downgrade the Presto installation, if the RPM a
 ``path/to/new/package.rpm`` is an earlier version than the Presto installed on the cluster.
 
 Note that if the configuration files on the cluster differ from the presto-admin configuration
-files found in ``/etc/opt/prestoadmin``, the presto-admin configuration files are not updated.
+files found in ``~/.prestoadmin``, the presto-admin configuration files are not updated.
 
 This command takes an optional ``--nodeps`` flag which indicates if the rpm upgrade should ignore checking any package dependencies.
 
@@ -559,8 +568,8 @@ Example
 -------
 ::
 
-    sudo ./presto-admin server upgrade path/to/new/package.rpm /tmp/cluster-configuration
-    sudo ./presto-admin server upgrade /path/to/new/package.rpm /tmp/cluster-configuration
+    ./presto-admin server upgrade path/to/new/package.rpm /tmp/cluster-configuration
+    ./presto-admin server upgrade /path/to/new/package.rpm /tmp/cluster-configuration
 
 
 *************
@@ -576,6 +585,6 @@ Example
 -------
 ::
 
-    sudo ./presto-admin topology show
+    ./presto-admin topology show
 
 

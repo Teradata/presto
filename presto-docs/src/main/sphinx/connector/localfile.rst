@@ -15,7 +15,7 @@ under ``/etc/opt/prestoadmin/connector`` named, for example, ``localfile.propert
 
     connector.name=localfile
 
-Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-catalog-installation`.
     
 Configuration Properties
 ------------------------

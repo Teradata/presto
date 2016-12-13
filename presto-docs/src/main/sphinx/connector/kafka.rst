@@ -34,7 +34,7 @@ replacing the properties as appropriate:
     kafka.table-names=table1,table2
     kafka.nodes=host1:port,host2:port
 
-Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-catalog-installation`.
     
 Multiple Kafka Clusters
 ^^^^^^^^^^^^^^^^^^^^^^^

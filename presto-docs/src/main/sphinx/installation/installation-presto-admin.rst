@@ -33,7 +33,7 @@ Comprehensive Presto Admin User Guide <presto-admin/user-guide.rst>
     Installing Java 8 <presto-admin/installation/java-installation.rst>
     Installing the Presto Server <presto-admin/installation/presto-server-installation.rst>
     Installing the Presto CLI <presto-admin/installation/presto-cli-installation.rst>
-    Adding a Connector <presto-admin/installation/presto-connector-installation.rst>
+    Adding a Connector <presto-admin/installation/presto-catalog-installation.rst>
     Configuring Presto <presto-admin/installation/presto-configuration.rst>
     Troubleshooting <presto-admin/installation/troubleshooting-installation.rst>
 

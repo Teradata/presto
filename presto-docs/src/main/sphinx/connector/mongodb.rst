@@ -20,7 +20,7 @@ replacing the properties as appropriate:
     connector.name=mongodb
     mongodb.seeds=host1,host:port
 
-Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-catalog-installation`.
     
 Multiple MongoDB Clusters
 ^^^^^^^^^^^^^^^^^^^^^^^^^

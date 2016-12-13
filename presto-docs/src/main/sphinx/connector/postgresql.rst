@@ -23,7 +23,7 @@ connection properties as appropriate for your setup:
     connection-user=root
     connection-password=secret
 
-Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-catalog-installation`.
     
 Multiple PostgreSQL Databases or Servers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

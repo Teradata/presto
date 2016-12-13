@@ -44,7 +44,7 @@ Install and manage Presto manually on an AWS EMR in the Amazon cloud.
     Installing Java 8 <installation/presto-admin/installation/java-installation.rst>
     Installing the Presto Server <installation/presto-admin/installation/presto-server-installation.rst>
     Installing the Presto CLI <installation/presto-admin/installation/presto-cli-installation.rst>
-    Adding a Connector <installation/presto-admin/installation/presto-connector-installation.rst>
+    Adding a Connector <installation/presto-admin/installation/presto-catalog-installation.rst>
     Configuring Presto <installation/presto-admin/installation/presto-configuration.rst>
     Troubleshooting <installation/presto-admin/installation/troubleshooting-installation.rst>
 

@@ -26,7 +26,7 @@ replacing the properties as appropriate:
     redis.table-names=schema1.table1,schema1.table2
     redis.nodes=host:port
 
-Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-catalog-installation`.
     
 Multiple Redis Servers
 ^^^^^^^^^^^^^^^^^^^^^^^

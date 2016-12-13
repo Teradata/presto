@@ -1,3 +1,4 @@
+.. highlight:: bash
 .. _quick-start-guide-label:
 
 *****************
@@ -16,8 +17,7 @@ For a detailed explanation of all of the commands and their options, see :ref:`c
     installation/java-installation
     installation/presto-server-installation
     installation/presto-cli-installation
-    installation/presto-connector-installation
+    installation/presto-catalog-installation
     installation/presto-configuration 
-    installation/presto-admin-upgrade
     installation/troubleshooting-installation
-
+    installation/presto-admin-upgrade

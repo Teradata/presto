@@ -1,5 +1,5 @@
 .. highlight:: bash
-
+	       
 ===============
 Troubleshooting
 ===============
@@ -12,7 +12,7 @@ Troubleshooting
     * :ref:`collect-query-info`
     * :ref:`collect-system-info`
 
-#. You can find the ``presto-admin`` logs in the ``/var/log/prestoadmin``
+#. You can find the ``presto-admin`` logs in the ``~/.prestoadmin/log``
    directory.
 #. You can check the status of Presto on your cluster by using
    :ref:`server-status`.
@@ -24,7 +24,7 @@ Troubleshooting
    To fix this, start Presto with:
    ::
 
-     $ sudo ./presto-admin server start
+     $ ./presto-admin server start
 
 #. If the Presto servers fail to start or crash soon after starting, look at
    the presto server logs on the Presto cluster ``/var/log/presto`` for an
@@ -35,9 +35,9 @@ Troubleshooting
     * Specifying a port that is already in use: Look at
       :ref:`presto-port-configuration-label` to learn how to change the port
       configuration.
-    * An error in a connector configuration file, such as a syntax error or
+    * An error in a catalog configuration file, such as a syntax error or
       a missing connector.name property: correct the file and deploy it to the
-      cluster again using :ref:`connector-add`
+      cluster again using :ref:`catalog-add`
 
 #. The following error can occur if you do not have passwordless ssh enabled
    and have not provided a password or if the user requires a sudo password: ::
@@ -47,3 +47,9 @@ Troubleshooting
    See :ref:`ssh-configuration-label` for information on setting up
    passwordless ssh and on providing a password, and :ref:`sudo-password-spec`
    for information on providing a sudo password.
+
+#. Support for connecting to a cluster with internal HTTPS and/or LDAP communication
+   enabled is experimental. Make sure to check both the Presto server log and the
+   ``presto-admin`` log to troubleshoot problems with your configuration; it may also
+   be helpful to verify that you can connect to the cluster via the Presto CLI using
+   HTTPS/LDAP as appropriate.

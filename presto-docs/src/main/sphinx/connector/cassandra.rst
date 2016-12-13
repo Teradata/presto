@@ -20,7 +20,7 @@ nodes used to discovery the cluster topology:
 You will also need to set ``cassandra.native-protocol-port`` if your
 Cassandra nodes are not using the default port (9042).
 
-Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-catalog-installation`.
 
 Multiple Cassandra Clusters
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

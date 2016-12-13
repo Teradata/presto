@@ -31,7 +31,7 @@ To configure the Black Hole connector, create a catalog properties file
 
     connector.name=blackhole
 
-Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-connector-installation`.
+Use ``presto-admin`` to deploy the connector file. See :doc:`../installation/presto-admin/installation/presto-catalog-installation`.
     
 Examples
 --------
