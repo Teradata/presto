@@ -133,4 +133,10 @@
             <unpack />
         </artifact>
     </artifactSet>
+
+    <artifactSet to="plugin/sqlserver">
+        <artifact id="${project.groupId}:presto-sqlserver:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
 </runtime>
