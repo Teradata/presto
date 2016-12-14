@@ -38,7 +38,7 @@ import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static java.lang.Math.max;
 
 public class SpillableHashAggregationBuilder
-    implements HashAggregationBuilder
+        implements HashAggregationBuilder
 {
     private InMemoryHashAggregationBuilder hashAggregationBuilder;
     private final SpillerFactory spillerFactory;
