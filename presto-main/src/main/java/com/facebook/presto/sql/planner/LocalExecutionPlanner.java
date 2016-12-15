@@ -1516,6 +1516,11 @@ public class LocalExecutionPlanner
             Optional<JoinFilterFunctionFactory> filterFunctionFactory = node.getFilter()
                     .map(filterExpression -> compileJoinFilterFunction(filterExpression, probeLayout, buildSource.getLayout(), context.getTypes(), context.getSession()));
 
+            boolean outer = node.getType() == RIGHT || node.getType() == FULL;
+            if (memoryLimitBeforeSpill.toBytes() > 0 && outer) {
+                throw new UnsupportedOperationException("Spilling for RIGHT and FULL outer joins is unsupported");
+            }
+
             HashBuilderOperatorFactory hashBuilderOperatorFactory = new HashBuilderOperatorFactory(
                     buildContext.getNextOperatorId(),
                     node.getId(),
@@ -1523,11 +1528,11 @@ public class LocalExecutionPlanner
                     buildSource.getLayout(),
                     buildChannels,
                     buildHashChannel,
-                    node.getType() == RIGHT || node.getType() == FULL,
+                    outer,
                     filterFunctionFactory,
                     10_000,
                     buildContext.getDriverInstanceCount().orElse(1),
-                    false,
+                    spillEnabled && buildContext.getDriverInstanceCount().orElse(1) > 1,
                     memoryLimitBeforeSpill,
                     spillerFactory);
 
