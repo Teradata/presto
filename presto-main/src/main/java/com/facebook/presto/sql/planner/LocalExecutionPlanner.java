@@ -139,7 +139,6 @@ import com.facebook.presto.sql.relational.RowExpression;
 import com.facebook.presto.sql.relational.SqlToRowExpressionTranslator;
 import com.facebook.presto.sql.tree.BooleanLiteral;
 import com.facebook.presto.sql.tree.Expression;
-import com.facebook.presto.sql.tree.ExpressionTreeRewriter;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.SymbolReference;
 import com.google.common.collect.HashMultimap;
@@ -175,8 +174,10 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import static com.facebook.presto.SystemSessionProperties.getOperatorMemoryLimitBeforeSpill;
 import static com.facebook.presto.SystemSessionProperties.getTaskConcurrency;
 import static com.facebook.presto.SystemSessionProperties.getTaskWriterCount;
+import static com.facebook.presto.SystemSessionProperties.isSpillEnabled;
 import static com.facebook.presto.metadata.FunctionKind.SCALAR;
 import static com.facebook.presto.operator.DistinctLimitOperator.DistinctLimitOperatorFactory;
 import static com.facebook.presto.operator.NestedLoopBuildOperator.NestedLoopBuildOperatorFactory;
@@ -765,7 +766,8 @@ public class LocalExecutionPlanner
                     (int) node.getCount(),
                     sortChannels,
                     sortOrders,
-                    node.isPartial());
+                    node.isPartial(),
+                    maxPartialAggregationMemorySize);
 
             return new PhysicalOperation(operator, source.getLayout(), source);
         }
@@ -832,42 +834,50 @@ public class LocalExecutionPlanner
         public PhysicalOperation visitGroupId(GroupIdNode node, LocalExecutionPlanContext context)
         {
             PhysicalOperation source = node.getSource().accept(this, context);
-            ImmutableMap.Builder<Symbol, Integer> newLayout = ImmutableMap.builder();
+            Map<Symbol, Integer> newLayout = new HashMap<>();
             ImmutableList.Builder<Type> outputTypes = ImmutableList.builder();
 
             int outputChannel = 0;
 
-            ImmutableList.Builder<Integer> groupingChannels = ImmutableList.builder();
-            for (Symbol inputSymbol : node.getDistinctGroupingColumns()) {
-                int inputChannel = source.getLayout().get(inputSymbol);
-                newLayout.put(inputSymbol, outputChannel++);
-                outputTypes.add(source.getTypes().get(inputChannel));
-                groupingChannels.add(inputChannel);
+            for (Symbol output : node.getGroupingSets().stream().flatMap(Collection::stream).collect(Collectors.toSet())) {
+                newLayout.put(output, outputChannel++);
+                outputTypes.add(source.getTypes().get(source.getLayout().get(node.getGroupingSetMappings().get(output))));
             }
 
-            ImmutableList.Builder<Integer> copyChannels = ImmutableList.builder();
-            for (Symbol inputSymbol : node.getIdentityMappings().keySet()) {
-                int inputChannel = source.getLayout().get(inputSymbol);
-                newLayout.put(node.getIdentityMappings().get(inputSymbol), outputChannel++);
+            Map<Symbol, Integer> argumentMappings = new HashMap<>();
+            for (Symbol output : node.getArgumentMappings().keySet()) {
+                int inputChannel = source.getLayout().get(node.getArgumentMappings().get(output));
+
+                newLayout.put(output, outputChannel++);
                 outputTypes.add(source.getTypes().get(inputChannel));
-                copyChannels.add(inputChannel);
+                argumentMappings.put(output, inputChannel);
+            }
+
+            // for every grouping set, create a mapping of all output to input channels (including arguments)
+            ImmutableList.Builder<Map<Integer, Integer>> mappings = ImmutableList.builder();
+            for (List<Symbol> groupingSet : node.getGroupingSets()) {
+                ImmutableMap.Builder<Integer, Integer> setMapping = ImmutableMap.builder();
+
+                for (Symbol output : groupingSet) {
+                    setMapping.put(newLayout.get(output), source.getLayout().get(node.getGroupingSetMappings().get(output)));
+                }
+
+                for (Symbol output : argumentMappings.keySet()) {
+                    setMapping.put(newLayout.get(output), argumentMappings.get(output));
+                }
+
+                mappings.add(setMapping.build());
             }
 
             newLayout.put(node.getGroupIdSymbol(), outputChannel);
             outputTypes.add(BIGINT);
 
-            List<List<Integer>> groupingSetChannels = node.getGroupingSets().stream()
-                    .map(groupingSet -> getChannelsForSymbols(groupingSet, source.getLayout()))
-                    .collect(toImmutableList());
-
             OperatorFactory groupIdOperatorFactory = new GroupIdOperator.GroupIdOperatorFactory(context.getNextOperatorId(),
                     node.getId(),
                     outputTypes.build(),
-                    groupingSetChannels,
-                    groupingChannels.build(),
-                    copyChannels.build());
+                    mappings.build());
 
-            return new PhysicalOperation(groupIdOperatorFactory, newLayout.build(), source);
+            return new PhysicalOperation(groupIdOperatorFactory, newLayout, source);
         }
 
         @Override
@@ -879,7 +889,10 @@ public class LocalExecutionPlanner
                 return planGlobalAggregation(context.getNextOperatorId(), node, source);
             }
 
-            return planGroupByAggregation(node, source, context.getNextOperatorId());
+            boolean spillEnabled = isSpillEnabled(context.getSession());
+            DataSize memoryLimitBeforeSpill = getOperatorMemoryLimitBeforeSpill(context.getSession());
+
+            return planGroupByAggregation(node, source, context.getNextOperatorId(), spillEnabled, memoryLimitBeforeSpill);
         }
 
         @Override
@@ -990,11 +1003,11 @@ public class LocalExecutionPlanner
 
             // compiler uses inputs instead of symbols, so rewrite the expressions first
             SymbolToInputRewriter symbolToInputRewriter = new SymbolToInputRewriter(sourceLayout);
-            Expression rewrittenFilter = ExpressionTreeRewriter.rewriteWith(symbolToInputRewriter, filterExpression);
+            Expression rewrittenFilter = symbolToInputRewriter.rewrite(filterExpression);
 
             List<Expression> rewrittenProjections = new ArrayList<>();
             for (Symbol symbol : outputSymbols) {
-                rewrittenProjections.add(ExpressionTreeRewriter.rewriteWith(symbolToInputRewriter, projectionExpressions.get(symbol)));
+                rewrittenProjections.add(symbolToInputRewriter.rewrite(projectionExpressions.get(symbol)));
             }
 
             IdentityHashMap<Expression, Type> expressionTypes = getExpressionTypesFromInput(
@@ -1537,8 +1550,7 @@ public class LocalExecutionPlanner
             Map<Integer, Type> sourceTypes = joinSourcesLayout.entrySet().stream()
                     .collect(toImmutableMap(Map.Entry::getValue, entry -> types.get(entry.getKey())));
 
-            SymbolToInputRewriter symbolToInputRewriter = new SymbolToInputRewriter(joinSourcesLayout);
-            Expression rewrittenFilter = ExpressionTreeRewriter.rewriteWith(symbolToInputRewriter, filterExpression);
+            Expression rewrittenFilter = new SymbolToInputRewriter(joinSourcesLayout).rewrite(filterExpression);
 
             IdentityHashMap<Expression, Type> expressionTypes = getExpressionTypesFromInput(
                     session,
@@ -1840,7 +1852,12 @@ public class LocalExecutionPlanner
             return new PhysicalOperation(operatorFactory, outputMappings.build(), source);
         }
 
-        private PhysicalOperation planGroupByAggregation(AggregationNode node, PhysicalOperation source, int operatorId)
+        private PhysicalOperation planGroupByAggregation(
+                AggregationNode node,
+                PhysicalOperation source,
+                int operatorId,
+                boolean spillEnabled,
+                DataSize memoryLimitBeforeSpill)
         {
             List<Symbol> groupBySymbols = node.getGroupingKeys();
 
@@ -1902,7 +1919,10 @@ public class LocalExecutionPlanner
                     hashChannel,
                     node.getGroupIdSymbol().map(mappings::get),
                     10_000,
-                    maxPartialAggregationMemorySize);
+                    maxPartialAggregationMemorySize,
+                    spillEnabled,
+                    memoryLimitBeforeSpill,
+                    spillerFactory);
 
             return new PhysicalOperation(operatorFactory, mappings, source);
         }

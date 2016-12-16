@@ -57,14 +57,6 @@ public class TestMySqlIntegrationSmokeTest
     }
 
     @Override
-    public void testTableSampleSystem()
-            throws Exception
-    {
-        // tablesample system doesn't work reliably with this connector
-        // because it generates a single split
-    }
-
-    @Override
     public void testDescribeTable()
             throws Exception
     {
@@ -84,12 +76,6 @@ public class TestMySqlIntegrationSmokeTest
                 .row("comment", "varchar(255)", "")
                 .build();
         assertEquals(actualColumns, expectedColumns);
-    }
-
-    @Override
-    public void testViewAccessControl()
-    {
-        // jdbc connector does not support views
     }
 
     @AfterClass(alwaysRun = true)

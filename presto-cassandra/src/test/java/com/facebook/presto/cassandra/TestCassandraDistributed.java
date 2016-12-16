@@ -36,105 +36,67 @@ public class TestCassandraDistributed
     }
 
     @Override
+    protected boolean supportsViews()
+    {
+        return false;
+    }
+
+    @Override
     public void testGroupingSetMixedExpressionAndColumn()
-            throws Exception
     {
         // Cassandra does not support DATE
     }
 
     @Override
     public void testGroupingSetMixedExpressionAndOrdinal()
-            throws Exception
     {
         // Cassandra does not support DATE
     }
 
     @Override
     public void testRenameTable()
-            throws Exception
     {
         // Cassandra does not support renaming tables
     }
 
     @Override
     public void testAddColumn()
-            throws Exception
     {
         // Cassandra does not support adding columns
     }
 
     @Override
     public void testRenameColumn()
-            throws Exception
     {
         // Cassandra does not support renaming columns
     }
 
     @Override
-    public void testView()
-            throws Exception
-    {
-        // Cassandra connector currently does not support views
-    }
-
-    @Override
-    public void testCompatibleTypeChangeForView()
-            throws Exception
-    {
-        // Cassandra connector currently does not support views
-    }
-
-    @Override
-    public void testCompatibleTypeChangeForView2()
-            throws Exception
-    {
-        // Cassandra connector currently does not support views
-    }
-
-    @Override
-    public void testViewMetadata()
-            throws Exception
-    {
-        // Cassandra connector currently does not support views
-    }
-
-    @Test
-    public void testViewCaseSensitivity()
-            throws Exception
-    {
-        // Cassandra connector currently does not support views
-    }
-
-    @Override
     public void testInsert()
-            throws Exception
     {
         // Cassandra connector currently does not support insert
     }
 
     @Override
     public void testCreateTable()
-            throws Exception
     {
         // Cassandra connector currently does not support create table
     }
 
     @Override
     public void testCreateTableAsSelect()
-            throws Exception
     {
         // Cassandra connector currently does not support create table
     }
 
     @Override
     public void testDelete()
-            throws Exception
     {
         // Cassandra connector currently does not support delete
     }
 
+    @Override
     public void testShowColumns()
-            throws Exception
     {
         MaterializedResult actual = computeActual("SHOW COLUMNS FROM orders");
 
@@ -151,5 +113,17 @@ public class TestCassandraDistributed
                 .build();
 
         assertEquals(actual, expectedParametrizedVarchar);
+    }
+
+    @Override
+    public void testDescribeOutput()
+    {
+        // this connector uses a non-canonical type for varchar columns in tpch
+    }
+
+    @Override
+    public void testDescribeOutputNamedAndUnnamed()
+    {
+        // this connector uses a non-canonical type for varchar columns in tpch
     }
 }

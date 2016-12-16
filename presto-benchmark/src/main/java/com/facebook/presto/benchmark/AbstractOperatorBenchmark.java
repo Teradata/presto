@@ -95,7 +95,7 @@ public abstract class AbstractOperatorBenchmark
 
     protected OperatorFactory createHashProjectOperator(int operatorId, PlanNodeId planNodeId, List<Type> types)
     {
-        return localQueryRunner.createHashProjectOperator(operatorId, planNodeId, types);
+        return LocalQueryRunner.createHashProjectOperator(operatorId, planNodeId, types);
     }
 
     protected abstract List<Driver> createDrivers(TaskContext taskContext);
@@ -130,7 +130,6 @@ public abstract class AbstractOperatorBenchmark
         TaskContext taskContext = new QueryContext(new QueryId("test"), new DataSize(256, MEGABYTE), memoryPool, systemMemoryPool, executor)
                 .addTaskContext(new TaskStateMachine(new TaskId("query", 0, 0), executor),
                         session,
-                        new DataSize(1, MEGABYTE),
                         false,
                         false);
 

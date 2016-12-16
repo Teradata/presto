@@ -49,14 +49,6 @@ public class TestMongoIntegrationSmokeTest
         this.runner = runner;
     }
 
-    @Override
-    public void testTableSampleSystem()
-            throws Exception
-    {
-        // tablesample system doesn't work reliably with this connector
-        // because it generates a single split
-    }
-
     @Test
     public void createTableWithEveryType()
             throws Exception
@@ -158,12 +150,6 @@ public class TestMongoIntegrationSmokeTest
         assertEquals(results.getRowCount(), 1);
         assertEquals(results.getMaterializedRows().get(0).getFieldCount(), 1);
         assertNotNull(results.getMaterializedRows().get(0).getField(0));
-    }
-
-    @Override
-    public void testViewAccessControl()
-    {
-        // does not support views
     }
 
     @AfterClass(alwaysRun = true)

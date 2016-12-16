@@ -19,8 +19,10 @@ import com.facebook.presto.sql.planner.assertions.PlanMatchPattern;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
 import com.facebook.presto.sql.planner.plan.EnforceSingleRowNode;
+import com.facebook.presto.sql.planner.plan.ExplainAnalyzeNode;
 import com.facebook.presto.sql.planner.plan.IndexJoinNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
+import com.facebook.presto.sql.planner.plan.OutputNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.SemiJoinNode;
 import com.facebook.presto.sql.planner.plan.ValuesNode;
@@ -63,6 +65,7 @@ public class TestLogicalPlanner
         this.queryRunner = new LocalQueryRunner(testSessionBuilder()
                 .setCatalog("local")
                 .setSchema("tiny")
+                .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
                 .build());
 
         queryRunner.createCatalog(queryRunner.getDefaultSession().getCatalog().get(),
@@ -151,7 +154,7 @@ public class TestLogicalPlanner
                 2);
     }
 
-    private int countOfMatchingNodes(Plan plan, Predicate<PlanNode> predicate)
+    private static int countOfMatchingNodes(Plan plan, Predicate<PlanNode> predicate)
     {
         PlanNodeExtractor planNodeExtractor = new PlanNodeExtractor(predicate);
         plan.getRoot().accept(planNodeExtractor, null);
@@ -238,36 +241,135 @@ public class TestLogicalPlanner
     }
 
     @Test
-    public void testGeneratesOneLeftHashForTwoJoinsWithShuffledSymbols()
+    public void testQuantifiedComparisonEqualsAny()
     {
-        assertPlan(
-                "SELECT * " +
-                        " FROM " +
-                        "  (SELECT " +
-                        "    l.suppkey," +
-                        "    l.partkey" +
-                        "   FROM" +
-                        "    lineitem l" +
-                        "   JOIN" +
-                        "    partsupp ps" +
-                        "   ON" +
-                        "    ps.suppkey = l.suppkey" +
-                        "    AND ps.partkey = l.partkey) l" +
-                        "  JOIN" +
-                        "   partsupp ps" +
-                        "  ON" +
-                        "   ps.partkey = l.partkey" +
-                        "   AND ps.suppkey = l.suppkey",
-                anyTree(node(JoinNode.class,
+        String query = "SELECT orderkey, custkey FROM orders WHERE orderkey = ANY (VALUES ROW(CAST(5 as BIGINT)), ROW(CAST(3 as BIGINT)))";
+        assertPlan(query, LogicalPlanner.Stage.CREATED, anyTree(
+                filter("X IN (Y)",
+                        apply(ImmutableList.of(),
+                                anyTree(tableScan("orders").withSymbol("orderkey", "X")),
+                                anyTree(node(ValuesNode.class).withSymbol("field", "Y")))))
+        );
+        assertPlan(query, anyTree(
+                filter("S",
                         project(
-                                node(JoinNode.class,
-                                        project(
-                                                anyTree()).withSymbol("hash", "H"),
-                                        anyTree())
-                        ).withSymbol("suppkey", "S")
-                                .withSymbol("partkey", "P")
-                                .withSymbol("hash", "H"),
-                        anyTree())));
+                                semiJoin("X", "Y", "S",
+                                        anyTree(tableScan("orders").withSymbol("orderkey", "X")),
+                                        anyTree(node(ValuesNode.class).withSymbol("field", "Y"))))))
+        );
+    }
+
+    @Test
+    public void testQuantifiedComparisonNotEqualsAll()
+    {
+        String query = "SELECT orderkey, custkey FROM orders WHERE orderkey <> ALL (VALUES ROW(CAST(5 as BIGINT)), ROW(CAST(3 as BIGINT)))";
+        assertPlan(query, LogicalPlanner.Stage.CREATED, anyTree(
+                filter("NOT (X IN (Y))",
+                        apply(ImmutableList.of(),
+                                anyTree(tableScan("orders").withSymbol("orderkey", "X")),
+                                anyTree(node(ValuesNode.class).withSymbol("field", "Y")))))
+        );
+        assertPlan(query, anyTree(
+                filter("NOT S",
+                        project(
+                                semiJoin("X", "Y", "S",
+                                        anyTree(tableScan("orders").withSymbol("orderkey", "X")),
+                                        anyTree(node(ValuesNode.class).withSymbol("field", "Y"))))))
+        );
+    }
+
+    @Test
+    public void testQuantifiedComparisonLessAll()
+    {
+        assertOrderedQuantifiedComparison("SELECT orderkey, custkey FROM orders WHERE orderkey < ALL (VALUES CAST(5 as BIGINT), CAST(3 as BIGINT))",
+                "X < MIN", "X", "min", "MIN");
+    }
+
+    @Test
+    public void testQuantifiedComparisonGreaterEqualAll()
+    {
+        assertOrderedQuantifiedComparison("SELECT orderkey, custkey FROM orders WHERE orderkey >= ALL (VALUES CAST(5 as BIGINT), CAST(3 as BIGINT))",
+                "X >= MAX", "X", "max", "MAX");
+    }
+
+    @Test
+    public void testQuantifiedComparisonLessSome()
+    {
+        assertOrderedQuantifiedComparison("SELECT orderkey, custkey FROM orders WHERE orderkey < SOME (VALUES CAST(5 as BIGINT), CAST(3 as BIGINT))",
+                "X < MAX", "X", "max", "MAX");
+    }
+
+    @Test
+    public void testQuantifiedComparisonGreaterEqualAny()
+    {
+        assertOrderedQuantifiedComparison("SELECT orderkey, custkey FROM orders WHERE orderkey >= ANY (VALUES CAST(5 as BIGINT), CAST(3 as BIGINT))",
+                "X >= MIN", "X", "min", "MIN");
+    }
+
+    @Test
+    public void testQuantifiedComparisonEqualAll()
+    {
+        String query = "SELECT orderkey, custkey FROM orders WHERE orderkey = ALL (VALUES CAST(5 as BIGINT), CAST(3 as BIGINT))";
+
+        assertPlan(query, LogicalPlanner.Stage.CREATED,
+                anyTree(
+                        project(
+                                filter("MIN = MAX AND X = MIN",
+                                        apply(ImmutableList.of(),
+                                                project(
+                                                        tableScan("orders").withSymbol("orderkey", "X")),
+                                                node(EnforceSingleRowNode.class,
+                                                        node(AggregationNode.class,
+                                                                anyTree(
+                                                                        node(ValuesNode.class)))).withSymbol("min", "MIN").withSymbol("max", "MAX")
+                                        )))));
+        assertPlan(query, anyTree(
+                node(JoinNode.class,
+                        anyTree(
+                                tableScan("orders")),
+                        anyTree(
+                                node(AggregationNode.class,
+                                        node(ValuesNode.class)))))
+        );
+    }
+
+    @Test
+    public void testQuantifiedComparisonNotEqualAny()
+    {
+        String query = "SELECT orderkey, custkey FROM orders WHERE orderkey <> SOME (VALUES CAST(5 as BIGINT), CAST(3 as BIGINT))";
+
+        assertPlan(query, LogicalPlanner.Stage.CREATED,
+                anyTree(
+                        project(
+                                filter("NOT (MIN = MAX AND X = MIN)",
+                                        apply(ImmutableList.of(),
+                                                project(
+                                                        tableScan("orders").withSymbol("orderkey", "X")),
+                                                node(EnforceSingleRowNode.class,
+                                                        node(AggregationNode.class,
+                                                                anyTree(
+                                                                        node(ValuesNode.class)))).withSymbol("min", "MIN").withSymbol("max", "MAX")
+                                        )))));
+        assertPlan(query, anyTree(
+                node(JoinNode.class,
+                        tableScan("orders"),
+                        anyTree(
+                                node(AggregationNode.class,
+                                        node(ValuesNode.class)))))
+        );
+    }
+
+    @Test
+    public void testExplainAnalyze()
+    {
+        String sql = "EXPLAIN ANALYZE SELECT * FROM (VALUES (1,2,3)) t(x,y,z)";
+        assertPlan(sql, node(OutputNode.class,
+                node(ExplainAnalyzeNode.class,
+                        node(ValuesNode.class)))
+        );
+        // check that outputs of the underlying query are not pruned
+        PlanNode valuesNode = plan(sql).getRoot().getSources().get(0).getSources().get(0);
+        assertEquals(valuesNode.getOutputSymbols().size(), 3);
     }
 
     private void assertPlan(String sql, PlanMatchPattern pattern)
@@ -298,6 +400,30 @@ public class TestLogicalPlanner
             fail("Invalid SQL: " + sql, ex);
             return null; // make compiler happy
         }
+    }
+
+    private void assertOrderedQuantifiedComparison(String query, String filter, String columnMapping, String function, String functionAlias)
+    {
+        assertPlan(query, LogicalPlanner.Stage.CREATED, anyTree(
+                project(
+                        filter(filter,
+                                apply(ImmutableList.of(),
+                                        project(
+                                                tableScan("orders").withSymbol("orderkey", columnMapping)),
+                                        node(EnforceSingleRowNode.class,
+                                                node(AggregationNode.class,
+                                                        anyTree(
+                                                                node(ValuesNode.class))).withSymbol(function, functionAlias)
+                                        ))))));
+        assertPlan(query, anyTree(
+                project(
+                        filter(filter,
+                                join(INNER, ImmutableList.of(),
+                                        tableScan("orders").withSymbol("orderkey", columnMapping),
+                                        node(EnforceSingleRowNode.class,
+                                                node(AggregationNode.class,
+                                                        node(ValuesNode.class)).withSymbol(function, functionAlias)
+                                        ))))));
     }
 
     private static final class PlanNodeExtractor

@@ -21,7 +21,6 @@ import com.facebook.presto.spi.ConnectorPageSink;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.PageSorter;
-import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.BlockBuilder;
 import com.facebook.presto.spi.block.SortOrder;
@@ -35,18 +34,17 @@ import io.airlift.units.DataSize;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CompletableFuture;
 
-import static com.facebook.presto.spi.StandardErrorCode.NOT_SUPPORTED;
-import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
 import static com.google.common.base.Preconditions.checkArgument;
+import static io.airlift.concurrent.MoreFutures.allAsList;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toList;
@@ -98,12 +96,6 @@ public class RaptorPageSink
         this.bucketCount = bucketCount;
         this.bucketFields = bucketColumnIds.stream().mapToInt(columnIds::indexOf).toArray();
 
-        for (int field : bucketFields) {
-            if (!columnTypes.get(field).equals(BIGINT)) {
-                throw new PrestoException(NOT_SUPPORTED, "Bucketing is only supported for BIGINT columns");
-            }
-        }
-
         if (temporalColumnHandle.isPresent() && columnIds.contains(temporalColumnHandle.get().getColumnId())) {
             temporalColumnIndex = OptionalInt.of(columnIds.indexOf(temporalColumnHandle.get().getColumnId()));
             temporalColumnType = Optional.of(columnTypes.get(temporalColumnIndex.getAsInt()));
@@ -130,19 +122,19 @@ public class RaptorPageSink
     }
 
     @Override
-    public Collection<Slice> finish()
+    public CompletableFuture<Collection<Slice>> finish()
     {
-        List<ShardInfo> shards = new ArrayList<>();
-        for (PageBuffer pageBuffer : pageWriter.getPageBuffers()) {
+        List<CompletableFuture<? extends List<Slice>>> futureSlices = pageWriter.getPageBuffers().stream().map(pageBuffer -> {
             pageBuffer.flush();
-            shards.addAll(pageBuffer.getStoragePageSink().commit());
-        }
+            CompletableFuture<List<ShardInfo>> futureShards = pageBuffer.getStoragePageSink().commit();
+            return futureShards.thenApply(shards -> shards.stream()
+                    .map(shard -> Slices.wrappedBuffer(shardInfoCodec.toJsonBytes(shard)))
+                    .collect(toList()));
+        }).collect(toList());
 
-        ImmutableList.Builder<Slice> fragments = ImmutableList.builder();
-        for (ShardInfo shard : shards) {
-            fragments.add(Slices.wrappedBuffer(shardInfoCodec.toJsonBytes(shard)));
-        }
-        return fragments.build();
+        return allAsList(futureSlices).thenApply(lists -> lists.stream()
+                .flatMap(Collection::stream)
+                .collect(toList()));
     }
 
     @Override
@@ -213,8 +205,12 @@ public class RaptorPageSink
             checkArgument(temporalColumnIndex.isPresent() == temporalColumnType.isPresent(),
                     "temporalColumnIndex and temporalColumnType must be both present or absent");
 
-            this.bucketFunction = bucketCount.isPresent() ? Optional.of(new RaptorBucketFunction(bucketCount.getAsInt())) : Optional.empty();
-            this.temporalFunction = temporalColumnType.map(type -> TemporalFunction.create(temporalColumnType.get()));
+            List<Type> bucketTypes = Arrays.stream(bucketFields)
+                    .mapToObj(columnTypes::get)
+                    .collect(toList());
+
+            this.bucketFunction = bucketCount.isPresent() ? Optional.of(new RaptorBucketFunction(bucketCount.getAsInt(), bucketTypes)) : Optional.empty();
+            this.temporalFunction = temporalColumnType.map(TemporalFunction::create);
         }
 
         @Override

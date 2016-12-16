@@ -47,20 +47,6 @@ public class TestPostgreSqlIntegrationSmokeTest
         this.postgreSqlServer = postgreSqlServer;
     }
 
-    @Override
-    public void testTableSampleSystem()
-            throws Exception
-    {
-        // tablesample system doesn't work reliably with this connector
-        // because it generates a single split
-    }
-
-    @Override
-    public void testViewAccessControl()
-    {
-        // jdbc connector does not support views
-    }
-
     @AfterClass(alwaysRun = true)
     public final void destroy()
             throws IOException
