@@ -40,3 +40,9 @@ if [[ -z ${PRODUCT_TESTS_JAR} ]]; then
     PRODUCT_TESTS_JAR="${PRODUCT_TESTS_ROOT}/target/presto-product-tests-${PRESTO_VERSION}-executable.jar"
 fi
 export PRODUCT_TESTS_JAR=$(canonical_path ${PRODUCT_TESTS_JAR})
+
+if [[ -z ${PRESTO_JDBC_DRIVER_JAR} ]]; then
+    source "${PRODUCT_TESTS_ROOT}/target/classes/presto.env"
+    PRESTO_JDBC_DRIVER_JAR="${PROJECT_ROOT}/presto-jdbc/target/presto-jdbc-${PRESTO_VERSION}.jar"
+fi
+export PRESTO_JDBC_DRIVER_JAR=$(canonical_path ${PRESTO_JDBC_DRIVER_JAR})

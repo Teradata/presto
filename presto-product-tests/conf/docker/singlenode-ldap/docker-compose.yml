@@ -9,8 +9,6 @@ services:
 
   application-runner:
     image: 'teradatalabs/centos6-java8-oracle-ldap:5'
-    volumes:
-      - ../../../conf/tempto/tempto-configuration-for-docker-ldap.yaml:/docker/volumes/tempto/tempto-configuration-local.yaml
 
   ldapserver:
     image: 'teradatalabs/centos6-java8-oracle-openldap:5'
