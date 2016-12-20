@@ -288,7 +288,7 @@ public class FeaturesConfig
         return spillEnabled;
     }
 
-    @Config("experimental.spill-enabled")
+    @Config("beta.spill-enabled")
     public FeaturesConfig setSpillEnabled(boolean spillEnabled)
     {
         this.spillEnabled = spillEnabled;
@@ -300,7 +300,7 @@ public class FeaturesConfig
         return operatorMemoryLimitBeforeSpill;
     }
 
-    @Config("experimental.operator-memory-limit-before-spill")
+    @Config("beta.operator-memory-limit-before-spill")
     public FeaturesConfig setOperatorMemoryLimitBeforeSpill(DataSize operatorMemoryLimitBeforeSpill)
     {
         this.operatorMemoryLimitBeforeSpill = operatorMemoryLimitBeforeSpill;
@@ -312,11 +312,11 @@ public class FeaturesConfig
         return spillerSpillPaths;
     }
 
-    @Config("experimental.spiller-spill-path")
+    @Config("beta.spiller-spill-path")
     public FeaturesConfig setSpillerSpillPaths(String spillPaths)
     {
         List<String> spillPathsSplit = ImmutableList.copyOf(Splitter.on(",").trimResults().omitEmptyStrings().split(spillPaths));
-        Preconditions.checkArgument(spillPathsSplit.size() >= 1, "At least one path required for experimental.spiller-spill-path config property");
+        Preconditions.checkArgument(spillPathsSplit.size() >= 1, "At least one path required for beta.spiller-spill-path config property");
         this.spillerSpillPaths = spillPathsSplit.stream().map(path -> Paths.get(path)).collect(toImmutableList());
         return this;
     }
@@ -326,7 +326,7 @@ public class FeaturesConfig
         return spillerThreads;
     }
 
-    @Config("experimental.spiller-threads")
+    @Config("beta.spiller-threads")
     public FeaturesConfig setSpillerThreads(int spillerThreads)
     {
         this.spillerThreads = spillerThreads;
@@ -338,7 +338,7 @@ public class FeaturesConfig
         return spillMinimumFreeSpaceThreshold;
     }
 
-    @Config("experimental.spiller-minimum-free-space-threshold")
+    @Config("beta.spiller-minimum-free-space-threshold")
     public FeaturesConfig setSpillMinimumFreeSpaceThreshold(double spillMinimumFreeSpaceThreshold)
     {
         this.spillMinimumFreeSpaceThreshold = spillMinimumFreeSpaceThreshold;

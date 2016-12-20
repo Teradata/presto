@@ -60,7 +60,7 @@ Performance
 
 Scale
 -----
-Beta - Spilling to disk for aggregations and avoid the memory limits within Presto. Must have ``experimental.spill-enabled`` set to ``true``.
+Beta - Spilling to disk for aggregations and avoid the memory limits within Presto. Must have ``beta.spill-enabled`` set to ``true``.
   
 
 Teradata JDBC Driver

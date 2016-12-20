@@ -35,9 +35,9 @@ public class TestQuerySpillLimits
             throws Exception
     {
         Map<String, String> properties = ImmutableMap.<String, String>builder()
-                .put("experimental.spill-enabled", "true")
-                .put("experimental.operator-memory-limit-before-spill", "1B")
-                .put("experimental.max-spill-per-node", "10B")
+                .put("beta.spill-enabled", "true")
+                .put("beta.operator-memory-limit-before-spill", "1B")
+                .put("beta.max-spill-per-node", "10B")
                 .build();
         try (QueryRunner queryRunner = createDistributedQueryRunner(SESSION, properties)) {
             queryRunner.execute(SESSION, "SELECT COUNT(DISTINCT clerk) as count, orderdate FROM orders GROUP BY orderdate ORDER BY count, orderdate");
@@ -49,9 +49,9 @@ public class TestQuerySpillLimits
             throws Exception
     {
         Map<String, String> properties = ImmutableMap.<String, String>builder()
-                .put("experimental.spill-enabled", "true")
-                .put("experimental.operator-memory-limit-before-spill", "1B")
-                .put("experimental.query-max-spill-per-node", "10B")
+                .put("beta.spill-enabled", "true")
+                .put("beta.operator-memory-limit-before-spill", "1B")
+                .put("beta.query-max-spill-per-node", "10B")
                 .build();
         try (QueryRunner queryRunner = createDistributedQueryRunner(SESSION, properties)) {
             queryRunner.execute(SESSION, "SELECT COUNT(DISTINCT clerk) as count, orderdate FROM orders GROUP BY orderdate ORDER BY count, orderdate");

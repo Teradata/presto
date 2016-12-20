@@ -26,7 +26,7 @@ public class NodeSpillConfig
         return maxSpillPerNode;
     }
 
-    @Config("experimental.max-spill-per-node")
+    @Config("beta.max-spill-per-node")
     public NodeSpillConfig setMaxSpillPerNode(DataSize maxSpillPerNode)
     {
         this.maxSpillPerNode = maxSpillPerNode;
@@ -38,7 +38,7 @@ public class NodeSpillConfig
         return queryMaxSpillPerNode;
     }
 
-    @Config("experimental.query-max-spill-per-node")
+    @Config("beta.query-max-spill-per-node")
     public NodeSpillConfig setQueryMaxSpillPerNode(DataSize queryMaxSpillPerNode)
     {
         this.queryMaxSpillPerNode = queryMaxSpillPerNode;

@@ -98,7 +98,7 @@ General properties
 Properties controlling spilling
 -------------------------------
 
-``experimental.spill-enabled``
+``beta.spill-enabled``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
  * **Type:** ``Boolean``
@@ -106,7 +106,7 @@ Properties controlling spilling
  * **Description:** Enable :ref:`spilling <spilling-toggle>`. This config property can be overridden by the ``spill_enabled`` session property.
 
 
-``experimental.spiller-spill-path``
+``beta.spiller-spill-path``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
  * **Type:** ``String``
@@ -114,7 +114,7 @@ Properties controlling spilling
  * **Description:** Directory where spilled content will be written. It can be a comma separated list to spill in round robin fashion into multiple directories.
 
 
-``experimental.spiller-minimum-free-space-threshold``
+``beta.spiller-minimum-free-space-threshold``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
  * **Type:** ``Double``
@@ -122,7 +122,7 @@ Properties controlling spilling
  * **Description:** If disk space usage of a given spill path is above this threshold, this spill path will not be eligible for spilling.
 
 
-``experimental.spiller-threads``
+``beta.spiller-threads``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
  * **Type:** ``Integer``
@@ -130,7 +130,7 @@ Properties controlling spilling
  * **Description:** Number of spiller threads. Increase this value if the default is not able to saturate the underlying spilling device (for example, when using a RAID matrix with multiple disks)
 
 
-``experimental.max-spill-per-node``
+``beta.max-spill-per-node``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
  * **Type:** ``String`` (data size)
@@ -138,7 +138,7 @@ Properties controlling spilling
  * **Description:** Max spill space to be used by all queries on a single node.
 
 
-``experimental.query-max-spill-per-node``
+``beta.query-max-spill-per-node``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
  * **Type:** ``String`` (data size)
