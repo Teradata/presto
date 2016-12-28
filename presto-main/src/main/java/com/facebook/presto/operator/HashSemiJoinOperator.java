@@ -174,7 +174,12 @@ public class HashSemiJoinOperator
         // update hashing strategy to use probe cursor
         for (int position = 0; position < page.getPositionCount(); position++) {
             if (probeJoinPage.getBlock(0).isNull(position)) {
-                blockBuilder.appendNull();
+                if (channelSet.size() > 0) {
+                    blockBuilder.appendNull();
+                }
+                else {
+                    BOOLEAN.writeBoolean(blockBuilder, false);
+                }
             }
             else {
                 boolean contains = channelSet.contains(position, probeJoinPage);

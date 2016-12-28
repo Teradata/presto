@@ -13,6 +13,8 @@
  */
 package com.facebook.presto.tests;
 
+import org.testng.annotations.Test;
+
 import static com.facebook.presto.tests.tpch.TpchQueryRunner.createQueryRunner;
 
 public class TestTpchDistributedQueries
@@ -22,5 +24,19 @@ public class TestTpchDistributedQueries
             throws Exception
     {
         super(createQueryRunner());
+    }
+
+    @Test
+    public void testFoo()
+    {
+        assertQuery("SELECT null IN (SELECT cast(NULL AS BIGINT))");
+        assertQuery("SELECT null IN (SELECT cast(null AS BIGINT) where false)");
+        assertQuery("SELECT null IN (SELECT 1)");
+        assertQuery("SELECT null IN (SELECT 1 where false)");
+        assertQuery("select null in ((select 1) union all (select null))");
+        assertQuery("select x in (select true) from (select * from (values cast(null as boolean)) t(x) where (x or null) is null)", "select null");
+        assertQuery("select x in (select 1) from (select * from (values cast(null as integer)) t(x) where (x + 10 is null) or x = 2)", "select null");
+        assertQuery("select x in (select 1) from (select * from (values cast(null as integer)) t(x) where (x + 10 is null) or x = 1)", "select null");
+        assertQuery("select x in (select true) from (select * from (values cast(null as boolean)) t(x) where x is null)", "select null");
     }
 }

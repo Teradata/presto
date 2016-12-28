@@ -175,6 +175,46 @@ public class TestHashSemiJoinOperator
     }
 
     @Test(dataProvider = "hashEnabledValues")
+    public void testEmptyBuildNull(boolean hashEnabled)
+            throws Exception
+    {
+        DriverContext driverContext = taskContext.addPipelineContext(true, true).addDriverContext();
+
+        // build
+        OperatorContext operatorContext = driverContext.addOperatorContext(0, new PlanNodeId("test"), ValuesOperator.class.getSimpleName());
+        List<Type> buildTypes = ImmutableList.of(BIGINT);
+        RowPagesBuilder rowPagesBuilder = rowPagesBuilder(hashEnabled, Ints.asList(0), buildTypes);
+        Operator buildOperator = new ValuesOperator(operatorContext, buildTypes, rowPagesBuilder.build());
+        SetBuilderOperatorFactory setBuilderOperatorFactory = new SetBuilderOperatorFactory(1, new PlanNodeId("test"), buildOperator.getTypes().get(0), 0, rowPagesBuilder.getHashChannel(), 10);
+        Operator setBuilderOperator = setBuilderOperatorFactory.createOperator(driverContext);
+
+        Driver driver = new Driver(driverContext, buildOperator, setBuilderOperator);
+        while (!driver.isFinished()) {
+            driver.process();
+        }
+
+        // probe
+        List<Type> probeTypes = ImmutableList.of(BIGINT);
+        RowPagesBuilder rowPagesBuilderProbe = rowPagesBuilder(hashEnabled, Ints.asList(0), probeTypes);
+        List<Page> probeInput = rowPagesBuilderProbe
+                .row((Object) null)
+                .build();
+        HashSemiJoinOperatorFactory joinOperatorFactory = new HashSemiJoinOperatorFactory(
+                2,
+                new PlanNodeId("test"),
+                setBuilderOperatorFactory.getSetProvider(),
+                rowPagesBuilderProbe.getTypes(),
+                0);
+
+        // expected
+        MaterializedResult expected = resultBuilder(driverContext.getSession(), concat(probeTypes, ImmutableList.of(BOOLEAN)))
+                .row(null, false)
+                .build();
+
+        OperatorAssertion.assertOperatorEquals(joinOperatorFactory, driverContext, probeInput, expected, hashEnabled, ImmutableList.of(probeTypes.size()));
+    }
+
+    @Test(dataProvider = "hashEnabledValues")
     public void testProbeSideNulls(boolean hashEnabled)
             throws Exception
     {
