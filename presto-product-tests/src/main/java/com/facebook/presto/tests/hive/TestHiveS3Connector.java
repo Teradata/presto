@@ -15,70 +15,88 @@
 package com.facebook.presto.tests.hive;
 
 import com.teradata.tempto.ProductTest;
+import com.teradata.tempto.query.QueryExecutionException;
 import com.teradata.tempto.query.QueryResult;
 import com.teradata.tempto.query.QueryType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testng.annotations.Test;
 
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.sql.SQLException;
 
-import static com.facebook.presto.tests.TestGroups.QUARANTINE;
 import static com.facebook.presto.tests.TestGroups.S3_CONNECTOR;
 import static com.teradata.tempto.assertions.QueryAssert.Row.row;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
+import static com.teradata.tempto.query.QueryExecutor.defaultQueryExecutor;
 import static com.teradata.tempto.query.QueryExecutor.query;
 import static com.teradata.tempto.util.DateTimeUtils.parseTimestampInUTC;
 import static java.lang.String.format;
 
-// Tests in this class are all quarantined so that they only run as part of the s3 connector job
-// These tests require access to an s3 cluster as well as some predefined tables with data loaded in s3.
+// This class is intended to test the s3 connector.  They require some predefined tables with data loaded.
+// Though the tests will be able to run on any configuration that has those tables loaded in hive,
+// they are intended to be used to test a configuration where the hive connector has access to S3,
+// and the tables are stored in s3
 public class TestHiveS3Connector
         extends ProductTest
 {
-    @Test(groups = {S3_CONNECTOR, QUARANTINE})
+    private static final Logger LOGGER = LoggerFactory.getLogger(TestHiveS3Connector.class);
+
+    @Test(groups = {S3_CONNECTOR})
     public void testSelectFromTextFile()
             throws SQLException
     {
         // This test uses a standard tpch nation table.  It assumes that table is already created in the hive catalog
         // and has data loaded.
-        QueryResult queryResult = query("SELECT n_name FROM hive.default.nation where n_nationkey = 7");
-        assertThat(queryResult).containsOnly(row("GERMANY"));
+        String tableName = "hive.default.nation";
+        if (isCreated(tableName)) {
+            QueryResult queryResult = query("SELECT n_name FROM hive.default.nation where n_nationkey = 7");
+            assertThat(queryResult).containsOnly(row("GERMANY"));
+        }
+        else {
+            LOGGER.warn(format("Skipping test. Table %s is not created", tableName));
+        }
     }
 
-    @Test(groups = {S3_CONNECTOR, QUARANTINE})
+    @Test(groups = {S3_CONNECTOR})
     public void testAllDataTypesTextFile()
             throws SQLException
     {
         // This test uses the all_types table as defined in the AllSimpleTypesTableDefinition class and
         // data from hive/data/all_types/data.textfile. The table is create with the name 'alltypes_text'.
         // The test assumes that table is already created in the hive catalog and has data loaded.
+        String tableName = "alltypes_text";
+        if (isCreated(tableName)) {
+            assertProperAllDatatypesSchema("alltypes_text");
+            QueryResult queryResult = query("SELECT * FROM alltypes_text");
 
-        assertProperAllDatatypesSchema("alltypes_text");
-        QueryResult queryResult = query("SELECT * FROM alltypes_text");
-
-        assertThat(queryResult).containsOnly(
-                row(
-                        127,
-                        32767,
-                        2147483647,
-                        9223372036854775807L,
-                        123.345f,
-                        234.567,
-                        new BigDecimal("346"),
-                        new BigDecimal("345.67800"),
-                        parseTimestampInUTC("2015-05-10 12:15:35.123"),
-                        Date.valueOf("2015-05-10"),
-                        "ala ma kota",
-                        "ala ma kot",
-                        "ala ma    ",
-                        true,
-                        "kot binarny".getBytes()
-                )
-        );
+            assertThat(queryResult).containsOnly(
+                    row(
+                            127,
+                            32767,
+                            2147483647,
+                            9223372036854775807L,
+                            123.345f,
+                            234.567,
+                            new BigDecimal("346"),
+                            new BigDecimal("345.67800"),
+                            parseTimestampInUTC("2015-05-10 12:15:35.123"),
+                            Date.valueOf("2015-05-10"),
+                            "ala ma kota",
+                            "ala ma kot",
+                            "ala ma    ",
+                            true,
+                            "kot binarny".getBytes()
+                    )
+            );
+        }
+        else {
+            LOGGER.warn(format("Skipping test. Table %s is not created", tableName));
+        }
     }
 
-    @Test(groups = {S3_CONNECTOR, QUARANTINE})
+    @Test(groups = {S3_CONNECTOR})
     public void testAllDataTypesRcFile()
             throws SQLException
     {
@@ -86,31 +104,37 @@ public class TestHiveS3Connector
         // from hive/data/all_types/data.rcfile.  the table is created with the name alltypes_rcfile.
         // The test assumes that table is already created in the hive catalog and has data loaded.
 
-        assertProperAllDatatypesSchema("alltypes_rcfile");
-        QueryResult queryResult = query("SELECT * FROM alltypes_rcfile");
+        String tableName = "alltypes_rcfile";
+        if (isCreated(tableName)) {
+            assertProperAllDatatypesSchema(tableName);
+            QueryResult queryResult = query(format("SELECT * FROM %s", tableName));
 
-        assertThat(queryResult).containsOnly(
-                row(
-                        127,
-                        32767,
-                        2147483647,
-                        9223372036854775807L,
-                        123.345f,
-                        234.567,
-                        new BigDecimal("346"),
-                        new BigDecimal("345.67800"),
-                        parseTimestampInUTC("2015-05-10 12:15:35.123"),
-                        Date.valueOf("2015-05-10"),
-                        "ala ma kota",
-                        "ala ma kot",
-                        "ala ma    ",
-                        true,
-                        "kot binarny".getBytes()
-                )
-        );
+            assertThat(queryResult).containsOnly(
+                    row(
+                            127,
+                            32767,
+                            2147483647,
+                            9223372036854775807L,
+                            123.345f,
+                            234.567,
+                            new BigDecimal("346"),
+                            new BigDecimal("345.67800"),
+                            parseTimestampInUTC("2015-05-10 12:15:35.123"),
+                            Date.valueOf("2015-05-10"),
+                            "ala ma kota",
+                            "ala ma kot",
+                            "ala ma    ",
+                            true,
+                            "kot binarny".getBytes()
+                    )
+            );
+        }
+        else {
+            LOGGER.warn(format("Skipping test. Table %s is not created", tableName));
+        }
     }
 
-    @Test(groups = {S3_CONNECTOR, QUARANTINE})
+    @Test(groups = {S3_CONNECTOR})
     public void testAllDataTypesOrc()
             throws SQLException
     {
@@ -118,31 +142,37 @@ public class TestHiveS3Connector
         // with data from hive/data/all_types/data.orc.  The table is created with the name alltypes_orc.
         // The test assumes that table is already created in the hive catalog and has data loaded.
 
-        assertProperAllDatatypesSchema("alltypes_orc");
-        QueryResult queryResult = query("SELECT * FROM alltypes_orc");
+        String tableName = "alltypes_orc";
+        if (isCreated(tableName)) {
+            assertProperAllDatatypesSchema(tableName);
+            QueryResult queryResult = query(format("SELECT * FROM %s", tableName));
 
-        assertThat(queryResult).containsOnly(
-                row(
-                        127,
-                        32767,
-                        2147483647,
-                        9223372036854775807L,
-                        123.345f,
-                        234.567,
-                        new BigDecimal("346"),
-                        new BigDecimal("345.67800"),
-                        parseTimestampInUTC("2015-05-10 12:15:35.123"),
-                        Date.valueOf("2015-05-10"),
-                        "ala ma kota",
-                        "ala ma kot",
-                        "ala ma    ",
-                        true,
-                        "kot binarny".getBytes()
-                )
-        );
+            assertThat(queryResult).containsOnly(
+                    row(
+                            127,
+                            32767,
+                            2147483647,
+                            9223372036854775807L,
+                            123.345f,
+                            234.567,
+                            new BigDecimal("346"),
+                            new BigDecimal("345.67800"),
+                            parseTimestampInUTC("2015-05-10 12:15:35.123"),
+                            Date.valueOf("2015-05-10"),
+                            "ala ma kota",
+                            "ala ma kot",
+                            "ala ma    ",
+                            true,
+                            "kot binarny".getBytes()
+                    )
+            );
+        }
+        else {
+            LOGGER.warn(format("Skipping test. Table %s is not created.", tableName));
+        }
     }
 
-    @Test(groups = {S3_CONNECTOR, QUARANTINE})
+    @Test(groups = {S3_CONNECTOR})
     public void testAllDataTypesParquet()
             throws SQLException
     {
@@ -151,34 +181,46 @@ public class TestHiveS3Connector
         // hive/data/all_types/data.textfile. The table is created with the name alltypes_parquet.
         // The test assumes that table is already created in the hive catalog and has data loaded.
 
-        assertProperParquetDatatypesSchema("alltypes_parquet");
-        QueryResult queryResult = query("SELECT * FROM alltypes_parquet");
+        String tableName = "alltypes_parquet";
+        if (isCreated(tableName)) {
+            assertProperParquetDatatypesSchema(tableName);
+            QueryResult queryResult = query(format("SELECT * FROM %s", tableName));
 
-        assertThat(queryResult).containsOnly(
-                row(
-                        127,
-                        32767,
-                        2147483647,
-                        9223372036854775807L,
-                        123.345f,
-                        234.567,
-                        parseTimestampInUTC("2015-05-10 12:15:35.123"),
-                        "ala ma kota",
-                        "ala ma kot",
-                        "ala ma    ",
-                        true
-                )
-        );
+            assertThat(queryResult).containsOnly(
+                    row(
+                            127,
+                            32767,
+                            2147483647,
+                            9223372036854775807L,
+                            123.345f,
+                            234.567,
+                            parseTimestampInUTC("2015-05-10 12:15:35.123"),
+                            "ala ma kota",
+                            "ala ma kot",
+                            "ala ma    ",
+                            true
+                    )
+            );
+        }
+        else {
+            LOGGER.warn(format("Skipping test. Table %s is not created", tableName));
+        }
     }
 
-    @Test(groups = {S3_CONNECTOR, QUARANTINE})
+    @Test(groups = {S3_CONNECTOR})
     public void shouldCreateTableAsSelect()
             throws Exception
     {
-        String tableName = "create_table_as_select";
-        query(format("DROP TABLE IF EXISTS %s", tableName));
-        query(format("CREATE TABLE %s AS SELECT * FROM nation", tableName));
-        assertThat(query(format("SELECT * FROM %s", tableName))).hasRowsCount(25);
+        String selectTable = "nation";
+        if (isCreated(selectTable)) {
+            String createTable = "create_table_as_select";
+            query(format("DROP TABLE IF EXISTS %s", createTable));
+            query(format("CREATE TABLE %s AS SELECT * FROM %s", createTable, selectTable));
+            assertThat(query(format("SELECT * FROM %s", createTable))).hasRowsCount(25);
+        }
+        else {
+            LOGGER.warn(format("Skipping test. Table %s is not created", selectTable));
+        }
     }
 
     private void assertProperAllDatatypesSchema(String tableName)
@@ -188,7 +230,7 @@ public class TestHiveS3Connector
                 row("c_smallint", "smallint"),
                 row("c_int", "integer"),
                 row("c_bigint", "bigint"),
-                row("c_float", "float"),
+                row("c_float", "real"),
                 row("c_double", "double"),
                 row("c_decimal", "decimal(10,0)"),
                 row("c_decimal_w_params", "decimal(10,5)"),
@@ -209,7 +251,7 @@ public class TestHiveS3Connector
                 row("c_smallint", "smallint"),
                 row("c_int", "integer"),
                 row("c_bigint", "bigint"),
-                row("c_float", "float"),
+                row("c_float", "real"),
                 row("c_double", "double"),
                 row("c_timestamp", "timestamp"),
                 row("c_string", "varchar"),
@@ -217,5 +259,16 @@ public class TestHiveS3Connector
                 row("c_char", "char(10)"),
                 row("c_boolean", "boolean")
         );
+    }
+
+    private boolean isCreated(String tableName)
+    {
+        try {
+            defaultQueryExecutor().executeQuery(format("DESCRIBE %s", tableName));
+            return true;
+        }
+        catch (QueryExecutionException e) {
+            return false;
+        }
     }
 }
