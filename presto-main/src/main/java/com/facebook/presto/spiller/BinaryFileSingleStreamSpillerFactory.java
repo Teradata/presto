@@ -33,7 +33,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 
-import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newFixedThreadPool;
@@ -76,9 +75,14 @@ public class BinaryFileSingleStreamSpillerFactory
         this.executor = requireNonNull(executor, "executor is null");
         this.spillerStats = requireNonNull(spillerStats, "spillerStats can not be null");
         requireNonNull(spillPaths, "spillPaths is null");
-        checkArgument(spillPaths.size() >= 1, "At least one spill path required");
         this.spillPaths = ImmutableList.copyOf(spillPaths);
-        spillPaths.forEach(path -> path.toFile().mkdirs());
+        spillPaths.forEach(path -> {
+            path.toFile().mkdirs();
+            if (!path.toFile().canWrite()) {
+                throw new IllegalArgumentException(
+                        String.format("spill path %s is not writable; adjust experimental.spiller-spill-path config property or filesystem permissions", path));
+            }
+        });
         this.minimumFreeSpaceThreshold = requireNonNull(maxUsedSpaceThreshold, "maxUsedSpaceThreshold can not be null");
         this.roundRobinIndex = 0;
     }
