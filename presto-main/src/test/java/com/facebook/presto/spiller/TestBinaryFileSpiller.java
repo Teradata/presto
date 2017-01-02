@@ -26,8 +26,13 @@ import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.io.Files;
+import io.airlift.testing.FileUtils;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.io.File;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -44,10 +49,31 @@ import static org.testng.Assert.assertEquals;
 public class TestBinaryFileSpiller
 {
     private static final List<Type> TYPES = ImmutableList.of(BIGINT, VARCHAR, DOUBLE, BIGINT);
-    private final BlockEncodingSerde blockEncodingSerde = new BlockEncodingManager(new TypeRegistry(ImmutableSet.of(BIGINT, DOUBLE, VARBINARY)));
-    private final SpillerStats spillerStats = new SpillerStats();
-    private final SpillerFactory factory = new GenericSpillerFactory(new BinaryFileSingleStreamSpillerFactory(blockEncodingSerde, spillerStats, new FeaturesConfig()));
-    private final AggregatedMemoryContext memoryContext = new AggregatedMemoryContext();
+
+    private BlockEncodingSerde blockEncodingSerde;
+    private File spillPath = Files.createTempDir();
+    private SpillerStats spillerStats;
+    private SpillerFactory factory;
+    private AggregatedMemoryContext memoryContext;
+
+    @BeforeMethod
+    public void setUp()
+            throws Exception
+    {
+        blockEncodingSerde = new BlockEncodingManager(new TypeRegistry(ImmutableSet.of(BIGINT, DOUBLE, VARBINARY)));
+        spillerStats = new SpillerStats();
+        FeaturesConfig featuresConfig = new FeaturesConfig();
+        featuresConfig.setSpillerSpillPaths(spillPath.getAbsolutePath());
+        factory = new GenericSpillerFactory(new BinaryFileSingleStreamSpillerFactory(blockEncodingSerde, spillerStats, featuresConfig));
+        memoryContext = new AggregatedMemoryContext();
+    }
+
+    @AfterMethod
+    public void tearDown()
+            throws Exception
+    {
+        FileUtils.deleteRecursively(spillPath);
+    }
 
     @Test
     public void testFileSpiller()
