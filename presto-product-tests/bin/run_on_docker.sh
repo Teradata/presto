@@ -192,7 +192,7 @@ fi
 trap terminate INT TERM EXIT
 
 # start external services
-EXTERNAL_SERVICES="hadoop-master mysql postgres cassandra"
+EXTERNAL_SERVICES="hadoop-master mysql postgres cassandra sqlserver"
 environment_compose up -d ${EXTERNAL_SERVICES}
 
 # start docker logs for the external services
