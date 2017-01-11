@@ -226,7 +226,7 @@ public class TpchMetadata
         // todo add stats for columns
         String tableName = tpchTableHandle.getTableName();
         double scaleFactor = tpchTableHandle.getScaleFactor();
-        switch (tableName) {
+        switch (tableName.toLowerCase()) {
             case "customer":
                 return (long) (150_000 * scaleFactor);
             case "orders":
