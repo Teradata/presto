@@ -30,7 +30,6 @@ import com.facebook.presto.spi.Node;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spiller.LocalSpillManager;
 import com.facebook.presto.spiller.NodeSpillConfig;
-import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.json.ObjectMapperProvider;
@@ -64,17 +63,17 @@ public class TestSqlTaskManager
     public static final OutputBufferId OUT = new OutputBufferId(0);
 
     private final TaskExecutor taskExecutor;
+    private final TaskManagementExecutor taskManagementExecutor;
     private final LocalMemoryManager localMemoryManager;
     private final LocalSpillManager localSpillManager;
-    private final MemoryRevokingScheduler memoryRevokingScheduler;
 
     public TestSqlTaskManager()
     {
         localMemoryManager = new LocalMemoryManager(new NodeMemoryConfig(), new ReservedSystemMemoryConfig());
         localSpillManager = new LocalSpillManager(new NodeSpillConfig());
-        memoryRevokingScheduler = new MemoryRevokingScheduler(localMemoryManager, new FeaturesConfig());
         taskExecutor = new TaskExecutor(8, 16);
         taskExecutor.start();
+        taskManagementExecutor = new TaskManagementExecutor();
     }
 
     @AfterClass
@@ -82,6 +81,7 @@ public class TestSqlTaskManager
             throws Exception
     {
         taskExecutor.stop();
+        taskManagementExecutor.close();
     }
 
     @Test
@@ -282,7 +282,7 @@ public class TestSqlTaskManager
                 new QueryMonitor(new ObjectMapperProvider().get(), new EventListenerManager(), new NodeInfo("test"), new NodeVersion("testVersion"), new QueryMonitorConfig()),
                 new NodeInfo("test"),
                 localMemoryManager,
-                memoryRevokingScheduler,
+                taskManagementExecutor,
                 config,
                 new NodeMemoryConfig(),
                 localSpillManager,

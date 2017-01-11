@@ -107,8 +107,6 @@ public class TestMemoryRevokingScheduler
             throws Exception
     {
         // todo test for different threshold/target
-        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(singletonList(memoryPool), 1.0, 1.0);
-
         SqlTask sqlTask1 = newSqlTask();
         SqlTask sqlTask2 = newSqlTask();
 
@@ -127,6 +125,7 @@ public class TestMemoryRevokingScheduler
         OperatorContext operatorContext5 = driverContext211.addOperatorContext(5, new PlanNodeId("na"), "na");
 
         Collection<SqlTask> tasks = ImmutableList.of(sqlTask1, sqlTask2);
+        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(singletonList(memoryPool), () -> tasks, executor, 1.0, 1.0);
 
         allOperatorContexts = ImmutableSet.of(operatorContext1, operatorContext2, operatorContext3, operatorContext4, operatorContext5);
         assertMemoryRevokingNotRequested();
@@ -188,7 +187,7 @@ public class TestMemoryRevokingScheduler
         OperatorContext operatorContext2 = createContexts(sqlTask2);
 
         List<SqlTask> tasks = ImmutableList.of(sqlTask1, sqlTask2);
-        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(asList(memoryPool, anotherMemoryPool), 1.0, 1.0);
+        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(asList(memoryPool, anotherMemoryPool), () -> tasks, executor, 1.0, 1.0);
         allOperatorContexts = ImmutableSet.of(operatorContext1, operatorContext2);
 
         /*
