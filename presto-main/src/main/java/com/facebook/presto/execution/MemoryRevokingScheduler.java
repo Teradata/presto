@@ -120,11 +120,10 @@ public class MemoryRevokingScheduler
                     public Void visitOperatorContext(OperatorContext operatorContext, AtomicLong remainingBytesToRevoke)
                     {
                         if (remainingBytesToRevoke.get() > 0) {
-                            long operatorRevocableBytes = operatorContext.getReservedRevocableBytes();
-                            if (operatorRevocableBytes > 0 && !operatorContext.isMemoryRevokingRequested()) {
-                                operatorContext.requestMemoryRevoking();
-                                remainingBytesToRevoke.addAndGet(-operatorRevocableBytes);
-                                log.info("(%s)requested revoking %s; remaining %s", memoryPool.getId(), operatorRevocableBytes, remainingBytesToRevoke.get());
+                            long revokedBytes = operatorContext.requestMemoryRevoking();
+                            if (revokedBytes > 0) {
+                                remainingBytesToRevoke.addAndGet(-revokedBytes);
+                                log.info("(%s)requested revoking %s; remaining %s", memoryPool.getId(), revokedBytes, remainingBytesToRevoke.get());
                             }
                         }
                         return null;
