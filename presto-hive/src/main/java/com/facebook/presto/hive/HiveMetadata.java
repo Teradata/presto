@@ -375,8 +375,7 @@ public class HiveMetadata
         String tableName = hivePartition.getTableName().getTableName();
         String partitionId = hivePartition.getPartitionId();
         if (partitionId.equals(HivePartition.UNPARTITIONED_ID)) {
-            Optional<Table> tableOptional = metastore.getTable(databaseName, tableName);
-            Table table = tableOptional
+            Table table = metastore.getTable(databaseName, tableName)
                     .orElseThrow(() -> new IllegalArgumentException(format("Could not get metadata for table %s.%s", databaseName, tableName)));
             return readStatisticsFromParameters(table.getParameters());
         }
