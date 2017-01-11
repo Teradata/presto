@@ -34,7 +34,7 @@ import static java.util.Objects.requireNonNull;
 
 public class MemoryRevokingScheduler
 {
-    private static final Logger LOG = Logger.get(MemoryRevokingScheduler.class);
+    private static final Logger log = Logger.get(MemoryRevokingScheduler.class);
 
     private static final Ordering<SqlTask> ORDER_BY_CREATE_TIME = Ordering.natural().onResultOf(task -> task.getTaskInfo().getStats().getCreateTime());
     private final List<MemoryPool> memoryPools;
@@ -124,7 +124,7 @@ public class MemoryRevokingScheduler
                             if (operatorRevocableBytes > 0 && !operatorContext.isMemoryRevokingRequested()) {
                                 operatorContext.requestMemoryRevoking();
                                 remainingBytesToRevoke.addAndGet(-operatorRevocableBytes);
-                                LOG.info("(%s)requested revoking %s; remaining %s", memoryPool.getId(), operatorRevocableBytes, remainingBytesToRevoke.get());
+                                log.info("(%s)requested revoking %s; remaining %s", memoryPool.getId(), operatorRevocableBytes, remainingBytesToRevoke.get());
                             }
                         }
                         return null;
