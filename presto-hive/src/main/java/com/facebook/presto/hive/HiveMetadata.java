@@ -381,8 +381,7 @@ public class HiveMetadata
             return readStatisticsFromParameters(table.getParameters());
         }
         else {
-            Optional<Partition> partitionOptional = metastore.getPartition(databaseName, tableName, toPartitionValues(partitionId));
-            Partition partition = partitionOptional
+            Partition partition = metastore.getPartition(databaseName, tableName, toPartitionValues(partitionId))
                     .orElseThrow(() -> new IllegalArgumentException(format("Could not get metadata for partition %s.%s.%s", databaseName, tableName, partitionId)));
             return readStatisticsFromParameters(partition.getParameters());
         }
