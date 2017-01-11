@@ -26,6 +26,8 @@ import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.stats.CounterStat;
 import io.airlift.units.Duration;
 
+import javax.annotation.concurrent.GuardedBy;
+
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.util.Optional;
@@ -84,7 +86,8 @@ public class OperatorContext
     private final AtomicLong finishUserNanos = new AtomicLong();
 
     private final AtomicLong memoryReservation = new AtomicLong();
-    private final AtomicLong revocableMemoryReservation = new AtomicLong();
+    @GuardedBy("this")
+    private long revocableMemoryReservation = 0;
     private final OperatorSystemMemoryContext systemMemoryContext;
 
     private final OperatorSpillContext spillContext;
@@ -93,7 +96,8 @@ public class OperatorContext
     private final boolean collectTimings;
 
     // memoryRevokingRequestedFuture is done iff memory revoking was requested for operator
-    private final AtomicReference<SettableFuture<?>> memoryRevokingRequestedFuture = new AtomicReference<>();
+    @GuardedBy("this")
+    private SettableFuture<?> memoryRevokingRequestedFuture = SettableFuture.create();
 
     public OperatorContext(int operatorId, PlanNodeId planNodeId, String operatorType, DriverContext driverContext, Executor executor)
     {
@@ -110,8 +114,6 @@ public class OperatorContext
         this.memoryFuture.get().set(null);
         this.revocableMemoryFuture = new AtomicReference<>(SettableFuture.create());
         this.revocableMemoryFuture.get().set(null);
-
-        this.memoryRevokingRequestedFuture.set(SettableFuture.create());
 
         collectTimings = driverContext.isVerboseStats() && driverContext.isCpuTimerEnabled();
     }
@@ -236,15 +238,15 @@ public class OperatorContext
         memoryReservation.addAndGet(bytes);
     }
 
-    public void reserveRevocableMemory(long bytes)
+    public synchronized void reserveRevocableMemory(long bytes)
     {
         updateMemoryFuture(driverContext.reserveRevocableMemory(bytes), revocableMemoryFuture);
-        revocableMemoryReservation.addAndGet(bytes);
+        revocableMemoryReservation += bytes;
     }
 
-    public long getReservedRevocableBytes()
+    public synchronized long getReservedRevocableBytes()
     {
-        return revocableMemoryReservation.get();
+        return revocableMemoryReservation;
     }
 
     private static void updateMemoryFuture(ListenableFuture<?> memoryPoolFuture, AtomicReference<SettableFuture<?>> targetFutureReference)
@@ -281,11 +283,11 @@ public class OperatorContext
         }
     }
 
-    public void setRevocableMemoryReservation(long newRevocableMemoryReservation)
+    public synchronized void setRevocableMemoryReservation(long newRevocableMemoryReservation)
     {
         checkArgument(newRevocableMemoryReservation >= 0, "newRevocableMemoryReservation is negative");
 
-        long delta = newRevocableMemoryReservation - revocableMemoryReservation.get();
+        long delta = newRevocableMemoryReservation - revocableMemoryReservation;
 
         if (delta > 0) {
             reserveRevocableMemory(delta);
@@ -295,12 +297,12 @@ public class OperatorContext
         }
     }
 
-    public void freeRevocableMemory(long bytes)
+    public synchronized void freeRevocableMemory(long bytes)
     {
         checkArgument(bytes >= 0, "bytes is negative");
-        checkArgument(bytes <= revocableMemoryReservation.get(), "tried to free more revocable memory than is reserved");
+        checkArgument(bytes <= revocableMemoryReservation, "tried to free more revocable memory than is reserved");
         driverContext.freeRevocableMemory(bytes);
-        revocableMemoryReservation.getAndAdd(-bytes);
+        revocableMemoryReservation -= bytes;
     }
 
     public void freeMemory(long bytes)
@@ -384,30 +386,36 @@ public class OperatorContext
         return true;
     }
 
-    public boolean isMemoryRevokingRequested()
+    public synchronized boolean isMemoryRevokingRequested()
     {
-        return memoryRevokingRequestedFuture.get().isDone();
+        return memoryRevokingRequestedFuture.isDone();
     }
 
-    public void requestMemoryRevoking()
+    /**
+     * Returns amount of memory which revoking was requested.
+     */
+    public synchronized long requestMemoryRevoking()
     {
-        memoryRevokingRequestedFuture.get().set(null);
+        boolean alreadyRequested = isMemoryRevokingRequested();
+        if (!alreadyRequested && revocableMemoryReservation > 0) {
+            memoryRevokingRequestedFuture.set(null);
+            return revocableMemoryReservation;
+        }
+        return 0;
     }
 
-    public void resetMemoryRevokingRequested()
+    public synchronized void resetMemoryRevokingRequested()
     {
-        SettableFuture<?> currentFuture = memoryRevokingRequestedFuture.get();
+        SettableFuture<?> currentFuture = memoryRevokingRequestedFuture;
         if (!currentFuture.isDone()) {
             return;
         }
-        memoryRevokingRequestedFuture.compareAndSet(currentFuture, SettableFuture.create());
-        // if we do not change the value of currentFuture we are still good as this means other thread
-        // changed it to SettableFuture.create in exactly same method.
+        memoryRevokingRequestedFuture = SettableFuture.create();
     }
 
-    public SettableFuture<?> getMemoryRevokingRequestedFuture()
+    public synchronized SettableFuture<?> getMemoryRevokingRequestedFuture()
     {
-        return memoryRevokingRequestedFuture.get();
+        return memoryRevokingRequestedFuture;
     }
 
     public void setInfoSupplier(Supplier<?> infoSupplier)
@@ -471,7 +479,7 @@ public class OperatorContext
                 new Duration(finishUserNanos.get(), NANOSECONDS).convertToMostSuccinctTimeUnit(),
 
                 succinctBytes(memoryReservation.get()),
-                succinctBytes(revocableMemoryReservation.get()),
+                succinctBytes(getReservedRevocableBytes()),
                 succinctBytes(systemMemoryContext.getReservedBytes()),
                 memoryFuture.get().isDone() ? Optional.empty() : Optional.of(WAITING_FOR_MEMORY),
                 info);
