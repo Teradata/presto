@@ -51,9 +51,9 @@ public class MemoryRevokingScheduler
     }
 
     @VisibleForTesting
-    MemoryRevokingScheduler(MemoryPool memoryPool, double memoryRevokingThreshold, double memoryRevokingTarget)
+    MemoryRevokingScheduler(List<MemoryPool> memoryPools, double memoryRevokingThreshold, double memoryRevokingTarget)
     {
-        this.memoryPools = ImmutableList.of(memoryPool);
+        this.memoryPools = ImmutableList.copyOf(memoryPools);
         this.memoryRevokingThreshold = memoryRevokingThreshold;
         this.memoryRevokingTarget = memoryRevokingTarget;
     }
@@ -71,15 +71,16 @@ public class MemoryRevokingScheduler
         }
 
         long remainingBytesToRevoke = (long) (-freeBytes + (memoryPool.getMaxBytes() * (1.0 - memoryRevokingTarget)));
-        remainingBytesToRevoke -= getMemoryAlreadyBeingRevoked(sqlTasks);
+        remainingBytesToRevoke -= getMemoryAlreadyBeingRevoked(sqlTasks, memoryPool);
         requestRevoking(remainingBytesToRevoke, sqlTasks, memoryPool);
     }
 
-    private long getMemoryAlreadyBeingRevoked(Collection<SqlTask> sqlTasks)
+    private long getMemoryAlreadyBeingRevoked(Collection<SqlTask> sqlTasks, MemoryPool memoryPool)
     {
         AtomicLong memoryAlreadyBeingRevoked = new AtomicLong();
         sqlTasks.stream()
                 .filter(task -> task.getTaskInfo().getTaskStatus().getState() == TaskState.RUNNING)
+                .filter(task -> task.getQueryContext().getMemoryPool() == memoryPool)
                 .forEach(task -> task.getQueryContext().accept(new TraversingQueryContextVisitor<Void, Void>()
                 {
                     @Override
@@ -99,16 +100,13 @@ public class MemoryRevokingScheduler
         AtomicLong remainingBytesToRevokeAtomic = new AtomicLong(remainingBytesToRevoke);
         sqlTasks.stream()
                 .filter(task -> task.getTaskInfo().getTaskStatus().getState() == TaskState.RUNNING)
+                .filter(task -> task.getQueryContext().getMemoryPool() == memoryPool)
                 .sorted(ORDER_BY_CREATE_TIME)
                 .forEach(task -> task.getQueryContext().accept(new TraversingQueryContextVisitor<AtomicLong, Void>()
                 {
                     @Override
                     public Void visitQueryContext(QueryContext queryContext, AtomicLong remainingBytesToRevoke)
                     {
-                        if (queryContext.getMemoryPool() != memoryPool) {
-                            return null;
-                        }
-
                         if (remainingBytesToRevoke.get() < 0) {
                             // exit immediately if no work needs to be done
                             return null;

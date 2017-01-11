@@ -45,6 +45,7 @@ import org.testng.annotations.Test;
 
 import java.net.URI;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -53,6 +54,8 @@ import static com.facebook.presto.execution.TaskTestUtils.createTestingPlanner;
 import static io.airlift.concurrent.Threads.threadsNamed;
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
+import static java.util.Arrays.asList;
+import static java.util.Collections.singletonList;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -104,7 +107,7 @@ public class TestMemoryRevokingScheduler
             throws Exception
     {
         // todo test for different threshold/target
-        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(memoryPool, 1.0, 1.0);
+        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(singletonList(memoryPool), 1.0, 1.0);
 
         SqlTask sqlTask1 = newSqlTask();
         SqlTask sqlTask2 = newSqlTask();
@@ -169,6 +172,52 @@ public class TestMemoryRevokingScheduler
         scheduler.requestMemoryRevokingIfNeeded(tasks);
         // no we have to trigger revoking for OC4
         assertMemoryRevokingRequestedFor(operatorContext3, operatorContext4);
+    }
+
+    @Test
+    public void testCountAlreadyRevokedMemoryWithinAPool()
+            throws Exception
+    {
+        // Given
+        SqlTask sqlTask1 = newSqlTask();
+        MemoryPool anotherMemoryPool = new MemoryPool(LocalMemoryManager.SYSTEM_POOL, new DataSize(10, DataSize.Unit.BYTE));
+        sqlTask1.getQueryContext().setMemoryPool(anotherMemoryPool);
+        OperatorContext operatorContext1 = createContexts(sqlTask1);
+
+        SqlTask sqlTask2 = newSqlTask();
+        OperatorContext operatorContext2 = createContexts(sqlTask2);
+
+        List<SqlTask> tasks = ImmutableList.of(sqlTask1, sqlTask2);
+        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(asList(memoryPool, anotherMemoryPool), 1.0, 1.0);
+        allOperatorContexts = ImmutableSet.of(operatorContext1, operatorContext2);
+
+        /*
+         * sqlTask1 fills its pool
+         */
+        operatorContext1.setRevocableMemoryReservation(12);
+        scheduler.requestMemoryRevokingIfNeeded(tasks);
+        assertMemoryRevokingRequestedFor(operatorContext1);
+
+        /*
+         * When sqlTask2 fills its pool
+         */
+        operatorContext2.setRevocableMemoryReservation(12);
+        scheduler.requestMemoryRevokingIfNeeded(tasks);
+
+        /*
+         * Then sqlTask2 should be asked to revoke its memory too
+         */
+        assertMemoryRevokingRequestedFor(operatorContext1, operatorContext2);
+    }
+
+    private OperatorContext createContexts(SqlTask sqlTask)
+    {
+        TaskContext taskContext = sqlTask.getQueryContext().addTaskContext(new TaskStateMachine(new TaskId("q", 1, 1), executor), session, false, false);
+        PipelineContext pipelineContext = taskContext.addPipelineContext(false, false);
+        DriverContext driverContext = pipelineContext.addDriverContext();
+        OperatorContext operatorContext = driverContext.addOperatorContext(1, new PlanNodeId("na"), "na");
+
+        return operatorContext;
     }
 
     private void assertMemoryRevokingRequestedFor(OperatorContext... operatorContexts)
