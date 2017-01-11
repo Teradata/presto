@@ -102,7 +102,7 @@ function stop_docker_compose_containers() {
     stop_application_runner_containers ${ENVIRONMENT}
 
     # stop containers started with "up", removing their volumes
-    environment_compose down -v
+    environment_compose down -v || true
   fi
 
   echo "Docker compose containers stopped: [$ENVIRONMENT]"
