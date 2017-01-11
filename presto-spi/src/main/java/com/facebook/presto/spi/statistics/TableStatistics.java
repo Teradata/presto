@@ -46,14 +46,6 @@ public final class TableStatistics
         return columnStatistics;
     }
 
-    public ColumnStatistics getColumnStatistics(String columnName)
-    {
-        if (columnStatistics.containsKey(columnName)) {
-            return columnStatistics.get(columnName);
-        }
-        return ColumnStatistics.EMPTY_STATISTICS;
-    }
-
     public static Builder builder()
     {
         return new Builder();
