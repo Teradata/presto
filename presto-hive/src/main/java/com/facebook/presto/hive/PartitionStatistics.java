@@ -26,21 +26,21 @@ public class PartitionStatistics
             Optional.empty());
 
     private final boolean columnStatsAcurate;
-    private final Optional<Long> numFiles;
-    private final Optional<Long> numRows;
+    private final Optional<Long> fileCount;
+    private final Optional<Long> rowCount;
     private final Optional<Long> rawDataSize;
     private final Optional<Long> totalSize;
 
     public PartitionStatistics(
             boolean columnStatsAcurate,
-            Optional<Long> numFiles,
-            Optional<Long> numRows,
+            Optional<Long> fileCount,
+            Optional<Long> rowCount,
             Optional<Long> rawDataSize,
             Optional<Long> totalSize)
     {
         this.columnStatsAcurate = columnStatsAcurate;
-        this.numFiles = numFiles;
-        this.numRows = numRows;
+        this.fileCount = fileCount;
+        this.rowCount = rowCount;
         this.rawDataSize = rawDataSize;
         this.totalSize = totalSize;
     }
@@ -50,14 +50,14 @@ public class PartitionStatistics
         return columnStatsAcurate;
     }
 
-    public Optional<Long> getNumFiles()
+    public Optional<Long> getFileCount()
     {
-        return numFiles;
+        return fileCount;
     }
 
-    public Optional<Long> getNumRows()
+    public Optional<Long> getRowCount()
     {
-        return numRows;
+        return rowCount;
     }
 
     public Optional<Long> getRawDataSize()

@@ -351,7 +351,7 @@ public class HiveMetadata
         List<HivePartition> hivePartitions = layout.getPartitions().orElse(ImmutableList.of());
         List<Long> knownPartitionRowCounts = hivePartitions.stream()
                 .map(this::getPartitionStatistics)
-                .map(PartitionStatistics::getNumRows)
+                .map(PartitionStatistics::getRowCount)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .collect(toList());
