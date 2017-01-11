@@ -39,6 +39,8 @@ import com.google.common.collect.Sets;
 import io.airlift.json.ObjectMapperProvider;
 import io.airlift.node.NodeInfo;
 import io.airlift.units.DataSize;
+import org.testng.annotations.AfterMethod;
+import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
 import java.net.URI;
@@ -56,19 +58,24 @@ import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
+@Test(singleThreaded = true)
 public class TestMemoryRevokingScheduler
 {
-    private final ScheduledExecutorService executor;
-    private final SqlTaskExecutionFactory sqlTaskExecutionFactory;
-    private final MemoryPool memoryPool = new MemoryPool(LocalMemoryManager.GENERAL_POOL, new DataSize(10, DataSize.Unit.BYTE));
-    private Session session = TestingSession.testSessionBuilder().build();
     private final AtomicInteger idGeneator = new AtomicInteger();
+    private final Session session = TestingSession.testSessionBuilder().build();
     private final SpillSpaceTracker spillSpaceTracker = new SpillSpaceTracker(new DataSize(10, GIGABYTE));
+
+    private ScheduledExecutorService executor;
+    private SqlTaskExecutionFactory sqlTaskExecutionFactory;
+    private MemoryPool memoryPool;
 
     private Set<OperatorContext> allOperatorContexts;
 
-    public TestMemoryRevokingScheduler()
+    @BeforeMethod
+    public void setUp()
     {
+        memoryPool = new MemoryPool(LocalMemoryManager.GENERAL_POOL, new DataSize(10, DataSize.Unit.BYTE));
+
         TaskExecutor taskExecutor = new TaskExecutor(8, 16);
         taskExecutor.start();
         executor = newScheduledThreadPool(10, threadsNamed("task-notification-%s"));
@@ -81,6 +88,15 @@ public class TestMemoryRevokingScheduler
                 planner,
                 new QueryMonitor(new ObjectMapperProvider().get(), new EventListenerManager(), new NodeInfo("test"), new NodeVersion("testVersion"), new QueryMonitorConfig()),
                 new TaskManagerConfig());
+
+        allOperatorContexts = null;
+    }
+
+    @AfterMethod
+    public void tearDown()
+    {
+        memoryPool = null;
+        executor.shutdownNow();
     }
 
     @Test
