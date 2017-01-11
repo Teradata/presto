@@ -31,7 +31,8 @@ public class PartitionStatistics
     private final Optional<Long> rawDataSize;
     private final Optional<Long> totalSize;
 
-    public PartitionStatistics(boolean columnStatsAcurate,
+    public PartitionStatistics(
+            boolean columnStatsAcurate,
             Optional<Long> numFiles,
             Optional<Long> numRows,
             Optional<Long> rawDataSize,
