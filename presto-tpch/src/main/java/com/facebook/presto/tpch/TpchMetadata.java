@@ -220,7 +220,7 @@ public class TpchMetadata
         return new TableStatistics(new Estimate(getRowCount(table)), ImmutableMap.of());
     }
 
-    public long getRowCount(TpchTableHandle tpchTableHandle)
+    private long getRowCount(TpchTableHandle tpchTableHandle)
     {
         // todo expose row counts from airlift-tpch instead of hardcoding it here
         // todo add stats for columns
