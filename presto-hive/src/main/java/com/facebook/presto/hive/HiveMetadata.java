@@ -401,7 +401,7 @@ public class HiveMetadata
             return Optional.empty();
         }
         try {
-            Long longValue = Long.valueOf(parameterValue);
+            long longValue = Long.parseLong(parameterValue);
             if (longValue < 0) {
                 return Optional.empty();
             }
