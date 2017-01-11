@@ -28,12 +28,12 @@ public final class TableStatistics
     public static final TableStatistics EMPTY_STATISTICS = TableStatistics.builder().build();
 
     private final Estimate rowCount;
-    private final Map<ColumnHandle, ColumnStatistics> columnStatisticsMap;
+    private final Map<ColumnHandle, ColumnStatistics> columnStatistics;
 
-    public TableStatistics(Estimate rowCount, Map<ColumnHandle, ColumnStatistics> columnStatisticsMap)
+    public TableStatistics(Estimate rowCount, Map<ColumnHandle, ColumnStatistics> columnStatistics)
     {
         this.rowCount = requireNonNull(rowCount, "rowCount can not be null");
-        this.columnStatisticsMap = unmodifiableMap(new HashMap<>(requireNonNull(columnStatisticsMap, "columnStatisticsMap can not be null")));
+        this.columnStatistics = unmodifiableMap(new HashMap<>(requireNonNull(columnStatistics, "columnStatistics can not be null")));
     }
 
     public Estimate getRowCount()
@@ -43,13 +43,13 @@ public final class TableStatistics
 
     public Map<ColumnHandle, ColumnStatistics> getColumnStatistics()
     {
-        return columnStatisticsMap;
+        return columnStatistics;
     }
 
     public ColumnStatistics getColumnStatistics(String columnName)
     {
-        if (columnStatisticsMap.containsKey(columnName)) {
-            return columnStatisticsMap.get(columnName);
+        if (columnStatistics.containsKey(columnName)) {
+            return columnStatistics.get(columnName);
         }
         return ColumnStatistics.EMPTY_STATISTICS;
     }
