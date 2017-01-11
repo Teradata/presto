@@ -15,6 +15,7 @@ package com.facebook.presto.execution;
 
 import com.facebook.presto.memory.LocalMemoryManager;
 import com.facebook.presto.memory.MemoryPool;
+import com.facebook.presto.memory.MemoryPoolListener;
 import com.facebook.presto.memory.QueryContext;
 import com.facebook.presto.memory.TraversingQueryContextVisitor;
 import com.facebook.presto.operator.OperatorContext;
@@ -25,15 +26,21 @@ import com.google.common.collect.Ordering;
 import io.airlift.log.Logger;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 
+import static java.util.Collections.synchronizedSet;
 import static java.util.Objects.requireNonNull;
 
 public class MemoryRevokingScheduler
@@ -46,6 +53,14 @@ public class MemoryRevokingScheduler
     private final ScheduledExecutorService taskManagementExecutor;
     private final double memoryRevokingThreshold;
     private final double memoryRevokingTarget;
+
+    private final MemoryPoolListener memoryPoolListener = MemoryPoolListener.onMemoryReserved(this::onMemoryReserved);
+
+    /**
+     * Ids of {@link MemoryPool}s that need checking.
+     */
+    private final Set<MemoryPool> potentiallyOverflowingPools;
+    private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
     @Inject
     public MemoryRevokingScheduler(
@@ -60,6 +75,7 @@ public class MemoryRevokingScheduler
         this.taskManagementExecutor = requireNonNull(taskManagementExecutor, "taskManagementExecutor cannot be null").getExecutor();
         this.memoryRevokingThreshold = config.getMemoryRevokingThreshold();
         this.memoryRevokingTarget = config.getMemoryRevokingTarget();
+        this.potentiallyOverflowingPools = synchronizedSet(new HashSet<>());
     }
 
     @VisibleForTesting
@@ -75,14 +91,22 @@ public class MemoryRevokingScheduler
         this.taskManagementExecutor = taskManagementExecutor;
         this.memoryRevokingThreshold = memoryRevokingThreshold;
         this.memoryRevokingTarget = memoryRevokingTarget;
+        this.potentiallyOverflowingPools = synchronizedSet(new HashSet<>());
     }
 
     @PostConstruct
     public void start()
     {
+        registerPeriodicCheck();
+        registerPoolListeners();
+    }
+
+    @VisibleForTesting
+    void registerPeriodicCheck()
+    {
         taskManagementExecutor.scheduleWithFixedDelay(() -> {
             try {
-                requestMemoryRevokingIfNeeded(currentTasksSupplier.get());
+                requestMemoryRevokingIfNeeded(true);
             }
             catch (Throwable e) {
                 log.warn(e, "Error requesting system memory revoking");
@@ -90,21 +114,116 @@ public class MemoryRevokingScheduler
         }, 0, 1, TimeUnit.SECONDS);
     }
 
-    public void requestMemoryRevokingIfNeeded(Collection<SqlTask> sqlTasks)
+    @VisibleForTesting
+    void registerPoolListeners()
     {
-        memoryPools.forEach(memoryPool -> requestMemoryRevokingIfNeeded(sqlTasks, memoryPool));
+        memoryPools.forEach(memoryPool -> memoryPool.addListener(memoryPoolListener));
+    }
+
+    private void onMemoryReserved(MemoryPool memoryPool)
+    {
+        try {
+            if (!memoryRevokingNeeded(memoryPool, memoryPool.getFreeBytes())) {
+                return;
+            }
+
+            if (potentiallyOverflowingPools.add(memoryPool)) {
+                log.debug("Scheduling check for %s", memoryPool);
+
+                taskManagementExecutor.execute(() -> {
+                    try {
+                        requestMemoryRevokingIfNeeded(false);
+                    }
+                    catch (Throwable e) {
+                        log.warn(e, "Error requesting immediate memory revoking");
+                    }
+                });
+            }
+        }
+        catch (Throwable e) {
+            log.warn(e, "Error when acting on memory pool reservation");
+        }
+    }
+
+    @PreDestroy
+    public void stop()
+    {
+        memoryPools.forEach(memoryPool -> memoryPool.removeListener(memoryPoolListener));
+    }
+
+    @VisibleForTesting
+    void requestMemoryRevokingIfNeeded()
+    {
+        requestMemoryRevokingIfNeeded(true);
+    }
+
+    private void requestMemoryRevokingIfNeeded(boolean checkAllPools)
+    {
+        /*
+         * There can be at most one thread actually executing this method. If pool or pools need to be re-checked,
+         * this will be signalled by populating potentiallyOverflowingPools.
+         */
+        if (!isRunning.compareAndSet(false, true)) {
+            // Already running
+
+            if (checkAllPools) {
+                /*
+                 * The check is currently running in some other thread, so tell them to check all pools one more time.
+                 *
+                 * There is a small chance of a race here. If the thread currently executing checkMemoryPools()
+                 * already did its last check of potentiallyOverflowingPools.isEmpty() but still did not reset
+                 * checkRunning flag, the check won't be done at all -- until periodic check is re-run or immediate
+                 * check is triggered (whichever happens earlier). Note however, that in such a situation the delay
+                 * until re-check will be equal to periodic check scheduling frequency, i.e. in no way worse than
+                 * normally.
+                 */
+                potentiallyOverflowingPools.addAll(memoryPools);
+            }
+
+            return;
+        }
+        try {
+            if (checkAllPools) {
+                potentiallyOverflowingPools.clear(); // all will be checked now
+                requestMemoryRevokingIfNeeded(currentTasksSupplier.get(), memoryPools);
+            }
+
+            while (!potentiallyOverflowingPools.isEmpty()) {
+                List<MemoryPool> poolsToCheck;
+                synchronized (potentiallyOverflowingPools) {
+                    poolsToCheck = new ArrayList<>(potentiallyOverflowingPools);
+                    potentiallyOverflowingPools.clear();
+                }
+                requestMemoryRevokingIfNeeded(currentTasksSupplier.get(), poolsToCheck);
+            }
+        }
+        finally {
+            isRunning.set(false);
+        }
+    }
+
+    private void requestMemoryRevokingIfNeeded(Collection<SqlTask> sqlTasks, Iterable<MemoryPool> memoryPools)
+    {
+        for (MemoryPool memoryPool : memoryPools) {
+            requestMemoryRevokingIfNeeded(sqlTasks, memoryPool);
+        }
     }
 
     private void requestMemoryRevokingIfNeeded(Collection<SqlTask> sqlTasks, MemoryPool memoryPool)
     {
         long freeBytes = memoryPool.getFreeBytes();
-        if (freeBytes > memoryPool.getMaxBytes() * (1.0 - memoryRevokingThreshold)) {
+        if (!memoryRevokingNeeded(memoryPool, freeBytes)) {
             return;
         }
 
         long remainingBytesToRevoke = (long) (-freeBytes + (memoryPool.getMaxBytes() * (1.0 - memoryRevokingTarget)));
         remainingBytesToRevoke -= getMemoryAlreadyBeingRevoked(sqlTasks, memoryPool);
         requestRevoking(remainingBytesToRevoke, sqlTasks, memoryPool);
+    }
+
+    private boolean memoryRevokingNeeded(MemoryPool memoryPool, long freeBytes)
+    {
+        return freeBytes <= memoryPool.getMaxBytes() * (1.0 - memoryRevokingThreshold);
     }
 
     private long getMemoryAlreadyBeingRevoked(Collection<SqlTask> sqlTasks, MemoryPool memoryPool)

@@ -47,6 +47,7 @@ import java.net.URI;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -81,7 +82,9 @@ public class TestMemoryRevokingScheduler
 
         TaskExecutor taskExecutor = new TaskExecutor(8, 16);
         taskExecutor.start();
-        executor = newScheduledThreadPool(10, threadsNamed("task-notification-%s"));
+
+        // Must be single threaded
+        executor = newScheduledThreadPool(1, threadsNamed("task-notification-%s"));
 
         LocalExecutionPlanner planner = createTestingPlanner();
 
@@ -130,45 +133,45 @@ public class TestMemoryRevokingScheduler
         allOperatorContexts = ImmutableSet.of(operatorContext1, operatorContext2, operatorContext3, operatorContext4, operatorContext5);
         assertMemoryRevokingNotRequested();
 
-        scheduler.requestMemoryRevokingIfNeeded(tasks);
+        scheduler.requestMemoryRevokingIfNeeded();
         assertEquals(10, memoryPool.getFreeBytes());
         assertMemoryRevokingNotRequested();
 
         operatorContext1.setRevocableMemoryReservation(3);
         operatorContext3.setRevocableMemoryReservation(6);
         assertEquals(1, memoryPool.getFreeBytes());
-        scheduler.requestMemoryRevokingIfNeeded(tasks);
+        scheduler.requestMemoryRevokingIfNeeded();
         // we are still good - no revoking needed
         assertMemoryRevokingNotRequested();
 
         operatorContext4.setRevocableMemoryReservation(7);
         assertEquals(-6, memoryPool.getFreeBytes());
-        scheduler.requestMemoryRevokingIfNeeded(tasks);
+        scheduler.requestMemoryRevokingIfNeeded();
         // we need to revoke 3 and 6
         assertMemoryRevokingRequestedFor(operatorContext1, operatorContext3);
 
         // yet another revoking request should not change anything
-        scheduler.requestMemoryRevokingIfNeeded(tasks);
+        scheduler.requestMemoryRevokingIfNeeded();
         assertMemoryRevokingRequestedFor(operatorContext1, operatorContext3);
 
         // lets revoke some bytes
         operatorContext1.setRevocableMemoryReservation(0);
         operatorContext1.resetMemoryRevokingRequested();
-        scheduler.requestMemoryRevokingIfNeeded(tasks);
+        scheduler.requestMemoryRevokingIfNeeded();
         assertMemoryRevokingRequestedFor(operatorContext3);
         assertEquals(-3, memoryPool.getFreeBytes());
 
         // and allocate some more
         operatorContext5.setRevocableMemoryReservation(3);
         assertEquals(-6, memoryPool.getFreeBytes());
-        scheduler.requestMemoryRevokingIfNeeded(tasks);
+        scheduler.requestMemoryRevokingIfNeeded();
         // we are still good with just OC3 in process of revoking
         assertMemoryRevokingRequestedFor(operatorContext3);
 
         // and allocate some more
         operatorContext5.setRevocableMemoryReservation(4);
         assertEquals(-7, memoryPool.getFreeBytes());
-        scheduler.requestMemoryRevokingIfNeeded(tasks);
+        scheduler.requestMemoryRevokingIfNeeded();
         // no we have to trigger revoking for OC4
         assertMemoryRevokingRequestedFor(operatorContext3, operatorContext4);
     }
@@ -194,19 +197,44 @@ public class TestMemoryRevokingScheduler
          * sqlTask1 fills its pool
          */
         operatorContext1.setRevocableMemoryReservation(12);
-        scheduler.requestMemoryRevokingIfNeeded(tasks);
+        scheduler.requestMemoryRevokingIfNeeded();
         assertMemoryRevokingRequestedFor(operatorContext1);
 
         /*
          * When sqlTask2 fills its pool
          */
         operatorContext2.setRevocableMemoryReservation(12);
-        scheduler.requestMemoryRevokingIfNeeded(tasks);
+        scheduler.requestMemoryRevokingIfNeeded();
 
         /*
          * Then sqlTask2 should be asked to revoke its memory too
          */
         assertMemoryRevokingRequestedFor(operatorContext1, operatorContext2);
+    }
+
+    /**
+     * Test that when a {@link MemoryPool} is over-allocated, revocable memory is revoked without delay (although asynchronously).
+     */
+    @Test
+    public void testImmediateMemoryRevoking()
+            throws Exception
+    {
+        // Given
+        SqlTask sqlTask = newSqlTask();
+        OperatorContext operatorContext = createContexts(sqlTask);
+
+        allOperatorContexts = ImmutableSet.of(operatorContext);
+        List<SqlTask> tasks = ImmutableList.of(sqlTask);
+        MemoryRevokingScheduler scheduler = new MemoryRevokingScheduler(singletonList(memoryPool), () -> tasks, executor, 1.0, 1.0);
+        scheduler.registerPoolListeners(); // no periodic check initiated
+
+        // When
+        operatorContext.reserveRevocableMemory(12);
+        // Make sure asynchronous callback got called (executor is single-threaded).
+        executor.invokeAll(singletonList((Callable<?>) () -> null));
+
+        // Then
+        assertMemoryRevokingRequestedFor(operatorContext);
     }
 
     private OperatorContext createContexts(SqlTask sqlTask)
