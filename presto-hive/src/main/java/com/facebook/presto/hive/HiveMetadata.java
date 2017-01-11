@@ -344,7 +344,6 @@ public class HiveMetadata
     {
         List<ConnectorTableLayoutResult> tableLayouts = getTableLayouts(session, tableHandle, constraint, Optional.empty());
         if (tableLayouts.isEmpty()) {
-            // todo - return statistics matching empty table instead
             return EMPTY_STATISTICS;
         }
         HiveTableLayoutHandle layout = checkType(tableLayouts.get(0), HiveTableLayoutHandle.class, "layoutHandle");
