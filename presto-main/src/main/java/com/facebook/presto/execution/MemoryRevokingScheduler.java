@@ -24,11 +24,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Ordering;
 import io.airlift.log.Logger;
 
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
@@ -38,24 +42,52 @@ public class MemoryRevokingScheduler
 
     private static final Ordering<SqlTask> ORDER_BY_CREATE_TIME = Ordering.natural().onResultOf(task -> task.getTaskInfo().getStats().getCreateTime());
     private final List<MemoryPool> memoryPools;
+    private final Supplier<? extends Collection<SqlTask>> currentTasksSupplier;
+    private final ScheduledExecutorService taskManagementExecutor;
     private final double memoryRevokingThreshold;
     private final double memoryRevokingTarget;
 
     @Inject
-    public MemoryRevokingScheduler(LocalMemoryManager localMemoryManager, FeaturesConfig config)
+    public MemoryRevokingScheduler(
+            LocalMemoryManager localMemoryManager,
+            SqlTaskManager sqlTaskManager,
+            TaskManagementExecutor taskManagementExecutor,
+            FeaturesConfig config)
     {
         requireNonNull(localMemoryManager, "localMemoryManager can not be null");
         this.memoryPools = ImmutableList.of(localMemoryManager.getPool(LocalMemoryManager.GENERAL_POOL), localMemoryManager.getPool(LocalMemoryManager.RESERVED_POOL));
+        this.currentTasksSupplier = requireNonNull(sqlTaskManager, "sqlTaskManager cannot be null")::getAllTasks;
+        this.taskManagementExecutor = requireNonNull(taskManagementExecutor, "taskManagementExecutor cannot be null").getExecutor();
         this.memoryRevokingThreshold = config.getMemoryRevokingThreshold();
         this.memoryRevokingTarget = config.getMemoryRevokingTarget();
     }
 
     @VisibleForTesting
-    MemoryRevokingScheduler(List<MemoryPool> memoryPools, double memoryRevokingThreshold, double memoryRevokingTarget)
+    MemoryRevokingScheduler(
+            List<MemoryPool> memoryPools,
+            Supplier<? extends Collection<SqlTask>> currentTasksSupplier,
+            ScheduledExecutorService taskManagementExecutor,
+            double memoryRevokingThreshold,
+            double memoryRevokingTarget)
     {
         this.memoryPools = ImmutableList.copyOf(memoryPools);
+        this.currentTasksSupplier = currentTasksSupplier;
+        this.taskManagementExecutor = taskManagementExecutor;
         this.memoryRevokingThreshold = memoryRevokingThreshold;
         this.memoryRevokingTarget = memoryRevokingTarget;
+    }
+
+    @PostConstruct
+    public void start()
+    {
+        taskManagementExecutor.scheduleWithFixedDelay(() -> {
+            try {
+                requestMemoryRevokingIfNeeded(currentTasksSupplier.get());
+            }
+            catch (Throwable e) {
+                log.warn(e, "Error requesting system memory revoking");
+            }
+        }, 0, 1, TimeUnit.SECONDS);
     }
 
     public void requestMemoryRevokingIfNeeded(Collection<SqlTask> sqlTasks)
