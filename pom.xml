@@ -50,7 +50,7 @@
         <dep.packaging.version>${dep.airlift.version}</dep.packaging.version>
         <dep.slice.version>0.27</dep.slice.version>
         <dep.aws-sdk.version>1.11.30</dep.aws-sdk.version>
-        <dep.tempto.version>1.22</dep.tempto.version>
+        <dep.tempto.version>1.23</dep.tempto.version>
 
         <!--
         Versions newer than 6.9 appear to have an issue where the @BeforeClass method in
@@ -118,6 +118,7 @@
         <module>presto-testing-server-launcher</module>
         <module>presto-plugin-toolkit</module>
         <module>presto-resource-group-managers</module>
+        <module>presto-sqlserver</module>
     </modules>
 
     <repositories>
@@ -331,6 +332,12 @@
             <dependency>
                 <groupId>com.facebook.presto</groupId>
                 <artifactId>presto-product-tests</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.facebook.presto</groupId>
+                <artifactId>presto-sqlserver</artifactId>
                 <version>${project.version}</version>
             </dependency>
 
@@ -616,6 +623,12 @@
             </dependency>
 
             <dependency>
+                <groupId>com.microsoft.sqlserver</groupId>
+                <artifactId>mssql-jdbc</artifactId>
+                <version>6.1.0.jre8</version>
+            </dependency>
+
+            <dependency>
                 <groupId>jline</groupId>
                 <artifactId>jline</artifactId>
                 <version>2.13</version>
@@ -668,7 +681,7 @@
             <dependency>
                 <groupId>commons-codec</groupId>
                 <artifactId>commons-codec</artifactId>
-                <version>1.9</version>
+                <version>1.10</version>
             </dependency>
 
             <dependency>
