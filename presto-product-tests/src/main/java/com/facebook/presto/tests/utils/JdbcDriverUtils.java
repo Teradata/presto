@@ -53,7 +53,7 @@ public class JdbcDriverUtils
         }
         else if (usingTeradataJdbcDriver(connection)) {
             try (Statement statement = connection.createStatement()) {
-                statement.execute(String.format("set session %s=%s", key, value));
+                statement.execute(String.format("set session %s='%s'", key, value));
             }
         }
         else {
