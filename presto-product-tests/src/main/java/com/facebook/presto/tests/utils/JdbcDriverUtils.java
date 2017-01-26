@@ -15,6 +15,7 @@ package com.facebook.presto.tests.utils;
 
 import com.facebook.presto.jdbc.PrestoConnection;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -45,6 +46,28 @@ public class JdbcDriverUtils
         return null;
     }
 
+    public static boolean shouldValueBeQuoted(String value)
+    {
+        // If value represents a number, no quotes are needed
+        // If value is 'true' or 'false', no quotes are needed
+        // Everything else should be enclosed in single quotes.
+
+        if (value.equalsIgnoreCase("true") ||
+                value.equalsIgnoreCase("false")) {
+            return false;
+        }
+
+        // Not particularly efficient, but for occasional use in
+        // setting session properties for tests, this should be OK.
+        try {
+            new BigDecimal(value);
+            return false;
+        }
+        catch (NumberFormatException e) { }
+
+        return true;
+    }
+
     public static void setSessionProperty(Connection connection, String key, String value) throws SQLException
     {
         if (usingPrestoJdbcDriver(connection)) {
@@ -53,7 +76,10 @@ public class JdbcDriverUtils
         }
         else if (usingTeradataJdbcDriver(connection)) {
             try (Statement statement = connection.createStatement()) {
-                statement.execute(String.format("set session %s='%s'", key, value));
+                if (shouldValueBeQuoted(value)) {
+                    value = "'" + value + "'";
+                }
+                statement.execute(String.format("set session %s=%s", key, value));
             }
         }
         else {
