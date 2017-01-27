@@ -245,9 +245,9 @@ public class JdbcTests
     public void testSessionProperties()
             throws SQLException
     {
-        final String propertyName = "join_distribution_type";
-        final String defaultValue = "repartitioned";
-        final String testValue = "replicated";
+        final String propertyName = "task_concurrency";
+        final String defaultValue = "16";
+        final String testValue = "32";
         assertThat(getSessionProperty(connection, propertyName)).isEqualTo(defaultValue);
         setSessionProperty(connection, propertyName, testValue);
         assertThat(getSessionProperty(connection, propertyName)).isEqualTo(testValue);

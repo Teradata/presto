@@ -14,6 +14,8 @@
 package com.facebook.presto.tests.utils;
 
 import com.facebook.presto.jdbc.PrestoConnection;
+import io.airlift.log.Logger;
+import org.apache.commons.lang3.StringUtils;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -23,6 +25,8 @@ import java.sql.Statement;
 
 public class JdbcDriverUtils
 {
+    private static final Logger LOGGER = Logger.get(JdbcDriverUtils.class);
+
     public static String getSessionProperty(Connection connection, String key) throws SQLException
     {
         return getSessionProperty(connection, key, "Value");
@@ -57,13 +61,23 @@ public class JdbcDriverUtils
             return false;
         }
 
-        // Not particularly efficient, but for occasional use in
-        // setting session properties for tests, this should be OK.
+        if (StringUtils.isNumeric(value)) {
+            return false;
+        }
+
+        if (StringUtils.isAlphanumericSpace(value)) {
+            return true;
+        }
+
+        // Not particularly efficient, but it should be rare that we get here.
+        // For occasional use in setting session properties for tests, this should be OK.
         try {
             new BigDecimal(value);
             return false;
         }
-        catch (NumberFormatException e) { }
+        catch (NumberFormatException e) {
+            LOGGER.info("'%s' is not a number", value, e);
+        }
 
         return true;
     }
