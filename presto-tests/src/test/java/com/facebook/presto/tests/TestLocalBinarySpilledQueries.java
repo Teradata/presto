@@ -41,8 +41,9 @@ public class TestLocalBinarySpilledQueries
         Session defaultSession = testSessionBuilder()
                 .setCatalog("local")
                 .setSchema(TINY_SCHEMA_NAME)
+                .setSystemProperty(SystemSessionProperties.TASK_CONCURRENCY, "2")
                 .setSystemProperty(SystemSessionProperties.SPILL_ENABLED, "true")
-                .setSystemProperty(SystemSessionProperties.OPERATOR_MEMORY_LIMIT_BEFORE_SPILL, "1B") //spill constantly
+                .setSystemProperty(SystemSessionProperties.OPERATOR_MEMORY_LIMIT_BEFORE_SPILL, "128kB")
                 .build();
 
         FeaturesConfig featuresConfig = new FeaturesConfig();
