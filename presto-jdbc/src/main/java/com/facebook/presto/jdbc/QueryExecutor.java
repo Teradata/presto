@@ -24,7 +24,6 @@ import io.airlift.http.client.HttpClientConfig;
 import io.airlift.http.client.Request;
 import io.airlift.http.client.jetty.JettyHttpClient;
 import io.airlift.http.client.jetty.JettyIoPool;
-import io.airlift.http.client.jetty.JettyIoPoolConfig;
 import io.airlift.json.JsonCodec;
 import io.airlift.units.Duration;
 
@@ -83,13 +82,13 @@ class QueryExecutor
         close();
     }
 
-    static QueryExecutor create(String userAgent)
+    static QueryExecutor create(String userAgent, JettyIoPool jettyIoPool)
     {
         return create(new JettyHttpClient(
                 new HttpClientConfig()
                         .setConnectTimeout(new Duration(10, TimeUnit.SECONDS))
                         .setSocksProxy(getSystemSocksProxy()),
-                new JettyIoPool("presto-jdbc", new JettyIoPoolConfig()),
+                jettyIoPool,
                 ImmutableSet.of(new UserAgentRequestFilter(userAgent))));
     }
 

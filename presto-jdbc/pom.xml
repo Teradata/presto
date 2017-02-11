@@ -142,7 +142,13 @@
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>concurrent</artifactId>
-            <scope>test</scope>
+            <exclusions>
+                <!-- jmxutils is not used -->
+                <exclusion>
+                    <groupId>org.weakref</groupId>
+                    <artifactId>jmxutils</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
     </dependencies>
 
