@@ -77,7 +77,7 @@ public class TestDiscoveryNodeManager
         for (PrestoNode node : Iterables.concat(activeNodes, inactiveNodes)) {
             descriptors.add(serviceDescriptor("presto")
                     .setNodeId(node.getNodeIdentifier())
-                    .addProperty("http", node.getHttpUri().toString())
+                    .addProperty("http-external", node.getHttpUri().toString())
                     .addProperty("node_version", node.getNodeVersion().toString())
                     .addProperty("coordinator", String.valueOf(node.equals(coordinator)))
                     .build());
