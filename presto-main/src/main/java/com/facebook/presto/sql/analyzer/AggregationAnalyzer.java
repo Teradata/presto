@@ -91,6 +91,8 @@ class AggregationAnalyzer
     private final List<Expression> parameters;
     private final boolean isDescribe;
 
+    private final boolean isDescribe;
+
     private final Scope scope;
 
     public AggregationAnalyzer(List<Expression> groupByExpressions, Metadata metadata, Scope scope, Set<Expression> columnReferences, List<Expression> parameters, boolean isDescribe)
