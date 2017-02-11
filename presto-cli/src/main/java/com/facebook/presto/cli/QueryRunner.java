@@ -32,6 +32,7 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.json.JsonCodec.jsonCodec;
 import static java.util.Objects.requireNonNull;
 
@@ -48,6 +49,8 @@ public class QueryRunner
             Optional<HostAndPort> socksProxy,
             Optional<String> keystorePath,
             Optional<String> keystorePassword,
+            Optional<String> truststorePath,
+            Optional<String> truststorePassword,
             Optional<String> kerberosPrincipal,
             Optional<String> kerberosRemoteServiceName,
             boolean authenticationEnabled,
@@ -56,10 +59,10 @@ public class QueryRunner
         this.session = new AtomicReference<>(requireNonNull(session, "session is null"));
         this.queryResultsCodec = requireNonNull(queryResultsCodec, "queryResultsCodec is null");
         this.httpClient = new JettyHttpClient(
-                getHttpClientConfig(socksProxy, keystorePath, keystorePassword, kerberosPrincipal, kerberosRemoteServiceName, authenticationEnabled),
+                getHttpClientConfig(socksProxy, keystorePath, keystorePassword, truststorePath, truststorePassword, kerberosPrincipal, kerberosRemoteServiceName, authenticationEnabled),
                 kerberosConfig,
                 Optional.<JettyIoPool>empty(),
-                ImmutableList.<HttpRequestFilter>of());
+                getRequestFilters(session));
     }
 
     public ClientSession getSession()
@@ -93,6 +96,8 @@ public class QueryRunner
             Optional<HostAndPort> socksProxy,
             Optional<String> keystorePath,
             Optional<String> keystorePassword,
+            Optional<String> truststorePath,
+            Optional<String> truststorePassword,
             Optional<String> kerberosPrincipal,
             Optional<String> kerberosRemoteServiceName,
             boolean authenticationEnabled,
@@ -104,6 +109,8 @@ public class QueryRunner
                 socksProxy,
                 keystorePath,
                 keystorePassword,
+                truststorePath,
+                truststorePassword,
                 kerberosPrincipal,
                 kerberosRemoteServiceName,
                 authenticationEnabled,
@@ -114,6 +121,8 @@ public class QueryRunner
             Optional<HostAndPort> socksProxy,
             Optional<String> keystorePath,
             Optional<String> keystorePassword,
+            Optional<String> truststorePath,
+            Optional<String> truststorePassword,
             Optional<String> kerberosPrincipal,
             Optional<String> kerberosRemoteServiceName,
             boolean authenticationEnabled)
@@ -128,9 +137,20 @@ public class QueryRunner
 
         keystorePath.ifPresent(httpClientConfig::setKeyStorePath);
         keystorePassword.ifPresent(httpClientConfig::setKeyStorePassword);
+        truststorePath.ifPresent(httpClientConfig::setTrustStorePath);
+        truststorePassword.ifPresent(httpClientConfig::setTrustStorePassword);
         kerberosPrincipal.ifPresent(httpClientConfig::setKerberosPrincipal);
         kerberosRemoteServiceName.ifPresent(httpClientConfig::setKerberosRemoteServiceName);
 
         return httpClientConfig;
+    }
+
+    public Iterable<HttpRequestFilter> getRequestFilters(ClientSession session)
+    {
+        if (session.getPassword() != null) {
+            checkArgument(session.getServer().getScheme().equalsIgnoreCase("https"), "Authentication using username/password requires https enabled");
+            return ImmutableList.<HttpRequestFilter>of(new LdapRequestFilter(session.getUser(), session.getPassword()));
+        }
+        return ImmutableList.<HttpRequestFilter>of();
     }
 }

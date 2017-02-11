@@ -158,6 +158,7 @@ public class PerfTest
                 ClientSession session = new ClientSession(
                         server,
                         "test-" + i,
+                        null,
                         "presto-perf",
                         catalog,
                         schema,

@@ -72,8 +72,17 @@ public class ClientOptions
     @Option(name = "--keystore-password", title = "keystore password", description = "Keystore password")
     public String keystorePassword;
 
+    @Option(name = "--truststore-path", title = "truststore path", description = "Truststore path")
+    public String truststorePath;
+
+    @Option(name = "--truststore-password", title = "truststore password", description = "Truststore password")
+    public String truststorePassword;
+
     @Option(name = "--user", title = "user", description = "Username")
     public String user = System.getProperty("user.name");
+
+    @Option(name = "--password", title = "password", description = "LDAP password for the user")
+    public String password;
 
     @Option(name = "--source", title = "source", description = "Name of source making query")
     public String source = "presto-cli";
@@ -124,6 +133,7 @@ public class ClientOptions
         return new ClientSession(
                 parseServer(server),
                 user,
+                password,
                 source,
                 catalog,
                 schema,

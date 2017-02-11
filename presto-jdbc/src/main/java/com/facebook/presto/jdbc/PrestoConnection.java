@@ -583,6 +583,7 @@ public class PrestoConnection
         ClientSession session = new ClientSession(
                 uri,
                 user,
+                null,
                 source,
                 catalog.get(),
                 schema.get(),

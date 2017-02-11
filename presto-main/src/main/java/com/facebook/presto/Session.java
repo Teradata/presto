@@ -369,6 +369,7 @@ public final class Session
         return new ClientSession(
                 requireNonNull(server, "server is null"),
                 identity.getUser(),
+                null,
                 source.orElse(null),
                 catalog.orElse(null),
                 schema.orElse(null),
