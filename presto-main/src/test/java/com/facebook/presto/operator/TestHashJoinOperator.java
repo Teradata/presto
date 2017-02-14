@@ -833,6 +833,12 @@ public class TestHashJoinOperator
                 }
 
                 @Override
+                public CompletableFuture<List<Page>> getAllSpilledPages()
+                {
+                    return CompletableFuture.completedFuture(ImmutableList.copyOf(getSpilledPages()));
+                }
+
+                @Override
                 public void close()
                 {
                 }

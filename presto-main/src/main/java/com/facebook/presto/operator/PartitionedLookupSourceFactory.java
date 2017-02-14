@@ -34,7 +34,6 @@ import javax.annotation.concurrent.GuardedBy;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -247,24 +246,24 @@ public final class PartitionedLookupSourceFactory
     }
 
     @Override
-    public ListenableFuture<LookupSource> readSpilledLookupSource(Session session, int partition)
+    public synchronized ListenableFuture<LookupSource> readSpilledLookupSource(Session session, int partition)
     {
         SingleStreamSpiller lookupSourceSpiller = spilledLookupSources.get(partition);
-        Iterator<Page> spilledBuildPages = lookupSourceSpiller.getSpilledPages();
 
-        PagesIndex index = pagesIndexFactory.newPagesIndex(types, 10_000);
+        return lookupSourceSpiller.getAllSpilledPages().thenApply((List<Page> spilledBuildPages) -> {
+            PagesIndex index = pagesIndexFactory.newPagesIndex(types, 10_000);
 
-        while (spilledBuildPages.hasNext()) {
-            index.addPage(spilledBuildPages.next());
-        }
+            for (Page page : spilledBuildPages) {
+                index.addPage(page);
+            }
 
-        return Futures.immediateFuture(
-                index.createLookupSourceSupplier(
-                        session,
-                        hashChannels,
-                        preComputedHashChannel,
-                        filterFunctionFactory,
-                        Optional.of(outputChannels)).get());
+            return index.createLookupSourceSupplier(
+                    session,
+                    hashChannels,
+                    preComputedHashChannel,
+                    filterFunctionFactory,
+                    Optional.of(outputChannels)).get();
+        });
     }
 
     private static class SpilledLookupSource
