@@ -31,10 +31,7 @@ a PostgreSQL server. Thus, if you have multiple PostgreSQL databases,
 or want to connect to multiple PostgreSQL servers, you must configure
 multiple instances of the PostgreSQL connector.
 
-To add another catalog, simply add another properties file to ``etc/catalog``
-with a different name (making sure it ends in ``.properties``). For example,
-if you name the property file ``sales.properties``, Presto will create a
-catalog named ``sales`` using the configured connector.
+See :ref:`catalog-properties` for more information on configuring connectors.
 
 Querying PostgreSQL
 -------------------

@@ -25,11 +25,8 @@ connection properties as appropriate for your setup:
 Multiple MySQL Servers
 ^^^^^^^^^^^^^^^^^^^^^^
 
-You can have as many catalogs as you need, so if you have additional
-MySQL servers, simply add another properties file to ``etc/catalog``
-with a different name (making sure it ends in ``.properties``). For
-example, if you name the property file ``sales.properties``, Presto
-will create a catalog named ``sales`` using the configured connector.
+You can have as many catalogs as you need.
+See :ref:`catalog-properties` for more information on configuring connectors.
 
 Querying MySQL
 --------------
