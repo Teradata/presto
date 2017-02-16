@@ -62,6 +62,8 @@ import static com.google.common.base.Preconditions.checkState;
  *             `--WindowNode(Specification: A, Functions: [avg(something)])
  *                `--...
  */
+
+@Deprecated
 public class MergeWindows
         implements PlanOptimizer
 {

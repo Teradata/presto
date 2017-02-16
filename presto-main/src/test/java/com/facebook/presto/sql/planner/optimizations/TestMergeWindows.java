@@ -30,6 +30,7 @@ import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.any;
@@ -89,7 +90,12 @@ public class TestMergeWindows
 
     public TestMergeWindows()
     {
-        super();
+        this(ImmutableMap.of());
+    }
+
+    public TestMergeWindows(Map<String, String> sessionProperties)
+    {
+        super(sessionProperties);
 
         specificationA = specification(
                 ImmutableList.of(SUPPKEY_ALIAS),

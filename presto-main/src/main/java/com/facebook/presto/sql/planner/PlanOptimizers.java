@@ -19,6 +19,7 @@ import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.iterative.IterativeOptimizer;
 import com.facebook.presto.sql.planner.iterative.rule.EvaluateZeroLimit;
 import com.facebook.presto.sql.planner.iterative.rule.ImplementBernoulliSampleAsFilter;
+import com.facebook.presto.sql.planner.iterative.rule.MergeAdjacentWindows;
 import com.facebook.presto.sql.planner.iterative.rule.MergeLimitWithDistinct;
 import com.facebook.presto.sql.planner.iterative.rule.MergeLimitWithSort;
 import com.facebook.presto.sql.planner.iterative.rule.MergeLimitWithTopN;
@@ -166,7 +167,17 @@ public class PlanOptimizers
                         ImmutableList.of(new CountConstantOptimizer()),
                         ImmutableSet.of(new SimplifyCountOverConstant())),
                 new WindowFilterPushDown(metadata), // This must run after PredicatePushDown and LimitPushDown so that it squashes any successive filter nodes and limits
-                new MergeWindows(),
+                new IterativeOptimizer(
+                                stats,
+                                ImmutableList.of(
+                                        new UnaliasSymbolReferences(),
+                                        new PruneIdentityProjections(),
+                                        new MergeWindows()),
+                                ImmutableSet.of(
+                                        new RemoveRedundantIdentityProjections(),
+                                        new SwapAdjacentWindowsByPartitionsOrder(),
+                                        new MergeAdjacentWindows())
+                ),
                 new IterativeOptimizer(
                         stats,
                         ImmutableList.of(
