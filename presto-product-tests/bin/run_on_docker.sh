@@ -194,7 +194,11 @@ fi
 trap terminate INT TERM EXIT
 
 # start external services
-EXTERNAL_SERVICES="hadoop-master mysql postgres cassandra sqlserver"
+if [[ "$ENVIRONMENT" == "singlenode-sqlserver" ]]; then
+  EXTERNAL_SERVICES="hadoop-master cassandra sqlserver"
+else
+  EXTERNAL_SERVICES="hadoop-master mysql postgres cassandra"
+fi
 environment_compose up -d ${EXTERNAL_SERVICES}
 
 # start docker logs for the external services
