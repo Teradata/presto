@@ -24,6 +24,7 @@ import java.sql.Date;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 
+import static com.facebook.presto.tests.TestGroups.PROFILE_SPECIFIC_TESTS;
 import static com.facebook.presto.tests.TestGroups.SQL_SERVER;
 import static com.facebook.presto.tests.TpchTableResults.PRESTO_NATION_RESULT;
 import static com.facebook.presto.tests.sqlserver.SqlServerDataTypesTableDefinition.SQLSERVER_ALL_TYPES;
@@ -62,7 +63,7 @@ public class Select
     private static final String NATION_TABLE_NAME = format("%s.%s.%s", CONNECTOR_NAME, KEY_SPACE, NATION.getName());
     private static final String ALL_TYPES_TABLE_NAME = format("%s.%s.%s", CONNECTOR_NAME, KEY_SPACE, SQLSERVER_ALL_TYPES.getName());
 
-    @Test(groups = SQL_SERVER)
+    @Test(groups = {SQL_SERVER, PROFILE_SPECIFIC_TESTS})
     public void testSelectNation()
             throws SQLException
     {
@@ -75,7 +76,7 @@ public class Select
         assertThat(queryResult).matches(PRESTO_NATION_RESULT);
     }
 
-    @Test(groups = SQL_SERVER)
+    @Test(groups = {SQL_SERVER, PROFILE_SPECIFIC_TESTS})
     public void testNationSelfInnerJoin()
             throws SQLException
     {
@@ -96,7 +97,7 @@ public class Select
                 row("CANADA", 3));
     }
 
-    @Test(groups = SQL_SERVER)
+    @Test(groups = {SQL_SERVER, PROFILE_SPECIFIC_TESTS})
     public void testNationJoinRegion()
             throws SQLException
     {
@@ -111,7 +112,7 @@ public class Select
         assertThat(queryResult).containsOnly(row("CANADA", "AMERICA"));
     }
 
-    @Test(groups = SQL_SERVER)
+    @Test(groups = {SQL_SERVER, PROFILE_SPECIFIC_TESTS})
     public void testAllDatatypes()
             throws SQLException
     {

@@ -21,6 +21,7 @@ import org.testng.annotations.Test;
 
 import java.sql.SQLException;
 
+import static com.facebook.presto.tests.TestGroups.PROFILE_SPECIFIC_TESTS;
 import static com.facebook.presto.tests.TestGroups.SQL_SERVER;
 import static com.facebook.presto.tests.sqlserver.SqlServerTpchTableDefinitions.NATION;
 import static com.facebook.presto.tests.sqlserver.TestConstants.CONNECTOR_NAME;
@@ -40,7 +41,7 @@ public class NegativeTests
         return immutableTable(NATION);
     }
 
-    @Test(groups = SQL_SERVER)
+    @Test(groups = {SQL_SERVER, PROFILE_SPECIFIC_TESTS})
     public void testNonExistentTable()
             throws SQLException
     {
@@ -49,7 +50,7 @@ public class NegativeTests
                 .failsWithMessage(format("Table %s does not exist", tableName));
     }
 
-    @Test(groups = SQL_SERVER)
+    @Test(groups = {SQL_SERVER, PROFILE_SPECIFIC_TESTS})
     public void testNonExistentSchema()
             throws SQLException
     {
@@ -58,7 +59,7 @@ public class NegativeTests
                 .failsWithMessage("Schema does_not_exist does not exist");
     }
 
-    @Test(groups = SQL_SERVER)
+    @Test(groups = {SQL_SERVER, PROFILE_SPECIFIC_TESTS})
     public void testNonExistentColumn()
             throws SQLException
     {
