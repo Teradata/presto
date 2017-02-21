@@ -68,9 +68,7 @@ public class SpillledLookupJoiner
 
     public long getInMemorySizeInBytes()
     {
-        if (lookupSourceFuture.isDone()) {
-            return getFutureValue(lookupSourceFuture).getInMemorySizeInBytes();
-        }
-        return 0;
+        checkState(lookupSourceFuture.isDone(), "Size is not known yet");
+        return getFutureValue(lookupSourceFuture).getInMemorySizeInBytes();
     }
 }
