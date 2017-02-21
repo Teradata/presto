@@ -1,4 +1,4 @@
--- database: presto; groups: sqlserver_connector; queryType: SELECT; tables: sqlserver.dbo.workers_sqlserver
+-- database: presto; groups: sqlserver; queryType: SELECT; tables: sqlserver.dbo.workers_sqlserver
 --!
 describe sqlserver.dbo.workers_sqlserver
 --!
