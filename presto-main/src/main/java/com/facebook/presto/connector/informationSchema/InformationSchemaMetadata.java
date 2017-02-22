@@ -58,6 +58,7 @@ public class InformationSchemaMetadata
     public static final SchemaTableName TABLE_SCHEMATA = new SchemaTableName(INFORMATION_SCHEMA, "schemata");
     public static final SchemaTableName TABLE_INTERNAL_PARTITIONS = new SchemaTableName(INFORMATION_SCHEMA, "__internal_partitions__");
     public static final SchemaTableName TABLE_ROLES = new SchemaTableName(INFORMATION_SCHEMA, "roles");
+    public static final SchemaTableName TABLE_APPLICABLE_ROLES = new SchemaTableName(INFORMATION_SCHEMA, "applicable_roles");
 
     public static final Map<SchemaTableName, ConnectorTableMetadata> TABLES = schemaMetadataBuilder()
             .table(tableMetadataBuilder(TABLE_COLUMNS)
@@ -98,6 +99,12 @@ public class InformationSchemaMetadata
                     .build())
             .table(tableMetadataBuilder(TABLE_ROLES)
                     .column("role_name", createUnboundedVarcharType())
+                    .build())
+            .table(tableMetadataBuilder(TABLE_APPLICABLE_ROLES)
+                    .column("grantee", createUnboundedVarcharType())
+                    .column("grantee_type", createUnboundedVarcharType())
+                    .column("role_name", createUnboundedVarcharType())
+                    .column("is_grantable", createUnboundedVarcharType())
                     .build())
             .build();
 
