@@ -31,15 +31,19 @@ import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.Queue;
 import java.util.Set;
+import java.util.function.Function;
 
 import static com.facebook.presto.hive.HiveErrorCode.HIVE_INVALID_METADATA;
-import static com.facebook.presto.hive.metastore.HivePrivilegeInfo.parsePrivilege;
+import static com.facebook.presto.spi.security.PrincipalType.ROLE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.nullToEmpty;
@@ -372,6 +376,24 @@ public class MetastoreUtil
         }
     }
 
+    public static Set<RoleGrant> listApplicableRoles(PrestoPrincipal principal, Function<PrestoPrincipal, Set<RoleGrant>> listRoleGrants)
+    {
+        Set<RoleGrant> result = new HashSet<>();
+        Queue<PrestoPrincipal> queue = new LinkedList<>();
+        queue.add(principal);
+        while (!queue.isEmpty()) {
+            PrestoPrincipal current = queue.poll();
+            Set<RoleGrant> grants = listRoleGrants.apply(current);
+            for (RoleGrant grant : grants) {
+                if (!result.contains(grant)) {
+                    result.add(grant);
+                    queue.add(new PrestoPrincipal(ROLE, grant.getRoleName()));
+                }
+            }
+        }
+        return ImmutableSet.copyOf(result);
+    }
+
     private static PrincipalType fromMetastoreApiPrincipalType(org.apache.hadoop.hive.metastore.api.PrincipalType principalType)
     {
         switch (principalType) {
@@ -382,19 +404,6 @@ public class MetastoreUtil
             default:
                 throw new IllegalArgumentException("Unsupported principal type: " + principalType);
         }
-    }
-
-    public static Set<HivePrivilegeInfo> toGrants(List<PrivilegeGrantInfo> userGrants)
-    {
-        if (userGrants == null) {
-            return ImmutableSet.of();
-        }
-
-        ImmutableSet.Builder<HivePrivilegeInfo> privileges = ImmutableSet.builder();
-        for (PrivilegeGrantInfo userGrant : userGrants) {
-            privileges.addAll(parsePrivilege(userGrant));
-        }
-        return privileges.build();
     }
 
     private static String toThriftDdl(String structName, List<Column> columns)
