@@ -124,7 +124,7 @@ function docker_images_used() {
 }
 
 function environment_compose() {
-  "${DOCKER_CONF_LOCATION}/${ENVIRONMENT}/compose.sh" "$@"
+  "${DOCKER_CONF_LOCATION}/${ENVIRONMENT}/compose.sh" --verbose "$@"
 }
 
 function cleanup() {
@@ -247,6 +247,10 @@ PRESTO_LOGS_PID=$!
 
 # wait until presto is started
 retry check_presto
+
+echo "Get the list of running containers"
+docker ps -a
+echo "Get the list of running containers end"
 
 # run product tests
 set +e
