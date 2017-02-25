@@ -572,6 +572,12 @@ public final class Session
             return this;
         }
 
+        public SessionBuilder setRole(String catalog, Optional<SelectedRole> role)
+        {
+            role.ifPresent(r -> roles.put(catalog, r));
+            return this;
+        }
+
         public SessionBuilder addPreparedStatement(String statementName, String query)
         {
             this.preparedStatements.put(statementName, query);
