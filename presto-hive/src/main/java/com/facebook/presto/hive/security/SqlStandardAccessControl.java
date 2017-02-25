@@ -69,6 +69,7 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denyRevokeT
 import static com.facebook.presto.spi.security.AccessDeniedException.denySelectTable;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySelectView;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetCatalogSessionProperty;
+import static com.facebook.presto.spi.security.AccessDeniedException.denySetRole;
 import static com.facebook.presto.spi.security.PrincipalType.ROLE;
 import static com.facebook.presto.spi.security.PrincipalType.USER;
 import static java.util.Objects.requireNonNull;
@@ -355,10 +356,19 @@ public class SqlStandardAccessControl
         }
     }
 
+    @Override
+    public void checkCanSetRole(ConnectorTransactionHandle transaction, Identity identity, String role, String catalogName)
+    {
+        SemiTransactionalHiveMetastore metastore = metastoreProvider.apply(((HiveTransactionHandle) transaction));
+        if (!listApplicableRoles(metastore, new PrestoPrincipal(USER, identity.getUser())).contains(role)) {
+            denySetRole(role);
+        }
+    }
+
     private boolean hasAdminOption(ConnectorTransactionHandle transaction, Identity identity, Set<String> roles)
     {
         SemiTransactionalHiveMetastore metastore = metastoreProvider.apply(((HiveTransactionHandle) transaction));
-        Set<RoleGrant> grants = MetastoreUtil.listApplicableRoles(new PrestoPrincipal(USER, identity.getUser()), metastore::listRoleGrants);
+        Set<RoleGrant> grants = listApplicableRoles(new PrestoPrincipal(USER, identity.getUser()), metastore::listRoleGrants);
         Set<String> rolesWithGrantOption = grants.stream()
                 .filter(RoleGrant::isGrantable)
                 .map(RoleGrant::getRoleName)
