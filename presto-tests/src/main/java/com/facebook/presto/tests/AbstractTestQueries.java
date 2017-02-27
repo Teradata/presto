@@ -5365,6 +5365,8 @@ public abstract class AbstractTestQueries
                         .put("connector_string", "bar string")
                         .put("connector_long", "11")
                         .build()),
+                ImmutableMap.of(),
+                ImmutableMap.of(),
                 queryRunner.getMetadata().getSessionPropertyManager(),
                 getSession().getPreparedStatements());
         MaterializedResult result = computeActual(session, "SHOW SESSION");

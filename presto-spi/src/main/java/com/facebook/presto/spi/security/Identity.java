@@ -23,11 +23,18 @@ public class Identity
 {
     private final String user;
     private final Optional<Principal> principal;
+    private final Optional<SelectedRole> role;
 
     public Identity(String user, Optional<Principal> principal)
     {
+        this(user, principal, Optional.empty());
+    }
+
+    public Identity(String user, Optional<Principal> principal, Optional<SelectedRole> role)
+    {
         this.user = requireNonNull(user, "user is null");
         this.principal = requireNonNull(principal, "principal is null");
+        this.role = requireNonNull(role, "role is null");
     }
 
     public String getUser()
@@ -38,6 +45,11 @@ public class Identity
     public Optional<Principal> getPrincipal()
     {
         return principal;
+    }
+
+    public Optional<SelectedRole> getRole()
+    {
+        return role;
     }
 
     @Override

@@ -20,6 +20,7 @@ import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.security.Identity;
+import com.facebook.presto.spi.security.SelectedRole;
 import com.facebook.presto.spi.type.TimeZoneKey;
 import com.facebook.presto.sql.tree.Execute;
 import com.facebook.presto.transaction.TransactionId;
@@ -36,6 +37,8 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.TimeZone;
 
+import static com.facebook.presto.connector.ConnectorId.createInformationSchemaConnectorId;
+import static com.facebook.presto.connector.ConnectorId.createSystemTablesConnectorId;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_FOUND;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -61,6 +64,8 @@ public final class Session
     private final Map<String, String> systemProperties;
     private final Map<ConnectorId, Map<String, String>> connectorProperties;
     private final Map<String, Map<String, String>> unprocessedCatalogProperties;
+    private final Map<ConnectorId, SelectedRole> roles;
+    private final Map<String, SelectedRole> unprocessedRoles;
     private final SessionPropertyManager sessionPropertyManager;
     private final Map<String, String> preparedStatements;
 
@@ -81,6 +86,8 @@ public final class Session
             Map<String, String> systemProperties,
             Map<ConnectorId, Map<String, String>> connectorProperties,
             Map<String, Map<String, String>> unprocessedCatalogProperties,
+            Map<ConnectorId, SelectedRole> roles,
+            Map<String, SelectedRole> unprocessedRoles,
             SessionPropertyManager sessionPropertyManager,
             Map<String, String> preparedStatements)
     {
@@ -112,6 +119,10 @@ public final class Session
                 .map(entry -> Maps.immutableEntry(entry.getKey(), ImmutableMap.copyOf(entry.getValue())))
                 .forEach(unprocessedCatalogPropertiesBuilder::put);
         this.unprocessedCatalogProperties = unprocessedCatalogPropertiesBuilder.build();
+
+        this.roles = ImmutableMap.copyOf(requireNonNull(roles, "roles is null"));
+        this.unprocessedRoles = ImmutableMap.copyOf(requireNonNull(unprocessedRoles, "unprocessedRoles is null"));
+
         checkArgument(!transactionId.isPresent() || unprocessedCatalogProperties.isEmpty(), "Catalog session properties cannot be set if there is an open transaction");
 
         checkArgument(catalog.isPresent() || !schema.isPresent(), "schema is set but catalog is not");
@@ -218,6 +229,24 @@ public final class Session
         return systemProperties;
     }
 
+    public Map<ConnectorId, SelectedRole> getRoles()
+    {
+        return roles;
+    }
+
+    /**
+     * Returns the map of catalog name -> selected role
+     */
+    public Map<String, SelectedRole> getUnprocessedRoles()
+    {
+        return unprocessedRoles;
+    }
+
+    public Optional<SelectedRole> getConnectorRole(ConnectorId connectorId)
+    {
+        return Optional.ofNullable(roles.get(connectorId));
+    }
+
     public Map<String, String> getPreparedStatements()
     {
         return preparedStatements;
@@ -272,6 +301,23 @@ public final class Session
             connectorProperties.put(connectorId, catalogProperties);
         }
 
+        ImmutableMap.Builder<ConnectorId, SelectedRole> roles = ImmutableMap.builder();
+        for (Entry<String, SelectedRole> entry : unprocessedRoles.entrySet()) {
+            String catalogName = entry.getKey();
+            SelectedRole role = entry.getValue();
+
+            ConnectorId connectorId = transactionManager.getOptionalCatalogMetadata(transactionId, catalogName)
+                    .orElseThrow(() -> new PrestoException(NOT_FOUND, "Catalog does not exist: " + catalogName))
+                    .getConnectorId();
+
+            if (role.getType() == SelectedRole.Type.ROLE) {
+                accessControl.checkCanSetRole(transactionId, identity, role.getRole().get(), catalogName);
+            }
+            roles.put(connectorId, role);
+            roles.put(createInformationSchemaConnectorId(connectorId), role);
+            roles.put(createSystemTablesConnectorId(connectorId), role);
+        }
+
         return new Session(
                 queryId,
                 Optional.of(transactionId),
@@ -289,6 +335,8 @@ public final class Session
                 systemProperties,
                 connectorProperties.build(),
                 ImmutableMap.of(),
+                roles.build(),
+                ImmutableMap.of(),
                 sessionPropertyManager,
                 preparedStatements);
     }
@@ -301,9 +349,10 @@ public final class Session
     public ConnectorSession toConnectorSession(ConnectorId connectorId)
     {
         requireNonNull(connectorId, "connectorId is null");
+
         return new FullConnectorSession(
                 queryId.toString(),
-                identity,
+                new Identity(identity.getUser(), identity.getPrincipal(), getConnectorRole(connectorId)),
                 timeZoneKey,
                 locale,
                 startTime,
@@ -332,6 +381,7 @@ public final class Session
                 startTime,
                 systemProperties,
                 connectorProperties,
+                roles,
                 preparedStatements);
     }
 
@@ -384,6 +434,7 @@ public final class Session
         private long startTime = System.currentTimeMillis();
         private final Map<String, String> systemProperties = new HashMap<>();
         private final Map<String, Map<String, String>> catalogSessionProperties = new HashMap<>();
+        private final Map<String, SelectedRole> roles = new HashMap<>();
         private final SessionPropertyManager sessionPropertyManager;
         private final Map<String, String> preparedStatements = new HashMap<>();
 
@@ -515,6 +566,12 @@ public final class Session
             return this;
         }
 
+        public SessionBuilder setRole(String catalog, SelectedRole role)
+        {
+            roles.put(catalog, role);
+            return this;
+        }
+
         public SessionBuilder addPreparedStatement(String statementName, String query)
         {
             this.preparedStatements.put(statementName, query);
@@ -540,6 +597,8 @@ public final class Session
                     systemProperties,
                     ImmutableMap.of(),
                     catalogSessionProperties,
+                    ImmutableMap.of(),
+                    roles,
                     sessionPropertyManager,
                     preparedStatements);
         }

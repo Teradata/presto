@@ -19,6 +19,7 @@ import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.security.AccessControl;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.security.Identity;
+import com.facebook.presto.spi.security.SelectedRole;
 import com.facebook.presto.sql.parser.ParsingException;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.transaction.TransactionId;
@@ -48,6 +49,7 @@ import static com.facebook.presto.client.PrestoHeaders.PRESTO_CATALOG;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_CLIENT_INFO;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_LANGUAGE;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_PREPARED_STATEMENT;
+import static com.facebook.presto.client.PrestoHeaders.PRESTO_ROLE;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_SCHEMA;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_SESSION;
 import static com.facebook.presto.client.PrestoHeaders.PRESTO_SOURCE;
@@ -79,6 +81,8 @@ final class HttpRequestSessionFactory
     private final Map<String, String> systemProperties;
     private final Map<String, Map<String, String>> catalogSessionProperties;
 
+    private final Map<String, SelectedRole> roles;
+
     private final Map<String, String> preparedStatements;
 
     private final Optional<TransactionId> transactionId;
@@ -105,7 +109,7 @@ final class HttpRequestSessionFactory
 
         // parse session properties
         ImmutableMap.Builder<String, String> systemProperties = ImmutableMap.builder();
-        Map<String, Map<String, String>> catalogSessionProperties  = new HashMap<>();
+        Map<String, Map<String, String>> catalogSessionProperties = new HashMap<>();
         for (Entry<String, String> entry : parseSessionHeaders(servletRequest).entrySet()) {
             String fullPropertyName = entry.getKey();
             String propertyValue = entry.getValue();
@@ -135,6 +139,8 @@ final class HttpRequestSessionFactory
         this.systemProperties = systemProperties.build();
         this.catalogSessionProperties = catalogSessionProperties.entrySet().stream()
                 .collect(toImmutableMap(Entry::getKey, entry -> ImmutableMap.copyOf(entry.getValue())));
+
+        this.roles = parseRoleHeaders(servletRequest);
 
         preparedStatements = parsePreparedStatementsHeaders(servletRequest);
 
@@ -186,6 +192,12 @@ final class HttpRequestSessionFactory
             }
         }
 
+        for (Entry<String, SelectedRole> entry : roles.entrySet()) {
+            String catalog = entry.getKey();
+            SelectedRole role = entry.getValue();
+            sessionBuilder.setRole(catalog, role);
+        }
+
         for (Entry<String, String> preparedStatement : preparedStatements.entrySet()) {
             sessionBuilder.addPreparedStatement(preparedStatement.getKey(), preparedStatement.getValue());
         }
@@ -220,6 +232,17 @@ final class HttpRequestSessionFactory
             sessionProperties.put(nameValue.get(0), nameValue.get(1));
         }
         return sessionProperties;
+    }
+
+    private static Map<String, SelectedRole> parseRoleHeaders(HttpServletRequest servletRequest)
+    {
+        ImmutableMap.Builder<String, SelectedRole> roles = ImmutableMap.builder();
+        for (String header : splitSessionHeader(servletRequest.getHeaders(PRESTO_ROLE))) {
+            List<String> nameValue = Splitter.on('=').limit(2).trimResults().splitToList(header);
+            assertRequest(nameValue.size() == 2, "Invalid %s header", PRESTO_ROLE);
+            roles.put(nameValue.get(0), SelectedRole.valueOf(urlDecode(nameValue.get(1))));
+        }
+        return roles.build();
     }
 
     private static void assertRequest(boolean expression, String format, Object... args)
