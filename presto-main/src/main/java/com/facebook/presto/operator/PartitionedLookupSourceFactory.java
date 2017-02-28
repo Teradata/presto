@@ -13,13 +13,17 @@
  */
 package com.facebook.presto.operator;
 
+import com.facebook.presto.operator.exchange.LocalPartitionGenerator;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spiller.PartitioningSpiller;
+import com.facebook.presto.spiller.PartitioningSpillerFactory;
 import com.facebook.presto.spiller.SingleStreamSpiller;
 import com.facebook.presto.sql.planner.Symbol;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
@@ -58,6 +62,9 @@ public final class PartitionedLookupSourceFactory
     private Map<Integer, SingleStreamSpiller> spilledLookupSources = new HashMap<>();
 
     @GuardedBy("this")
+    private final PartitioningSpillerFactory partitioningSpillerFactory;
+
+    @GuardedBy("this")
     private Supplier<LookupSource> lookupSourceSupplier;
 
     @GuardedBy("this")
@@ -69,13 +76,15 @@ public final class PartitionedLookupSourceFactory
             List<Integer> hashChannels,
             int partitionCount,
             Map<Symbol, Integer> layout,
-            boolean outer)
+            boolean outer,
+            PartitioningSpillerFactory partitioningSpillerFactory)
     {
         this.types = ImmutableList.copyOf(requireNonNull(types, "types is null"));
         this.outputTypes = ImmutableList.copyOf(requireNonNull(outputTypes, "outputTypes is null"));
         this.layout = ImmutableMap.copyOf(layout);
         this.partitions = (Supplier<LookupSource>[]) new Supplier<?>[partitionCount];
         this.outer = outer;
+        this.partitioningSpillerFactory = partitioningSpillerFactory;
 
         hashChannelTypes = hashChannels.stream()
                 .map(types::get)
@@ -184,6 +193,33 @@ public final class PartitionedLookupSourceFactory
     public ListenableFuture<?> isDestroyed()
     {
         return nonCancellationPropagating(destroyed);
+    }
+
+    @Override
+    public synchronized PartitioningSpiller createProbeSpiller(OperatorContext operatorContext, List<Type> probeTypes, HashGenerator probeHashGenerator)
+    {
+        checkAllFuturesDone();
+        ImmutableSet.Builder<Integer> unspilledPartitions = ImmutableSet.builder();
+        for (int partition = 0; partition < partitions.length; partition++) {
+            if (!spilledLookupSources.containsKey(partition)) {
+                unspilledPartitions.add(partition);
+            }
+        }
+
+        return partitioningSpillerFactory.create(
+                probeTypes,
+                new LocalPartitionGenerator(probeHashGenerator, partitions.length),
+                partitions.length,
+                unspilledPartitions.build(),
+                () -> operatorContext.getSpillContext().newLocalSpillContext(),
+                operatorContext.getSystemMemoryContext().newAggregatedMemoryContext());
+    }
+
+    private void checkAllFuturesDone()
+    {
+        for (SettableFuture<LookupSource> lookupSourceFuture : lookupSourceFutures) {
+            checkState(lookupSourceFuture.isDone());
+        }
     }
 
     @Override
