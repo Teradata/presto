@@ -15,6 +15,7 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.execution.TaskId;
+import com.facebook.presto.memory.QueryContextVisitor;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -42,6 +43,7 @@ import static io.airlift.units.DataSize.succinctBytes;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static java.util.stream.Collectors.toList;
 
 /**
  * Only calling getDriverStats is ThreadSafe
@@ -79,6 +81,7 @@ public class DriverContext
     private final AtomicLong memoryReservation = new AtomicLong();
     private final AtomicLong peakMemoryReservation = new AtomicLong();
     private final AtomicLong systemMemoryReservation = new AtomicLong();
+    private final AtomicLong revocableMemoryReservation = new AtomicLong();
 
     private final List<OperatorContext> operatorContexts = new CopyOnWriteArrayList<>();
     private final boolean partitioned;
@@ -171,6 +174,11 @@ public class DriverContext
 
     public void failed(Throwable cause)
     {
+        if (!finished.compareAndSet(false, true)) {
+            // already finished
+            return;
+        }
+
         pipelineContext.failed(cause);
         finished.set(true);
     }
@@ -191,6 +199,13 @@ public class DriverContext
         ListenableFuture<?> future = pipelineContext.reserveMemory(bytes);
         long newMemoryReservation = memoryReservation.addAndGet(bytes);
         peakMemoryReservation.accumulateAndGet(newMemoryReservation, Math::max);
+        return future;
+    }
+
+    public ListenableFuture<?> reserveRevocableMemory(long bytes)
+    {
+        ListenableFuture<?> future = pipelineContext.reserveRevocableMemory(bytes);
+        revocableMemoryReservation.getAndAdd(bytes);
         return future;
     }
 
@@ -228,13 +243,24 @@ public class DriverContext
         memoryReservation.getAndAdd(-bytes);
     }
 
+    public void freeRevocableMemory(long bytes)
+    {
+        if (bytes == 0) {
+            return;
+        }
+        checkArgument(bytes >= 0, "bytes is negative");
+        checkArgument(bytes <= revocableMemoryReservation.get(), "tried to free more revocable memory than is reserved");
+        pipelineContext.freeRevocableMemory(bytes);
+        revocableMemoryReservation.getAndAdd(-bytes);
+    }
+
     public void freeSystemMemory(long bytes)
     {
         if (bytes == 0) {
             return;
         }
         checkArgument(bytes >= 0, "bytes is negative");
-        checkArgument(bytes <= systemMemoryReservation.get(), "tried to free more memory than is reserved");
+        checkArgument(bytes <= systemMemoryReservation.get(), "tried to free more system memory than is reserved");
         pipelineContext.freeSystemMemory(bytes);
         systemMemoryReservation.getAndAdd(-bytes);
     }
@@ -256,6 +282,11 @@ public class DriverContext
     public long getMemoryUsage()
     {
         return memoryReservation.get();
+    }
+
+    public long getRevocableMemoryUsage()
+    {
+        return revocableMemoryReservation.get();
     }
 
     public void moreMemoryAvailable()
@@ -393,6 +424,7 @@ public class DriverContext
                 elapsedTime.convertToMostSuccinctTimeUnit(),
                 succinctBytes(memoryReservation.get()),
                 succinctBytes(peakMemoryReservation.get()),
+                succinctBytes(revocableMemoryReservation.get()),
                 succinctBytes(systemMemoryReservation.get()),
                 new Duration(totalScheduledTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalCpuTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
@@ -408,6 +440,18 @@ public class DriverContext
                 outputDataSize.convertToMostSuccinctDataSize(),
                 outputPositions,
                 ImmutableList.copyOf(transform(operatorContexts, OperatorContext::getOperatorStats)));
+    }
+
+    public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)
+    {
+        return visitor.visitDriverContext(this, context);
+    }
+
+    public <C, R> List<R> acceptChildren(QueryContextVisitor<C, R> visitor, C context)
+    {
+        return operatorContexts.stream()
+                .map(operatorContext -> operatorContext.accept(visitor, context))
+                .collect(toList());
     }
 
     public boolean isPartitioned()

@@ -28,12 +28,14 @@ public interface HashAggregationBuilder
 
     boolean isFull();
 
-    CompletableFuture<?> isBlocked();
-
     void updateMemory();
 
     void recordHashCollisions(HashCollisionsCounter hashCollisionsCounter);
 
     @Override
     void close();
+
+    CompletableFuture<?> startMemoryRevoke();
+
+    void finishMemoryRevoke();
 }

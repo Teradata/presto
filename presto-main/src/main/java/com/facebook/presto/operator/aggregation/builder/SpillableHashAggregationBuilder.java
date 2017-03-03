@@ -51,15 +51,17 @@ public class SpillableHashAggregationBuilder
     private final List<Integer> groupByChannels;
     private final Optional<Integer> hashChannel;
     private final OperatorContext operatorContext;
-    private final long memorySizeBeforeSpill;
+    private final long memoryLimitForMerge;
     private final long memoryLimitForMergeWithMemory;
     private Optional<Spiller> spiller = Optional.empty();
     private Optional<MergingHashAggregationBuilder> merger = Optional.empty();
     private Optional<MergeHashSort> mergeHashSort = Optional.empty();
     private CompletableFuture<?> spillInProgress = CompletableFuture.completedFuture(null);
-    private final LocalMemoryContext aggregationMemoryContext;
-    private final LocalMemoryContext spillMemoryContext;
+    private final LocalMemoryContext memoryContext;
     private final JoinCompiler joinCompiler;
+
+    // todo get rid of that and only use revocable memory
+    private long emptyHashAggregationBuilderSize = 0;
 
     private long hashCollisions;
     private double expectedHashCollisions;
@@ -72,7 +74,7 @@ public class SpillableHashAggregationBuilder
             List<Integer> groupByChannels,
             Optional<Integer> hashChannel,
             OperatorContext operatorContext,
-            DataSize memoryLimitBeforeSpill,
+            DataSize memoryLimitForMerge,
             DataSize memoryLimitForMergeWithMemory,
             SpillerFactory spillerFactory,
             JoinCompiler joinCompiler)
@@ -84,14 +86,13 @@ public class SpillableHashAggregationBuilder
         this.groupByChannels = groupByChannels;
         this.hashChannel = hashChannel;
         this.operatorContext = operatorContext;
-        this.memorySizeBeforeSpill = memoryLimitBeforeSpill.toBytes();
+        this.memoryLimitForMerge = memoryLimitForMerge.toBytes();
         this.memoryLimitForMergeWithMemory = memoryLimitForMergeWithMemory.toBytes();
         this.spillerFactory = spillerFactory;
         this.joinCompiler = joinCompiler;
 
         AbstractAggregatedMemoryContext systemMemoryContext = operatorContext.getSystemMemoryContext();
-        this.aggregationMemoryContext = systemMemoryContext.newLocalMemoryContext();
-        this.spillMemoryContext = systemMemoryContext.newLocalMemoryContext();
+        this.memoryContext = systemMemoryContext.newLocalMemoryContext();
 
         rebuildHashAggregationBuilder();
     }
@@ -102,20 +103,14 @@ public class SpillableHashAggregationBuilder
         checkState(hasPreviousSpillCompletedSuccessfully(), "Previous spill hasn't yet finished");
 
         hashAggregationBuilder.processPage(page);
-
-        if (shouldSpill(getSizeInMemory())) {
-            spillToDisk();
-        }
     }
 
     @Override
     public void updateMemory()
     {
-        aggregationMemoryContext.setBytes(getSizeInMemory());
-
-        if (spillInProgress.isDone()) {
-            spillMemoryContext.setBytes(0L);
-        }
+        checkState(spillInProgress.isDone());
+        operatorContext.setMemoryReservation(emptyHashAggregationBuilderSize);
+        operatorContext.setRevocableMemoryReservation(hashAggregationBuilder.getSizeInMemory() - emptyHashAggregationBuilderSize);
     }
 
     public long getSizeInMemory()
@@ -141,15 +136,9 @@ public class SpillableHashAggregationBuilder
         return false;
     }
 
-    @Override
-    public CompletableFuture<?> isBlocked()
-    {
-        return spillInProgress;
-    }
-
     private boolean hasPreviousSpillCompletedSuccessfully()
     {
-        if (isBlocked().isDone()) {
+        if (spillInProgress.isDone()) {
             // check for exception from previous spill for early failure
             getFutureValue(spillInProgress);
             return true;
@@ -159,9 +148,18 @@ public class SpillableHashAggregationBuilder
         }
     }
 
-    private boolean shouldSpill(long memorySize)
+    @Override
+    public CompletableFuture<?> startMemoryRevoke()
     {
-        return (memorySizeBeforeSpill > 0 && memorySize > memorySizeBeforeSpill);
+        checkState(spillInProgress.isDone());
+        spillToDisk();
+        return spillInProgress;
+    }
+
+    @Override
+    public void finishMemoryRevoke()
+    {
+        updateMemory();
     }
 
     private boolean shouldMergeWithMemory(long memorySize)
@@ -218,19 +216,12 @@ public class SpillableHashAggregationBuilder
                     () -> operatorContext.getSpillContext().newLocalSpillContext(),
                     operatorContext.getSystemMemoryContext().newAggregatedMemoryContext()));
         }
-        long spillMemoryUsage = getSizeInMemory();
 
         // start spilling process with current content of the hashAggregationBuilder builder...
         spillInProgress = spiller.get().spill(hashAggregationBuilder.buildHashSortedResult());
         // ... and immediately create new hashAggregationBuilder so effectively memory ownership
         // over hashAggregationBuilder is transferred from this thread to a spilling thread
         rebuildHashAggregationBuilder();
-
-        // First decrease memory usage of aggregation context...
-        aggregationMemoryContext.setBytes(getSizeInMemory());
-        // And then transfer this memory to spill context
-        // TODO: is there an easy way to do this atomically?
-        spillMemoryContext.setBytes(spillMemoryUsage);
 
         return spillInProgress;
     }
@@ -250,7 +241,7 @@ public class SpillableHashAggregationBuilder
                         .add(hashAggregationBuilder.buildHashSortedResult())
                         .build());
 
-        return mergeSortedPages(mergedSpilledPages, max(memorySizeBeforeSpill - memoryLimitForMergeWithMemory, 1L));
+        return mergeSortedPages(mergedSpilledPages, max(memoryLimitForMerge - memoryLimitForMergeWithMemory, 1L));
     }
 
     private Iterator<Page> mergeFromDisk()
@@ -264,10 +255,10 @@ public class SpillableHashAggregationBuilder
                 hashAggregationBuilder.buildIntermediateTypes(),
                 spiller.get().getSpills());
 
-        return mergeSortedPages(mergedSpilledPages, memorySizeBeforeSpill);
+        return mergeSortedPages(mergedSpilledPages, memoryLimitForMerge);
     }
 
-    private Iterator<Page> mergeSortedPages(Iterator<Page> sortedPages, long memorySizeBeforeSpill)
+    private Iterator<Page> mergeSortedPages(Iterator<Page> sortedPages, long memoryLimitForMerge)
     {
         merger = Optional.of(new MergingHashAggregationBuilder(
                 accumulatorFactories,
@@ -278,7 +269,7 @@ public class SpillableHashAggregationBuilder
                 operatorContext,
                 sortedPages,
                 operatorContext.getSystemMemoryContext().newLocalMemoryContext(),
-                memorySizeBeforeSpill,
+                memoryLimitForMerge,
                 hashAggregationBuilder.getKeyChannels(),
                 joinCompiler));
 
@@ -302,5 +293,6 @@ public class SpillableHashAggregationBuilder
                 operatorContext,
                 DataSize.succinctBytes(0),
                 joinCompiler);
+        this.emptyHashAggregationBuilderSize = this.hashAggregationBuilder.getSizeInMemory();
     }
 }
