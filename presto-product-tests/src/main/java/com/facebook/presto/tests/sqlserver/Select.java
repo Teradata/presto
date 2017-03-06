@@ -13,11 +13,14 @@
  */
 package com.facebook.presto.tests.sqlserver;
 
+import com.teradata.tempto.AfterTestWithContext;
+import com.teradata.tempto.BeforeTestWithContext;
 import com.teradata.tempto.ProductTest;
 import com.teradata.tempto.Requirement;
 import com.teradata.tempto.RequirementsProvider;
 import com.teradata.tempto.configuration.Configuration;
 import com.teradata.tempto.query.QueryResult;
+import io.airlift.log.Logger;
 import org.testng.annotations.Test;
 
 import java.sql.Date;
@@ -32,6 +35,7 @@ import static com.facebook.presto.tests.sqlserver.SqlServerTpchTableDefinitions.
 import static com.facebook.presto.tests.sqlserver.TestConstants.CONNECTOR_NAME;
 import static com.facebook.presto.tests.sqlserver.TestConstants.KEY_SPACE;
 import static com.facebook.presto.tests.utils.QueryExecutors.onPresto;
+import static com.facebook.presto.tests.utils.QueryExecutors.onSqlServer;
 import static com.teradata.tempto.Requirements.compose;
 import static com.teradata.tempto.assertions.QueryAssert.Row.row;
 import static com.teradata.tempto.assertions.QueryAssert.assertThat;
@@ -60,8 +64,22 @@ public class Select
                 immutableTable(SQLSERVER_ALL_TYPES));
     }
 
+    private static final String CTAS_TABLE_NAME = "create_table_as_select";
     private static final String NATION_TABLE_NAME = format("%s.%s.%s", CONNECTOR_NAME, KEY_SPACE, NATION.getName());
+    private static final String CREATE_TABLE_AS_SELECT = format("%s.%s.%s", CONNECTOR_NAME, KEY_SPACE, CTAS_TABLE_NAME);
     private static final String ALL_TYPES_TABLE_NAME = format("%s.%s.%s", CONNECTOR_NAME, KEY_SPACE, SQLSERVER_ALL_TYPES.getName());
+
+    @BeforeTestWithContext
+    @AfterTestWithContext
+    public void dropTestTables()
+    {
+        try {
+            onPresto().executeQuery(format("DROP TABLE IF EXISTS %s", CREATE_TABLE_AS_SELECT));
+        }
+        catch (Exception e) {
+            Logger.get(getClass()).warn(e, "failed to drop table");
+        }
+    }
 
     @Test(groups = {SQL_SERVER, PROFILE_SPECIFIC_TESTS})
     public void testSelectNation()
@@ -140,5 +158,22 @@ public class Select
                         ),
                         row(null, null, null, null, null, null, null, null, null, null, null, null, null, null)
                 );
+    }
+
+    @Test(groups = {SQL_SERVER, PROFILE_SPECIFIC_TESTS})
+    public void testCreateTableAsSelect()
+            throws SQLException
+    {
+        String sql = format(
+                "CREATE TABLE %s AS SELECT * FROM %s", CREATE_TABLE_AS_SELECT, NATION_TABLE_NAME);
+        onPresto().executeQuery(sql);
+
+        sql = format(
+                "SELECT n_nationkey, n_name, n_regionkey, n_comment FROM %s.%s.%s",
+                "master", KEY_SPACE, CTAS_TABLE_NAME);
+        QueryResult queryResult = onSqlServer()
+                .executeQuery(sql);
+
+        assertThat(queryResult).matches(PRESTO_NATION_RESULT);
     }
 }
