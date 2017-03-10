@@ -19,7 +19,10 @@ import com.facebook.presto.metadata.SessionPropertyManager;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
+import com.facebook.presto.spi.security.ConnectorIdentity;
+import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.transaction.TransactionId;
+import com.google.common.collect.ImmutableMap;
 
 public final class SystemConnectorSessionUtil
 {
@@ -31,12 +34,14 @@ public final class SystemConnectorSessionUtil
     public static Session toSession(ConnectorTransactionHandle transactionHandle, ConnectorSession session)
     {
         TransactionId transactionId = ((GlobalSystemTransactionHandle) transactionHandle).getTransactionId();
+        ConnectorIdentity connectorIdentity = session.getIdentity();
+        Identity identity = new Identity(connectorIdentity.getUser(), connectorIdentity.getPrincipal(), ImmutableMap.of());
         return Session.builder(new SessionPropertyManager(SYSTEM_SESSION_PROPERTIES))
                 .setQueryId(new QueryId(session.getQueryId()))
                 .setTransactionId(transactionId)
                 .setCatalog("catalog")
                 .setSchema("schema")
-                .setIdentity(session.getIdentity())
+                .setIdentity(identity)
                 .setTimeZoneKey(session.getTimeZoneKey())
                 .setLocale(session.getLocale())
                 .setStartTime(session.getStartTime())

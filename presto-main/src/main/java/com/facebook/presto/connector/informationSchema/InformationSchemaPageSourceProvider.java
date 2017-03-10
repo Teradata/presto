@@ -42,7 +42,6 @@ import com.facebook.presto.spi.connector.ConnectorTransactionHandle;
 import com.facebook.presto.spi.predicate.NullableValue;
 import com.facebook.presto.spi.predicate.TupleDomain;
 import com.facebook.presto.spi.security.GrantInfo;
-import com.facebook.presto.spi.security.Identity;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.PrivilegeInfo;
 import com.facebook.presto.spi.security.RoleGrant;
@@ -134,10 +133,9 @@ public class InformationSchemaPageSourceProvider
         InformationSchemaTableHandle handle = split.getTableHandle();
         Map<String, NullableValue> filters = split.getFilters();
 
-        Identity identity = connectorSession.getIdentity();
         Session session = Session.builder(metadata.getSessionPropertyManager())
                 .setQueryId(new QueryId(connectorSession.getQueryId()))
-                .setIdentity(identity)
+                .setIdentity(connectorSession.getIdentity().toIdentity(handle.getCatalogName()))
                 .setSource("information_schema")
                 .setCatalog("") // default catalog is not be used
                 .setSchema("") // default schema is not be used

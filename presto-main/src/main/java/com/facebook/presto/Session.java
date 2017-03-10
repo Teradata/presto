@@ -37,6 +37,8 @@ import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.TimeZone;
 
+import static com.facebook.presto.connector.ConnectorId.createInformationSchemaConnectorId;
+import static com.facebook.presto.connector.ConnectorId.createSystemTablesConnectorId;
 import static com.facebook.presto.spi.StandardErrorCode.NOT_FOUND;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static com.google.common.base.MoreObjects.toStringHelper;
@@ -274,19 +276,26 @@ public final class Session
             connectorProperties.put(connectorId, catalogProperties);
         }
 
+        ImmutableMap.Builder<String, SelectedRole> roles = ImmutableMap.builder();
         for (Entry<String, SelectedRole> entry : identity.getRoles().entrySet()) {
             String catalogName = entry.getKey();
             SelectedRole role = entry.getValue();
+            ConnectorId connectorId = transactionManager.getOptionalCatalogMetadata(transactionId, catalogName)
+                    .orElseThrow(() -> new PrestoException(NOT_FOUND, "Catalog does not exist: " + catalogName))
+                    .getConnectorId();
             if (role.getType() == SelectedRole.Type.ROLE) {
                 accessControl.checkCanSetRole(transactionId, identity, role.getRole().get(), catalogName);
             }
+            roles.put(connectorId.getCatalogName(), role);
+            roles.put(createInformationSchemaConnectorId(connectorId).getCatalogName(), role);
+            roles.put(createSystemTablesConnectorId(connectorId).getCatalogName(), role);
         }
 
         return new Session(
                 queryId,
                 Optional.of(transactionId),
                 clientTransactionSupport,
-                identity,
+                new Identity(identity.getUser(), identity.getPrincipal(), roles.build()),
                 source,
                 catalog,
                 schema,
@@ -305,7 +314,7 @@ public final class Session
 
     public ConnectorSession toConnectorSession()
     {
-        return new FullConnectorSession(queryId.toString(), identity, timeZoneKey, locale, startTime);
+        return new FullConnectorSession(queryId.toString(), identity.toConnectorIdentity(), timeZoneKey, locale, startTime);
     }
 
     public ConnectorSession toConnectorSession(ConnectorId connectorId)
@@ -314,7 +323,7 @@ public final class Session
 
         return new FullConnectorSession(
                 queryId.toString(),
-                identity,
+                identity.toConnectorIdentity(connectorId.getCatalogName()),
                 timeZoneKey,
                 locale,
                 startTime,

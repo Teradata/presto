@@ -14,30 +14,24 @@
 package com.facebook.presto.spi.security;
 
 import java.security.Principal;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 import static java.util.Collections.emptyMap;
-import static java.util.Collections.unmodifiableMap;
+import static java.util.Collections.singletonMap;
 import static java.util.Objects.requireNonNull;
 
-public class Identity
+public class ConnectorIdentity
 {
     private final String user;
     private final Optional<Principal> principal;
-    private final Map<String, SelectedRole> roles;
+    private final Optional<SelectedRole> role;
 
-    public Identity(String user, Optional<Principal> principal)
-    {
-        this(user, principal, emptyMap());
-    }
-
-    public Identity(String user, Optional<Principal> principal, Map<String, SelectedRole> roles)
+    public ConnectorIdentity(String user, Optional<Principal> principal, Optional<SelectedRole> role)
     {
         this.user = requireNonNull(user, "user is null");
         this.principal = requireNonNull(principal, "principal is null");
-        this.roles = unmodifiableMap(requireNonNull(roles, "roles is null"));
+        this.role = requireNonNull(role, "role is null");
     }
 
     public String getUser()
@@ -50,19 +44,14 @@ public class Identity
         return principal;
     }
 
-    public Map<String, SelectedRole> getRoles()
+    public Optional<SelectedRole> getRole()
     {
-        return roles;
+        return role;
     }
 
-    public ConnectorIdentity toConnectorIdentity()
+    public Identity toIdentity(String catalogName)
     {
-        return new ConnectorIdentity(user, principal, Optional.empty());
-    }
-
-    public ConnectorIdentity toConnectorIdentity(String catalog)
-    {
-        return new ConnectorIdentity(user, principal, Optional.ofNullable(roles.get(catalog)));
+        return new Identity(user, principal, role.isPresent() ? singletonMap(catalogName, role.get()) : emptyMap());
     }
 
     @Override
@@ -74,23 +63,25 @@ public class Identity
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        Identity identity = (Identity) o;
-        return Objects.equals(user, identity.user);
+        ConnectorIdentity that = (ConnectorIdentity) o;
+        return Objects.equals(user, that.user) &&
+                Objects.equals(principal, that.principal) &&
+                Objects.equals(role, that.role);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(user);
+        return Objects.hash(user, principal, role);
     }
 
     @Override
     public String toString()
     {
-        StringBuilder sb = new StringBuilder("Identity{");
+        StringBuilder sb = new StringBuilder("ConnectorIdentity{");
         sb.append("user='").append(user).append('\'');
         principal.ifPresent(principal -> sb.append(", principal=").append(principal));
-        sb.append(", roles=").append(roles);
+        role.ifPresent(role -> sb.append(", role=").append(role));
         sb.append('}');
         return sb.toString();
     }

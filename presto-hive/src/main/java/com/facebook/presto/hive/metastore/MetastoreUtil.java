@@ -16,7 +16,7 @@ package com.facebook.presto.hive.metastore;
 import com.facebook.presto.hive.HiveBucketProperty;
 import com.facebook.presto.hive.HiveType;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.security.Identity;
+import com.facebook.presto.spi.security.ConnectorIdentity;
 import com.facebook.presto.spi.security.PrestoPrincipal;
 import com.facebook.presto.spi.security.PrincipalType;
 import com.facebook.presto.spi.security.RoleGrant;
@@ -422,10 +422,9 @@ public class MetastoreUtil
         return result.build();
     }
 
-    public static Set<String> listEnabledRoles(Identity identity, Function<PrestoPrincipal, Set<RoleGrant>> listRoleGrants)
+    public static Set<String> listEnabledRoles(ConnectorIdentity identity, Function<PrestoPrincipal, Set<RoleGrant>> listRoleGrants)
     {
-        // TODO identity.getrole()
-        Optional<SelectedRole> role = Optional.empty();
+        Optional<SelectedRole> role = identity.getRole();
 
         if (role.isPresent() && role.get().getType() == SelectedRole.Type.NONE) {
             return ImmutableSet.of("public");
