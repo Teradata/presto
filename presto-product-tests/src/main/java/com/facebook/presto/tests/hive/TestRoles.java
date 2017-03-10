@@ -49,6 +49,7 @@ public class TestRoles
     public void setUp()
             throws Exception
     {
+        onPresto().executeQuery("SET ROLE admin");
         onHive().executeQuery("SET ROLE admin");
         cleanup();
     }
@@ -505,6 +506,7 @@ public class TestRoles
     public void testSetAdminRole()
             throws Exception
     {
+        onPresto().executeQuery("SET ROLE NONE");
         QueryAssert.assertThat(onPresto().executeQuery("SELECT * FROM hive.information_schema.enabled_roles"))
                 .containsOnly(
                         row("public"));
