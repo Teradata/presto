@@ -48,6 +48,7 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denySelectV
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetCatalogSessionProperty;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetRole;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowGrants;
+import static com.facebook.presto.spi.security.AccessDeniedException.denyShowRoles;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowSchemas;
 import static com.facebook.presto.spi.security.AccessDeniedException.denyShowTables;
 
@@ -328,5 +329,22 @@ public interface ConnectorAccessControl
     default void checkCanSetRole(ConnectorTransactionHandle transactionHandle, Identity identity, String role, String catalogName)
     {
         denySetRole(role);
+    }
+
+    /**
+     * Check if identity is allowed to show roles on the specified catalog.
+     * @throws com.facebook.presto.spi.security.AccessDeniedException if not allowed
+     */
+    default void checkCanShowRoles(ConnectorTransactionHandle transactionHandle, Identity identity, String catalogName)
+    {
+        denyShowRoles(catalogName);
+    }
+
+    /**
+     * Filter the list of roles to those visible to the identity.
+     */
+    default Set<String> filterRoles(ConnectorTransactionHandle transactionHandle, Identity identity, String catalogName, Set<String> roles)
+    {
+        return Collections.emptySet();
     }
 }

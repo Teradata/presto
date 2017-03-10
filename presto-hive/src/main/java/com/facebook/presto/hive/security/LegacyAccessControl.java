@@ -208,4 +208,15 @@ public class LegacyAccessControl
     {
         return grantInfos;
     }
+
+    @Override
+    public void checkCanShowRoles(ConnectorTransactionHandle transactionHandle, Identity identity, String catalogName)
+    {
+    }
+
+    @Override
+    public Set<String> filterRoles(ConnectorTransactionHandle transactionHandle, Identity identity, String catalogName, Set<String> roles)
+    {
+        return roles;
+    }
 }

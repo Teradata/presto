@@ -70,6 +70,7 @@ import static com.facebook.presto.spi.security.AccessDeniedException.denySelectT
 import static com.facebook.presto.spi.security.AccessDeniedException.denySelectView;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetCatalogSessionProperty;
 import static com.facebook.presto.spi.security.AccessDeniedException.denySetRole;
+import static com.facebook.presto.spi.security.AccessDeniedException.denyShowRoles;
 import static com.facebook.presto.spi.security.PrincipalType.ROLE;
 import static com.facebook.presto.spi.security.PrincipalType.USER;
 import static java.util.Objects.requireNonNull;
@@ -374,6 +375,20 @@ public class SqlStandardAccessControl
                 .map(RoleGrant::getRoleName)
                 .collect(toSet());
         return rolesWithGrantOption.containsAll(roles);
+    }
+
+    @Override
+    public void checkCanShowRoles(ConnectorTransactionHandle transactionHandle, Identity identity, String catalogName)
+    {
+        if (!isAdmin(transactionHandle, identity)) {
+            denyShowRoles(catalogName);
+        }
+    }
+
+    @Override
+    public Set<String> filterRoles(ConnectorTransactionHandle transactionHandle, Identity identity, String catalogName, Set<String> roles)
+    {
+        return roles;
     }
 
     private boolean checkDatabasePermission(ConnectorTransactionHandle transaction, Identity identity, String schemaName, HivePrivilege... requiredPrivileges)
