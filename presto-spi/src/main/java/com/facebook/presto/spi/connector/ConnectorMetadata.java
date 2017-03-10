@@ -452,7 +452,7 @@ public interface ConnectorMetadata
     /**
      * List the table privileges granted to the specified grantee for the tables that have the specified prefix
      */
-    default List<GrantInfo> listTablePrivileges(ConnectorSession session, SchemaTablePrefix prefix, String grantee)
+    default List<GrantInfo> listTablePrivileges(ConnectorSession session, SchemaTablePrefix prefix)
     {
         return emptyList();
     }

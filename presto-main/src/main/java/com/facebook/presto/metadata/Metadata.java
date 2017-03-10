@@ -325,7 +325,7 @@ public interface Metadata
     /**
      * Gets the privileges for the specified table available to the given grantee
      */
-    List<GrantInfo> listTablePrivileges(Session session, QualifiedTablePrefix prefix, String grantee);
+    List<GrantInfo> listTablePrivileges(Session session, QualifiedTablePrefix prefix);
 
     FunctionRegistry getFunctionRegistry();
 

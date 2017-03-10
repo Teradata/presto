@@ -908,7 +908,7 @@ public class MetadataManager
     }
 
     @Override
-    public List<GrantInfo> listTablePrivileges(Session session, QualifiedTablePrefix prefix, String grantee)
+    public List<GrantInfo> listTablePrivileges(Session session, QualifiedTablePrefix prefix)
     {
         requireNonNull(prefix, "prefix is null");
         SchemaTablePrefix tablePrefix = prefix.asSchemaTablePrefix();
@@ -921,7 +921,7 @@ public class MetadataManager
             ConnectorSession connectorSession = session.toConnectorSession(catalogMetadata.getConnectorId());
             for (ConnectorId connectorId : catalogMetadata.listConnectorIds()) {
                 ConnectorMetadata metadata = catalogMetadata.getMetadataFor(connectorId);
-                grants.addAll(metadata.listTablePrivileges(connectorSession, tablePrefix, grantee).stream()
+                grants.addAll(metadata.listTablePrivileges(connectorSession, tablePrefix).stream()
                         .collect(toSet()));
             }
         }

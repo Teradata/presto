@@ -234,9 +234,7 @@ public class InformationSchemaPageSourceProvider
     private InternalTable buildTablePrivileges(Session session, String catalogName, Map<String, NullableValue> filters)
     {
         QualifiedTablePrefix prefix = extractQualifiedTablePrefix(catalogName, filters);
-        String grantee = extractGrantee(session, filters);
-        List<GrantInfo> grants = ImmutableList.copyOf(listTablePrivileges(session, metadata, accessControl, prefix, grantee));
-
+        List<GrantInfo> grants = ImmutableList.copyOf(listTablePrivileges(session, metadata, accessControl, prefix));
         InternalTable.Builder table = InternalTable.builder(informationSchemaTableColumns(TABLE_TABLE_PRIVILEGES));
         for (GrantInfo grant : grants) {
             for (PrivilegeInfo privilegeInfo : grant.getPrivilegeInfo()) {
@@ -394,15 +392,6 @@ public class InformationSchemaPageSourceProvider
             return new QualifiedTablePrefix(catalogName, Optional.empty(), Optional.empty());
         }
         return new QualifiedTablePrefix(catalogName, schemaName, tableName);
-    }
-
-    private static String extractGrantee(Session session, Map<String, NullableValue> filters)
-    {
-        Optional<String> grantee = getFilterColumn(filters, "grantee");
-        if (!grantee.isPresent()) {
-            return session.getUser();
-        }
-        return grantee.get();
     }
 
     private static Optional<String> getFilterColumn(Map<String, NullableValue> filters, String columnName)

@@ -74,9 +74,9 @@ public final class MetadataListing
         return accessControl.filterTables(session.getRequiredTransactionId(), session.getIdentity(), prefix.getCatalogName(), tableNames);
     }
 
-    public static Set<GrantInfo> listTablePrivileges(Session session, Metadata metadata, AccessControl accessControl, QualifiedTablePrefix prefix, String grantee)
+    public static Set<GrantInfo> listTablePrivileges(Session session, Metadata metadata, AccessControl accessControl, QualifiedTablePrefix prefix)
     {
-        Set<GrantInfo> grants = ImmutableSet.copyOf(metadata.listTablePrivileges(session, prefix, grantee));
+        Set<GrantInfo> grants = ImmutableSet.copyOf(metadata.listTablePrivileges(session, prefix));
         return accessControl.filterGrants(session.getRequiredTransactionId(), session.getIdentity(), prefix, grants);
     }
 

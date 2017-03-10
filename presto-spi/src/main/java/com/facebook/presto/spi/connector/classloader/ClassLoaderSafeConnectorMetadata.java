@@ -443,10 +443,10 @@ public class ClassLoaderSafeConnectorMetadata
     }
 
     @Override
-    public List<GrantInfo> listTablePrivileges(ConnectorSession session, SchemaTablePrefix prefix, String grantee)
+    public List<GrantInfo> listTablePrivileges(ConnectorSession session, SchemaTablePrefix prefix)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            return delegate.listTablePrivileges(session, prefix, grantee);
+            return delegate.listTablePrivileges(session, prefix);
         }
     }
 
