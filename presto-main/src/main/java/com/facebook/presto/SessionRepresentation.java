@@ -49,7 +49,7 @@ public final class SessionRepresentation
     private final long startTime;
     private final Map<String, String> systemProperties;
     private final Map<ConnectorId, Map<String, String>> catalogProperties;
-    private final Map<ConnectorId, SelectedRole> roles;
+    private final Map<String, SelectedRole> roles;
     private final Map<String, String> preparedStatements;
 
     @JsonCreator
@@ -70,7 +70,7 @@ public final class SessionRepresentation
             @JsonProperty("startTime") long startTime,
             @JsonProperty("systemProperties") Map<String, String> systemProperties,
             @JsonProperty("catalogProperties") Map<ConnectorId, Map<String, String>> catalogProperties,
-            @JsonProperty("roles") Map<ConnectorId, SelectedRole> roles,
+            @JsonProperty("roles") Map<String, SelectedRole> roles,
             @JsonProperty("preparedStatements") Map<String, String> preparedStatements)
     {
         this.queryId = requireNonNull(queryId, "queryId is null");
@@ -195,7 +195,7 @@ public final class SessionRepresentation
     }
 
     @JsonProperty
-    public Map<ConnectorId, SelectedRole> getRoles()
+    public Map<String, SelectedRole> getRoles()
     {
         return roles;
     }
@@ -212,7 +212,7 @@ public final class SessionRepresentation
                 new QueryId(queryId),
                 transactionId,
                 clientTransactionSupport,
-                new Identity(user, Optional.empty()),
+                new Identity(user, Optional.empty(), roles),
                 source,
                 catalog,
                 schema,
@@ -224,8 +224,6 @@ public final class SessionRepresentation
                 startTime,
                 systemProperties,
                 catalogProperties,
-                ImmutableMap.of(),
-                roles,
                 ImmutableMap.of(),
                 sessionPropertyManager,
                 preparedStatements);

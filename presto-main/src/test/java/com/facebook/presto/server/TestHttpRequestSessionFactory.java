@@ -95,7 +95,7 @@ public class TestHttpRequestSessionFactory
                 .put("query1", "select * from foo")
                 .put("query2", "select * from bar")
                 .build());
-        assertEquals(session.getUnprocessedRoles(), ImmutableMap.of(
+        assertEquals(session.getIdentity().getRoles(), ImmutableMap.of(
                 "foo_connector", new SelectedRole(SelectedRole.Type.ALL, Optional.empty()),
                 "bar_connector", new SelectedRole(SelectedRole.Type.NONE, Optional.empty()),
                 "foobar_connector", new SelectedRole(SelectedRole.Type.ROLE, Optional.of("role"))

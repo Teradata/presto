@@ -337,8 +337,6 @@ public class LocalQueryRunner
                 defaultSession.getSystemProperties(),
                 defaultSession.getConnectorProperties(),
                 defaultSession.getUnprocessedCatalogProperties(),
-                defaultSession.getRoles(),
-                defaultSession.getUnprocessedRoles(),
                 metadata.getSessionPropertyManager(),
                 defaultSession.getPreparedStatements());
 

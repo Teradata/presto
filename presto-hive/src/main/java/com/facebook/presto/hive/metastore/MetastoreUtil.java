@@ -424,7 +424,8 @@ public class MetastoreUtil
 
     public static Set<String> listEnabledRoles(Identity identity, Function<PrestoPrincipal, Set<RoleGrant>> listRoleGrants)
     {
-        Optional<SelectedRole> role = identity.getRole();
+        // TODO identity.getrole()
+        Optional<SelectedRole> role = Optional.empty();
 
         if (role.isPresent() && role.get().getType() == SelectedRole.Type.NONE) {
             return ImmutableSet.of("public");
@@ -435,7 +436,7 @@ public class MetastoreUtil
             principal = new PrestoPrincipal(USER, identity.getUser());
         }
         else {
-            principal = new PrestoPrincipal(ROLE, identity.getRole().get().getRole().get());
+            principal = new PrestoPrincipal(ROLE, role.get().getRole().get());
         }
 
         Set<String> roles = listApplicableRoles(principal, listRoleGrants)
