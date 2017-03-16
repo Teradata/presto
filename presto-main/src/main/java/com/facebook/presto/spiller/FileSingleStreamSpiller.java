@@ -43,6 +43,7 @@ import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.facebook.presto.execution.buffer.PagesSerdeUtil.writeSerializedPage;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -67,6 +68,7 @@ public class FileSingleStreamSpiller
 
     private final ListeningExecutorService executor;
 
+    private final AtomicBoolean writable = new AtomicBoolean(true);
     private ListenableFuture<?> spillInProgress = Futures.immediateFuture(null);
 
     public FileSingleStreamSpiller(
@@ -94,6 +96,7 @@ public class FileSingleStreamSpiller
     public ListenableFuture<?> spill(Iterator<Page> pageIterator)
     {
         checkNoSpillInProgress();
+        checkIsWritable();
         spillInProgress = executor.submit(() -> writePages(pageIterator));
         return spillInProgress;
     }
@@ -101,6 +104,7 @@ public class FileSingleStreamSpiller
     @Override
     public Iterator<Page> getSpilledPages()
     {
+        writable.set(false);
         checkNoSpillInProgress();
         return readPages();
     }
@@ -108,6 +112,7 @@ public class FileSingleStreamSpiller
     @Override
     public CompletableFuture<List<Page>> getAllSpilledPages()
     {
+        writable.set(false);
         return MoreFutures.toCompletableFuture(executor.submit(() ->
                 ImmutableList.copyOf(getSpilledPages())
         ));
@@ -168,5 +173,11 @@ public class FileSingleStreamSpiller
     private void checkNoSpillInProgress()
     {
         checkState(spillInProgress.isDone(), "spill in progress");
+    }
+
+    private void checkIsWritable()
+    {
+        checkState(writable.get(), "Spilling no longer allowed. " +
+                "The spiller has been made non-writable on first read for subsequent reads to be consistent");
     }
 }
