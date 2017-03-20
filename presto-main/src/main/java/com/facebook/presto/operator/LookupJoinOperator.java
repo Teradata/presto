@@ -43,7 +43,6 @@ public class LookupJoinOperator
 
     private final List<Type> allTypes;
     private final List<Type> probeTypes;
-    private final ListenableFuture<? extends LookupSource> lookupSourceFuture;
     private final LookupSourceFactory lookupSourceFactory;
     private final JoinProbeFactory joinProbeFactory;
     private final Runnable onClose;
@@ -84,7 +83,7 @@ public class LookupJoinOperator
         this.lookupJoinsCount = requireNonNull(lookupJoinsCount, "lookupJoinsCount is null");
         this.hashGenerator = requireNonNull(hashGenerator, "hashGenerator is null");
 
-        this.lookupSourceFuture = lookupSourceFactory.createLookupSource();
+        ListenableFuture<LookupSource> lookupSourceFuture = lookupSourceFactory.createLookupSource();
         this.probeOnOuterSide = joinType == PROBE_OUTER || joinType == FULL_OUTER;
         this.lookupJoiner = new LookupJoiner(allTypes, lookupSourceFuture, joinProbeFactory, probeOnOuterSide);
     }
@@ -158,7 +157,6 @@ public class LookupJoinOperator
     public ListenableFuture<?> isBlocked()
     {
         if (!spillInProgress.isDone()) {
-            checkState(lookupSourceFuture.isDone());
             return spillInProgress;
         }
         if (spilledLookupJoiner.isPresent()) {
@@ -202,7 +200,6 @@ public class LookupJoinOperator
     private void ensureSpillerLoaded()
     {
         checkState(lookupSourceFactory.hasSpilled());
-        checkState(lookupSourceFuture.isDone());
         if (!spiller.isPresent()) {
             spiller = Optional.of(lookupSourceFactory.createProbeSpiller(operatorContext, probeTypes, hashGenerator));
         }
