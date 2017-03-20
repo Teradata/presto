@@ -18,6 +18,7 @@ import com.facebook.presto.spi.CatalogSchemaName;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.security.AccessDeniedException;
 import com.facebook.presto.spi.security.Identity;
+import com.facebook.presto.transaction.TransactionId;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -26,6 +27,7 @@ import org.testng.annotations.Test;
 import java.security.Principal;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import static com.facebook.presto.spi.security.Privilege.SELECT;
 import static com.facebook.presto.transaction.TransactionBuilder.transaction;
@@ -51,8 +53,9 @@ public class TestFileBasedSystemAccessControl
     {
        AccessControlManager accessControlManager = newAccessControlManager();
 
-        transaction(transactionManager, accessControlManager)
-                .execute(transactionId -> {
+        accessControlShouldPass(
+                accessControlManager,
+                transactionId -> {
                     assertEquals(accessControlManager.filterCatalogs(admin, allCatalogs), allCatalogs);
                     Set<String> aliceCatalogs = ImmutableSet.of("open-to-all", "alice-catalog", "all-allowed");
                     assertEquals(accessControlManager.filterCatalogs(alice, allCatalogs), aliceCatalogs);
@@ -68,8 +71,9 @@ public class TestFileBasedSystemAccessControl
     {
         AccessControlManager accessControlManager = newAccessControlManager();
 
-        transaction(transactionManager, accessControlManager)
-                .execute(transactionId -> {
+        accessControlShouldPass(
+                accessControlManager,
+                transactionId -> {
                     Set<String> aliceSchemas = ImmutableSet.of("schema");
                     assertEquals(accessControlManager.filterSchemas(transactionId, alice, "alice-catalog", aliceSchemas), aliceSchemas);
                     assertEquals(accessControlManager.filterSchemas(transactionId, bob, "alice-catalog", aliceSchemas), ImmutableSet.of());
@@ -79,15 +83,10 @@ public class TestFileBasedSystemAccessControl
                     accessControlManager.checkCanRenameSchema(transactionId, alice, aliceSchema, "new-schema");
                     accessControlManager.checkCanShowSchemas(transactionId, alice, "alice-catalog");
                 });
-        try {
-            transaction(transactionManager, accessControlManager)
-                    .execute(transactionId -> {
-                        accessControlManager.checkCanCreateSchema(transactionId, bob, aliceSchema);
-                    });
-            fail();
-        }
-        catch (AccessDeniedException expected) {
-        }
+
+        accessControlShouldFail(
+                accessControlManager,
+                transactionId -> accessControlManager.checkCanCreateSchema(transactionId, bob, aliceSchema));
     }
 
     @Test
@@ -95,8 +94,9 @@ public class TestFileBasedSystemAccessControl
     {
         AccessControlManager accessControlManager = newAccessControlManager();
 
-        transaction(transactionManager, accessControlManager)
-                .execute(transactionId -> {
+        accessControlShouldPass(
+                accessControlManager,
+                (transactionId -> {
                     Set<SchemaTableName> aliceTables = ImmutableSet.of(new SchemaTableName("schema", "table"));
                     assertEquals(accessControlManager.filterTables(transactionId, alice, "alice-catalog", aliceTables), aliceTables);
                     assertEquals(accessControlManager.filterTables(transactionId, bob, "alice-catalog", aliceTables), ImmutableSet.of());
@@ -108,16 +108,10 @@ public class TestFileBasedSystemAccessControl
                     accessControlManager.checkCanDeleteFromTable(transactionId, alice, aliceTable);
                     accessControlManager.checkCanAddColumns(transactionId, alice, aliceTable);
                     accessControlManager.checkCanRenameColumn(transactionId, alice, aliceTable);
-                });
-        try {
-            transaction(transactionManager, accessControlManager)
-                    .execute(transactionId -> {
-                        accessControlManager.checkCanCreateTable(transactionId, bob, aliceTable);
-                    });
-            fail();
-        }
-        catch (AccessDeniedException expected) {
-        }
+                }));
+        accessControlShouldFail(
+                accessControlManager,
+                transactionId -> accessControlManager.checkCanCreateTable(transactionId, bob, aliceTable));
     }
 
     @Test
@@ -126,8 +120,9 @@ public class TestFileBasedSystemAccessControl
     {
         AccessControlManager accessControlManager = newAccessControlManager();
 
-        transaction(transactionManager, accessControlManager)
-                .execute(transactionId -> {
+        accessControlShouldPass(
+                accessControlManager,
+                transactionId -> {
                     accessControlManager.checkCanCreateView(transactionId, alice, aliceView);
                     accessControlManager.checkCanDropView(transactionId, alice, aliceView);
                     accessControlManager.checkCanSelectFromView(transactionId, alice, aliceView);
@@ -137,15 +132,26 @@ public class TestFileBasedSystemAccessControl
                     accessControlManager.checkCanGrantTablePrivilege(transactionId, alice, SELECT, aliceTable);
                     accessControlManager.checkCanRevokeTablePrivilege(transactionId, alice, SELECT, aliceTable);
                 });
+        accessControlShouldFail(
+                accessControlManager,
+                transactionId -> {
+                    accessControlManager.checkCanCreateView(transactionId, bob, aliceView);
+                });
+    }
+
+    private void accessControlShouldFail(AccessControlManager accessControlManager, Consumer<TransactionId> callback)
+    {
         try {
-            transaction(transactionManager, accessControlManager)
-                    .execute(transactionId -> {
-                        accessControlManager.checkCanCreateView(transactionId, bob, aliceView);
-                    });
+            transaction(transactionManager, accessControlManager).execute(callback);
             fail();
         }
         catch (AccessDeniedException expected) {
         }
+    }
+
+    private void accessControlShouldPass(AccessControlManager accessControlManager, Consumer<TransactionId> callback)
+    {
+        transaction(transactionManager, accessControlManager).execute(callback);
     }
 
     private AccessControlManager newAccessControlManager()
