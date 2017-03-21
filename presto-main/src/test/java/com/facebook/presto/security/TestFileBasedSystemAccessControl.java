@@ -44,6 +44,9 @@ import static org.testng.Assert.fail;
 
 public class TestFileBasedSystemAccessControl
 {
+    private static final String JAVA_KDC_PROPERTY = "java.security.krb5.kdc";
+    private static final String JAVA_REALM_PROPERTY = "java.security.krb5.realm";
+    private static final String DEFAULT_CONFIG = "catalog.json";
     private static final Principal TESTING_PRINCIPAL = new TestingPrincipal("principal");
     private static final Identity alice = new Identity("alice", Optional.of(TESTING_PRINCIPAL));
     private static final Identity bob = new Identity("bob", Optional.of(TESTING_PRINCIPAL));
@@ -53,7 +56,6 @@ public class TestFileBasedSystemAccessControl
     private static final QualifiedObjectName aliceTable = new QualifiedObjectName("alice-catalog", "schema", "table");
     private static final QualifiedObjectName aliceView = new QualifiedObjectName("alice-catalog", "schema", "view");
     private static final CatalogSchemaName aliceSchema = new CatalogSchemaName("alice-catalog", "schema");
-    public static final String DEFAULT_CONFIG = "catalog.json";
     private TransactionManager transactionManager;
     private Principal ldapPrincipal;
     private Principal kerberosHostRealm;
@@ -81,26 +83,26 @@ public class TestFileBasedSystemAccessControl
     @AfterClass(alwaysRun = true)
     public void tearDown()
     {
-        for (Map.Entry<Object, Object> property : oldSessionProperties.entrySet()) {
-            System.setProperty((String) property.getKey(), (String) property.getValue());
+        if (oldSessionProperties != null) {
+            for (Map.Entry<Object, Object> property : oldSessionProperties.entrySet()) {
+                System.setProperty((String) property.getKey(), (String) property.getValue());
+            }
         }
     }
 
     private Properties setKerberosSessionProperties()
     {
         Properties properties = new Properties();
-        String kdcProperty = "java.security.krb5.kdc";
-        String oldKdc = System.getProperty(kdcProperty);
-        System.setProperty(kdcProperty, "localhost");
+        String oldKdc = System.getProperty(JAVA_KDC_PROPERTY);
+        System.setProperty(JAVA_KDC_PROPERTY, "localhost");
         if (oldKdc != null) {
-            properties.setProperty(kdcProperty, oldKdc);
+            properties.setProperty(JAVA_KDC_PROPERTY, oldKdc);
         }
 
-        String realmProperty = "java.security.krb5.realm";
-        String oldRealm = System.getProperty(realmProperty);
-        System.setProperty(realmProperty, "REALM");
+        String oldRealm = System.getProperty(JAVA_REALM_PROPERTY);
+        System.setProperty(JAVA_REALM_PROPERTY, "REALM");
         if (oldRealm != null) {
-            properties.setProperty(realmProperty, oldRealm);
+            properties.setProperty(JAVA_REALM_PROPERTY, oldRealm);
         }
 
         return properties;
