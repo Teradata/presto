@@ -14,15 +14,15 @@
 package com.facebook.presto.operator;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.operator.PartitionedConsumption.Partition;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spiller.PartitioningSpiller;
 import com.facebook.presto.sql.planner.Symbol;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ListenableFuture;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public interface LookupSourceFactory
 {
@@ -44,18 +44,13 @@ public interface LookupSourceFactory
         throw new UnsupportedOperationException();
     }
 
-    default Set<Integer> getSpilledPartitions()
-    {
-        return ImmutableSet.of();
-    }
-
-    default ListenableFuture<LookupSource> readSpilledLookupSource(Session session, int partition)
-    {
-        throw new UnsupportedOperationException();
-    }
-
     default boolean hasSpilled()
     {
-        return !getSpilledPartitions().isEmpty();
+        return false;
+    }
+
+    default Iterator<Partition<LookupSource>> beginLookupSourceUnspilling(int lookupSourceConsumers, Session session)
+    {
+        throw new UnsupportedOperationException();
     }
 }

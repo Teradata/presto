@@ -14,13 +14,13 @@
 package com.facebook.presto.operator;
 
 import com.facebook.presto.operator.LookupJoinOperators.JoinType;
+import com.facebook.presto.operator.PartitionedConsumption.Partition;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.block.MappedBlock;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spiller.PartitioningSpiller;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.ListenableFuture;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 
@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static com.facebook.presto.operator.LookupJoinOperators.JoinType.FULL_OUTER;
 import static com.facebook.presto.operator.LookupJoinOperators.JoinType.PROBE_OUTER;
 import static com.google.common.base.Preconditions.checkState;
+import static io.airlift.concurrent.MoreFutures.toListenableFuture;
 import static java.util.Objects.requireNonNull;
 
 public class LookupJoinOperator
@@ -43,6 +44,7 @@ public class LookupJoinOperator
 
     private final List<Type> allTypes;
     private final List<Type> probeTypes;
+    private final SharedMemoryContext sharedMemoryContext;
     private final LookupSourceFactory lookupSourceFactory;
     private final JoinProbeFactory joinProbeFactory;
     private final Runnable onClose;
@@ -58,7 +60,7 @@ public class LookupJoinOperator
 
     private Optional<PartitioningSpiller> spiller = Optional.empty();
     private ListenableFuture<?> spillInProgress = NOT_BLOCKED;
-    private Optional<Iterator<Integer>> spilledPartitions = Optional.empty();
+    private Optional<Iterator<Partition<LookupSource>>> lookupPartitions = Optional.empty();
 
     public LookupJoinOperator(
             OperatorContext operatorContext,
@@ -69,11 +71,13 @@ public class LookupJoinOperator
             JoinProbeFactory joinProbeFactory,
             Runnable onClose,
             AtomicInteger lookupJoinsCount,
+            SharedMemoryContext sharedMemoryContext,
             HashGenerator hashGenerator)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.allTypes = ImmutableList.copyOf(requireNonNull(allTypes, "allTypes is null"));
         this.probeTypes = ImmutableList.copyOf(requireNonNull(probeTypes, "probeTypes is null"));
+        this.sharedMemoryContext = requireNonNull(sharedMemoryContext, "sharedMemoryContext is null");
 
         requireNonNull(joinType, "joinType is null");
 
@@ -105,18 +109,17 @@ public class LookupJoinOperator
     {
         lookupJoiner.finish();
 
+        //The `hasSpilled()` value below is determined before the operator starts its work.
+        //Hence, there's no race between an operator finishing early and a spill occurring
+        //during other LookupJoinOperator operator's work. At least, at the moment of writing of this comment...
         if (!finishing && lookupSourceFactory.hasSpilled()) {
-            // Last LookupJoinOperator will handle spilled pages
-            int count = lookupJoinsCount.decrementAndGet();
-            checkState(count >= 0);
-            if (count > 0) {
-                spiller = Optional.empty();
-            }
-            else {
-                // last LookupJoinOperator might not spilled at all, but other parallel joins could
-                // so we have to load spiller if this operator hasn't used one yet
-                ensureSpillerLoaded();
-            }
+            //the `lookupJoinsCount` below no longer changes when any of the operators start its work.
+            //Hence, there's no risk of over-releasing or under-releasing (and thus: deadlocking) of any Partition
+            //returned from `beginLookupSourceUnspilling` method. At least, at the moment of writing of this comment...
+            int consumersCount = lookupJoinsCount.get();
+            lookupPartitions = Optional.of(
+                    lookupSourceFactory.beginLookupSourceUnspilling(consumersCount, operatorContext.getSession()));
+            ensureSpillerLoaded();
         }
         finishing = true;
     }
@@ -124,16 +127,21 @@ public class LookupJoinOperator
     private void unspillNextLookupSource()
     {
         checkState(spiller.isPresent());
-        checkState(spilledPartitions.isPresent());
-        if (spilledPartitions.get().hasNext()) {
-            int currentSpilledPartition = spilledPartitions.get().next();
+        checkState(lookupPartitions.isPresent());
 
+        spilledLookupJoiner.ifPresent(joiner -> {
+            joiner.finish(sharedMemoryContext);
+        });
+
+        if (lookupPartitions.get().hasNext()) {
+            Partition<LookupSource> currentSpilledPartition = lookupPartitions.get().next();
+
+            LookupJoiner nextLookupJoiner = new LookupJoiner(allTypes, toListenableFuture(currentSpilledPartition.load()), joinProbeFactory, probeOnOuterSide);
             spilledLookupJoiner = Optional.of(new SpillledLookupJoiner(
-                    allTypes,
-                    lookupSourceFactory.readSpilledLookupSource(operatorContext.getSession(), currentSpilledPartition),
-                    joinProbeFactory,
-                    spiller.get().getSpilledPages(currentSpilledPartition),
-                    probeOnOuterSide));
+                    currentSpilledPartition,
+                    nextLookupJoiner,
+                    spiller.get().getSpilledPages(currentSpilledPartition.number())
+            ));
         }
         else {
             spiller.get().close();
@@ -203,9 +211,6 @@ public class LookupJoinOperator
         if (!spiller.isPresent()) {
             spiller = Optional.of(lookupSourceFactory.createProbeSpiller(operatorContext, probeTypes, hashGenerator));
         }
-        if (!spilledPartitions.isPresent()) {
-            spilledPartitions = Optional.of(ImmutableSet.copyOf(lookupSourceFactory.getSpilledPartitions()).iterator());
-        }
     }
 
     private Page mapPage(IntArrayList unspilledPositions, Page page)
@@ -226,7 +231,7 @@ public class LookupJoinOperator
                 return null;
             }
             SpillledLookupJoiner joiner = spilledLookupJoiner.get();
-            operatorContext.setMemoryReservation(joiner.getInMemorySizeInBytes());
+            joiner.reserveMemory(sharedMemoryContext, operatorContext);
             return joiner.getOutput();
         }
         else {
