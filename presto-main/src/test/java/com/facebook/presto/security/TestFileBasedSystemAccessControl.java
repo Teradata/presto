@@ -27,7 +27,6 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
-import javax.naming.InvalidNameException;
 import javax.security.auth.kerberos.KerberosPrincipal;
 
 import java.security.Principal;
@@ -66,23 +65,20 @@ public class TestFileBasedSystemAccessControl
 
     @BeforeClass
     public void setUp()
+            throws Exception
     {
         oldSessionProperties = setKerberosSessionProperties();
-        try {
-            ldapPrincipal = new LdapPrincipal("CN=principal");
-        }
-        catch (InvalidNameException e) {
-            fail(e.toString());
-        }
-
+        ldapPrincipal = new LdapPrincipal("CN=principal");
         kerberosHostRealm = new KerberosPrincipal("principal/hostname@REALM");
         kerberosIpRealm = new KerberosPrincipal("principal/192.1.1.1@REALM");
         kerberosRealm = new KerberosPrincipal("principal@REALM");
         kerberosHost = new KerberosPrincipal("principal/hostname");
         kerberosSimple = new KerberosPrincipal("principal");
+
+        transactionManager = createTestTransactionManager();
     }
 
-    @AfterClass
+    @AfterClass(alwaysRun = true)
     public void tearDown()
     {
         for (Map.Entry<Object, Object> property : oldSessionProperties.entrySet()) {
@@ -103,7 +99,7 @@ public class TestFileBasedSystemAccessControl
         String realmProperty = "java.security.krb5.realm";
         String oldRealm = System.getProperty(realmProperty);
         System.setProperty(realmProperty, "REALM");
-        if (oldKdc != null) {
+        if (oldRealm != null) {
             properties.setProperty(realmProperty, oldRealm);
         }
 
@@ -217,8 +213,9 @@ public class TestFileBasedSystemAccessControl
     public void testKerberosPrincipalExactMatchFalse()
     {
         AccessControlManager accessControlManager = newAccessControlManager("kerbExactMatchFalse.json");
-        transaction(transactionManager, accessControlManager)
-                .execute(transactionId -> {
+        accessControlShouldPass(
+                accessControlManager,
+                transactionId -> {
                     checkCanSetWithAllPrincipals(accessControlManager, "alice");
                     checkCanSetWithAllPrincipals(accessControlManager, "principal");
                 });
@@ -228,8 +225,9 @@ public class TestFileBasedSystemAccessControl
     public void testKerberosPrincipalExactMatchTrue()
     {
         AccessControlManager accessControlManager = newAccessControlManager("kerbExactMatchTrue.json");
-        transaction(transactionManager, accessControlManager)
-                .execute(transactionId -> {
+        accessControlShouldPass(
+                accessControlManager,
+                transactionId -> {
                     accessControlManager.checkCanSetUser(kerberosRealm, "principal");
                     accessControlManager.checkCanSetUser(kerberosSimple, "principal");
                     accessControlManager.checkCanSetUser(null, "principal");
@@ -320,7 +318,6 @@ public class TestFileBasedSystemAccessControl
 
     private AccessControlManager newAccessControlManager(String configFile)
     {
-        transactionManager = createTestTransactionManager();
         AccessControlManager accessControlManager =  new AccessControlManager(transactionManager);
 
         String path = this.getClass().getClassLoader().getResource(configFile).getPath();

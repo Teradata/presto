@@ -127,10 +127,8 @@ public class FileBasedSystemAccessControl
 
     private String getKerberosUserName(KerberosPrincipal principal)
     {
-        KerberosPrincipal kerberosPrincipal = principal;
-
-        String realmName = kerberosPrincipal.getRealm();
-        String kerberosUserName = kerberosPrincipal.getName();
+        String realmName = principal.getRealm();
+        String kerberosUserName = principal.getName();
 
         if (!isNullOrEmpty(realmName)) {
             kerberosUserName = kerberosUserName.substring(0, kerberosUserName.length() - realmName.length() - 1);
