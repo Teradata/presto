@@ -89,8 +89,7 @@ Kerberos Principal Rule
 -----------------------
 This optional rule governs whether a given Kerberos principal can be used to set a given user.
 Thus, it is possible to ensure that principal ``bob@REALM`` is only used by user ``bob``.
-If no ``kerberosPrincipals`` rule is specified, ``exactMatch`` is ``false``.
-This rule is composed of a single field:
+The rule is composed of a single field:
 
 * ``exactMatch`` (required): boolean indicating whether the user must exactly match the Kerberos
   principal with ``@REALM`` trimmed off.
@@ -98,6 +97,9 @@ This rule is composed of a single field:
 .. note::
   If a principal has a host field specified (e.g. ``presto/localhost@REALM``), the Presto user
   must be ``presto/localhost`` if ``exactMatch`` is ``true``
+
+.. note::
+    If no ``kerberosPrincipals`` rule is specified, ``exactMatch`` defaults to ``false``.
 
 For example, if you want to allow only the user ``admin`` to access the
 ``mysql`` and the ``system`` catalog, allow all users to access the ``hive``
