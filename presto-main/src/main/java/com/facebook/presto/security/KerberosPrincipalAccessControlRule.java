@@ -13,16 +13,22 @@
  */
 package com.facebook.presto.security;
 
-import com.facebook.presto.spi.Plugin;
-import com.facebook.presto.spi.security.SystemAccessControlFactory;
-import com.google.common.collect.ImmutableList;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
-public class SystemAccessControlPlugin
-        implements Plugin
+public class KerberosPrincipalAccessControlRule
 {
-    @Override
-    public Iterable<SystemAccessControlFactory> getSystemAccessControlFactories()
+    private final boolean exactMatch;
+
+    @JsonCreator
+    public KerberosPrincipalAccessControlRule(
+            @JsonProperty("exactMatch") boolean exactMatch)
     {
-        return ImmutableList.of(new KerberosExactMatchAccessControlFactory());
+        this.exactMatch = exactMatch;
+    }
+
+    public boolean match(String user, String kerberosUserName)
+    {
+        return !exactMatch || user.equals(kerberosUserName);
     }
 }
