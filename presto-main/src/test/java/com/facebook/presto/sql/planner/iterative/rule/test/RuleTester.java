@@ -14,10 +14,11 @@
 package com.facebook.presto.sql.planner.iterative.rule.test;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.cost.CostCalculator;
 import com.facebook.presto.metadata.Metadata;
+import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.testing.LocalQueryRunner;
+import com.facebook.presto.testing.TestingLookup;
 import com.facebook.presto.tpch.TpchConnectorFactory;
 import com.google.common.collect.ImmutableMap;
 
@@ -26,9 +27,8 @@ import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 public class RuleTester
 {
     private final Metadata metadata;
-    private final CostCalculator costCalculator;
     private final Session session;
-    private final LocalQueryRunner queryRunner;
+    private final Lookup lookup;
 
     public RuleTester()
     {
@@ -38,17 +38,17 @@ public class RuleTester
                 .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
                 .build();
 
-        queryRunner = new LocalQueryRunner(session);
+        LocalQueryRunner queryRunner = new LocalQueryRunner(session);
         queryRunner.createCatalog(session.getCatalog().get(),
                 new TpchConnectorFactory(1),
                 ImmutableMap.<String, String>of());
 
         this.metadata = queryRunner.getMetadata();
-        this.costCalculator = queryRunner.getCostCalculator();
+        this.lookup = new TestingLookup(queryRunner.getCostCalculator());
     }
 
     public RuleAssert assertThat(Rule rule)
     {
-        return new RuleAssert(metadata, costCalculator, session, rule);
+        return new RuleAssert(metadata, lookup, session, rule);
     }
 }
