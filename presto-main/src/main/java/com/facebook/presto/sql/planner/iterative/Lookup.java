@@ -13,7 +13,13 @@
  */
 package com.facebook.presto.sql.planner.iterative;
 
+import com.facebook.presto.Session;
+import com.facebook.presto.cost.PlanNodeCost;
+import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+
+import java.util.Map;
 
 public interface Lookup
 {
@@ -25,4 +31,6 @@ public interface Lookup
      * argument as is.
      */
     PlanNode resolve(PlanNode node);
+
+    PlanNodeCost getCost(PlanNode node, Session session, Map<Symbol, Type> types);
 }
