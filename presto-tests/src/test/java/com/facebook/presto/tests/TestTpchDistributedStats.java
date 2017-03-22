@@ -13,8 +13,6 @@
  */
 package com.facebook.presto.tests;
 
-import com.facebook.presto.execution.QueryPlan;
-import com.facebook.presto.tests.statistics.MetricComparison;
 import org.testng.annotations.Test;
 
 import static com.facebook.presto.tests.statistics.MetricComparison.Result.MATCH;
@@ -30,11 +28,7 @@ public class TestTpchDistributedStats
     @Test
     void testEstimateForSimpleQuery()
     {
-        String queryId = executeQuery("SELECT * FROM NATION");
-
-        QueryPlan queryPlan = getQueryPlan(queryId);
-
-        MetricComparison rootOutputRowCountComparison = getRootOutputRowCountComparison(queryId, queryPlan);
-        assertEquals(rootOutputRowCountComparison.result(), MATCH);
+        assertEquals(compareMetric("SELECT * FROM NATION").result(), MATCH);
     }
+
 }
