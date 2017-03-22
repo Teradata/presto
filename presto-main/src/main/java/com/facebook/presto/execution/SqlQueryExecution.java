@@ -18,7 +18,7 @@ import com.facebook.presto.OutputBuffers.OutputBufferId;
 import com.facebook.presto.Session;
 import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.connector.ConnectorId;
-import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.LegacyCostCalculator;
 import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.execution.scheduler.ExecutionPolicy;
 import com.facebook.presto.execution.scheduler.NodeScheduler;
@@ -103,7 +103,7 @@ public final class SqlQueryExecution
     private final ExecutorService queryExecutor;
 
     private final QueryExplainer queryExplainer;
-    private final CostCalculator costCalculator;
+    private final LegacyCostCalculator costCalculator;
     private final AtomicReference<SqlQueryScheduler> queryScheduler = new AtomicReference<>();
     private final AtomicReference<QueryPlan> queryPlan = new AtomicReference<>();
     private final NodeTaskMap nodeTaskMap;
@@ -123,7 +123,7 @@ public final class SqlQueryExecution
             SplitManager splitManager,
             NodePartitioningManager nodePartitioningManager,
             NodeScheduler nodeScheduler,
-            CostCalculator costCalculator,
+            LegacyCostCalculator costCalculator,
             List<PlanOptimizer> planOptimizers,
             RemoteTaskFactory remoteTaskFactory,
             LocationFactory locationFactory,
@@ -571,7 +571,7 @@ public final class SqlQueryExecution
         private final SplitManager splitManager;
         private final NodePartitioningManager nodePartitioningManager;
         private final NodeScheduler nodeScheduler;
-        private final CostCalculator costCalculator;
+        private final LegacyCostCalculator costCalculator;
         private final List<PlanOptimizer> planOptimizers;
         private final RemoteTaskFactory remoteTaskFactory;
         private final TransactionManager transactionManager;
@@ -591,7 +591,7 @@ public final class SqlQueryExecution
                 SplitManager splitManager,
                 NodePartitioningManager nodePartitioningManager,
                 NodeScheduler nodeScheduler,
-                CostCalculator costCalculator,
+                LegacyCostCalculator costCalculator,
                 PlanOptimizers planOptimizers,
                 RemoteTaskFactory remoteTaskFactory,
                 TransactionManager transactionManager,

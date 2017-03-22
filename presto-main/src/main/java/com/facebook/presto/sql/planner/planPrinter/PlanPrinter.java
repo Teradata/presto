@@ -14,7 +14,7 @@
 package com.facebook.presto.sql.planner.planPrinter;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.LegacyCostCalculator;
 import com.facebook.presto.cost.PlanNodeCost;
 import com.facebook.presto.execution.StageInfo;
 import com.facebook.presto.execution.StageStats;
@@ -133,12 +133,12 @@ public class PlanPrinter
     private final Metadata metadata;
     private final Optional<Map<PlanNodeId, PlanNodeStats>> stats;
 
-    private PlanPrinter(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, CostCalculator costCalculator, Session sesion)
+    private PlanPrinter(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, LegacyCostCalculator costCalculator, Session sesion)
     {
         this(plan, types, metadata, costCalculator, sesion, 0);
     }
 
-    private PlanPrinter(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, CostCalculator costCalculator, Session session, int indent)
+    private PlanPrinter(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, LegacyCostCalculator costCalculator, Session session, int indent)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(types, "types is null");
@@ -153,7 +153,7 @@ public class PlanPrinter
         plan.accept(visitor, indent);
     }
 
-    private PlanPrinter(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, CostCalculator costCalculator, Session session, Map<PlanNodeId, PlanNodeStats> stats, int indent)
+    private PlanPrinter(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, LegacyCostCalculator costCalculator, Session session, Map<PlanNodeId, PlanNodeStats> stats, int indent)
     {
         requireNonNull(plan, "plan is null");
         requireNonNull(types, "types is null");
@@ -174,22 +174,22 @@ public class PlanPrinter
         return output.toString();
     }
 
-    public static String textLogicalPlan(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, CostCalculator costCalculator, Session session)
+    public static String textLogicalPlan(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, LegacyCostCalculator costCalculator, Session session)
     {
         return new PlanPrinter(plan, types, metadata, costCalculator, session).toString();
     }
 
-    public static String textLogicalPlan(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, CostCalculator costCalculator, Session session, int indent)
+    public static String textLogicalPlan(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, LegacyCostCalculator costCalculator, Session session, int indent)
     {
         return new PlanPrinter(plan, types, metadata, costCalculator, session, indent).toString();
     }
 
-    public static String textLogicalPlan(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, CostCalculator costCalculator, Session session, Map<PlanNodeId, PlanNodeStats> stats, int indent)
+    public static String textLogicalPlan(PlanNode plan, Map<Symbol, Type> types, Metadata metadata, LegacyCostCalculator costCalculator, Session session, Map<PlanNodeId, PlanNodeStats> stats, int indent)
     {
         return new PlanPrinter(plan, types, metadata, costCalculator, session, stats, indent).toString();
     }
 
-    public static String textDistributedPlan(StageInfo outputStageInfo, Metadata metadata, CostCalculator costCalculator, Session session)
+    public static String textDistributedPlan(StageInfo outputStageInfo, Metadata metadata, LegacyCostCalculator costCalculator, Session session)
     {
         StringBuilder builder = new StringBuilder();
         List<StageInfo> allStages = outputStageInfo.getSubStages().stream()
@@ -203,7 +203,7 @@ public class PlanPrinter
         return builder.toString();
     }
 
-    public static String textDistributedPlan(SubPlan plan, Metadata metadata, CostCalculator costCalculator, Session session)
+    public static String textDistributedPlan(SubPlan plan, Metadata metadata, LegacyCostCalculator costCalculator, Session session)
     {
         StringBuilder builder = new StringBuilder();
         for (PlanFragment fragment : plan.getAllFragments()) {
@@ -213,7 +213,7 @@ public class PlanPrinter
         return builder.toString();
     }
 
-    private static String formatFragment(Metadata metadata, CostCalculator costCalculator, Session session, PlanFragment fragment, Optional<StageStats> stageStats, Optional<Map<PlanNodeId, PlanNodeStats>> planNodeStats)
+    private static String formatFragment(Metadata metadata, LegacyCostCalculator costCalculator, Session session, PlanFragment fragment, Optional<StageStats> stageStats, Optional<Map<PlanNodeId, PlanNodeStats>> planNodeStats)
     {
         StringBuilder builder = new StringBuilder();
         builder.append(format("Fragment %s [%s]\n",

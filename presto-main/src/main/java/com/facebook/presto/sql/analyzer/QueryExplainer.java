@@ -14,7 +14,7 @@
 package com.facebook.presto.sql.analyzer;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.LegacyCostCalculator;
 import com.facebook.presto.execution.DataDefinitionTask;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.security.AccessControl;
@@ -46,7 +46,7 @@ public class QueryExplainer
     private final Metadata metadata;
     private final AccessControl accessControl;
     private final SqlParser sqlParser;
-    private final CostCalculator costCalculator;
+    private final LegacyCostCalculator costCalculator;
     private final Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask;
 
     @Inject
@@ -55,7 +55,7 @@ public class QueryExplainer
             Metadata metadata,
             AccessControl accessControl,
             SqlParser sqlParser,
-            CostCalculator costCalculator,
+            LegacyCostCalculator costCalculator,
             Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask)
     {
         this(planOptimizers.get(),
@@ -71,7 +71,7 @@ public class QueryExplainer
             Metadata metadata,
             AccessControl accessControl,
             SqlParser sqlParser,
-            CostCalculator costCalculator,
+            LegacyCostCalculator costCalculator,
             Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask)
     {
         this.planOptimizers = requireNonNull(planOptimizers, "planOptimizers is null");

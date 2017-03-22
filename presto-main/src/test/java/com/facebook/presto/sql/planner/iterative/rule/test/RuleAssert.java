@@ -14,7 +14,7 @@
 package com.facebook.presto.sql.planner.iterative.rule.test;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.LegacyCostCalculator;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Plan;
@@ -22,6 +22,7 @@ import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.planner.assertions.PlanMatchPattern;
+import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.planPrinter.PlanPrinter;
@@ -38,21 +39,23 @@ import static org.testng.Assert.fail;
 public class RuleAssert
 {
     private final Metadata metadata;
-    private final CostCalculator costCalculator;
+    private final LegacyCostCalculator costCalculator;
     private final Session session;
     private final Rule rule;
 
     private final PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
+    private final Lookup lookup;
 
     private Map<Symbol, Type> symbols;
     private PlanNode plan;
 
-    public RuleAssert(Metadata metadata, CostCalculator costCalculator, Session session, Rule rule)
+    public RuleAssert(Metadata metadata, LegacyCostCalculator costCalculator, Lookup lookup, Session session, Rule rule)
     {
         this.metadata = metadata;
         this.costCalculator = costCalculator;
         this.session = session;
         this.rule = rule;
+        this.lookup = lookup;
     }
 
     public RuleAssert on(Function<PlanBuilder, PlanNode> planProvider)
@@ -68,7 +71,7 @@ public class RuleAssert
     public void doesNotFire()
     {
         SymbolAllocator symbolAllocator = new SymbolAllocator(symbols);
-        Optional<PlanNode> result = rule.apply(plan, x -> x, idAllocator, symbolAllocator);
+        Optional<PlanNode> result = rule.apply(plan, lookup, idAllocator, symbolAllocator);
 
         if (result.isPresent()) {
             fail(String.format(
@@ -81,7 +84,7 @@ public class RuleAssert
     public void matches(PlanMatchPattern pattern)
     {
         SymbolAllocator symbolAllocator = new SymbolAllocator(symbols);
-        Optional<PlanNode> result = rule.apply(plan, x -> x, idAllocator, symbolAllocator);
+        Optional<PlanNode> result = rule.apply(plan, lookup, idAllocator, symbolAllocator);
         Map<Symbol, Type> types = symbolAllocator.getTypes();
 
         if (!result.isPresent()) {

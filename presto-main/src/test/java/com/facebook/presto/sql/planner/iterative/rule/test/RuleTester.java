@@ -14,8 +14,10 @@
 package com.facebook.presto.sql.planner.iterative.rule.test;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.CoefficientBasedCostCalculator;
+import com.facebook.presto.cost.LegacyCostCalculator;
 import com.facebook.presto.metadata.Metadata;
+import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.testing.LocalQueryRunner;
 import com.facebook.presto.tpch.TpchConnectorFactory;
@@ -26,9 +28,10 @@ import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 public class RuleTester
 {
     private final Metadata metadata;
-    private final CostCalculator costCalculator;
+    private final LegacyCostCalculator costCalculator;
     private final Session session;
     private final LocalQueryRunner queryRunner;
+    private final Lookup lookup;
 
     public RuleTester()
     {
@@ -45,10 +48,11 @@ public class RuleTester
 
         this.metadata = queryRunner.getMetadata();
         this.costCalculator = queryRunner.getCostCalculator();
+        this.lookup = new TestingLookup(new CoefficientBasedCostCalculator(queryRunner.getMetadata()), ImmutableMap.of());
     }
 
     public RuleAssert assertThat(Rule rule)
     {
-        return new RuleAssert(metadata, costCalculator, session, rule);
+        return new RuleAssert(metadata, costCalculator, lookup, session, rule);
     }
 }

@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.planner.iterative;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.CoefficientBasedCostCalculator;
 import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.StatsRecorder;
@@ -70,7 +71,7 @@ public class TestIterativeOptimizer
     @Test(timeOut = 1000)
     public void optimizerTimeoutsOnNonConvergingPlan()
     {
-        PlanOptimizer optimizer = new IterativeOptimizer(new StatsRecorder(), ImmutableSet.of(new NonConvergingRule()));
+        PlanOptimizer optimizer = new IterativeOptimizer(new StatsRecorder(), new CoefficientBasedCostCalculator(queryRunner.getMetadata()), ImmutableSet.of(new NonConvergingRule()));
 
         try {
             queryRunner.inTransaction(transactionSession -> {

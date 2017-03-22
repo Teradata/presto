@@ -15,7 +15,7 @@ package com.facebook.presto.tests;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.connector.ConnectorId;
-import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.LegacyCostCalculator;
 import com.facebook.presto.execution.QueryInfo;
 import com.facebook.presto.execution.QueryManager;
 import com.facebook.presto.execution.QueryPlan;
@@ -229,7 +229,7 @@ public class DistributedQueryRunner
     }
 
     @Override
-    public CostCalculator getCostCalculator()
+    public LegacyCostCalculator getCostCalculator()
     {
         return coordinator.getCostCalculator();
     }

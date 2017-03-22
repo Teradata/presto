@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.operator;
 
-import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.LegacyCostCalculator;
 import com.facebook.presto.execution.QueryInfo;
 import com.facebook.presto.execution.QueryPerformanceFetcher;
 import com.facebook.presto.execution.StageId;
@@ -45,10 +45,10 @@ public class ExplainAnalyzeOperator
         private final PlanNodeId planNodeId;
         private final QueryPerformanceFetcher queryPerformanceFetcher;
         private final Metadata metadata;
-        private final CostCalculator costCalculator;
+        private final LegacyCostCalculator costCalculator;
         private boolean closed;
 
-        public ExplainAnalyzeOperatorFactory(int operatorId, PlanNodeId planNodeId, QueryPerformanceFetcher queryPerformanceFetcher, Metadata metadata, CostCalculator costCalculator)
+        public ExplainAnalyzeOperatorFactory(int operatorId, PlanNodeId planNodeId, QueryPerformanceFetcher queryPerformanceFetcher, Metadata metadata, LegacyCostCalculator costCalculator)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -87,11 +87,11 @@ public class ExplainAnalyzeOperator
     private final OperatorContext operatorContext;
     private final QueryPerformanceFetcher queryPerformanceFetcher;
     private final Metadata metadata;
-    private final CostCalculator costCalculator;
+    private final LegacyCostCalculator costCalculator;
     private boolean finishing;
     private boolean outputConsumed;
 
-    public ExplainAnalyzeOperator(OperatorContext operatorContext, QueryPerformanceFetcher queryPerformanceFetcher, Metadata metadata, CostCalculator costCalculator)
+    public ExplainAnalyzeOperator(OperatorContext operatorContext, QueryPerformanceFetcher queryPerformanceFetcher, Metadata metadata, LegacyCostCalculator costCalculator)
     {
         this.operatorContext = requireNonNull(operatorContext, "operatorContext is null");
         this.queryPerformanceFetcher = requireNonNull(queryPerformanceFetcher, "queryPerformanceFetcher is null");
