@@ -1,0 +1,6 @@
+version: '2'
+services:
+
+  presto-master:
+    image: 'teradatalabs/mapr-client:${DOCKER_IMAGES_VERSION}'
+    command: /docker/volumes/conf/docker/singlenode-mapr/mapr-presto-launcher-wrapper.sh
