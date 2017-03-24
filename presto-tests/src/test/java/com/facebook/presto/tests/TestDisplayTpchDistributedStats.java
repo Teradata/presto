@@ -36,8 +36,6 @@ import static java.util.stream.Collectors.groupingBy;
 public class TestDisplayTpchDistributedStats
         extends AbstractTestDistributedStats
 {
-    public static final int NUMBER_OF_TPCH_QUERIES = 22;
-
     public TestDisplayTpchDistributedStats()
             throws Exception
     {}

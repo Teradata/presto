@@ -34,6 +34,8 @@ import static java.util.Collections.emptyMap;
 
 public class AbstractTestDistributedStats
 {
+    public static final int NUMBER_OF_TPCH_QUERIES = 22;
+
     private final DistributedQueryRunner runner;
 
     public AbstractTestDistributedStats()
