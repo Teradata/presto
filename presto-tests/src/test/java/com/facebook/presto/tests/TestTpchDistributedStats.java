@@ -88,7 +88,7 @@ public class TestTpchDistributedStats
     @Test
     void testEnforceSingleRow()
     {
-        String query = "SELECT (SELECT max(n_regionkey) FROM nation)";
+        String query = "SELECT (SELECT n_regionkey FROM nation WHERE n_name = 'Germany')";
         MetricComparison metricComparison = compareMetric(query);
         assertEquals(metricComparison.result(), MATCH);
     }
