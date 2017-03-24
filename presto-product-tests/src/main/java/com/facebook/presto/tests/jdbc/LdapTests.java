@@ -65,8 +65,8 @@ public class LdapTests
             "[Teradata][Presto](100140) SSL certificate error: Keystore was tampered with, or password was incorrect.";
     private static final String INVALID_CREDENTIALS_ERROR =
             "[Teradata][Presto](100240) Authentication failed: Invalid credentials.";
-    private static final String MALFORMED_CREDENTIALS_ERROR =
-            "[Teradata][Presto](100240) Authentication failed: Malformed decoded credentials.";
+    private static final String UNKNOWN_REASON_ERROR =
+            "[Teradata][Presto](100240) Authentication failed: Unknown reason.";
     private static final String UNAUTHORIZED_USER_ERROR =
             "[Teradata][Presto](100240) Authentication failed: Unauthorized user.";
     private static final String INVALID_SSL_PROPERTY =
@@ -160,14 +160,14 @@ public class LdapTests
     public void shouldFailQueryForEmptyUser()
             throws IOException, InterruptedException
     {
-        expectQueryToFail("", ldapUserPassword, MALFORMED_CREDENTIALS_ERROR);
+        expectQueryToFail("", ldapUserPassword, UNKNOWN_REASON_ERROR);
     }
 
     @Test(groups = {LDAP, SIMBA_JDBC, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
     public void shouldFailQueryForLdapWithoutPassword()
             throws IOException, InterruptedException
     {
-        expectQueryToFail(ldapUserName, "", MALFORMED_CREDENTIALS_ERROR);
+        expectQueryToFail(ldapUserName, "", UNKNOWN_REASON_ERROR);
     }
 
     @Test(groups = {LDAP, SIMBA_JDBC, PROFILE_SPECIFIC_TESTS}, timeOut = TIMEOUT)
@@ -203,7 +203,7 @@ public class LdapTests
     public void shouldFailForUserWithColon()
            throws SQLException, InterruptedException
     {
-        expectQueryToFail("UserWith:Colon", ldapUserPassword, MALFORMED_CREDENTIALS_ERROR);
+        expectQueryToFail("UserWith:Colon", ldapUserPassword, INVALID_CREDENTIALS_ERROR);
     }
 
     private void expectQueryToFailForUserNotInGroup(String user)
