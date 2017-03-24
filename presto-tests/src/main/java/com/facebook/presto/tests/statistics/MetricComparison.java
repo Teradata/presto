@@ -66,6 +66,11 @@ public class MetricComparison
                 .orElse(NO_ESTIMATE);
     }
 
+    public Optional<Double> getEstimate()
+    {
+        return estimatedCost;
+    }
+
     private String print(Optional<Double> cost)
     {
         return cost.map(Object::toString).orElse("UNKNOWN");

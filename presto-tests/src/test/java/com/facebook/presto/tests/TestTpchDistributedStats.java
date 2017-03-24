@@ -13,144 +13,126 @@
  */
 package com.facebook.presto.tests;
 
-import com.facebook.presto.execution.QueryPlan;
-import com.facebook.presto.execution.StageInfo;
-import com.facebook.presto.spi.QueryId;
-import com.facebook.presto.sql.planner.optimizations.PlanNodeSearcher;
-import com.facebook.presto.sql.planner.plan.PlanNode;
-import com.facebook.presto.tests.statistics.Metric;
-import com.facebook.presto.tests.statistics.MetricComparator;
 import com.facebook.presto.tests.statistics.MetricComparison;
-import com.facebook.presto.tpch.ColumnNaming;
-import com.google.common.base.Throwables;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.io.Resources;
 import org.testng.annotations.Test;
-
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.IntStream;
 
 import static com.facebook.presto.tests.statistics.MetricComparison.Result.DIFFER;
 import static com.facebook.presto.tests.statistics.MetricComparison.Result.MATCH;
-import static com.facebook.presto.tests.statistics.MetricComparison.Result.NO_BASELINE;
 import static com.facebook.presto.tests.statistics.MetricComparison.Result.NO_ESTIMATE;
-import static com.facebook.presto.tests.tpch.TpchQueryRunner.createQueryRunnerWithoutCatalogs;
-import static java.lang.String.format;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
-import static java.util.stream.Collectors.groupingBy;
 import static org.testng.Assert.assertEquals;
 
 public class TestTpchDistributedStats
+        extends AbstractTestDistributedStats
 {
-    public static final int NUMBER_OF_TPCH_QUERIES = 22;
-
-    DistributedQueryRunner runner;
-
     public TestTpchDistributedStats()
             throws Exception
+    {}
+
+    @Test
+    void testTableScanStats()
     {
-        runner = createQueryRunnerWithoutCatalogs(emptyMap(), emptyMap());
-        runner.createCatalog("tpch", "tpch", ImmutableMap.of(
-                "tpch.column-naming", ColumnNaming.STANDARD.name()
-        ));
+        assertEquals(compareMetric("SELECT * FROM nation").result(), MATCH);
+        assertEquals(compareMetric("SELECT * FROM part").result(), MATCH);
+        assertEquals(compareMetric("SELECT * FROM partsupp").result(), MATCH);
+        assertEquals(compareMetric("SELECT * FROM region").result(), MATCH);
+        assertEquals(compareMetric("SELECT * FROM supplier").result(), MATCH);
+        assertEquals(compareMetric("SELECT * FROM lineitem").result(), MATCH);
+        assertEquals(compareMetric("SELECT * FROM lineitem").result(), MATCH);
     }
 
     @Test
-    void testEstimateForSimpleQuery()
+    void testFilter()
     {
-        String queryId = executeQuery("SELECT * FROM NATION");
-
-        QueryPlan queryPlan = getQueryPlan(queryId);
-
-        MetricComparison rootOutputRowCountComparison = getRootOutputRowCountComparison(queryId, queryPlan);
-        assertEquals(rootOutputRowCountComparison.result(), MATCH);
+        String query = "" +
+                "SELECT * " +
+                "FROM lineitem " +
+                "WHERE l_shipdate <= DATE '1998-12-01' - INTERVAL '90' DAY";
+        MetricComparison metricComparison = compareMetric(query);
+        assertEquals(metricComparison.result(), DIFFER);
+        assertEquals(metricComparison.getEstimate().get(), 30000, 1);
     }
 
-    private MetricComparison getRootOutputRowCountComparison(String queryId, QueryPlan queryPlan)
-    {
-        List<MetricComparison> comparisons = new MetricComparator().getMetricComparisons(queryPlan, getOutputStageInfo(queryId));
-        return comparisons.stream()
-                .filter(comparison -> comparison.getMetric().equals(Metric.OUTPUT_ROW_COUNT))
-                .filter(comparison -> comparison.getPlanNode().equals(queryPlan.getPlan().getRoot()))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("No comparison for root node found"));
-    }
-
-    /**
-     * This is a development tool for manual inspection of differences between
-     * cost estimates and actual execution costs. Its outputs need to be inspected
-     * manually because at this point no sensible assertions can be formulated
-     * for the entirety of TPCH queries.
-     */
     @Test
-    void testCostEstimatesVsRealityDifferences()
+    void testJoin()
     {
-        IntStream.rangeClosed(1, NUMBER_OF_TPCH_QUERIES)
-                .filter(i -> i != 15) //query 15 creates a view, which TPCH connector does not support.
-                .forEach(i -> summarizeQuery(i, getTpchQuery(i)));
+        String query = "SELECT * FROM  part, partsupp WHERE p_partkey = ps_partkey";
+        MetricComparison metricComparison = compareMetric(query);
+        assertEquals(metricComparison.result(), DIFFER);
+        assertEquals(metricComparison.getEstimate().get(), 16000, 1);
     }
 
-    private String getTpchQuery(int i)
+    @Test
+    void testUnion()
     {
-        try {
-            String queryClassPath = "/io/airlift/tpch/queries/q" + i + ".sql";
-            return Resources.toString(getClass().getResource(queryClassPath), Charset.defaultCharset());
-        }
-        catch (IOException e) {
-            throw Throwables.propagate(e);
-        }
+        String query = "SELECT * FROM nation UNION SELECT * FROM nation";
+        MetricComparison metricComparison = compareMetric(query);
+        assertEquals(metricComparison.result(), NO_ESTIMATE);
     }
 
-    private QueryPlan getQueryPlan(String queryId)
+    @Test
+    void testIntersect()
     {
-        return runner.getQueryPlan(new QueryId(queryId));
+        String query = "SELECT * FROM nation INTERSECT SELECT * FROM nation";
+        MetricComparison metricComparison = compareMetric(query);
+        assertEquals(metricComparison.result(), NO_ESTIMATE);
     }
 
-    private void summarizeQuery(int queryNumber, String query)
+    @Test
+    void testExcept()
     {
-        String queryId = executeQuery(query);
-        QueryPlan queryPlan = getQueryPlan(queryId);
-
-        List<PlanNode> allPlanNodes = new PlanNodeSearcher(queryPlan.getPlan().getRoot()).findAll();
-
-        System.out.println(format("Query TPCH [%s] produces [%s] plan nodes.\n", queryNumber, allPlanNodes.size()));
-
-        List<MetricComparison> comparisons = new MetricComparator().getMetricComparisons(queryPlan, getOutputStageInfo(queryId));
-
-        Map<Metric, Map<MetricComparison.Result, List<MetricComparison>>> metricSummaries =
-                comparisons.stream()
-                        .collect(groupingBy(MetricComparison::getMetric, groupingBy(MetricComparison::result)));
-
-        metricSummaries.forEach((metricName, resultSummaries) -> {
-            System.out.println(format("Summary for metric [%s]", metricName));
-            outputSummary(resultSummaries, NO_ESTIMATE);
-            outputSummary(resultSummaries, NO_BASELINE);
-            outputSummary(resultSummaries, DIFFER);
-            outputSummary(resultSummaries, MATCH);
-            System.out.println();
-        });
-
-        System.out.println("Detailed results:\n");
-
-        comparisons.forEach(System.out::println);
+        String query = "SELECT * FROM nation EXCEPT SELECT * FROM nation";
+        MetricComparison metricComparison = compareMetric(query);
+        assertEquals(metricComparison.result(), NO_ESTIMATE);
     }
 
-    private String executeQuery(String query)
+    @Test
+    void testEnforceSingleRow()
     {
-        return runner.executeWithQueryId(runner.getDefaultSession(), query).getQueryId();
+        String query = "SELECT (SELECT n_regionkey FROM nation WHERE n_name = 'Germany')";
+        MetricComparison metricComparison = compareMetric(query);
+        assertEquals(metricComparison.result(), MATCH);
     }
 
-    private StageInfo getOutputStageInfo(String queryId)
+    @Test
+    void testValues()
     {
-        return runner.getQueryInfo(new QueryId(queryId)).getOutputStage().get();
+        String query = "VALUES 1";
+        MetricComparison metricComparison = compareMetric(query);
+        assertEquals(metricComparison.result(), MATCH);
     }
 
-    private void outputSummary(Map<MetricComparison.Result, List<MetricComparison>> resultSummaries, MetricComparison.Result result)
+    @Test
+    void testSemiJoin()
     {
-        System.out.println(format("[%s]\t-\t[%s]", result, resultSummaries.getOrDefault(result, emptyList()).size()));
+        String query = "SELECT * FROM nation WHERE n_regionkey IN (SELECT r_regionkey FROM region)";
+        MetricComparison metricComparison = compareMetric(query);
+        assertEquals(metricComparison.result(), MATCH);
+    }
+
+    @Test
+    void testUselessLimit()
+    {
+        String query = "SELECT * FROM nation LIMIT 30";
+        MetricComparison metricComparison = compareMetric(query);
+        assertEquals(metricComparison.result(), MATCH);
+    }
+
+    @Test
+    void testLimit()
+    {
+        String query = "SELECT * FROM nation LIMIT 10";
+        MetricComparison metricComparison = compareMetric(query);
+        assertEquals(metricComparison.result(), MATCH);
+        assertEquals(metricComparison.getEstimate().get(), 10, 1);
+    }
+
+    @Test
+    void testGroupBy()
+    {
+        String query = "" +
+                "SELECT l_returnflag, l_linestatus " +
+                "FROM lineitem " +
+                "GROUP BY l_returnflag, l_linestatus";
+        assertEquals(compareMetric(query).result(), NO_ESTIMATE);
     }
 }
