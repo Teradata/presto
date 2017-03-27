@@ -24,7 +24,6 @@ import com.facebook.presto.connector.ConnectorManager;
 import com.facebook.presto.connector.system.SystemConnectorModule;
 import com.facebook.presto.cost.CoefficientBasedCostCalculator;
 import com.facebook.presto.cost.CostCalculator;
-import com.facebook.presto.cost.LegacyCostCalculator;
 import com.facebook.presto.event.query.QueryMonitor;
 import com.facebook.presto.event.query.QueryMonitorConfig;
 import com.facebook.presto.execution.LocationFactory;
@@ -110,6 +109,8 @@ import com.facebook.presto.sql.planner.CompilerConfig;
 import com.facebook.presto.sql.planner.LocalExecutionPlanner;
 import com.facebook.presto.sql.planner.NodePartitioningManager;
 import com.facebook.presto.sql.planner.PlanOptimizers;
+import com.facebook.presto.sql.planner.iterative.Lookup;
+import com.facebook.presto.sql.planner.iterative.StatelessLookup;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.transaction.ForTransactionManager;
@@ -178,10 +179,10 @@ public class ServerMainModule
 
         if (serverConfig.isCoordinator()) {
             install(new CoordinatorModule());
-            binder.bind(new TypeLiteral<Optional<QueryPerformanceFetcher>>(){}).toProvider(QueryPerformanceFetcherProvider.class).in(Scopes.SINGLETON);
+            binder.bind(new TypeLiteral<Optional<QueryPerformanceFetcher>>() {}).toProvider(QueryPerformanceFetcherProvider.class).in(Scopes.SINGLETON);
         }
         else {
-            binder.bind(new TypeLiteral<Optional<QueryPerformanceFetcher>>(){}).toInstance(Optional.empty());
+            binder.bind(new TypeLiteral<Optional<QueryPerformanceFetcher>>() {}).toInstance(Optional.empty());
             // Install no-op resource group manager on workers, since only coordinators manage resource groups.
             binder.bind(ResourceGroupManager.class).to(NoOpResourceGroupManager.class).in(Scopes.SINGLETON);
 
@@ -336,7 +337,7 @@ public class ServerMainModule
 
         // statistics calculator
         binder.bind(CostCalculator.class).to(CoefficientBasedCostCalculator.class).in(Scopes.SINGLETON);
-        binder.bind(LegacyCostCalculator.class).in(Scopes.SINGLETON);
+        binder.bind(Lookup.class).to(StatelessLookup.class).in(Scopes.SINGLETON);
 
         // type
         binder.bind(TypeRegistry.class).in(Scopes.SINGLETON);

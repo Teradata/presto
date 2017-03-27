@@ -15,7 +15,7 @@ package com.facebook.presto.sql.planner;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.SystemSessionProperties;
-import com.facebook.presto.cost.LegacyCostCalculator;
+import com.facebook.presto.cost.CostCalculator;
 import com.facebook.presto.execution.QueryPerformanceFetcher;
 import com.facebook.presto.execution.TaskManagerConfig;
 import com.facebook.presto.execution.buffer.OutputBuffer;
@@ -104,6 +104,7 @@ import com.facebook.presto.sql.gen.JoinFilterFunctionCompiler;
 import com.facebook.presto.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.Partitioning.ArgumentBinding;
+import com.facebook.presto.sql.planner.iterative.StatelessLookup;
 import com.facebook.presto.sql.planner.optimizations.IndexJoinOptimizer;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AssignUniqueId;
@@ -232,7 +233,7 @@ public class LocalExecutionPlanner
 
     private final Metadata metadata;
     private final SqlParser sqlParser;
-    private final LegacyCostCalculator costCalculator;
+    private final CostCalculator costCalculator;
 
     private final Optional<QueryPerformanceFetcher> queryPerformanceFetcher;
     private final PageSourceProvider pageSourceProvider;
@@ -257,7 +258,7 @@ public class LocalExecutionPlanner
     public LocalExecutionPlanner(
             Metadata metadata,
             SqlParser sqlParser,
-            LegacyCostCalculator costCalculator,
+            CostCalculator costCalculator,
             Optional<QueryPerformanceFetcher> queryPerformanceFetcher,
             PageSourceProvider pageSourceProvider,
             IndexManager indexManager,
@@ -606,7 +607,7 @@ public class LocalExecutionPlanner
             checkState(queryPerformanceFetcher.isPresent(), "ExplainAnalyze can only run on coordinator");
             PhysicalOperation source = node.getSource().accept(this, context);
 
-            OperatorFactory operatorFactory = new ExplainAnalyzeOperatorFactory(context.getNextOperatorId(), node.getId(), queryPerformanceFetcher.get(), metadata, costCalculator);
+            OperatorFactory operatorFactory = new ExplainAnalyzeOperatorFactory(context.getNextOperatorId(), node.getId(), queryPerformanceFetcher.get(), metadata, new StatelessLookup(costCalculator));
             return new PhysicalOperation(operatorFactory, makeLayout(node), source);
         }
 

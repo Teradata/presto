@@ -15,7 +15,6 @@ package com.facebook.presto.tests;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.CoefficientBasedCostCalculator;
-import com.facebook.presto.cost.LegacyCostCalculator;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.security.AccessDeniedException;
 import com.facebook.presto.spi.type.Type;
@@ -58,7 +57,6 @@ public abstract class AbstractTestQueryFramework
     private QueryRunner queryRunner;
     private H2QueryRunner h2QueryRunner;
     private SqlParser sqlParser;
-    private LegacyCostCalculator costCalculator;
 
     protected AbstractTestQueryFramework(QueryRunnerSupplier supplier)
     {
@@ -72,7 +70,6 @@ public abstract class AbstractTestQueryFramework
         queryRunner = queryRunnerSupplier.get();
         h2QueryRunner = new H2QueryRunner();
         sqlParser = new SqlParser();
-        costCalculator = new LegacyCostCalculator(new CoefficientBasedCostCalculator(queryRunner.getMetadata()));
     }
 
     @AfterClass(alwaysRun = true)
@@ -289,7 +286,7 @@ public abstract class AbstractTestQueryFramework
                 metadata,
                 queryRunner.getAccessControl(),
                 sqlParser,
-                costCalculator,
+                queryRunner.getLookup(),
                 ImmutableMap.of());
     }
 

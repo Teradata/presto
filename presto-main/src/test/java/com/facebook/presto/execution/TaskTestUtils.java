@@ -19,7 +19,6 @@ import com.facebook.presto.TaskSource;
 import com.facebook.presto.block.BlockEncodingManager;
 import com.facebook.presto.connector.ConnectorId;
 import com.facebook.presto.cost.CoefficientBasedCostCalculator;
-import com.facebook.presto.cost.LegacyCostCalculator;
 import com.facebook.presto.execution.TestSqlTaskManager.MockExchangeClientSupplier;
 import com.facebook.presto.execution.scheduler.LegacyNetworkTopology;
 import com.facebook.presto.execution.scheduler.NodeScheduler;
@@ -125,7 +124,7 @@ public final class TaskTestUtils
         return new LocalExecutionPlanner(
                 metadata,
                 new SqlParser(),
-                new LegacyCostCalculator(new CoefficientBasedCostCalculator(metadata)),
+                new CoefficientBasedCostCalculator(metadata),
                 Optional.empty(),
                 pageSourceManager,
                 new IndexManager(),
