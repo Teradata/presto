@@ -27,7 +27,6 @@ import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.plan.EnforceSingleRowNode;
 import com.facebook.presto.sql.planner.plan.ExchangeNode;
 import com.facebook.presto.sql.planner.plan.FilterNode;
-import com.facebook.presto.sql.planner.plan.GroupIdNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.LimitNode;
 import com.facebook.presto.sql.planner.plan.OutputNode;
@@ -95,13 +94,9 @@ public class CoefficientBasedCostCalculator
         @Override
         protected PlanNodeCost visitPlan(PlanNode node, List<PlanNodeCost> context)
         {
+            // TODO: Explicitly visit GroupIdNode and throw an IllegalArgumentException
+            // this can only be done once we get rid of the LegacyCostCalculator
             return UNKNOWN_COST;
-        }
-
-        @Override
-        public PlanNodeCost visitGroupId(GroupIdNode node, List<PlanNodeCost> context)
-        {
-            throw new IllegalArgumentException("GroupIdNode not resolved");
         }
 
         @Override
