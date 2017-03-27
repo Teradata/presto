@@ -28,14 +28,23 @@ public class SqlServerDataTypesTableDefinition
 {
     public static final RelationalTableDefinition SQLSERVER_ALL_TYPES;
 
+    public static final RelationalTableDefinition SQLSERVER_INSERT;
+
     private SqlServerDataTypesTableDefinition() {}
 
     private static final String ALL_TYPES_TABLE_NAME = "all_types";
+
+    private static final String INSERT_TABLE_NAME = "insert_table";
 
     private static final String ALL_TYPES_DDL =
             "CREATE TABLE %NAME% (bi bigint, si smallint, i int, ti tinyint, f float, r real," +
                     "c char(4), vc varchar(6), te text, nc nchar(5), nvc nvarchar(7), nt text," +
                     "d date, dt datetime, dt2 datetime2, sdt smalldatetime, pf30 float(30), pf22 float(22))";
+
+    private static final String INSERT_DDL =
+            "CREATE TABLE %NAME% (bi bigint, si smallint, i int, f float," +
+                    "c char(4), vc varchar(6), " +
+                    "pf30 float(30), d date) ";
 
     static {
         RelationalDataSource dataSource = () -> {
@@ -54,10 +63,19 @@ public class SqlServerDataTypesTableDefinition
                             null, null, null, null, null, null)
             ).iterator();
         };
+
         SQLSERVER_ALL_TYPES = RelationalTableDefinition.builder(ALL_TYPES_TABLE_NAME)
                 .withDatabase(CONNECTOR_NAME)
                 .setCreateTableDDLTemplate(ALL_TYPES_DDL)
                 .setDataSource(dataSource)
+                .build();
+
+        SQLSERVER_INSERT = RelationalTableDefinition.builder(INSERT_TABLE_NAME)
+                .withDatabase(CONNECTOR_NAME)
+                .setCreateTableDDLTemplate(INSERT_DDL)
+                .setDataSource(() ->
+                        ImmutableList.<List<Object>>of().iterator()
+                )
                 .build();
     }
 }
