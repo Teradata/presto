@@ -17,15 +17,23 @@ package com.facebook.presto.tests.statistics;
 import com.facebook.presto.execution.QueryPlan;
 import com.facebook.presto.execution.StageInfo;
 import com.facebook.presto.spi.QueryId;
+import com.facebook.presto.sql.planner.plan.OutputNode;
+import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.tests.DistributedQueryRunner;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import org.intellij.lang.annotations.Language;
 
 import java.util.List;
+import java.util.function.Predicate;
 
+import static com.facebook.presto.sql.planner.optimizations.Predicates.alwaysTrue;
 import static com.facebook.presto.tests.statistics.MetricComparison.Result.MATCH;
+import static com.facebook.presto.tests.statistics.MetricComparison.Result.NO_BASELINE;
+import static com.facebook.presto.tests.statistics.MetricComparison.Result.NO_ESTIMATE;
+import static com.facebook.presto.tests.statistics.MetricComparisonStrategies.defaultTolerance;
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 import static org.testng.Assert.assertEquals;
 
 public class StatisticsAssertion
@@ -53,19 +61,56 @@ public class StatisticsAssertion
 
     public static class Result
     {
-        private final List<MetricComparison> metricComparison;
+        public static final Predicate<PlanNode> IS_OUTPUT_NODE = OutputNode.class::isInstance;
 
-        public Result(List<MetricComparison> metricComparison)
+        private final List<MetricComparison> metricComparisons;
+
+        public Result(List<MetricComparison> metricComparisons)
         {
-            Preconditions.checkArgument(metricComparison.isEmpty(), "No metric ");
-            this.metricComparison = ImmutableList.copyOf(metricComparison);
+            checkArgument(!metricComparisons.isEmpty(), "No metric comparisons given");
+            this.metricComparisons = ImmutableList.copyOf(metricComparisons);
         }
 
-        public void matches()
+        public Result matches()
         {
-            metricComparison.stream()
-                    .map(MetricComparison::result)
-                    .forEach(result -> assertEquals(result, MATCH));
+            return match(alwaysTrue(), Metric.OUTPUT_ROW_COUNT, defaultTolerance());
+        }
+
+        public Result outputHas(Metric metric, MetricComparisonStrategy strategy)
+        {
+            return match(IS_OUTPUT_NODE, metric, strategy);
+        }
+
+        private Result match(Predicate<PlanNode> planNodeFilter, Metric metric, MetricComparisonStrategy strategy)
+        {
+            return testMetrics(planNodeFilter, metric, metricComparison -> metricComparison.result(strategy) == MATCH);
+        }
+
+        private Result testMetrics(Predicate<PlanNode> planNodeFilter, Metric metric, Predicate<MetricComparison> assertCondition)
+        {
+            List<MetricComparison> differingMetricComparisons = metricComparisons.stream()
+                    .filter(metricComparison -> metricComparison.getMetric() == metric)
+                    .filter(metricComparison -> planNodeFilter.test(metricComparison.getPlanNode()))
+                    .filter(assertCondition.negate())
+                    .collect(toList());
+
+            assertEquals(
+                    differingMetricComparisons.size(),
+                    0,
+                    String.format("Following metrics do not match: " + differingMetricComparisons));
+            return this;
+        }
+
+        public Result outputHasNoEstimate(Metric metric)
+        {
+            // TODO: remove passing strategy here
+            return testMetrics(IS_OUTPUT_NODE, metric, metricComparison -> metricComparison.result(defaultTolerance()) == NO_ESTIMATE);
+        }
+
+        public Result outputHasNoBaseline(Metric metric)
+        {
+            // TODO: remove passing strategy here
+            return testMetrics(IS_OUTPUT_NODE, metric, metricComparison -> metricComparison.result(defaultTolerance()) == NO_BASELINE);
         }
     }
 }

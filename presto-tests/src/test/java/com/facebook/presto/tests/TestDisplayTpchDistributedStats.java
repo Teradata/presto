@@ -32,6 +32,7 @@ import static com.facebook.presto.tests.statistics.MetricComparison.Result.DIFFE
 import static com.facebook.presto.tests.statistics.MetricComparison.Result.MATCH;
 import static com.facebook.presto.tests.statistics.MetricComparison.Result.NO_BASELINE;
 import static com.facebook.presto.tests.statistics.MetricComparison.Result.NO_ESTIMATE;
+import static com.facebook.presto.tests.statistics.MetricComparisonStrategies.defaultTolerance;
 import static com.facebook.presto.tests.tpch.TpchQueryRunner.createQueryRunnerWithoutCatalogs;
 import static java.lang.String.format;
 import static java.util.Collections.emptyList;
@@ -87,7 +88,7 @@ public class TestDisplayTpchDistributedStats
 
         Map<Metric, Map<MetricComparison.Result, List<MetricComparison>>> metricSummaries =
                 comparisons.stream()
-                        .collect(groupingBy(MetricComparison::getMetric, groupingBy(MetricComparison::result)));
+                        .collect(groupingBy(MetricComparison::getMetric, groupingBy((metricComparison) -> metricComparison.result(defaultTolerance()))));
 
         metricSummaries.forEach((metricName, resultSummaries) -> {
             System.out.println(format("Summary for metric [%s] contains [%s] metrics", metricName, resultSummaries.size()));
