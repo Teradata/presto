@@ -122,6 +122,8 @@ import com.facebook.presto.sql.planner.PlanFragmenter;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.PlanOptimizers;
 import com.facebook.presto.sql.planner.SubPlan;
+import com.facebook.presto.sql.planner.iterative.Lookup;
+import com.facebook.presto.sql.planner.iterative.StatelessLookup;
 import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
@@ -210,7 +212,6 @@ public class LocalQueryRunner
     private final PageSorter pageSorter;
     private final PageIndexerFactory pageIndexerFactory;
     private final MetadataManager metadata;
-    private final CostCalculator costCalculator;
     private final TestingAccessControlManager accessControl;
     private final SplitManager splitManager;
     private final BlockEncodingSerde blockEncodingSerde;
@@ -220,6 +221,8 @@ public class LocalQueryRunner
     private final PageSinkManager pageSinkManager;
     private final TransactionManager transactionManager;
     private final SpillerFactory spillerFactory;
+    private final CostCalculator costCalculator;
+    private final Lookup lookup;
 
     private final ExpressionCompiler expressionCompiler;
     private final JoinFilterFunctionCompiler joinFilterFunctionCompiler;
@@ -285,7 +288,6 @@ public class LocalQueryRunner
                 new SchemaPropertyManager(),
                 new TablePropertyManager(),
                 transactionManager);
-        this.costCalculator = new CoefficientBasedCostCalculator(metadata);
         this.accessControl = new TestingAccessControlManager(transactionManager);
         this.pageSourceManager = new PageSourceManager();
 
@@ -361,6 +363,8 @@ public class LocalQueryRunner
                 .build();
 
         this.spillerFactory = new BinarySpillerFactory(blockEncodingSerde, featuresConfig);
+        this.costCalculator = new CoefficientBasedCostCalculator(metadata);
+        this.lookup = new StatelessLookup(costCalculator);
     }
 
     public static LocalQueryRunner queryRunnerWithInitialTransaction(Session defaultSession)
@@ -399,12 +403,6 @@ public class LocalQueryRunner
     public Metadata getMetadata()
     {
         return metadata;
-    }
-
-    @Override
-    public CostCalculator getCostCalculator()
-    {
-        return costCalculator;
     }
 
     @Override
@@ -559,7 +557,7 @@ public class LocalQueryRunner
         Plan plan = createPlan(session, sql);
 
         if (printPlan) {
-            System.out.println(PlanPrinter.textLogicalPlan(plan.getRoot(), plan.getTypes(), metadata, costCalculator, session));
+            System.out.println(PlanPrinter.textLogicalPlan(plan.getRoot(), plan.getTypes(), metadata, lookup, session));
         }
 
         SubPlan subplan = PlanFragmenter.createSubPlans(session, metadata, plan);
@@ -663,7 +661,7 @@ public class LocalQueryRunner
         FeaturesConfig featuresConfig = new FeaturesConfig()
                 .setDistributedIndexJoinsEnabled(false)
                 .setOptimizeHashGeneration(true);
-        PlanOptimizers planOptimizers = new PlanOptimizers(metadata, sqlParser, featuresConfig, true, new MBeanExporter(new TestingMBeanServer()));
+        PlanOptimizers planOptimizers = new PlanOptimizers(metadata, sqlParser, featuresConfig, true, new MBeanExporter(new TestingMBeanServer()), new CoefficientBasedCostCalculator(metadata));
         return createPlan(session, sql, planOptimizers.get(), stage);
     }
 
@@ -692,7 +690,7 @@ public class LocalQueryRunner
                 metadata,
                 accessControl,
                 sqlParser,
-                costCalculator,
+                lookup,
                 dataDefinitionTask);
         Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(queryExplainer), parameters);
 
@@ -806,6 +804,11 @@ public class LocalQueryRunner
         if (node instanceof TableScanNode) {
             builder.add((TableScanNode) node);
         }
+    }
+
+    public Lookup getLookup()
+    {
+        return lookup;
     }
 
     private static class HashProjectionFunction

@@ -14,7 +14,6 @@
 package com.facebook.presto.sql.planner.iterative.rule.test;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.cost.CostCalculator;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Plan;
@@ -22,6 +21,7 @@ import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.planner.assertions.PlanMatchPattern;
+import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.planPrinter.PlanPrinter;
@@ -38,21 +38,21 @@ import static org.testng.Assert.fail;
 public class RuleAssert
 {
     private final Metadata metadata;
-    private final CostCalculator costCalculator;
     private final Session session;
     private final Rule rule;
 
     private final PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
+    private final Lookup lookup;
 
     private Map<Symbol, Type> symbols;
     private PlanNode plan;
 
-    public RuleAssert(Metadata metadata, CostCalculator costCalculator, Session session, Rule rule)
+    public RuleAssert(Metadata metadata, Lookup lookup, Session session, Rule rule)
     {
         this.metadata = metadata;
-        this.costCalculator = costCalculator;
         this.session = session;
         this.rule = rule;
+        this.lookup = lookup;
     }
 
     public RuleAssert on(Function<PlanBuilder, PlanNode> planProvider)
@@ -68,27 +68,27 @@ public class RuleAssert
     public void doesNotFire()
     {
         SymbolAllocator symbolAllocator = new SymbolAllocator(symbols);
-        Optional<PlanNode> result = rule.apply(plan, x -> x, idAllocator, symbolAllocator);
+        Optional<PlanNode> result = rule.apply(plan, lookup, idAllocator, symbolAllocator);
 
         if (result.isPresent()) {
             fail(String.format(
                     "Expected %s to not fire for:\n%s",
                     rule.getClass().getName(),
-                    PlanPrinter.textLogicalPlan(plan, symbolAllocator.getTypes(), metadata, costCalculator, session, 2)));
+                    PlanPrinter.textLogicalPlan(plan, symbolAllocator.getTypes(), metadata, lookup, session, 2)));
         }
     }
 
     public void matches(PlanMatchPattern pattern)
     {
         SymbolAllocator symbolAllocator = new SymbolAllocator(symbols);
-        Optional<PlanNode> result = rule.apply(plan, x -> x, idAllocator, symbolAllocator);
+        Optional<PlanNode> result = rule.apply(plan, lookup, idAllocator, symbolAllocator);
         Map<Symbol, Type> types = symbolAllocator.getTypes();
 
         if (!result.isPresent()) {
             fail(String.format(
                     "%s did not fire for:\n%s",
                     rule.getClass().getName(),
-                    PlanPrinter.textLogicalPlan(plan, types, metadata, costCalculator, session, 2)));
+                    PlanPrinter.textLogicalPlan(plan, types, metadata, lookup, session, 2)));
         }
 
         PlanNode actual = result.get();
@@ -97,7 +97,7 @@ public class RuleAssert
             fail(String.format(
                     "%s: rule fired but return the original plan:\n%s",
                     rule.getClass().getName(),
-                    PlanPrinter.textLogicalPlan(plan, types, metadata, costCalculator, session, 2)));
+                    PlanPrinter.textLogicalPlan(plan, types, metadata, lookup, session, 2)));
         }
 
         if (!ImmutableSet.copyOf(plan.getOutputSymbols()).equals(ImmutableSet.copyOf(actual.getOutputSymbols()))) {
@@ -110,6 +110,6 @@ public class RuleAssert
                     actual.getOutputSymbols()));
         }
 
-        assertPlan(session, metadata, costCalculator, new Plan(actual, types), pattern);
+        assertPlan(session, metadata, lookup, new Plan(actual, types), pattern);
     }
 }

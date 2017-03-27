@@ -44,10 +44,12 @@ import com.google.common.collect.Iterables;
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static com.facebook.presto.cost.PlanNodeCost.UNKNOWN_COST;
+import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 
 /**
  * Simple implementation of CostCalculator. It make many arbitrary decisions (e.g filtering selectivity, join matching).
@@ -71,16 +73,14 @@ public class CoefficientBasedCostCalculator
     }
 
     @Override
-    public Map<PlanNode, PlanNodeCost> calculateCostForPlan(Session session, Map<Symbol, Type> types, PlanNode planNode)
+    public PlanNodeCost calculateCostForNode(Session session, Map<Symbol, Type> types, PlanNode planNode, List<PlanNodeCost> childCosts)
     {
         Visitor visitor = new Visitor(session, types);
-        HashMap<PlanNode, PlanNodeCost> costMap = new HashMap<>();
-        planNode.accept(visitor, costMap);
-        return ImmutableMap.copyOf(costMap);
+        return planNode.accept(visitor, childCosts);
     }
 
     private class Visitor
-            extends PlanVisitor<Map<PlanNode, PlanNodeCost>, Void>
+            extends PlanVisitor<List<PlanNodeCost>, PlanNodeCost>
     {
         private final Session session;
         private final Map<Symbol, Type> types;
@@ -92,77 +92,60 @@ public class CoefficientBasedCostCalculator
         }
 
         @Override
-        protected Void visitPlan(PlanNode node, Map<PlanNode, PlanNodeCost> context)
+        protected PlanNodeCost visitPlan(PlanNode node, List<PlanNodeCost> context)
         {
-            visitChildren(node, context);
-            context.put(node, UNKNOWN_COST);
-            return null;
+            // TODO: Explicitly visit GroupIdNode and throw an IllegalArgumentException
+            // this can only be done once we get rid of the LegacyCostCalculator
+            return UNKNOWN_COST;
         }
 
         @Override
-        public Void visitOutput(OutputNode node, Map<PlanNode, PlanNodeCost> context)
+        public PlanNodeCost visitOutput(OutputNode node, List<PlanNodeCost> context)
         {
-            visitChildren(node, context);
-            context.put(node, context.get(node.getSource()));
-            return null;
-        }
-
-        private void visitChildren(PlanNode node, Map<PlanNode, PlanNodeCost> context)
-        {
-            for (PlanNode source : node.getSources()) {
-                source.accept(this, context);
-            }
+            return Iterables.getOnlyElement(context);
         }
 
         @Override
-        public Void visitFilter(FilterNode node, Map<PlanNode, PlanNodeCost> context)
+        public PlanNodeCost visitFilter(FilterNode node, List<PlanNodeCost> context)
         {
-            boolean fullyEnforced = false;
-            if (node.getSource() instanceof TableScanNode) {
-                 fullyEnforced = visitTableScan((TableScanNode) node.getSource(), context, node.getPredicate());
-            }
-            else {
-                visitChildren(node, context);
-            }
-
-            PlanNodeCost sourceCost = context.get(node.getSource());
-            final double filterCoefficient = fullyEnforced ? 1.0 : FILTER_COEFFICIENT;
-            PlanNodeCost filterCost = sourceCost
-                    .mapOutputRowCount(value -> value * filterCoefficient);
-            context.put(node, filterCost);
-            return null;
+            PlanNodeCost sourceCost = Iterables.getOnlyElement(context);
+            return sourceCost
+                    .mapOutputRowCount(value -> value * FILTER_COEFFICIENT);
         }
 
         @Override
-        public Void visitProject(ProjectNode node, Map<PlanNode, PlanNodeCost> context)
+        public PlanNodeCost visitProject(ProjectNode node, List<PlanNodeCost> context)
         {
-            return copySourceCost(node, context);
+            return Iterables.getOnlyElement(context);
         }
 
         @Override
-        public Void visitJoin(JoinNode node, Map<PlanNode, PlanNodeCost> context)
+        public PlanNodeCost visitJoin(JoinNode node, List<PlanNodeCost> context)
         {
-            visitChildren(node, context);
-            PlanNodeCost leftCost = context.get(node.getLeft());
-            PlanNodeCost rightCost = context.get(node.getRight());
+            checkSourceCostsCount(context, 2);
+            PlanNodeCost leftCost = context.get(0);
+            PlanNodeCost rightCost = context.get(1);
 
             PlanNodeCost.Builder joinCost = PlanNodeCost.builder();
             if (!leftCost.getOutputRowCount().isValueUnknown() && !rightCost.getOutputRowCount().isValueUnknown()) {
                 double joinOutputRowCount = Math.max(leftCost.getOutputRowCount().getValue(), rightCost.getOutputRowCount().getValue()) * JOIN_MATCHING_COEFFICIENT;
                 joinCost.setOutputRowCount(new Estimate(joinOutputRowCount));
             }
+            return joinCost.build();
+        }
 
-            context.put(node, joinCost.build());
-            return null;
+        private void checkSourceCostsCount(List<PlanNodeCost> sourceCosts, int expectedCount)
+        {
+            checkArgument(sourceCosts.size() == expectedCount, "expected %s source costs, but found %s", sourceCosts.size(), expectedCount);
         }
 
         @Override
-        public Void visitExchange(ExchangeNode node, Map<PlanNode, PlanNodeCost> context)
+        public PlanNodeCost visitExchange(ExchangeNode node, List<PlanNodeCost> context)
         {
-            visitChildren(node, context);
             Estimate exchangeOutputRowCount = new Estimate(0);
-            for (PlanNode child : node.getSources()) {
-                PlanNodeCost childCost = context.get(child);
+            checkSourceCostsCount(context, node.getSources().size());
+            for (int i = 0; i < node.getSources().size(); i++) {
+                PlanNodeCost childCost = context.get(i);
                 if (childCost.getOutputRowCount().isValueUnknown()) {
                     exchangeOutputRowCount = Estimate.unknownValue();
                 }
@@ -171,37 +154,21 @@ public class CoefficientBasedCostCalculator
                 }
             }
 
-            PlanNodeCost exchangeCost = PlanNodeCost.builder()
+            return PlanNodeCost.builder()
                     .setOutputRowCount(exchangeOutputRowCount)
                     .build();
-            context.put(node, exchangeCost);
-            return null;
         }
 
         @Override
-        public Void visitTableScan(TableScanNode node, Map<PlanNode, PlanNodeCost> context)
+        public PlanNodeCost visitTableScan(TableScanNode node, List<PlanNodeCost> context)
         {
-            visitTableScan(node, context, BooleanLiteral.TRUE_LITERAL);
-            return null;
-        }
-
-        /**
-         * Return true if whole predicate has been enforced
-         */
-        private boolean visitTableScan(TableScanNode node, Map<PlanNode, PlanNodeCost> context, Expression predicate)
-        {
-            boolean fullyEnforced = false;
-            // todo add mechanism to properly set fullEnforced flag.
-            // this requires extending metadata.getTableStatistic with return information on which part of passed constraind
-            // is enforced by table scan.
-            Constraint<ColumnHandle> constraint = getConstraint(node, predicate);
+            // TODO: handle getting constraints for filter above table scan
+            Constraint<ColumnHandle> constraint = getConstraint(node, BooleanLiteral.TRUE_LITERAL);
             PlanNodeCost.Builder tableScanCost = PlanNodeCost.builder();
 
             TableStatistics tableStatistics = metadata.getTableStatistics(session, node.getTable(), constraint);
             tableScanCost.setOutputRowCount(tableStatistics.getRowCount());
-
-            context.put(node, tableScanCost.build());
-            return fullyEnforced;
+            return tableScanCost.build();
         }
 
         private Constraint<ColumnHandle> getConstraint(TableScanNode node, Expression predicate)
@@ -220,42 +187,34 @@ public class CoefficientBasedCostCalculator
         }
 
         @Override
-        public Void visitValues(ValuesNode node, Map<PlanNode, PlanNodeCost> context)
+        public PlanNodeCost visitValues(ValuesNode node, List<PlanNodeCost> context)
         {
             Estimate valuesCount = new Estimate(node.getRows().size());
-            PlanNodeCost valuesCost = PlanNodeCost.builder()
+            return PlanNodeCost.builder()
                     .setOutputRowCount(valuesCount)
                     .build();
-            context.put(node, valuesCost);
-            return null;
         }
 
         @Override
-        public Void visitEnforceSingleRow(EnforceSingleRowNode node, Map<PlanNode, PlanNodeCost> context)
+        public PlanNodeCost visitEnforceSingleRow(EnforceSingleRowNode node, List<PlanNodeCost> context)
         {
-            visitChildren(node, context);
-            PlanNodeCost nodeCost = PlanNodeCost.builder()
+            return PlanNodeCost.builder()
                     .setOutputRowCount(new Estimate(1.0))
                     .build();
-            context.put(node, nodeCost);
-            return null;
         }
 
         @Override
-        public Void visitSemiJoin(SemiJoinNode node, Map<PlanNode, PlanNodeCost> context)
+        public PlanNodeCost visitSemiJoin(SemiJoinNode node, List<PlanNodeCost> context)
         {
-            visitChildren(node, context);
-            PlanNodeCost sourceStatitics = context.get(node.getSource());
-            PlanNodeCost semiJoinCost = sourceStatitics.mapOutputRowCount(rowCount -> rowCount * JOIN_MATCHING_COEFFICIENT);
-            context.put(node, semiJoinCost);
-            return null;
+            checkState(context.size() == 2, "must have exactly two child costs.");
+            PlanNodeCost sourceCost = context.get(0);
+            return sourceCost.mapOutputRowCount(rowCount -> rowCount * JOIN_MATCHING_COEFFICIENT);
         }
 
         @Override
-        public Void visitLimit(LimitNode node, Map<PlanNode, PlanNodeCost> context)
+        public PlanNodeCost visitLimit(LimitNode node, List<PlanNodeCost> context)
         {
-            visitChildren(node, context);
-            PlanNodeCost sourceCost = context.get(node.getSource());
+            PlanNodeCost sourceCost = Iterables.getOnlyElement(context);
             PlanNodeCost.Builder limitCost = PlanNodeCost.builder();
             if (sourceCost.getOutputRowCount().getValue() < node.getCount()) {
                 limitCost.setOutputRowCount(sourceCost.getOutputRowCount());
@@ -263,16 +222,7 @@ public class CoefficientBasedCostCalculator
             else {
                 limitCost.setOutputRowCount(new Estimate(node.getCount()));
             }
-            context.put(node, limitCost.build());
-            return null;
-        }
-
-        private Void copySourceCost(PlanNode node, Map<PlanNode, PlanNodeCost> context)
-        {
-            visitChildren(node, context);
-            PlanNode source = Iterables.getOnlyElement(node.getSources());
-            context.put(node, context.get(source));
-            return null;
+            return limitCost.build();
         }
     }
 }
