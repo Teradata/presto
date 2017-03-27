@@ -17,6 +17,7 @@ import com.facebook.presto.Session;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.inject.Inject;
 
@@ -26,10 +27,9 @@ import java.util.Map;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
 
 /**
- * Interface of cost calculator.
+ * Legacy cost calculator for existing code that uses the old CostCalculator API
  *
- * It's responsibility is to provide approximation of cost of execution of plan node.
- * Example implementations may be based on table statistics or data samples.
+ * New code should use the new costCalculator API through the Lookup.getCost() method
  */
 @Deprecated
 public class LegacyCostCalculator
@@ -53,13 +53,10 @@ public class LegacyCostCalculator
 
         private PlanNodeCost calculateCost(Session session, Map<Symbol, Type> types, PlanNode planNode)
         {
-                PlanNodeCost cost = costCalculator.calculateCostForNode(
-                        session,
-                        types,
-                        planNode,
-                        planNode.getSources().stream()
-                                .map(n -> calculateCost(session, types, n))
-                                .collect(toImmutableList()));
+            ImmutableList<PlanNodeCost> sourceCosts = planNode.getSources().stream()
+                    .map(node -> calculateCost(session, types, node))
+                    .collect(toImmutableList());
+            PlanNodeCost cost = costCalculator.calculateCostForNode(session, types, planNode, sourceCosts);
                 costs.put(planNode, cost);
 
                 return cost;

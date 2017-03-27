@@ -122,6 +122,7 @@ import com.facebook.presto.sql.planner.PlanFragmenter;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.PlanOptimizers;
 import com.facebook.presto.sql.planner.SubPlan;
+import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
@@ -220,6 +221,7 @@ public class LocalQueryRunner
     private final PageSinkManager pageSinkManager;
     private final TransactionManager transactionManager;
     private final SpillerFactory spillerFactory;
+    private final Lookup lookup;
 
     private final ExpressionCompiler expressionCompiler;
     private final JoinFilterFunctionCompiler joinFilterFunctionCompiler;
@@ -361,6 +363,7 @@ public class LocalQueryRunner
                 .build();
 
         this.spillerFactory = new BinarySpillerFactory(blockEncodingSerde, featuresConfig);
+        this.lookup = new TestingLookup(new CoefficientBasedCostCalculator(metadata));
     }
 
     public static LocalQueryRunner queryRunnerWithInitialTransaction(Session defaultSession)
@@ -806,6 +809,11 @@ public class LocalQueryRunner
         if (node instanceof TableScanNode) {
             builder.add((TableScanNode) node);
         }
+    }
+
+    public Lookup getLookup()
+    {
+        return lookup;
     }
 
     private static class HashProjectionFunction

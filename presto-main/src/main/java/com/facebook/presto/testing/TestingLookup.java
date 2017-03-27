@@ -12,7 +12,7 @@
  * limitations under the License.
  */
 
-package com.facebook.presto.sql.planner.iterative.rule.test;
+package com.facebook.presto.testing;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.CostCalculator;
@@ -22,6 +22,7 @@ import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 
+import java.util.HashMap;
 import java.util.Map;
 
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
@@ -32,10 +33,10 @@ public class TestingLookup
     private final CostCalculator costCalculator;
     private final Map<PlanNode, PlanNodeCost> costs;
 
-    public TestingLookup(CostCalculator costCalculator, Map<PlanNode, PlanNodeCost> costs)
+    public TestingLookup(CostCalculator costCalculator)
     {
         this.costCalculator = costCalculator;
-        this.costs = costs;
+        this.costs = new HashMap<>();
     }
 
     @Override
@@ -45,14 +46,14 @@ public class TestingLookup
     }
 
     @Override
-    public PlanNodeCost getCost(Session session, Map<Symbol, Type> types, PlanNode node)
+    public PlanNodeCost getCost(Session session, Map<Symbol, Type> types, PlanNode planNode)
     {
-        if (costs.containsKey(node)) {
-            return costs.get(node);
-        }
-
-        PlanNodeCost cost = costCalculator.calculateCostForNode(session, types, node, node.getSources().stream().map(n -> getCost(session, types, n)).collect(toImmutableList()));
-        costs.put(node, cost);
-        return cost;
+        return costs.computeIfAbsent(planNode, node -> costCalculator.calculateCostForNode(
+                session,
+                types,
+                node,
+                node.getSources().stream()
+                        .map(sourceNode -> getCost(session, types, sourceNode))
+                        .collect(toImmutableList())));
     }
 }

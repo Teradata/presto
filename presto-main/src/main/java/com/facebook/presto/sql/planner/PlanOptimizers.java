@@ -125,7 +125,8 @@ public class PlanOptimizers
                 new CanonicalizeExpressions(),
                 new IterativeOptimizer(
                         stats,
-                        costCalculator, ImmutableSet.<Rule>builder()
+                        costCalculator,
+                        ImmutableSet.<Rule>builder()
                                 .addAll(predicatePushDownRules)
                                 .addAll(ImmutableSet.of(
                                         new RemoveRedundantIdentityProjections(),
@@ -143,7 +144,7 @@ public class PlanOptimizers
                                         new PruneValuesColumns(),
                                         new PruneTableScanColumns()))
                                 .build()
-                ),
+                        ),
                 new IterativeOptimizer(
                         stats,
                         costCalculator,

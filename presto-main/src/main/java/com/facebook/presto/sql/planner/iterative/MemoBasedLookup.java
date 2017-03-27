@@ -49,19 +49,14 @@ public class MemoBasedLookup
     }
 
     @Override
-    public PlanNodeCost getCost(Session session, Map<Symbol, Type> types, PlanNode node)
+    public PlanNodeCost getCost(Session session, Map<Symbol, Type> types, PlanNode planNode)
     {
-        node = resolve(node);
-        if (costs.containsKey(node)) {
-            return costs.get(node);
-        }
-
-        return costCalculator.calculateCostForNode(
+        return costs.computeIfAbsent(resolve(planNode), node -> costCalculator.calculateCostForNode(
                 session,
                 types,
                 node,
                 node.getSources().stream()
-                        .map(n -> getCost(session, types, n))
-                        .collect(toImmutableList()));
+                        .map(sourceNode -> getCost(session, types, sourceNode))
+                        .collect(toImmutableList())));
     }
 }

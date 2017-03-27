@@ -27,6 +27,7 @@ import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.plan.EnforceSingleRowNode;
 import com.facebook.presto.sql.planner.plan.ExchangeNode;
 import com.facebook.presto.sql.planner.plan.FilterNode;
+import com.facebook.presto.sql.planner.plan.GroupIdNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.LimitNode;
 import com.facebook.presto.sql.planner.plan.OutputNode;
@@ -48,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 
 import static com.facebook.presto.cost.PlanNodeCost.UNKNOWN_COST;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
 /**
@@ -97,6 +99,12 @@ public class CoefficientBasedCostCalculator
         }
 
         @Override
+        public PlanNodeCost visitGroupId(GroupIdNode node, List<PlanNodeCost> context)
+        {
+            throw new IllegalArgumentException("GroupIdNode not resolved");
+        }
+
+        @Override
         public PlanNodeCost visitOutput(OutputNode node, List<PlanNodeCost> context)
         {
             return Iterables.getOnlyElement(context);
@@ -119,7 +127,7 @@ public class CoefficientBasedCostCalculator
         @Override
         public PlanNodeCost visitJoin(JoinNode node, List<PlanNodeCost> context)
         {
-            checkState(context.size() == 2);
+            checkSourceCostsCount(context, 2);
             PlanNodeCost leftCost = context.get(0);
             PlanNodeCost rightCost = context.get(1);
 
@@ -131,12 +139,17 @@ public class CoefficientBasedCostCalculator
             return joinCost.build();
         }
 
+        private void checkSourceCostsCount(List<PlanNodeCost> sourceCosts, int expectedCount)
+        {
+            checkArgument(sourceCosts.size() == expectedCount, "expected %s source costs, but found %s", sourceCosts.size(), expectedCount);
+        }
+
         @Override
         public PlanNodeCost visitExchange(ExchangeNode node, List<PlanNodeCost> context)
         {
             Estimate exchangeOutputRowCount = new Estimate(0);
+            checkSourceCostsCount(context, node.getSources().size());
             for (int i = 0; i < node.getSources().size(); i++) {
-                checkState(node.getSources().size() == context.size(), "There must be the same number of child costs as sources");
                 PlanNodeCost childCost = context.get(i);
                 if (childCost.getOutputRowCount().isValueUnknown()) {
                     exchangeOutputRowCount = Estimate.unknownValue();
@@ -154,6 +167,7 @@ public class CoefficientBasedCostCalculator
         @Override
         public PlanNodeCost visitTableScan(TableScanNode node, List<PlanNodeCost> context)
         {
+            // TODO: handle getting constraints for filter above table scan
             Constraint<ColumnHandle> constraint = getConstraint(node, BooleanLiteral.TRUE_LITERAL);
             PlanNodeCost.Builder tableScanCost = PlanNodeCost.builder();
 
