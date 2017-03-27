@@ -102,7 +102,6 @@ public class TestTpchDistributedStats
                 .outputHas(Metric.OUTPUT_ROW_COUNT, noError());
         statisticsAssertion.check("SELECT * FROM nation WHERE n_regionkey IN (SELECT r_regionkey FROM region WHERE r_regionkey % 3 = 0)")
                 .outputHas(Metric.OUTPUT_ROW_COUNT, absoluteError(Range.singleton(15.)));
-
     }
 
     @Test
