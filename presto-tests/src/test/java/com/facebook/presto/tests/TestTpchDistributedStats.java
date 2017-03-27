@@ -115,9 +115,7 @@ public class TestTpchDistributedStats
         String queryId = executeQuery(query);
         QueryPlan queryPlan = getQueryPlan(queryId);
 
-        List<PlanNode> allPlanNodes = new PlanNodeSearcher(queryPlan.getPlan().getRoot()).findAll();
-
-        System.out.println(format("Query TPCH [%s] produces [%s] plan nodes.\n", queryNumber, allPlanNodes.size()));
+        System.out.println(format("Query TPCH [%s].\n", queryNumber));
 
         List<MetricComparison> comparisons = new MetricComparator().getMetricComparisons(queryPlan, getOutputStageInfo(queryId));
 
@@ -126,7 +124,7 @@ public class TestTpchDistributedStats
                         .collect(groupingBy(MetricComparison::getMetric, groupingBy(MetricComparison::result)));
 
         metricSummaries.forEach((metricName, resultSummaries) -> {
-            System.out.println(format("Summary for metric [%s]", metricName));
+            System.out.println(format("Summary for metric [%s] contains [%s] metrics", metricName, resultSummaries.size()));
             outputSummary(resultSummaries, NO_ESTIMATE);
             outputSummary(resultSummaries, NO_BASELINE);
             outputSummary(resultSummaries, DIFFER);
