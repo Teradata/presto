@@ -26,6 +26,7 @@ import com.facebook.presto.sql.planner.PartitioningScheme;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.TestingTableHandle;
+import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
 import com.facebook.presto.sql.planner.plan.Assignments;
 import com.facebook.presto.sql.planner.plan.DeleteNode;
@@ -34,6 +35,7 @@ import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.LimitNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.facebook.presto.sql.planner.plan.SampleNode;
 import com.facebook.presto.sql.planner.plan.TableFinishNode;
@@ -69,8 +71,13 @@ public class PlanBuilder
 
     public ValuesNode values(Symbol... columns)
     {
+        return values(idAllocator.getNextId(), columns);
+    }
+
+    public ValuesNode values(PlanNodeId id, Symbol... columns)
+    {
         return new ValuesNode(
-                idAllocator.getNextId(),
+                id,
                 ImmutableList.copyOf(columns),
                 ImmutableList.of());
     }
@@ -161,6 +168,11 @@ public class PlanBuilder
     public JoinNode join(JoinNode.Type type, PlanNode left, PlanNode right, List<JoinNode.EquiJoinClause> criteria, List<Symbol> outputSymbols, Optional<Expression> filter)
     {
         return new JoinNode(idAllocator.getNextId(), type, left, right, criteria, outputSymbols, filter, Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
+    public JoinGraphNode joinGraph(List<PlanNode> sources, List<JoinNode.EquiJoinClause> criteria, List<Expression> filters)
+    {
+        return new JoinGraphNode(idAllocator.getNextId(), sources, criteria, filters);
     }
 
     public class ExchangeBuilder

@@ -14,7 +14,10 @@
 
 package com.facebook.presto.sql.planner.iterative.rule;
 
+import com.facebook.presto.sql.ExpressionUtils;
+import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
@@ -23,6 +26,8 @@ import com.facebook.presto.sql.tree.Expression;
 import com.google.common.collect.ImmutableList;
 
 import java.util.List;
+
+import static com.google.common.collect.Iterables.getOnlyElement;
 
 public class JoinGraphNode
         extends PlanNode
@@ -75,5 +80,14 @@ public class JoinGraphNode
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
         return new JoinGraphNode(getId(), newChildren, criteria, filters);
+    }
+
+    public PlanNode extractOnlySource(PlanNodeIdAllocator idAllocator)
+    {
+        PlanNode extracted = getOnlyElement(nodes);
+        if (!filters.isEmpty()) {
+            extracted = new FilterNode(idAllocator.getNextId(), extracted, ExpressionUtils.and(filters));
+        }
+        return extracted;
     }
 }
