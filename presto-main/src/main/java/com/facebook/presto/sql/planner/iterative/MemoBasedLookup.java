@@ -16,7 +16,9 @@ package com.facebook.presto.sql.planner.iterative;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.CostCalculator;
-import com.facebook.presto.cost.PlanNodeCost;
+import com.facebook.presto.cost.PlanNodeCostEstimate;
+import com.facebook.presto.cost.PlanNodeStatsEstimate;
+import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.plan.PlanNode;
@@ -24,19 +26,21 @@ import com.facebook.presto.sql.planner.plan.PlanNode;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
 public class MemoBasedLookup
         implements Lookup
 {
     private final Memo memo;
-    private final Map<PlanNode, PlanNodeCost> costs = new HashMap<>();
+    private final Map<PlanNode, PlanNodeStatsEstimate> stats = new HashMap<>();
+    private final Map<PlanNode, PlanNodeCostEstimate> costs = new HashMap<>();
+    private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
 
-    public MemoBasedLookup(Memo memo, CostCalculator costCalculator)
+    public MemoBasedLookup(Memo memo, StatsCalculator statsCalculator, CostCalculator costCalculator)
     {
         this.memo = memo;
+        this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
     }
 
@@ -49,15 +53,27 @@ public class MemoBasedLookup
         return node;
     }
 
+    // todo[LO] maybe lookup passed to stats cost calculator should be constrained so only
+    //          methods for obtaining traits and only for self/sources would work?
+
     @Override
-    public PlanNodeCost getCost(PlanNode planNode, Session session, Map<Symbol, Type> types)
+    public PlanNodeStatsEstimate getStats(PlanNode planNode, Session session, Map<Symbol, Type> types)
     {
-        return costs.computeIfAbsent(resolve(planNode), node -> costCalculator.calculateCost(
+        return stats.computeIfAbsent(resolve(planNode), node -> statsCalculator.calculateStats(
                 node,
-                node.getSources().stream()
-                        .map(sourceNode -> getCost(sourceNode, session, types))
-                        .collect(toImmutableList()),
+                this,
                 session,
                 types));
+    }
+
+    @Override
+    public PlanNodeCostEstimate getCumulativeCost(PlanNode planNode, Session session, Map<Symbol, Type> types)
+    {
+        return costs.computeIfAbsent(resolve(planNode), node -> costCalculator.calculateCumulativeCost(
+                node,
+                this,
+                session,
+                types
+        ));
     }
 }

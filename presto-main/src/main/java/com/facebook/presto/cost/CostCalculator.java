@@ -11,22 +11,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.presto.cost;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.google.inject.BindingAnnotation;
 
-import java.util.List;
+import javax.annotation.concurrent.ThreadSafe;
+
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.util.Map;
+
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Interface of cost calculator.
- * It's responsibility is to provide approximation of cost of execution of plan node.
- * Example implementations may be based on table statistics or data samples.
+ *
+ * Computes estimated cost of executing given PlanNode.
+ * Implementation may use lookup to compute needed traits for self/source nodes.
  */
+@ThreadSafe
 public interface CostCalculator
 {
-    PlanNodeCost calculateCost(PlanNode planNode, List<PlanNodeCost> sourceCosts, Session session, Map<Symbol, Type> types);
+    PlanNodeCostEstimate calculateCost(PlanNode planNode, Lookup lookup, Session session, Map<Symbol, Type> types);
+
+    default PlanNodeCostEstimate calculateCumulativeCost(PlanNode planNode, Lookup lookup, Session session, Map<Symbol, Type> types)
+    {
+        PlanNodeCostEstimate childrenCost = planNode.getSources().stream()
+                .map(child -> lookup.getCumulativeCost(child, session, types))
+                .reduce(PlanNodeCostEstimate.builder().build(), PlanNodeCostEstimate::add);
+
+        return calculateCost(planNode, lookup, session, types).add(childrenCost);
+    }
+
+    @BindingAnnotation @Target({PARAMETER}) @Retention(RUNTIME)
+    @interface EstimatedExchanges {
+    }
 }

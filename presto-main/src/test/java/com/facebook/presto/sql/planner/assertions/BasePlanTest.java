@@ -113,7 +113,7 @@ public class BasePlanTest
         List<PlanOptimizer> optimizers = ImmutableList.of(
                 new UnaliasSymbolReferences(),
                 new PruneUnreferencedOutputs(),
-                new IterativeOptimizer(new StatsRecorder(), queryRunner.getCostCalculator(), ImmutableSet.of(new RemoveRedundantIdentityProjections())));
+                new IterativeOptimizer(new StatsRecorder(), queryRunner.getStatsCalculator(), queryRunner.getEstimatedExchangesCostCalculator(), ImmutableSet.of(new RemoveRedundantIdentityProjections())));
         queryRunner.inTransaction(transactionSession -> {
             Plan actualPlan = queryRunner.createPlan(transactionSession, sql, optimizers, LogicalPlanner.Stage.OPTIMIZED);
             PlanAssert.assertPlan(transactionSession, queryRunner.getMetadata(), queryRunner.getLookup(), actualPlan, pattern);

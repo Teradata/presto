@@ -93,7 +93,7 @@ public class TestEliminateSorts
                 new AddExchanges(queryRunner.getMetadata(), new SqlParser()),
                 new PruneUnreferencedOutputs(),
                 new MergeProjections(),
-                new IterativeOptimizer(new StatsRecorder(), queryRunner.getCostCalculator(), ImmutableSet.of(new RemoveRedundantIdentityProjections()))
+                new IterativeOptimizer(new StatsRecorder(), queryRunner.getStatsCalculator(), queryRunner.getEstimatedExchangesCostCalculator(), ImmutableSet.of(new RemoveRedundantIdentityProjections()))
         );
 
         queryRunner.inTransaction(transactionSession -> {

@@ -16,7 +16,9 @@ package com.facebook.presto.testing;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.CostCalculator;
-import com.facebook.presto.cost.PlanNodeCost;
+import com.facebook.presto.cost.PlanNodeCostEstimate;
+import com.facebook.presto.cost.PlanNodeStatsEstimate;
+import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Lookup;
@@ -25,21 +27,28 @@ import com.facebook.presto.sql.planner.plan.PlanNode;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
 public class TestingLookup
         implements Lookup
 {
+    private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
-    private final Map<PlanNode, PlanNodeCost> costs = new HashMap<>();
+    private final Map<PlanNode, PlanNodeStatsEstimate> stats = new HashMap<>();
+    private final Map<PlanNode, PlanNodeCostEstimate> costs = new HashMap<>();
 
-    public TestingLookup(CostCalculator costCalculator)
+    public TestingLookup(StatsCalculator statsCalculator, CostCalculator costCalculator)
     {
+        this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
     }
 
-    public void setCost(PlanNode node, PlanNodeCost cost)
+    public void setStats(PlanNode node, PlanNodeStatsEstimate stats)
+    {
+        this.stats.put(node, stats);
+    }
+
+    public void setCost(PlanNode node, PlanNodeCostEstimate cost)
     {
         costs.put(node, cost);
     }
@@ -51,12 +60,23 @@ public class TestingLookup
     }
 
     @Override
-    public PlanNodeCost getCost(PlanNode planNode, Session session, Map<Symbol, Type> types)
+    public PlanNodeStatsEstimate getStats(PlanNode planNode, Session session, Map<Symbol, Type> types)
     {
-        return costs.computeIfAbsent(planNode, node -> costCalculator.calculateCost(
-                node, node.getSources().stream()
-                        .map(sourceNode -> getCost(sourceNode, session, types))
-                        .collect(toImmutableList()), session,
+        return stats.computeIfAbsent(planNode, node -> statsCalculator.calculateStats(
+                node,
+                this,
+                session,
                 types));
+    }
+
+    @Override
+    public PlanNodeCostEstimate getCumulativeCost(PlanNode planNode, Session session, Map<Symbol, Type> types)
+    {
+        return costs.computeIfAbsent(resolve(planNode), node -> costCalculator.calculateCumulativeCost(
+                node,
+                this,
+                session,
+                types
+        ));
     }
 }

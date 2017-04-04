@@ -15,13 +15,15 @@
 package com.facebook.presto.sql.planner.iterative.rule;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.cost.CostCalculator;
-import com.facebook.presto.cost.PlanNodeCost;
+import com.facebook.presto.cost.CostCalculatorUsingExchanges;
+import com.facebook.presto.cost.PlanNodeStatsEstimate;
+import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.spi.statistics.Estimate;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.GroupReference;
+import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Memo;
 import com.facebook.presto.sql.planner.iterative.MemoBasedLookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
@@ -59,7 +61,7 @@ public class TestMemoBasedLookup
         PlanNode plan = node(source);
         Memo memo = new Memo(idAllocator, plan);
 
-        MemoBasedLookup lookup = new MemoBasedLookup(memo, new NodeCountingCostCalculator());
+        MemoBasedLookup lookup = new MemoBasedLookup(memo, new NodeCountingStatsCalculator(), new CostCalculatorUsingExchanges(1));
         PlanNode memoSource = Iterables.getOnlyElement(memo.getNode(memo.getRootGroup()).getSources());
         checkState(memoSource instanceof GroupReference, "expected GroupReference");
         assertEquals(lookup.resolve(memoSource), source);
@@ -70,10 +72,10 @@ public class TestMemoBasedLookup
     {
         PlanNode plan = node(node(node()));
         Memo memo = new Memo(idAllocator, plan);
-        MemoBasedLookup lookup = new MemoBasedLookup(memo, new NodeCountingCostCalculator());
+        MemoBasedLookup lookup = new MemoBasedLookup(memo, new NodeCountingStatsCalculator(), new CostCalculatorUsingExchanges(1));
 
-        PlanNodeCost actualCost = lookup.getCost(memo.getNode(memo.getRootGroup()), queryRunner.getDefaultSession(), ImmutableMap.of());
-        PlanNodeCost expectedCost = PlanNodeCost.builder().setOutputRowCount(new Estimate(3)).build();
+        PlanNodeStatsEstimate actualCost = lookup.getStats(memo.getNode(memo.getRootGroup()), queryRunner.getDefaultSession(), ImmutableMap.of());
+        PlanNodeStatsEstimate expectedCost = PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(3)).build();
         assertEquals(actualCost, expectedCost);
     }
 
@@ -139,19 +141,20 @@ public class TestMemoBasedLookup
         }
     }
 
-    private static class NodeCountingCostCalculator
-            implements CostCalculator
+    private static class NodeCountingStatsCalculator
+            implements StatsCalculator
     {
         @Override
-        public PlanNodeCost calculateCost(PlanNode planNode, List<PlanNodeCost> sourceCosts, Session session, Map<Symbol, Type> types)
+        public PlanNodeStatsEstimate calculateStats(PlanNode planNode, Lookup lookup, Session session, Map<Symbol, Type> types)
         {
             double outputRows = 1;
-            for (PlanNodeCost sourceCost : sourceCosts) {
+            for (PlanNode source : planNode.getSources()) {
+                PlanNodeStatsEstimate sourceCost = lookup.getStats(source, session, types);
                 if (!sourceCost.getOutputRowCount().isValueUnknown()) {
                     outputRows += sourceCost.getOutputRowCount().getValue();
                 }
             }
-            return PlanNodeCost.builder()
+            return PlanNodeStatsEstimate.builder()
                     .setOutputRowCount(new Estimate(outputRows))
                     .build();
         }

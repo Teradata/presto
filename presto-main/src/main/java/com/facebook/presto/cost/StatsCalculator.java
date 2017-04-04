@@ -11,29 +11,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.sql.planner.iterative;
+package com.facebook.presto.cost;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.cost.PlanNodeCostEstimate;
-import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+
+import javax.annotation.concurrent.ThreadSafe;
 
 import java.util.Map;
 
-public interface Lookup
+/**
+ * Interface of stats calculator.
+ *
+ * Obtains estimated statistics for output produced by given PlanNode.
+ * Implementation may use lookup to compute needed traits for self/source nodes.
+ */
+@ThreadSafe
+public interface StatsCalculator
 {
-    /**
-     * Resolves a node by materializing GroupReference nodes
-     * representing symbolic references to other nodes.
-     *
-     * If the node is not a GroupReference, it returns the
-     * argument as is.
-     */
-    PlanNode resolve(PlanNode node);
-
-    PlanNodeStatsEstimate getStats(PlanNode node, Session session, Map<Symbol, Type> types);
-
-    PlanNodeCostEstimate getCumulativeCost(PlanNode node, Session session, Map<Symbol, Type> types);
+    PlanNodeStatsEstimate calculateStats(
+            PlanNode planNode,
+            Lookup lookup,
+            Session session,
+            Map<Symbol, Type> types);
 }

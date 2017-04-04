@@ -52,7 +52,7 @@ public class RuleTester
                 ImmutableMap.<String, String>of());
 
         this.metadata = queryRunner.getMetadata();
-        this.lookup = new TestingLookup(queryRunner.getCostCalculator());
+        this.lookup = new TestingLookup(queryRunner.getStatsCalculator(), queryRunner.getEstimatedExchangesCostCalculator());
         this.transactionManager = queryRunner.getTransactionManager();
         this.accessControl = queryRunner.getAccessControl();
     }

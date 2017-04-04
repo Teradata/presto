@@ -274,7 +274,8 @@ public class TestReorderWindows
         List<PlanOptimizer> optimizers = ImmutableList.of(
                 new UnaliasSymbolReferences(),
                 new IterativeOptimizer(new StatsRecorder(),
-                        queryRunner.getCostCalculator(),
+                        queryRunner.getStatsCalculator(),
+                        queryRunner.getEstimatedExchangesCostCalculator(),
                         ImmutableSet.of(
                                 new RemoveRedundantIdentityProjections(),
                                 new SwapAdjacentWindowsBySpecifications())),
