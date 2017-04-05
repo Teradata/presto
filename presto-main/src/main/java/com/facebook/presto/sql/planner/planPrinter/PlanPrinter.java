@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.planner.planPrinter;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.PlanNodeCostEstimate;
 import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.execution.StageInfo;
 import com.facebook.presto.execution.StageStats;
@@ -1210,13 +1211,26 @@ public class PlanPrinter
 
         private String formatCost(PlanNode node)
         {
-            PlanNodeStatsEstimate cost = lookup.getStats(node, session, types);
-            Estimate outputRowCount = cost.getOutputRowCount();
-            Estimate outputSizeInBytes = cost.getOutputSizeInBytes();
-            return String.format("{rows: %s, bytes: %s}",
+            PlanNodeStatsEstimate stats = lookup.getStats(node, session, types);
+            PlanNodeCostEstimate cost = lookup.getCumulativeCost(node, session, types);
+            Estimate outputRowCount = stats.getOutputRowCount();
+            return String.format("{rows: %s, bytes: %s, cpu: %s, memory: %s, network: %s}",
                     outputRowCount.isValueUnknown() ? "?" : String.valueOf((long) outputRowCount.getValue()),
-                    outputSizeInBytes.isValueUnknown() ? "?" : succinctBytes((long) outputSizeInBytes.getValue()));
+                    formatEstimateAsDataSize(stats.getOutputSizeInBytes()),
+                    formatEstimate(cost.getCpuCost()),
+                    formatEstimateAsDataSize(cost.getMemoryCost()),
+                    formatEstimate(cost.getNetworkCost()));
         }
+    }
+
+    private static String formatEstimate(Estimate value)
+    {
+        return value.isValueUnknown() ? "?" : String.valueOf(value.getValue());
+    }
+
+    private static String formatEstimateAsDataSize(Estimate value)
+    {
+        return value.isValueUnknown() ? "?" : succinctBytes((long) value.getValue()).toString();
     }
 
     private static String formatHash(Optional<Symbol>... hashes)
