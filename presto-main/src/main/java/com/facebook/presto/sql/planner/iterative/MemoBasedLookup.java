@@ -15,6 +15,8 @@
 package com.facebook.presto.sql.planner.iterative;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.PlanNodeCostEstimate;
 import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.spi.type.Type;
@@ -32,12 +34,15 @@ public class MemoBasedLookup
 {
     private final Memo memo;
     private final Map<PlanNode, PlanNodeStatsEstimate> stats = new HashMap<>();
+    private final Map<PlanNode, PlanNodeCostEstimate> costs = new HashMap<>();
     private final StatsCalculator statsCalculator;
+    private final CostCalculator costCalculator;
 
-    public MemoBasedLookup(Memo memo, StatsCalculator statsCalculator)
+    public MemoBasedLookup(Memo memo, StatsCalculator statsCalculator, CostCalculator costCalculator)
     {
         this.memo = memo;
         this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
+        this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
     }
 
     @Override
@@ -59,5 +64,15 @@ public class MemoBasedLookup
                         .collect(toImmutableList()),
                 session,
                 types));
+    }
+
+    @Override
+    public PlanNodeCostEstimate getCumulativeCost(Session session, Map<Symbol, Type> types, PlanNode planNode)
+    {
+        return costs.computeIfAbsent(resolve(planNode), node -> costCalculator.calculateCumulativeCost(
+                session,
+                types,
+                node,
+                this));
     }
 }

@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.planner.iterative;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.PlanNodeCostEstimate;
 import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
@@ -33,4 +34,6 @@ public interface Lookup
     PlanNode resolve(PlanNode node);
 
     PlanNodeStatsEstimate getStats(Session session, Map<Symbol, Type> types, PlanNode node);
+
+    PlanNodeCostEstimate getCumulativeCost(Session session, Map<Symbol, Type> types, PlanNode node);
 }
