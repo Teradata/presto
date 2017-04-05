@@ -24,6 +24,7 @@ import static java.util.Objects.requireNonNull;
 public class PlanNodeStatsEstimate
 {
     public static final PlanNodeStatsEstimate UNKNOWN_STATS = PlanNodeStatsEstimate.builder().build();
+    public static final double DEFAULT_ROW_SIZE = 42;
 
     private final Estimate outputRowCount;
     private final Estimate outputSizeInBytes;
@@ -110,6 +111,9 @@ public class PlanNodeStatsEstimate
 
         public PlanNodeStatsEstimate build()
         {
+            if (outputSizeInBytes.isValueUnknown() && !outputRowCount.isValueUnknown()) {
+                outputSizeInBytes = new Estimate(DEFAULT_ROW_SIZE * outputRowCount.getValue());
+            }
             return new PlanNodeStatsEstimate(outputRowCount, outputSizeInBytes);
         }
     }
