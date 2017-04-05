@@ -1843,18 +1843,18 @@ public abstract class AbstractTestQueries
     public void testGrouping()
             throws Exception
     {
-//        assertQuery(
-//            "SELECT a, b, sum(c), grouping(a, b) + grouping(a) " +
-//                    "FROM (VALUES" +
-//                    "      ('h', 'j', 11), " +
-//                    "      ('k', 'l', 7) " +
-//                    "      ) AS t (a, b, c) " +
-//                    "GROUP BY GROUPING SETS ( (a), (b)) " +
-//                    "ORDER BY grouping(b) ASC",
-//            "VALUES (NULL, 'j', 11, 3), " +
-//                    "(NULL, 'l', 7, 3), " +
-//                    "('h', NULL, 11, 1), " +
-//                    "('k', NULL, 7, 1)");
+        assertQuery(
+            "SELECT a, b, sum(c), grouping(a, b) + grouping(a) " +
+                    "FROM (VALUES" +
+                    "      ('h', 'j', 11), " +
+                    "      ('k', 'l', 7) " +
+                    "      ) AS t (a, b, c) " +
+                    "GROUP BY GROUPING SETS ( (a), (b)) " +
+                    "ORDER BY grouping(b) ASC",
+            "VALUES (NULL, 'j', 11, 3), " +
+                    "(NULL, 'l', 7, 3), " +
+                    "('h', NULL, 11, 1), " +
+                    "('k', NULL, 7, 1)");
 
         assertQuery(
             "SELECT a, b, sum(c), grouping(a, b) " +
