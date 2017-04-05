@@ -15,6 +15,7 @@
 package com.facebook.presto.sql.planner.iterative.rule;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.CostCalculatorUsingExchanges;
 import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.spi.statistics.Estimate;
@@ -59,7 +60,7 @@ public class TestMemoBasedLookup
         PlanNode plan = node(source);
         Memo memo = new Memo(idAllocator, plan);
 
-        MemoBasedLookup lookup = new MemoBasedLookup(memo, new NodeCountingStatsCalculator());
+        MemoBasedLookup lookup = new MemoBasedLookup(memo, new NodeCountingStatsCalculator(), new CostCalculatorUsingExchanges(1));
         PlanNode memoSource = Iterables.getOnlyElement(memo.getNode(memo.getRootGroup()).getSources());
         checkState(memoSource instanceof GroupReference, "expected GroupReference");
         assertEquals(lookup.resolve(memoSource), source);
@@ -70,7 +71,7 @@ public class TestMemoBasedLookup
     {
         PlanNode plan = node(node(node()));
         Memo memo = new Memo(idAllocator, plan);
-        MemoBasedLookup lookup = new MemoBasedLookup(memo, new NodeCountingStatsCalculator());
+        MemoBasedLookup lookup = new MemoBasedLookup(memo, new NodeCountingStatsCalculator(), new CostCalculatorUsingExchanges(1));
 
         PlanNodeStatsEstimate actualCost = lookup.getStats(queryRunner.getDefaultSession(), ImmutableMap.of(), memo.getNode(memo.getRootGroup()));
         PlanNodeStatsEstimate expectedCost = PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(3)).build();

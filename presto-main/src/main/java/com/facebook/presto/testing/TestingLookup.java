@@ -15,8 +15,10 @@
 package com.facebook.presto.testing;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.cost.StatsCalculator;
+import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.PlanNodeCostEstimate;
 import com.facebook.presto.cost.PlanNodeStatsEstimate;
+import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Lookup;
@@ -32,16 +34,24 @@ public class TestingLookup
         implements Lookup
 {
     private final StatsCalculator statsCalculator;
+    private final CostCalculator costCalculator;
     private final Map<PlanNode, PlanNodeStatsEstimate> stats = new HashMap<>();
+    private final Map<PlanNode, PlanNodeCostEstimate> costs = new HashMap<>();
 
-    public TestingLookup(StatsCalculator statsCalculator)
+    public TestingLookup(StatsCalculator statsCalculator, CostCalculator costCalculator)
     {
         this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
+        this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
     }
 
     public void setStats(PlanNode node, PlanNodeStatsEstimate stats)
     {
         this.stats.put(node, stats);
+    }
+
+    public void setCost(PlanNode node, PlanNodeCostEstimate cost)
+    {
+        costs.put(node, cost);
     }
 
     @Override
@@ -60,5 +70,15 @@ public class TestingLookup
                         .collect(toImmutableList()),
                 session,
                 types));
+    }
+
+    @Override
+    public PlanNodeCostEstimate getCumulativeCost(Session session, Map<Symbol, Type> types, PlanNode planNode)
+    {
+        return costs.computeIfAbsent(resolve(planNode), node -> costCalculator.calculateCumulativeCost(
+                session,
+                types,
+                node,
+                this));
     }
 }

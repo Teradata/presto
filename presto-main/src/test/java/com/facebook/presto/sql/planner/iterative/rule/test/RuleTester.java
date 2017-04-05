@@ -44,7 +44,7 @@ public class RuleTester
                 ImmutableMap.<String, String>of());
 
         this.metadata = queryRunner.getMetadata();
-        this.lookup = new TestingLookup(queryRunner.getStatsCalculator());
+        this.lookup = new TestingLookup(queryRunner.getStatsCalculator(), queryRunner.getEstimatedExchangesCostCalculator());
     }
 
     public RuleAssert assertThat(Rule rule)
