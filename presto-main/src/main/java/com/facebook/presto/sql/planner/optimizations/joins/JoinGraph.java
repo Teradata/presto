@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.planner.optimizations.joins;
 
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.iterative.GroupReference;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
@@ -35,6 +36,7 @@ import java.util.Optional;
 
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -232,7 +234,6 @@ public class JoinGraph
         {
             if (!shallow) {
                 for (PlanNode child : node.getSources()) {
-                    child = lookup.resolve(child);
                     JoinGraph graph = child.accept(this, context);
                     if (graph.size() < 2) {
                         continue;
@@ -250,7 +251,7 @@ public class JoinGraph
         @Override
         public JoinGraph visitFilter(FilterNode node, Context context)
         {
-            JoinGraph graph = lookup.resolve(node.getSource()).accept(this, context);
+            JoinGraph graph = node.getSource().accept(this, context);
             return graph.withFilter(node.getPredicate());
         }
 
@@ -262,8 +263,8 @@ public class JoinGraph
                 return visitPlan(node, context);
             }
 
-            JoinGraph left = lookup.resolve(node.getLeft()).accept(this, context);
-            JoinGraph right = lookup.resolve(node.getRight()).accept(this, context);
+            JoinGraph left = node.getLeft().accept(this, context);
+            JoinGraph right = node.getRight().accept(this, context);
 
             JoinGraph graph = left.joinWith(right, node.getCriteria(), context, node.getId());
 
@@ -277,10 +278,38 @@ public class JoinGraph
         public JoinGraph visitProject(ProjectNode node, Context context)
         {
             if (node.isIdentity()) {
-                JoinGraph graph = lookup.resolve(node.getSource()).accept(this, context);
+                JoinGraph graph = node.getSource().accept(this, context);
                 return graph.withAssignments(node.getAssignments().getMap());
             }
             return visitPlan(node, context);
+        }
+
+        @Override
+        public JoinGraph visitGroupReference(GroupReference node, Context context)
+        {
+            PlanNode dereferenced = lookup.resolve(node);
+            JoinGraph graph = dereferenced.accept(this, context);
+            if (isTrivialGraph(graph)) {
+                return replacementGraph(dereferenced, node, context);
+            }
+            return graph;
+        }
+
+        private boolean isTrivialGraph(JoinGraph graph)
+        {
+            return graph.nodes.size() < 2 && graph.edges.isEmpty() && graph.filters.isEmpty() && !graph.assignments.isPresent();
+        }
+
+        private JoinGraph replacementGraph(PlanNode oldNode, PlanNode newNode, Context context)
+        {
+            // TODO optimize when idea is generally approved
+            List<Symbol> symbols = context.symbolSources.entrySet().stream()
+                    .filter(entry -> entry.getValue() == oldNode)
+                    .map(Map.Entry::getKey)
+                    .collect(toImmutableList());
+            symbols.forEach(symbol -> context.symbolSources.put(symbol, newNode));
+
+            return new JoinGraph(newNode);
         }
     }
 
