@@ -161,7 +161,6 @@ public class CoefficientBasedStatsCalculator
         @Override
         public PlanNodeStatsEstimate visitTableScan(TableScanNode node, List<PlanNodeStatsEstimate> sourceCosts)
         {
-            // TODO: handle getting constraints for filter above table scan
             Constraint<ColumnHandle> constraint = getConstraint(node, BooleanLiteral.TRUE_LITERAL);
             PlanNodeStatsEstimate.Builder tableScanCost = PlanNodeStatsEstimate.builder();
 
