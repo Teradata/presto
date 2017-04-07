@@ -14,7 +14,6 @@
 package com.facebook.presto.sql.planner.iterative.rule.test;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.testing.LocalQueryRunner;
@@ -26,13 +25,12 @@ import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 
 public class RuleTester
 {
-    private final Metadata metadata;
-    private final Session session;
+    LocalQueryRunner queryRunner;
     private final Lookup lookup;
 
     public RuleTester()
     {
-        session = testSessionBuilder()
+        Session session = testSessionBuilder()
                 .setCatalog("local")
                 .setSchema("tiny")
                 .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
@@ -41,14 +39,19 @@ public class RuleTester
         LocalQueryRunner queryRunner = new LocalQueryRunner(session);
         queryRunner.createCatalog(session.getCatalog().get(),
                 new TpchConnectorFactory(1),
-                ImmutableMap.<String, String>of());
+                ImmutableMap.of());
+        this.queryRunner = queryRunner;
+        this.lookup = new TestingLookup(queryRunner.getStatsCalculator(), queryRunner.getEstimatedExchangesCostCalculator());
+    }
 
-        this.metadata = queryRunner.getMetadata();
+    public RuleTester(LocalQueryRunner queryRunner)
+    {
+        this.queryRunner = queryRunner;
         this.lookup = new TestingLookup(queryRunner.getStatsCalculator(), queryRunner.getEstimatedExchangesCostCalculator());
     }
 
     public RuleAssert assertThat(Rule rule)
     {
-        return new RuleAssert(metadata, lookup, session, rule);
+        return new RuleAssert(queryRunner, lookup, rule);
     }
 }
