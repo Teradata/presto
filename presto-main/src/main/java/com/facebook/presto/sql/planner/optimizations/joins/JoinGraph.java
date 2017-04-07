@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.planner.optimizations.joins;
 
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
@@ -50,10 +51,27 @@ public class JoinGraph
     private final Multimap<PlanNodeId, Edge> edges;
     private final PlanNodeId rootId;
 
+    /**
+     * Builds all (distinct) {@link JoinGraph}-es whole plan tree.
+     */
     public static List<JoinGraph> buildFrom(PlanNode plan)
     {
+        return buildFrom(plan, Lookup.noLookup());
+    }
+
+    /**
+     * Builds {@link JoinGraph} containing {@code plan} node.
+     */
+    public static JoinGraph buildShallowFrom(PlanNode plan, Lookup lookup)
+    {
+        JoinGraph graph = plan.accept(new Builder(true, lookup), new Context());
+        return graph;
+    }
+
+    private static List<JoinGraph> buildFrom(PlanNode plan, Lookup lookup)
+    {
         Context context = new Context();
-        JoinGraph graph = plan.accept(new Builder(), context);
+        JoinGraph graph = plan.accept(new Builder(false, lookup), context);
         if (graph.size() > 1) {
             context.addSubGraph(graph);
         }
@@ -199,15 +217,28 @@ public class JoinGraph
     private static class Builder
             extends PlanVisitor<Context, JoinGraph>
     {
+        // TODO When com.facebook.presto.sql.planner.optimizations.EliminateCrossJoins is removed, remove 'shallow' flag
+        private final boolean shallow;
+        private final Lookup lookup;
+
+        private Builder(boolean shallow, Lookup lookup)
+        {
+            this.shallow = shallow;
+            this.lookup = requireNonNull(lookup, "lookup cannot be null");
+        }
+
         @Override
         protected JoinGraph visitPlan(PlanNode node, Context context)
         {
-            for (PlanNode child : node.getSources()) {
-                JoinGraph graph = child.accept(this, context);
-                if (graph.size() < 2) {
-                    continue;
+            if (!shallow) {
+                for (PlanNode child : node.getSources()) {
+                    child = lookup.resolve(child);
+                    JoinGraph graph = child.accept(this, context);
+                    if (graph.size() < 2) {
+                        continue;
+                    }
+                    context.addSubGraph(graph.withRootId(child.getId()));
                 }
-                context.addSubGraph(graph.withRootId(child.getId()));
             }
 
             for (Symbol symbol : node.getOutputSymbols()) {
@@ -219,7 +250,7 @@ public class JoinGraph
         @Override
         public JoinGraph visitFilter(FilterNode node, Context context)
         {
-            JoinGraph graph = node.getSource().accept(this, context);
+            JoinGraph graph = lookup.resolve(node.getSource()).accept(this, context);
             return graph.withFilter(node.getPredicate());
         }
 
@@ -231,8 +262,8 @@ public class JoinGraph
                 return visitPlan(node, context);
             }
 
-            JoinGraph left = node.getLeft().accept(this, context);
-            JoinGraph right = node.getRight().accept(this, context);
+            JoinGraph left = lookup.resolve(node.getLeft()).accept(this, context);
+            JoinGraph right = lookup.resolve(node.getRight()).accept(this, context);
 
             JoinGraph graph = left.joinWith(right, node.getCriteria(), context, node.getId());
 
@@ -246,7 +277,7 @@ public class JoinGraph
         public JoinGraph visitProject(ProjectNode node, Context context)
         {
             if (node.isIdentity()) {
-                JoinGraph graph = node.getSource().accept(this, context);
+                JoinGraph graph = lookup.resolve(node.getSource()).accept(this, context);
                 return graph.withAssignments(node.getAssignments().getMap());
             }
             return visitPlan(node, context);
@@ -285,6 +316,8 @@ public class JoinGraph
     private static class Context
     {
         private final Map<Symbol, PlanNode> symbolSources = new HashMap<>();
+
+        // TODO When com.facebook.presto.sql.planner.optimizations.EliminateCrossJoins is removed, remove 'joinGraphs'
         private final List<JoinGraph> joinGraphs = new ArrayList<>();
 
         public void setSymbolSource(Symbol symbol, PlanNode node)
