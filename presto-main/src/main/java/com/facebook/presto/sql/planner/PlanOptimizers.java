@@ -30,6 +30,7 @@ import com.facebook.presto.sql.planner.iterative.rule.MergeLimitWithTopN;
 import com.facebook.presto.sql.planner.iterative.rule.MergeLimits;
 import com.facebook.presto.sql.planner.iterative.rule.PruneTableScanColumns;
 import com.facebook.presto.sql.planner.iterative.rule.PruneValuesColumns;
+import com.facebook.presto.sql.planner.iterative.rule.PushDownTableConstraints;
 import com.facebook.presto.sql.planner.iterative.rule.PushLimitThroughMarkDistinct;
 import com.facebook.presto.sql.planner.iterative.rule.PushLimitThroughProject;
 import com.facebook.presto.sql.planner.iterative.rule.PushLimitThroughSemiJoin;
@@ -168,7 +169,7 @@ public class PlanOptimizers
                                         new PruneValuesColumns(),
                                         new PruneTableScanColumns()))
                                 .build()
-                        ),
+                ),
                 new IterativeOptimizer(
                         stats,
                         statsCalculator,
@@ -205,6 +206,11 @@ public class PlanOptimizers
                 new TransformUncorrelatedScalarToJoin(),
                 new TransformCorrelatedScalarAggregationToJoin(metadata),
                 new PredicatePushDown(metadata, sqlParser),
+                new IterativeOptimizer(
+                        stats,
+                        statsCalculator,
+                        estimatedExchangesCostCalculator,
+                        ImmutableSet.of(new PushDownTableConstraints(metadata))),
                 new MergeProjections(),
                 new SimplifyExpressions(metadata, sqlParser), // Re-run the SimplifyExpressions to simplify any recomposed expressions from other optimizations
                 new ProjectionPushDown(),
@@ -232,6 +238,11 @@ public class PlanOptimizers
                 new MetadataQueryOptimizer(metadata),
                 new EliminateCrossJoins(), // This can pull up Filter and Project nodes from between Joins, so we need to push them down again
                 new PredicatePushDown(metadata, sqlParser),
+                new IterativeOptimizer(
+                        stats,
+                        statsCalculator,
+                        estimatedExchangesCostCalculator,
+                        ImmutableSet.of(new PushDownTableConstraints(metadata))),
                 new ProjectionPushDown());
 
         if (featuresConfig.isOptimizeSingleDistinct()) {
