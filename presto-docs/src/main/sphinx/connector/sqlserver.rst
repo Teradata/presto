@@ -79,19 +79,10 @@ SQL Server Type               Presto Type
 ``bigint``                    ``bigint``
 ``smallint``                  ``smallint``
 ``int``                       ``integer``
-``tinyint``                   ``tinyint``
 ``float``                     ``double``
-``real``                      ``real``
 ``char(n)``                   ``char(n)``
 ``varchar(n)``                ``varchar(n)``
-``text``                      ``varchar``
-``nchar(n)``                  ``char(n)``
-``nvarchar(n)``               ``varchar(n)``
-``text``                      ``varchar``
 ``date``                      ``date``
-``datetime``                  ``timestamp``
-``datetime2``                 ``timestamp``
-``smalldatetime``             ``timestamp``
 ============================= ============================
 
 Complete list of `SQL Server data types
@@ -104,4 +95,3 @@ The following SQL statements are not yet supported:
 * :doc:`/sql/create-table` (:doc:`/sql/create-table-as` is supported)
 * :doc:`/sql/grant`
 * :doc:`/sql/revoke`
-* :doc:`/sql/insert`
