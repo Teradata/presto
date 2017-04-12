@@ -266,7 +266,10 @@ public final class PartitionedLookupSourceFactory
     {
         checkState(hasSpilled());
         if (lookupSourceUnspilling.isPresent()) {
-            checkState(lookupSourceUnspilling.get().getConsumersCount() == consumersCount, "All consumers must pass the same consumersCount");
+            checkState(lookupSourceUnspilling.get().getConsumersCount() == consumersCount,
+                    "All consumers must pass the same consumersCount, expected [%s] but got [%s]",
+                    lookupSourceUnspilling.get().getConsumersCount(),
+                    consumersCount);
         }
         else {
             Set<Integer> partitionNumbers = spilledLookupSources.keySet();

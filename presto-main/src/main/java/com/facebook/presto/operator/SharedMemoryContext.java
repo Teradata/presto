@@ -99,7 +99,7 @@ public class SharedMemoryContext
         return format("Expected %s bytes for reservation %s, got %s bytes for reservation %s. " +
                         "Current reservations count is %s. " +
                         "This most likely means the operators sharing this memory do not synchronize their reads with each other.",
-                this.reservationBytes, this.reservationKey, inMemorySizeInBytes, reservationKey, this.reservations);
+                this.reservationBytes.orElse(0L), this.reservationKey, inMemorySizeInBytes, reservationKey, this.reservations);
     }
 
     @Override
