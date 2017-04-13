@@ -101,41 +101,54 @@ public class PushDownTableConstraints
                 .collect(toList());
         checkState(!layouts.isEmpty(), "No usable layouts for %s", tableScan);
 
-        List<PlanNode> possiblePlans = layouts.stream()
-                .map(layout -> {
-                    TableScanNode rewrittenTableScan = new TableScanNode(
-                            tableScan.getId(),
-                            tableScan.getTable(),
-                            tableScan.getOutputSymbols(),
-                            tableScan.getAssignments(),
-                            Optional.of(layout.getLayout().getHandle()),
-                            simplifiedConstraint.intersect(layout.getLayout().getPredicate()),
-                            Optional.ofNullable(tableScan.getOriginalConstraint()).orElse(predicate));
+        // At this point we have no way to choose between possible layouts, just take the first one
+        TableLayoutResult layout = layouts.get(0);
 
-                    Expression resultingPredicate = combineConjuncts(
-                            DomainTranslator.toPredicate(layout.getUnenforcedConstraint().transform(assignments::get)),
-                            stripDeterministicConjuncts(predicate),
-                            decomposedPredicate.getRemainingExpression());
+        PlanNode rewrittenPlan = new TableScanNode(
+                tableScan.getId(),
+                tableScan.getTable(),
+                tableScan.getOutputSymbols(),
+                tableScan.getAssignments(),
+                Optional.of(layout.getLayout().getHandle()),
+                simplifiedConstraint.intersect(layout.getLayout().getPredicate()),
+                Optional.ofNullable(tableScan.getOriginalConstraint()).orElse(predicate));
 
-                    if (!BooleanLiteral.TRUE_LITERAL.equals(resultingPredicate)) {
-                        return new FilterNode(idAllocator.getNextId(), rewrittenTableScan, resultingPredicate);
-                    }
+        Expression resultingPredicate = combineConjuncts(
+                DomainTranslator.toPredicate(layout.getUnenforcedConstraint().transform(assignments::get)),
+                stripDeterministicConjuncts(predicate),
+                decomposedPredicate.getRemainingExpression());
+        if (!BooleanLiteral.TRUE_LITERAL.equals(resultingPredicate)) {
+            rewrittenPlan = new FilterNode(idAllocator.getNextId(), rewrittenPlan, resultingPredicate);
+        }
 
-                    return rewrittenTableScan;
-                })
-                .collect(toList());
-
-        PlanNode plan = possiblePlans.get(0);
-        if (plan instanceof FilterNode && ((FilterNode) plan).getPredicate().equals(filter.getPredicate())
-                && ((TableScanNode) lookup.resolve(((FilterNode) plan).getSource())).getCurrentConstraint().equals(tableScan.getCurrentConstraint())) {
+        if (!planChanged(rewrittenPlan, filter, lookup)) {
             return Optional.empty();
         }
-        return Optional.of(plan);
+        return Optional.of(rewrittenPlan);
     }
 
     private Predicate<TableLayoutResult> layoutHasAllNeededOutputs(TableScanNode node)
     {
-        return layout -> !layout.getLayout().getColumns().isPresent()
-                || layout.getLayout().getColumns().get().containsAll(Lists.transform(node.getOutputSymbols(), node.getAssignments()::get));
+        return layout -> {
+            List<ColumnHandle> columnHandles = Lists.transform(node.getOutputSymbols(), node.getAssignments()::get);
+            return !layout.getLayout().getColumns().isPresent()
+                    || layout.getLayout().getColumns().get().containsAll(columnHandles);
+        };
+    }
+
+    private boolean planChanged(PlanNode rewrittenPlan, FilterNode oldPlan, Lookup lookup)
+    {
+        if (!(rewrittenPlan instanceof FilterNode)) {
+            return true;
+        }
+
+        FilterNode rewrittenFilter = (FilterNode) rewrittenPlan;
+        if (!rewrittenFilter.getPredicate().equals(oldPlan.getPredicate())) {
+            return true;
+        }
+
+        TableScanNode oldTableScan = (TableScanNode) lookup.resolve(oldPlan.getSource());
+        TableScanNode rewrittenTableScan = (TableScanNode) lookup.resolve(rewrittenFilter.getSource());
+        return !rewrittenTableScan.getCurrentConstraint().equals(oldTableScan.getCurrentConstraint());
     }
 }
