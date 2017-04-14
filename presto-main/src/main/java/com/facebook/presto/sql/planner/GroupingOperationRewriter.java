@@ -18,9 +18,11 @@ import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.analyzer.TypeSignatureProvider;
 import com.facebook.presto.sql.tree.ArrayConstructor;
 import com.facebook.presto.sql.tree.Cast;
+import com.facebook.presto.sql.tree.DereferenceExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.GroupingOperation;
+import com.facebook.presto.sql.tree.Identifier;
 import com.facebook.presto.sql.tree.LongLiteral;
 import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.QuerySpecification;
@@ -29,12 +31,14 @@ import com.facebook.presto.type.ListLiteralType;
 import com.google.common.collect.ImmutableList;
 
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
 import static com.facebook.presto.operator.scalar.GroupingOperationFunction.GROUPING;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.sql.analyzer.ExpressionAnalyzer.resolveFunction;
+import static com.facebook.presto.sql.tree.DereferenceExpression.getQualifiedName;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
@@ -64,7 +68,28 @@ public final class GroupingOperationRewriter
         else {
             checkState(groupIdSymbol.isPresent(), "groupId symbol is missing");
 
-            List<Expression> columnReferences = ImmutableList.copyOf(analysis.getColumnReferences());
+            List<Identifier> identifiers = ImmutableList.copyOf(analysis.getColumnReferences()).stream()
+                    .filter(Identifier.class::isInstance)
+                    .map(Identifier.class::cast)
+                    .sorted(Comparator.comparing(Identifier::getName))
+                    .collect(toImmutableList());
+
+            List<DereferenceExpression> dereferenceExpressions = ImmutableList.copyOf(analysis.getColumnReferences()).stream()
+                    .filter(DereferenceExpression.class::isInstance)
+                    .map(DereferenceExpression.class::cast)
+                    .filter(dereferenceExpression -> getQualifiedName(dereferenceExpression) != null)
+                    .sorted((o1, o2) -> {
+                        QualifiedName q1 = getQualifiedName(o1);
+                        QualifiedName q2 = getQualifiedName(o2);
+                        return q1.toString().compareTo(q2.toString());
+                    })
+                    .collect(toImmutableList());
+
+            ImmutableList.Builder<Expression> columnReferencesBuilder = ImmutableList.builder();
+            columnReferencesBuilder.addAll(dereferenceExpressions);
+            columnReferencesBuilder.addAll(identifiers);
+            List<Expression> columnReferences = columnReferencesBuilder.build();
+
             List<Expression> groupingOrdinals = expression.getGroupingColumns().stream()
                     .map(columnReferences::indexOf)
                     .map(columnOrdinal -> new LongLiteral(Integer.toString(columnOrdinal)))
