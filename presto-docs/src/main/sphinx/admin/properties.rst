@@ -736,6 +736,31 @@ Optimizer properties
   optimization may be a slight overhead.
 
 
+``optimizer.push-aggregation-through-join``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ * **Type:** ``Boolean``
+ * **Default value:** ``true``
+ * **Description:**
+
+  When an aggregation is above an outer join and all columns from the outer side of the join
+  are in the grouping clause, the aggregation is pushed below the outer join. This optimization
+  is particularly useful for correlated scalar subqueries, which get rewritten to an aggregation
+  over an outer join. For example:
+
+  .. code-block:: sql
+
+    SELECT * FROM item i
+        WHERE i.i_current_price > (
+            SELECT AVG(j.i_current_price) FROM item j
+                WHERE i.i_category = j.i_category);
+
+  Enabling this optimization can substantially speed up queries by reducing
+  the amount of data that needs to be processed by the join.  However, it may slow down some
+  queries that have very selective joins. This can also be specified on a per-query basis using
+  the ``push_aggregation_through_join`` session property.
+
+
 ``optimizer.push-table-write-through-union``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -815,6 +840,14 @@ Session properties
   in table partitioning. Note that this property is only used if a given projection uses all
   columns used for table partitioning inside connector.
 
+``push_aggregation_through_join``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ * **Type:** ``Boolean``
+ * **Default value:** ``optimizer.push-aggregation-through-join`` (``true``)
+ * **Description:**
+
+  See :ref:`optimizer.push-aggregation-through-join <tuning-pref-optimizer>`.
 
 
 ``push_table_write_through_union``
