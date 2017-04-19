@@ -28,7 +28,7 @@ import java.io.Closeable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.OptionalInt;
 
 import static com.facebook.presto.operator.LookupJoinOperators.JoinType.FULL_OUTER;
 import static com.facebook.presto.operator.LookupJoinOperators.JoinType.PROBE_OUTER;
@@ -49,7 +49,7 @@ public class LookupJoinOperator
     private final JoinProbeFactory joinProbeFactory;
     private final Runnable onClose;
 
-    private final AtomicInteger lookupJoinsCount;
+    private final OptionalInt lookupJoinsCount;
     private final HashGenerator hashGenerator;
     private final boolean probeOnOuterSide;
 
@@ -70,7 +70,7 @@ public class LookupJoinOperator
             LookupSourceFactory lookupSourceFactory,
             JoinProbeFactory joinProbeFactory,
             Runnable onClose,
-            AtomicInteger lookupJoinsCount,
+            OptionalInt lookupJoinsCount,
             SharedMemoryContext sharedMemoryContext,
             HashGenerator hashGenerator)
     {
@@ -113,10 +113,7 @@ public class LookupJoinOperator
         //Hence, there's no race between an operator finishing early and a spill occurring
         //during other LookupJoinOperator operator's work. At least, at the moment of writing of this comment...
         if (!finishing && lookupSourceFactory.hasSpilled()) {
-            //the `lookupJoinsCount` below no longer changes when any of the operators start its work.
-            //Hence, there's no risk of over-releasing or under-releasing (and thus: deadlocking) of any Partition
-            //returned from `beginLookupSourceUnspilling` method. At least, at the moment of writing of this comment...
-            int consumersCount = lookupJoinsCount.get();
+            int consumersCount = lookupJoinsCount.orElseThrow(() -> new IllegalStateException("Indeterminate number of LookupJoinOperator-s when using spill to disk. This is a bug."));
             lookupPartitions = Optional.of(
                     lookupSourceFactory.beginLookupSourceUnspilling(consumersCount, operatorContext.getSession()));
             ensureSpillerLoaded();

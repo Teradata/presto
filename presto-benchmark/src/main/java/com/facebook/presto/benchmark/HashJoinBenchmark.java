@@ -81,7 +81,7 @@ public class HashJoinBenchmark
 
         OperatorFactory lineItemTableScan = createTableScanOperator(0, new PlanNodeId("test"), "lineitem", "orderkey", "quantity");
 
-        OperatorFactory joinOperator = LOOKUP_JOIN_OPERATORS.innerJoin(1, new PlanNodeId("test"), lookupSourceFactory, lineItemTableScan.getTypes(), Ints.asList(0), Optional.empty(), Optional.empty());
+        OperatorFactory joinOperator = LOOKUP_JOIN_OPERATORS.innerJoin(1, new PlanNodeId("test"), lookupSourceFactory, lineItemTableScan.getTypes(), Ints.asList(0), Optional.empty(), Optional.empty(), OptionalInt.empty());
 
         NullOutputOperatorFactory output = new NullOutputOperatorFactory(2, new PlanNodeId("test"), joinOperator.getTypes());
 

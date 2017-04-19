@@ -56,6 +56,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.ExecutionException;
 
 import static com.facebook.presto.bytecode.Access.FINAL;
@@ -101,7 +102,8 @@ public class JoinProbeCompiler
             List<Integer> probeJoinChannel,
             Optional<Integer> probeHashChannel,
             List<Integer> probeOutputChannels,
-            JoinType joinType)
+            JoinType joinType,
+            OptionalInt totalOperatorsCount)
     {
         try {
             List<Type> probeOutputChannelTypes = probeOutputChannels.stream()
@@ -122,7 +124,8 @@ public class JoinProbeCompiler
                     probeOutputChannelTypes,
                     probeJoinChannel,
                     probeHashChannel,
-                    joinType);
+                    joinType,
+                    totalOperatorsCount);
         }
         catch (ExecutionException | UncheckedExecutionException | ExecutionError e) {
             throw Throwables.propagate(e.getCause());
@@ -585,7 +588,8 @@ public class JoinProbeCompiler
                         JoinType.class,
                         JoinProbeFactory.class,
                         List.class,
-                        Optional.class);
+                        Optional.class,
+                        OptionalInt.class);
             }
             catch (NoSuchMethodException e) {
                 throw Throwables.propagate(e);
@@ -600,7 +604,8 @@ public class JoinProbeCompiler
                 List<? extends Type> probeOutputTypes,
                 List<Integer> probeJoinChannel,
                 Optional<Integer> probeHashChannel,
-                JoinType joinType)
+                JoinType joinType,
+                OptionalInt totalOperatorsCount)
         {
             try {
                 return constructor.newInstance(
@@ -612,7 +617,8 @@ public class JoinProbeCompiler
                         joinType,
                         joinProbeFactory,
                         probeJoinChannel,
-                        probeHashChannel);
+                        probeHashChannel,
+                        totalOperatorsCount);
             }
             catch (Exception e) {
                 throw Throwables.propagate(e);

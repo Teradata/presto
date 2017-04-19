@@ -106,7 +106,7 @@ public class HashBuildAndJoinBenchmark
             hashChannel = Optional.of(2);
         }
 
-        OperatorFactory joinOperator = LOOKUP_JOIN_OPERATORS.innerJoin(2, new PlanNodeId("test"), hashBuilder.getLookupSourceFactory(), source.getTypes(), Ints.asList(0), hashChannel, Optional.empty());
+        OperatorFactory joinOperator = LOOKUP_JOIN_OPERATORS.innerJoin(2, new PlanNodeId("test"), hashBuilder.getLookupSourceFactory(), source.getTypes(), Ints.asList(0), hashChannel, Optional.empty(), OptionalInt.empty());
         joinDriversBuilder.add(joinOperator);
         joinDriversBuilder.add(new NullOutputOperatorFactory(3, new PlanNodeId("test"), joinOperator.getTypes()));
         DriverFactory joinDriverFactory = new DriverFactory(1, true, true, joinDriversBuilder.build(), OptionalInt.empty());

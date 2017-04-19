@@ -25,7 +25,7 @@ import com.google.common.util.concurrent.SettableFuture;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.OptionalInt;
 import java.util.function.Consumer;
 
 import static com.facebook.presto.operator.LookupJoinOperators.JoinType.INNER;
@@ -49,7 +49,7 @@ public class LookupJoinOperatorFactory
     private final Optional<OperatorFactory> outerOperatorFactory;
     private final ReferenceCount referenceCount;
     private final SharedMemoryContext sharedMemoryContext;
-    private final AtomicInteger lookupJoinsCount = new AtomicInteger();
+    private final OptionalInt totalOperatorsCount;
     private final HashGenerator probeHashGenerator;
     private boolean closed;
 
@@ -61,7 +61,8 @@ public class LookupJoinOperatorFactory
             JoinType joinType,
             JoinProbeFactory joinProbeFactory,
             List<Integer> probeJoinChannels,
-            Optional<Integer> probeHashChannel)
+            Optional<Integer> probeHashChannel,
+            OptionalInt totalOperatorsCount)
     {
         this.operatorId = operatorId;
         this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -108,6 +109,7 @@ public class LookupJoinOperatorFactory
             };
             this.outerOperatorFactory = Optional.of(new LookupOuterOperatorFactory(operatorId, planNodeId, outerPositionsFuture, probeOutputTypes, buildOutputTypes, onOperatorClose));
         }
+        this.totalOperatorsCount = totalOperatorsCount;
     }
 
     private LookupJoinOperatorFactory(LookupJoinOperatorFactory other, SharedMemoryContext sharedMemoryContext)
@@ -126,6 +128,7 @@ public class LookupJoinOperatorFactory
         outerOperatorFactory = other.outerOperatorFactory;
         probeHashGenerator = other.probeHashGenerator;
         this.sharedMemoryContext = sharedMemoryContext;
+        totalOperatorsCount = other.totalOperatorsCount;
 
         referenceCount.retain();
     }
@@ -153,7 +156,6 @@ public class LookupJoinOperatorFactory
         lookupSourceFactory.setTaskContext(driverContext.getPipelineContext().getTaskContext());
 
         referenceCount.retain();
-        lookupJoinsCount.incrementAndGet();
         return new LookupJoinOperator(
                 operatorContext,
                 getTypes(),
@@ -162,7 +164,7 @@ public class LookupJoinOperatorFactory
                 lookupSourceFactory,
                 joinProbeFactory,
                 referenceCount::release,
-                lookupJoinsCount,
+                totalOperatorsCount,
                 sharedMemoryContext,
                 probeHashGenerator);
     }

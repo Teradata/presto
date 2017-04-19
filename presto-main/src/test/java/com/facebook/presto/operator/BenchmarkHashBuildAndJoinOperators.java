@@ -42,6 +42,7 @@ import org.openjdk.jmh.runner.options.VerboseMode;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 
@@ -318,7 +319,8 @@ public class BenchmarkHashBuildAndJoinOperators
                 joinContext.getTypes(),
                 joinContext.getHashChannels(),
                 joinContext.getHashChannel(),
-                Optional.of(joinContext.getOutputChannels()));
+                Optional.of(joinContext.getOutputChannels()),
+                OptionalInt.empty());
 
         DriverContext driverContext = joinContext.createTaskContext().addPipelineContext(0, true, true).addDriverContext();
         Operator joinOperator = joinOperatorFactory.createOperator(driverContext);

@@ -1452,12 +1452,13 @@ public class LocalExecutionPlanner
             }
 
             OperatorFactory lookupJoinOperatorFactory;
+            OptionalInt totalOperatorsCount = getJoinOperatorsCountForSpill(context, session);
             switch (node.getType()) {
                 case INNER:
-                    lookupJoinOperatorFactory = lookupJoinOperators.innerJoin(context.getNextOperatorId(), node.getId(), indexLookupSourceFactory, probeSource.getTypes(), probeChannels, probeHashChannel, Optional.empty());
+                    lookupJoinOperatorFactory = lookupJoinOperators.innerJoin(context.getNextOperatorId(), node.getId(), indexLookupSourceFactory, probeSource.getTypes(), probeChannels, probeHashChannel, Optional.empty(), totalOperatorsCount);
                     break;
                 case SOURCE_OUTER:
-                    lookupJoinOperatorFactory = lookupJoinOperators.probeOuterJoin(context.getNextOperatorId(), node.getId(), indexLookupSourceFactory, probeSource.getTypes(), probeChannels, probeHashChannel, Optional.empty());
+                    lookupJoinOperatorFactory = lookupJoinOperators.probeOuterJoin(context.getNextOperatorId(), node.getId(), indexLookupSourceFactory, probeSource.getTypes(), probeChannels, probeHashChannel, Optional.empty(), totalOperatorsCount);
                     break;
                 default:
                     throw new AssertionError("Unknown type: " + node.getType());
@@ -1648,19 +1649,29 @@ public class LocalExecutionPlanner
             List<Integer> probeOutputChannels = ImmutableList.copyOf(getChannelsForSymbols(probeOutputSymbols, probeSource.getLayout()));
             List<Integer> probeJoinChannels = ImmutableList.copyOf(getChannelsForSymbols(probeSymbols, probeSource.getLayout()));
             Optional<Integer> probeHashChannel = probeHashSymbol.map(channelGetter(probeSource));
+            OptionalInt totalOperatorsCount = getJoinOperatorsCountForSpill(context, session);
 
             switch (node.getType()) {
                 case INNER:
-                    return lookupJoinOperators.innerJoin(context.getNextOperatorId(), node.getId(), lookupSourceFactory, probeTypes, probeJoinChannels, probeHashChannel, Optional.of(probeOutputChannels));
+                    return lookupJoinOperators.innerJoin(context.getNextOperatorId(), node.getId(), lookupSourceFactory, probeTypes, probeJoinChannels, probeHashChannel, Optional.of(probeOutputChannels), totalOperatorsCount);
                 case LEFT:
-                    return lookupJoinOperators.probeOuterJoin(context.getNextOperatorId(), node.getId(), lookupSourceFactory, probeTypes, probeJoinChannels, probeHashChannel, Optional.of(probeOutputChannels));
+                    return lookupJoinOperators.probeOuterJoin(context.getNextOperatorId(), node.getId(), lookupSourceFactory, probeTypes, probeJoinChannels, probeHashChannel, Optional.of(probeOutputChannels), totalOperatorsCount);
                 case RIGHT:
-                    return lookupJoinOperators.lookupOuterJoin(context.getNextOperatorId(), node.getId(), lookupSourceFactory, probeTypes, probeJoinChannels, probeHashChannel, Optional.of(probeOutputChannels));
+                    return lookupJoinOperators.lookupOuterJoin(context.getNextOperatorId(), node.getId(), lookupSourceFactory, probeTypes, probeJoinChannels, probeHashChannel, Optional.of(probeOutputChannels), totalOperatorsCount);
                 case FULL:
-                    return lookupJoinOperators.fullOuterJoin(context.getNextOperatorId(), node.getId(), lookupSourceFactory, probeTypes, probeJoinChannels, probeHashChannel, Optional.of(probeOutputChannels));
+                    return lookupJoinOperators.fullOuterJoin(context.getNextOperatorId(), node.getId(), lookupSourceFactory, probeTypes, probeJoinChannels, probeHashChannel, Optional.of(probeOutputChannels), totalOperatorsCount);
                 default:
                     throw new UnsupportedOperationException("Unsupported join type: " + node.getType());
             }
+        }
+
+        private OptionalInt getJoinOperatorsCountForSpill(LocalExecutionPlanContext context, Session session)
+        {
+            OptionalInt driverInstanceCount = context.getDriverInstanceCount();
+            if (isSpillEnabled(session)) {
+                checkState(driverInstanceCount.isPresent(), "Indeterminate number of LookupJoinOperator-s when using spill to disk. This is a bug.");
+            }
+            return driverInstanceCount;
         }
 
         private Map<Symbol, Integer> createJoinSourcesLayout(Map<Symbol, Integer> lookupSourceLayout, Map<Symbol, Integer> probeSourceLayout)
