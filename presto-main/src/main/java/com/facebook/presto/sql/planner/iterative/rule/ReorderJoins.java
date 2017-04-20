@@ -16,7 +16,7 @@ package com.facebook.presto.sql.planner.iterative.rule;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.CostComparator;
-import com.facebook.presto.cost.PlanNodeCostEstimate;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.planner.iterative.Lookup;
@@ -28,8 +28,13 @@ import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Set;
 
+import static com.facebook.presto.SystemSessionProperties.getJoinDistributionType;
 import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.createBinaryJoin;
+import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.flipJoin;
 import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.generatePartitions;
+import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.planPriorityQueue;
+import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
+import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
 import static com.google.common.base.Preconditions.checkState;
 
 public class ReorderJoins
@@ -62,11 +67,7 @@ public class ReorderJoins
             return plan.get();
         }
         else {
-            PriorityQueue<JoinNode> joinOrders = new PriorityQueue<>((node1, node2) -> {
-                PlanNodeCostEstimate node1Cost = lookup.getCumulativeCost(session, symbolAllocator.getTypes(), node1);
-                PlanNodeCostEstimate node2Cost = lookup.getCumulativeCost(session, symbolAllocator.getTypes(), node2);
-                return costComparator.compare(node1Cost, node2Cost);
-            });
+            PriorityQueue<JoinNode> joinOrders = planPriorityQueue(symbolAllocator, lookup, session, costComparator);
             // TODO: eliminate cross joins
             for (Set<Integer> partitioning : generatePartitions(joinGraph.getSources().size())) {
                 joinOrders.add(createJoinNodeTree(joinGraph, partitioning, idAllocator, symbolAllocator, lookup, session));
@@ -91,7 +92,7 @@ public class ReorderJoins
         }
 
         // TODO: choose distribution type and right vs left.
-        return new JoinNode(
+        JoinNode genericJoinNode = new JoinNode(
                 idAllocator.getNextId(),
                 JoinNode.Type.INNER,
                 left,
@@ -101,6 +102,23 @@ public class ReorderJoins
                 joinNode.getFilter(),
                 joinNode.getLeftHashSymbol(),
                 joinNode.getRightHashSymbol(),
-                joinNode.getDistributionType());
+                Optional.empty());
+        return chooseJoinNodeProperties(genericJoinNode, symbolAllocator, lookup, session);
+    }
+
+    private JoinNode chooseJoinNodeProperties(JoinNode joinNode, SymbolAllocator symbolAllocator, Lookup lookup, Session session)
+    {
+        PriorityQueue<JoinNode> possibleJoinNodes = planPriorityQueue(symbolAllocator, lookup, session, costComparator);
+        if (!getJoinDistributionType(session).equals(FeaturesConfig.JoinDistributionType.REPLICATED)) {
+            JoinNode repartitionedJoin = joinNode.withDistributionType(PARTITIONED);
+            possibleJoinNodes.add(repartitionedJoin);
+            possibleJoinNodes.add(flipJoin(repartitionedJoin));
+        }
+        if (!getJoinDistributionType(session).equals(FeaturesConfig.JoinDistributionType.REPARTITIONED)) {
+            JoinNode replicatedJoin = joinNode.withDistributionType(REPLICATED);
+            possibleJoinNodes.add(replicatedJoin);
+            possibleJoinNodes.add(flipJoin(replicatedJoin));
+        }
+        return possibleJoinNodes.poll();
     }
 }
