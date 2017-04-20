@@ -26,6 +26,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
+import java.util.Optional;
 import java.util.Set;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
@@ -36,6 +37,7 @@ import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.joinGr
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.values;
 import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.createBinaryJoin;
 import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.generatePartitions;
+import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static org.testng.Assert.assertEquals;
@@ -88,6 +90,8 @@ public class TestReorderJoinsUtils
                 join(
                         JoinNode.Type.INNER,
                         ImmutableList.of(equiJoinClause("A1", "B1"), equiJoinClause("C1", "D1")),
+                        Optional.empty(),
+                        Optional.of(PARTITIONED),
                         joinGraph(
                                 ImmutableList.of(equiJoinClause("A1", "C1")),
                                 ImmutableList.of("A1 > C1"),

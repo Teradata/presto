@@ -14,10 +14,15 @@
 
 package com.facebook.presto.sql.planner.iterative.rule;
 
+import com.facebook.presto.Session;
+import com.facebook.presto.cost.CostComparator;
+import com.facebook.presto.cost.PlanNodeCostEstimate;
 import com.facebook.presto.sql.ExpressionUtils;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.planner.SymbolReferenceExtractor;
+import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.tree.Expression;
@@ -27,7 +32,9 @@ import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static com.facebook.presto.util.ImmutableCollectors.toImmutableList;
@@ -135,7 +142,37 @@ public class ReorderJoinsUtils
                 Optional.of(PARTITIONED));
     }
 
-    private static List<JoinNode.EquiJoinClause> flipJoinCriteriaIfNecessary(List<JoinNode.EquiJoinClause> joinCriteria, PlanNode left)
+    public static PriorityQueue<JoinNode> planPriorityQueue(SymbolAllocator symbolAllocator, Lookup lookup, Session session, CostComparator costComparator)
+    {
+        return new PriorityQueue<>((node1, node2) -> {
+            PlanNodeCostEstimate node1Cost = lookup.getCumulativeCost(session, symbolAllocator.getTypes(), node1);
+            PlanNodeCostEstimate node2Cost = lookup.getCumulativeCost(session, symbolAllocator.getTypes(), node2);
+            return costComparator.compare(session, node1Cost, node2Cost);
+        });
+    }
+
+    public static JoinNode flipJoin(JoinNode joinNode)
+    {
+        List<Symbol> leftSymbols = joinNode.getOutputSymbols().stream().filter(symbol -> joinNode.getLeft().getOutputSymbols().contains(symbol)).collect(Collectors.toList());
+        List<Symbol> rightSymbols = joinNode.getOutputSymbols().stream().filter(symbol -> joinNode.getRight().getOutputSymbols().contains(symbol)).collect(Collectors.toList());
+        List<Symbol> flippedSymbols = ImmutableList.<Symbol>builder()
+                .addAll(rightSymbols)
+                .addAll(leftSymbols)
+                .build();
+        return new JoinNode(
+                joinNode.getId(),
+                joinNode.getType(),
+                joinNode.getRight(),
+                joinNode.getLeft(),
+                flipJoinCriteriaIfNecessary(joinNode.getCriteria(), joinNode.getRight()),
+                flippedSymbols,
+                joinNode.getFilter(),
+                joinNode.getRightHashSymbol(),
+                joinNode.getLeftHashSymbol(),
+                joinNode.getDistributionType());
+    }
+
+    public static List<JoinNode.EquiJoinClause> flipJoinCriteriaIfNecessary(List<JoinNode.EquiJoinClause> joinCriteria, PlanNode left)
     {
         return joinCriteria
                 .stream()
