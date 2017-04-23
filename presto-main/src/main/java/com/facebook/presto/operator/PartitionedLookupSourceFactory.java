@@ -14,6 +14,7 @@
 package com.facebook.presto.operator;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.operator.PartitionedConsumption.Partition;
 import com.facebook.presto.operator.exchange.LocalPartitionGenerator;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
@@ -33,6 +34,7 @@ import io.airlift.concurrent.MoreFutures;
 
 import javax.annotation.concurrent.GuardedBy;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -41,6 +43,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static com.facebook.presto.operator.OuterLookupSource.createOuterLookupSourceSupplier;
@@ -79,6 +82,9 @@ public final class PartitionedLookupSourceFactory
 
     @GuardedBy("this")
     private final List<SettableFuture<LookupSource>> lookupSourceFutures = new ArrayList<>();
+
+    @GuardedBy("this")
+    private Optional<PartitionedConsumption<LookupSource>> lookupSourceUnspilling = Optional.empty();
 
     public PartitionedLookupSourceFactory(
             List<Type> types,
@@ -206,6 +212,14 @@ public final class PartitionedLookupSourceFactory
             spilledLookupSources.values().forEach(SingleStreamSpiller::close);
             spilledLookupSources.clear();
         }
+        lookupSourceUnspilling.ifPresent(partitionedConsumption -> {
+            try {
+                partitionedConsumption.close();
+            }
+            catch (IOException e) {
+                throw new RuntimeException("Error closing lookupSourceUnspilling", e);
+            }
+        });
         destroyed.complete(null);
     }
 
@@ -242,30 +256,47 @@ public final class PartitionedLookupSourceFactory
     }
 
     @Override
-    public synchronized Set<Integer> getSpilledPartitions()
+    public synchronized boolean hasSpilled()
     {
-        return spilledLookupSources.keySet();
+        return !spilledLookupSources.keySet().isEmpty();
     }
 
     @Override
-    public CompletableFuture<LookupSource> readSpilledLookupSource(Session session, int partition)
+    public synchronized Iterator<Partition<LookupSource>> beginLookupSourceUnspilling(int consumersCount, Session session)
     {
-        SingleStreamSpiller lookupSourceSpiller = spilledLookupSources.get(partition);
-        Iterator<Page> spilledBuildPages = lookupSourceSpiller.getSpilledPages();
+        checkState(hasSpilled());
+        if (lookupSourceUnspilling.isPresent()) {
+            checkState(lookupSourceUnspilling.get().getConsumersCount() == consumersCount, "All consumers must pass the same consumersCount");
+        }
+        else {
+            Set<Integer> partitionNumbers = spilledLookupSources.keySet();
+            Function<Integer, CompletableFuture<LookupSource>> partitionLoader = partitionNumber -> loadLookupSourcePartition(session, partitionNumber);
+            lookupSourceUnspilling = Optional.of(new PartitionedConsumption<>(consumersCount, partitionNumbers, partitionLoader));
+        }
+        return lookupSourceUnspilling.get().getPartitions().iterator();
+    }
 
+    private CompletableFuture<LookupSource> loadLookupSourcePartition(Session session, Integer partitionNumber)
+    {
+        SingleStreamSpiller lookupSourceSpiller = spilledLookupSources.get(partitionNumber);
+        CompletableFuture<List<Page>> spilledPages = lookupSourceSpiller.getAllSpilledPages();
+        return spilledPages.thenApply((List<Page> spilledBuildPages) -> getLookupSource(session, spilledBuildPages));
+    }
+
+    private LookupSource getLookupSource(Session session, List<Page> spilledBuildPages)
+    {
         PagesIndex index = pagesIndexFactory.newPagesIndex(types, 10_000);
 
-        while (spilledBuildPages.hasNext()) {
-            index.addPage(spilledBuildPages.next());
+        for (Page page : spilledBuildPages) {
+            index.addPage(page);
         }
 
-        return CompletableFuture.completedFuture(
-                index.createLookupSourceSupplier(
-                        session,
-                        hashChannels,
-                        preComputedHashChannel,
-                        filterFunctionFactory,
-                        Optional.of(outputChannels)).get());
+        return index.createLookupSourceSupplier(
+                session,
+                hashChannels,
+                preComputedHashChannel,
+                filterFunctionFactory,
+                Optional.of(outputChannels)).get();
     }
 
     private static class SpilledLookupSource

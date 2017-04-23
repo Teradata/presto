@@ -18,6 +18,7 @@ import com.google.common.collect.Iterators;
 
 import java.io.Closeable;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 public interface SingleStreamSpiller
@@ -43,6 +44,12 @@ public interface SingleStreamSpiller
      * as they were spilled. Method requires the issued spill request to be completed.
      */
     Iterator<Page> getSpilledPages();
+
+    /**
+     * Returns a future computation of list of pages
+     * obtained by iterating the {@code getSpilledPages} Iterator.
+     */
+    CompletableFuture<List<Page>> getAllSpilledPages();
 
     /**
      * Close releases/removes all underlying resources used during spilling

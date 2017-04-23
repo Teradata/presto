@@ -19,6 +19,7 @@ import com.facebook.presto.memory.LocalMemoryContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import io.airlift.concurrent.MoreFutures;
@@ -36,7 +37,9 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static com.facebook.presto.execution.buffer.PagesSerdeUtil.writePage;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -61,6 +64,7 @@ public class BinaryFileSingleStreamSpiller
 
     private final ListeningExecutorService executor;
 
+    private final AtomicBoolean writable = new AtomicBoolean(true);
     private CompletableFuture<?> spillInProgress = CompletableFuture.completedFuture(null);
 
     public BinaryFileSingleStreamSpiller(
@@ -88,6 +92,7 @@ public class BinaryFileSingleStreamSpiller
     public CompletableFuture<?> spill(Iterator<Page> pageIterator)
     {
         checkNoSpillInProgress();
+        checkIsWritable();
         spillInProgress = MoreFutures.toCompletableFuture(executor.submit(
                 () -> writePages(pageIterator)));
         return spillInProgress;
@@ -98,11 +103,27 @@ public class BinaryFileSingleStreamSpiller
         checkState(spillInProgress.isDone(), "spill in progress");
     }
 
+    private void checkIsWritable()
+    {
+        checkState(writable.get(), "Spilling no longer allowed. " +
+                "The spiller has been made non-writable on first read for subsequent reads to be consistent");
+    }
+
     @Override
     public Iterator<Page> getSpilledPages()
     {
+        writable.set(false);
         checkNoSpillInProgress();
         return readPages();
+    }
+
+    @Override
+    public CompletableFuture<List<Page>> getAllSpilledPages()
+    {
+        writable.set(false);
+        return MoreFutures.toCompletableFuture(executor.submit(() ->
+                ImmutableList.copyOf(getSpilledPages())
+        ));
     }
 
     private void writePages(Iterator<Page> pageIterator)
