@@ -14,8 +14,6 @@
 
 package com.facebook.presto.sql.planner.iterative.rule;
 
-import com.facebook.presto.cost.PlanNodeCostEstimate;
-import com.facebook.presto.spi.statistics.Estimate;
 import com.facebook.presto.sql.ExpressionUtils;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
@@ -38,17 +36,6 @@ import static com.facebook.presto.util.ImmutableCollectors.toImmutableSet;
 public class ReorderJoinsUtils
 {
     private ReorderJoinsUtils() {}
-
-    // Todo: this is temporary until PlanNodeCostEstimates are comparable
-    public static double getCostSum(PlanNodeCostEstimate planNodeCost)
-    {
-        return getOrZero(planNodeCost.getCpuCost()) + getOrZero(planNodeCost.getMemoryCost()) + getOrZero(planNodeCost.getNetworkCost());
-    }
-
-    private static double getOrZero(Estimate estimate)
-    {
-        return estimate.isValueUnknown() ? 0 : estimate.getValue();
-    }
 
     public static Set<Set<Integer>> generatePartitions(int totalNodes)
     {

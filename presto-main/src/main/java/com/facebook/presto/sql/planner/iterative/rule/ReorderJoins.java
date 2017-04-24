@@ -15,6 +15,7 @@
 package com.facebook.presto.sql.planner.iterative.rule;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.cost.PlanNodeCostEstimate;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.SymbolAllocator;
@@ -29,13 +30,18 @@ import java.util.Set;
 
 import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.createBinaryJoin;
 import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.generatePartitions;
-import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.getCostSum;
 import static com.google.common.base.Preconditions.checkState;
 
 public class ReorderJoins
         implements Rule
 {
     private final ReorderJoinsMemo memo = new ReorderJoinsMemo();
+    private final CostComparator costComparator;
+
+    public ReorderJoins(CostComparator costComparator)
+    {
+        this.costComparator = costComparator;
+    }
 
     @Override
     public Optional<PlanNode> apply(PlanNode node, Lookup lookup, PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator, Session session)
@@ -59,7 +65,7 @@ public class ReorderJoins
             PriorityQueue<JoinNode> joinOrders = new PriorityQueue<>((node1, node2) -> {
                 PlanNodeCostEstimate node1Cost = lookup.getCumulativeCost(session, symbolAllocator.getTypes(), node1);
                 PlanNodeCostEstimate node2Cost = lookup.getCumulativeCost(session, symbolAllocator.getTypes(), node2);
-                return Double.compare(getCostSum(node1Cost), getCostSum(node2Cost));
+                return costComparator.compare(node1Cost, node2Cost);
             });
             // TODO: eliminate cross joins
             for (Set<Integer> partitioning : generatePartitions(joinGraph.getSources().size())) {
