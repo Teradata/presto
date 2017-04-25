@@ -43,7 +43,7 @@ public class CostComparator
 
     public int compare(Session session, PlanNodeCostEstimate left, PlanNodeCostEstimate right)
     {
-        if (getQueryMaxMemory(session).toBytes() >
+        if (getQueryMaxMemory(session).toBytes() <
                 Math.max(left.getMemoryCost().getValue(), right.getMemoryCost().getValue())) {
             return Double.compare(left.getMemoryCost().getValue(), right.getMemoryCost().getValue());
         }
