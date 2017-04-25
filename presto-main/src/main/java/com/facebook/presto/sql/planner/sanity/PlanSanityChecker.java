@@ -35,7 +35,8 @@ public final class PlanSanityChecker
             new NoSubqueryExpressionLeftChecker(),
             new NoApplyNodeLeftChecker(),
             new VerifyNoFilteredAggregations(),
-            new VerifyOnlyOneOutputNode());
+            new VerifyOnlyOneOutputNode(),
+            new NoJoinGraphNodeLeftChecker());
 
     private PlanSanityChecker() {}
 

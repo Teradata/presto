@@ -20,6 +20,7 @@ import com.facebook.presto.spi.block.SortOrder;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
 import com.facebook.presto.sql.planner.plan.ExceptNode;
@@ -238,11 +239,27 @@ public final class PlanMatchPattern
 
     public static PlanMatchPattern join(JoinNode.Type joinType, List<ExpectedValueProvider<JoinNode.EquiJoinClause>> expectedEquiCriteria, Optional<String> expectedFilter, PlanMatchPattern left, PlanMatchPattern right)
     {
+        return join(joinType, expectedEquiCriteria, expectedFilter, Optional.empty(), left, right);
+    }
+
+    public static PlanMatchPattern join(JoinNode.Type joinType, List<ExpectedValueProvider<JoinNode.EquiJoinClause>> expectedEquiCriteria, Optional<String> expectedFilter, Optional<JoinNode.DistributionType> distributionType, PlanMatchPattern left, PlanMatchPattern right)
+    {
         return node(JoinNode.class, left, right).with(
                 new JoinMatcher(
                         joinType,
                         expectedEquiCriteria,
-                        expectedFilter.map(predicate -> rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(predicate)))));
+                        expectedFilter.map(predicate -> rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(predicate))),
+                        distributionType));
+    }
+
+    public static PlanMatchPattern joinGraph(List<ExpectedValueProvider<JoinNode.EquiJoinClause>> expectedEquiCriteria, List<String> expectedFilters, PlanMatchPattern... sources)
+    {
+        return node(JoinGraphNode.class, sources).with(
+                new JoinGraphMatcher(
+                        expectedEquiCriteria,
+                        expectedFilters.stream()
+                                .map(stringExpression -> rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(stringExpression)))
+                                .collect(toImmutableList())));
     }
 
     public static PlanMatchPattern exchange(PlanMatchPattern... sources)

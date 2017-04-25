@@ -13,6 +13,8 @@
  */
 package com.facebook.presto.sql.planner.plan;
 
+import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
+
 public class PlanVisitor<C, R>
 {
     protected R visitPlan(PlanNode node, C context)
@@ -186,6 +188,11 @@ public class PlanVisitor<C, R>
     }
 
     public R visitAssignUniqueId(AssignUniqueId node, C context)
+    {
+        return visitPlan(node, context);
+    }
+
+    public R visitJoinGraph(JoinGraphNode node, C context)
     {
         return visitPlan(node, context);
     }
