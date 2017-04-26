@@ -80,13 +80,7 @@ public class LookupJoiner
 
     public boolean isFinished()
     {
-        boolean finished = finishing && probe == null && pageBuilder.isEmpty();
-
-        // if finished drop references so memory is freed early
-        if (finished) {
-            close();
-        }
-        return finished;
+        return finishing && probe == null && pageBuilder.isEmpty();
     }
 
     public void addInput(Page page)
