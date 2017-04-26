@@ -260,7 +260,7 @@ public class ShowStatsRewrite
             TreeSet<String> statisticsKeys = new TreeSet<>();
             statisticsKeys.addAll(tableStatistics.getTableStatistics().keySet());
             for (ColumnStatistics columnStats : tableStatistics.getColumnStatistics().values()) {
-                statisticsKeys.addAll(columnStats.getStatistics().keySet());
+                statisticsKeys.addAll(columnStats.getOnlyRangeColumnStatistics().getStatistics().keySet());
             }
             return unmodifiableList(new ArrayList(statisticsKeys));
         }
@@ -271,7 +271,7 @@ public class ShowStatsRewrite
 
             // Stats for columns
             for (Map.Entry<ColumnHandle, ColumnStatistics> columnStats : tableStatistics.getColumnStatistics().entrySet()) {
-                Map<String, Estimate> columnStatisticsValues = columnStats.getValue().getStatistics();
+                Map<String, Estimate> columnStatisticsValues = columnStats.getValue().getOnlyRangeColumnStatistics().getStatistics();
                 rowsBuilder.add(createStatsRow(Optional.of(columnNames.get(columnStats.getKey())), statisticsNames, columnStatisticsValues));
             }
 

@@ -29,6 +29,7 @@ import com.facebook.presto.spi.ConnectorTableHandle;
 import com.facebook.presto.spi.SchemaTableName;
 import com.facebook.presto.spi.statistics.ColumnStatistics;
 import com.facebook.presto.spi.statistics.Estimate;
+import com.facebook.presto.spi.statistics.RangeColumnStatistics;
 import com.facebook.presto.spi.statistics.TableStatistics;
 import com.facebook.presto.spi.type.TypeManager;
 import com.google.common.collect.ImmutableMap;
@@ -84,14 +85,16 @@ public class MetastoreHiveStatisticsProvider
                 continue;
             }
             ColumnStatistics.Builder columnStatistics = ColumnStatistics.builder();
+            RangeColumnStatistics.Builder rangeStatistics = RangeColumnStatistics.builder();
             if (hiveColumnHandle.isPartitionKey()) {
-                columnStatistics.setDistinctValuesCount(countDistinctPartitionKeys(hiveColumnHandle, hivePartitions));
-                columnStatistics.setNullsFraction(calculateNullsFractionForPartitioningKey(hiveColumnHandle, hivePartitions, partitionStatistics));
+                rangeStatistics.setDistinctValuesCount(countDistinctPartitionKeys(hiveColumnHandle, hivePartitions));
+                rangeStatistics.setNullsFraction(calculateNullsFractionForPartitioningKey(hiveColumnHandle, hivePartitions, partitionStatistics));
             }
             else {
-                columnStatistics.setDistinctValuesCount(calculateDistinctValuesCount(partitionStatistics, columnName));
-                columnStatistics.setNullsFraction(calculateNullsFraction(partitionStatistics, columnName, rowCount));
+                rangeStatistics.setDistinctValuesCount(calculateDistinctValuesCount(partitionStatistics, columnName));
+                rangeStatistics.setNullsFraction(calculateNullsFraction(partitionStatistics, columnName, rowCount));
             }
+            columnStatistics.addRange(rangeStatistics.build());
             tableStatistics.setColumnStatistics(hiveColumnHandle, columnStatistics.build());
         }
         return tableStatistics.build();
