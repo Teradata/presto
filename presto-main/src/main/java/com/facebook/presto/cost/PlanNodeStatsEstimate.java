@@ -21,14 +21,15 @@ import java.util.function.Function;
 import static com.facebook.presto.spi.statistics.Estimate.unknownValue;
 import static java.util.Objects.requireNonNull;
 
-public class PlanNodeCost
+public class PlanNodeStatsEstimate
 {
-    public static final PlanNodeCost UNKNOWN_COST = PlanNodeCost.builder().build();
+    public static final PlanNodeStatsEstimate UNKNOWN_STATS = PlanNodeStatsEstimate.builder().build();
+    public static final double DEFAULT_ROW_SIZE = 42;
 
     private final Estimate outputRowCount;
     private final Estimate outputSizeInBytes;
 
-    private PlanNodeCost(Estimate outputRowCount, Estimate outputSizeInBytes)
+    private PlanNodeStatsEstimate(Estimate outputRowCount, Estimate outputSizeInBytes)
     {
         this.outputRowCount = requireNonNull(outputRowCount, "outputRowCount can not be null");
         this.outputSizeInBytes = requireNonNull(outputSizeInBytes, "outputSizeInBytes can not be null");
@@ -44,12 +45,12 @@ public class PlanNodeCost
         return outputSizeInBytes;
     }
 
-    public PlanNodeCost mapOutputRowCount(Function<Double, Double> mappingFunction)
+    public PlanNodeStatsEstimate mapOutputRowCount(Function<Double, Double> mappingFunction)
     {
         return builder().setFrom(this).setOutputRowCount(outputRowCount.map(mappingFunction)).build();
     }
 
-    public PlanNodeCost mapOutputSizeInBytes(Function<Double, Double> mappingFunction)
+    public PlanNodeStatsEstimate mapOutputSizeInBytes(Function<Double, Double> mappingFunction)
     {
         return builder().setFrom(this).setOutputSizeInBytes(outputRowCount.map(mappingFunction)).build();
     }
@@ -57,7 +58,7 @@ public class PlanNodeCost
     @Override
     public String toString()
     {
-        return "PlanNodeCost{outputRowCount=" + outputRowCount + ", outputSizeInBytes=" + outputSizeInBytes + '}';
+        return "PlanNodeStatsEstimate{outputRowCount=" + outputRowCount + ", outputSizeInBytes=" + outputSizeInBytes + '}';
     }
 
     @Override
@@ -69,7 +70,7 @@ public class PlanNodeCost
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
-        PlanNodeCost that = (PlanNodeCost) o;
+        PlanNodeStatsEstimate that = (PlanNodeStatsEstimate) o;
         return Objects.equals(outputRowCount, that.outputRowCount) &&
                 Objects.equals(outputSizeInBytes, that.outputSizeInBytes);
     }
@@ -90,7 +91,7 @@ public class PlanNodeCost
         private Estimate outputRowCount = unknownValue();
         private Estimate outputSizeInBytes = unknownValue();
 
-        public Builder setFrom(PlanNodeCost otherStatistics)
+        public Builder setFrom(PlanNodeStatsEstimate otherStatistics)
         {
             return setOutputRowCount(otherStatistics.getOutputRowCount())
                     .setOutputSizeInBytes(otherStatistics.getOutputSizeInBytes());
@@ -108,9 +109,12 @@ public class PlanNodeCost
             return this;
         }
 
-        public PlanNodeCost build()
+        public PlanNodeStatsEstimate build()
         {
-            return new PlanNodeCost(outputRowCount, outputSizeInBytes);
+            if (outputSizeInBytes.isValueUnknown() && !outputRowCount.isValueUnknown()) {
+                outputSizeInBytes = new Estimate(DEFAULT_ROW_SIZE * outputRowCount.getValue());
+            }
+            return new PlanNodeStatsEstimate(outputRowCount, outputSizeInBytes);
         }
     }
 }

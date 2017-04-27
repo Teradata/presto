@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.tests.statistics;
 
-import com.facebook.presto.cost.PlanNodeCost;
+import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.execution.QueryPlan;
 import com.facebook.presto.execution.StageInfo;
 import com.facebook.presto.spi.statistics.Estimate;
@@ -42,18 +42,18 @@ public class MetricComparator
     public List<MetricComparison> getMetricComparisons(QueryPlan queryPlan, StageInfo outputStageInfo)
     {
         return metrics.stream().flatMap(metric -> {
-            Map<PlanNode, PlanNodeCost> estimatesByPlanNode = queryPlan.getPlanNodeCosts();
-            Map<PlanNodeId, PlanNodeCost> executionCostsByPlanId = getExecutionCostsById(outputStageInfo);
+            Map<PlanNode, PlanNodeStatsEstimate> estimatesByPlanNode = queryPlan.getPlanNodeStatsEstimates();
+            Map<PlanNodeId, PlanNodeStatsEstimate> executionCostsByPlanId = getExecutionCostsById(outputStageInfo);
             return estimatesByPlanNode.entrySet().stream().map(nodeCostEntry -> {
                 PlanNode node = nodeCostEntry.getKey();
-                PlanNodeCost estimate = nodeCostEntry.getValue();
-                Optional<PlanNodeCost> execution = Optional.ofNullable(executionCostsByPlanId.get(node.getId()));
+                PlanNodeStatsEstimate estimate = nodeCostEntry.getValue();
+                Optional<PlanNodeStatsEstimate> execution = Optional.ofNullable(executionCostsByPlanId.get(node.getId()));
                 return createMetricComparison(metric, node, estimate, execution);
             });
         }).collect(Collectors.toList());
     }
 
-    private Map<PlanNodeId, PlanNodeCost> getExecutionCostsById(StageInfo outputStageInfo)
+    private Map<PlanNodeId, PlanNodeStatsEstimate> getExecutionCostsById(StageInfo outputStageInfo)
     {
         List<StageInfo> allStagesInfos = getAllStages(Optional.of(outputStageInfo));
         Stream<Map<PlanNodeId, PlanNodeStats>> aggregatedPlanNodeStatsByStages =
@@ -63,18 +63,18 @@ public class MetricComparator
         };
         Map<PlanNodeId, PlanNodeStats> planNodeIdPlanNodeStatsMap =
                 mergeMaps(aggregatedPlanNodeStatsByStages, allowNoDuplicates);
-        return transformValues(planNodeIdPlanNodeStatsMap, this::toPlanNodeCost);
+        return transformValues(planNodeIdPlanNodeStatsMap, this::toPlanNodeStatsEstimate);
     }
 
-    private PlanNodeCost toPlanNodeCost(PlanNodeStats operatorStats)
+    private PlanNodeStatsEstimate toPlanNodeStatsEstimate(PlanNodeStats operatorStats)
     {
-        return PlanNodeCost.builder()
+        return PlanNodeStatsEstimate.builder()
                 .setOutputRowCount(new Estimate(operatorStats.getPlanNodeOutputPositions()))
                 .setOutputSizeInBytes(new Estimate(operatorStats.getPlanNodeOutputDataSize().toBytes()))
                 .build();
     }
 
-    private MetricComparison createMetricComparison(Metric metric, PlanNode node, PlanNodeCost estimate, Optional<PlanNodeCost> execution)
+    private MetricComparison createMetricComparison(Metric metric, PlanNode node, PlanNodeStatsEstimate estimate, Optional<PlanNodeStatsEstimate> execution)
     {
         Optional<Double> estimatedCost = asOptional(metric.getValue(estimate));
         Optional<Double> executionCost = execution.flatMap(e -> asOptional(metric.getValue(e)));

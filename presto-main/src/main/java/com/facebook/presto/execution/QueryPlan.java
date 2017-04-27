@@ -13,23 +13,29 @@
  */
 package com.facebook.presto.execution;
 
-import com.facebook.presto.cost.PlanNodeCost;
+import com.facebook.presto.Session;
+import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.sql.planner.Plan;
+import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.google.common.collect.ImmutableList;
 
-import java.util.Collections;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+
+import static com.facebook.presto.util.ImmutableCollectors.toImmutableMap;
 
 public class QueryPlan
 {
     private final Plan plan;
-    private final Map<PlanNode, PlanNodeCost> planNodeCosts;
+    private final Map<PlanNode, PlanNodeStatsEstimate> planNodeStatsEstimates;
 
-    public QueryPlan(Plan plan, Map<PlanNode, PlanNodeCost> planNodeCosts)
+    public QueryPlan(Plan plan, Lookup lookup, Session session)
     {
         this.plan = plan;
-        this.planNodeCosts = new HashMap<>(planNodeCosts);
+        this.planNodeStatsEstimates = getPlanNodes(
+                plan.getRoot()).stream()
+                .collect(toImmutableMap(node -> node, node -> lookup.getStats(session, plan.getTypes(), node)));
     }
 
     public Plan getPlan()
@@ -37,8 +43,18 @@ public class QueryPlan
         return plan;
     }
 
-    public Map<PlanNode, PlanNodeCost> getPlanNodeCosts()
+    private List<PlanNode> getPlanNodes(PlanNode root)
     {
-        return Collections.unmodifiableMap(planNodeCosts);
+        ImmutableList.Builder<PlanNode> planNodes = ImmutableList.builder();
+        planNodes.add(root);
+        for (PlanNode source : root.getSources()) {
+            planNodes.addAll(getPlanNodes(source));
+        }
+        return planNodes.build();
+    }
+
+    public Map<PlanNode, PlanNodeStatsEstimate> getPlanNodeStatsEstimates()
+    {
+        return planNodeStatsEstimates;
     }
 }

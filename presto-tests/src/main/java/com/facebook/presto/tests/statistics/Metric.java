@@ -13,25 +13,25 @@
  */
 package com.facebook.presto.tests.statistics;
 
-import com.facebook.presto.cost.PlanNodeCost;
+import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.spi.statistics.Estimate;
 
 import java.util.function.Function;
 
 public enum Metric
 {
-    OUTPUT_ROW_COUNT(PlanNodeCost::getOutputRowCount),
-    OUTPUT_SIZE_BYTES(PlanNodeCost::getOutputSizeInBytes);
+    OUTPUT_ROW_COUNT(PlanNodeStatsEstimate::getOutputRowCount),
+    OUTPUT_SIZE_BYTES(PlanNodeStatsEstimate::getOutputSizeInBytes);
 
-    private final Function<PlanNodeCost, Estimate> metricFunction;
+    private final Function<PlanNodeStatsEstimate, Estimate> metricFunction;
 
-    Metric(Function<PlanNodeCost, Estimate> metricFunction)
+    Metric(Function<PlanNodeStatsEstimate, Estimate> metricFunction)
     {
         this.metricFunction = metricFunction;
     }
 
-    Estimate getValue(PlanNodeCost planNodeCost)
+    Estimate getValue(PlanNodeStatsEstimate planNodeStatsEstimate)
     {
-        return metricFunction.apply(planNodeCost);
+        return metricFunction.apply(planNodeStatsEstimate);
     }
 }
