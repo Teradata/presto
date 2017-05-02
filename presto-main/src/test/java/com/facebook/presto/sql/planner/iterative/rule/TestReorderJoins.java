@@ -46,18 +46,18 @@ public class TestReorderJoins
                 .on(p ->
                         p.joinGraph(
                                 ImmutableList.of(
-                                        p.values(new PlanNodeId("values1"), p.symbol("A1", BIGINT)),
-                                        p.values(new PlanNodeId("values2"), p.symbol("B1", BIGINT)),
-                                        p.values(new PlanNodeId("values3"), p.symbol("C1", BIGINT))),
+                                        p.values(new PlanNodeId("valuesA"), p.symbol("A1", BIGINT)),
+                                        p.values(new PlanNodeId("valuesB"), p.symbol("B1", BIGINT)),
+                                        p.values(new PlanNodeId("ValuesC"), p.symbol("C1", BIGINT))),
                                 ImmutableList.of(
                                         new JoinNode.EquiJoinClause(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT)),
                                         new JoinNode.EquiJoinClause(p.symbol("B1", BIGINT), p.symbol("C1", BIGINT)),
                                         new JoinNode.EquiJoinClause(p.symbol("A1", BIGINT), p.symbol("C1", BIGINT))),
                                 ImmutableList.of()))
                 .withStats(ImmutableMap.of(
-                        new PlanNodeId("values1"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
-                        new PlanNodeId("values2"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
-                        new PlanNodeId("values3"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
+                        new PlanNodeId("valuesA"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
+                        new PlanNodeId("valuesB"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
+                        new PlanNodeId("ValuesC"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
                 .matches(join(
                         JoinNode.Type.INNER,
                         ImmutableList.of(equiJoinClause("B1", "C1"), equiJoinClause("A1", "C1")),
@@ -66,7 +66,8 @@ public class TestReorderJoins
                                 JoinNode.Type.INNER,
                                 ImmutableList.of(equiJoinClause("A1", "B1")),
                                 Optional.empty(),
-                                Optional.of(PARTITIONED), values(ImmutableMap.of("A1", 0)),
+                                Optional.of(PARTITIONED),
+                                values(ImmutableMap.of("A1", 0)),
                                 values(ImmutableMap.of("B1", 0))
                         ),
                         values(ImmutableMap.of("C1", 0))
@@ -87,19 +88,20 @@ public class TestReorderJoins
                 .on(p ->
                         p.joinGraph(
                                 ImmutableList.of(
-                                        p.values(new PlanNodeId("values1"), p.symbol("A1", BIGINT)),
-                                        p.values(new PlanNodeId("values2"), p.symbol("B1", BIGINT))),
+                                        p.values(new PlanNodeId("valuesA"), p.symbol("A1", BIGINT)),
+                                        p.values(new PlanNodeId("valuesB"), p.symbol("B1", BIGINT))),
                                 ImmutableList.of(
                                         new JoinNode.EquiJoinClause(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT))),
                                 ImmutableList.of()))
                 .withStats(ImmutableMap.of(
-                        new PlanNodeId("values1"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(100)).build(),
-                        new PlanNodeId("values2"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
+                        new PlanNodeId("valuesA"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(100)).build(),
+                        new PlanNodeId("valuesB"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
                 .matches(join(
                         JoinNode.Type.INNER,
                         ImmutableList.of(equiJoinClause("B1", "A1")),
                         Optional.empty(),
-                        Optional.of(REPLICATED), values(ImmutableMap.of("B1", 0)),
+                        Optional.of(REPLICATED),
+                        values(ImmutableMap.of("B1", 0)),
                         values(ImmutableMap.of("A1", 0))
                 ));
     }
@@ -118,19 +120,20 @@ public class TestReorderJoins
                 .on(p ->
                         p.joinGraph(
                                 ImmutableList.of(
-                                        p.values(new PlanNodeId("values1"), p.symbol("A1", BIGINT)),
-                                        p.values(new PlanNodeId("values2"), p.symbol("B1", BIGINT))),
+                                        p.values(new PlanNodeId("valuesA"), p.symbol("A1", BIGINT)),
+                                        p.values(new PlanNodeId("valuesB"), p.symbol("B1", BIGINT))),
                                 ImmutableList.of(
                                         new JoinNode.EquiJoinClause(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT))),
                                 ImmutableList.of()))
                 .withStats(ImmutableMap.of(
-                        new PlanNodeId("values1"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(100)).build(),
-                        new PlanNodeId("values2"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
+                        new PlanNodeId("valuesA"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(100)).build(),
+                        new PlanNodeId("valuesB"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
                 .matches(join(
                         JoinNode.Type.INNER,
                         ImmutableList.of(equiJoinClause("B1", "A1")),
                         Optional.empty(),
-                        Optional.of(PARTITIONED), values(ImmutableMap.of("B1", 0)),
+                        Optional.of(PARTITIONED),
+                        values(ImmutableMap.of("B1", 0)),
                         values(ImmutableMap.of("A1", 0))
                 ));
     }
@@ -149,19 +152,20 @@ public class TestReorderJoins
                 .on(p ->
                         p.joinGraph(
                                 ImmutableList.of(
-                                        p.values(new PlanNodeId("values1"), p.symbol("A1", BIGINT)),
-                                        p.values(new PlanNodeId("values2"), p.symbol("B1", BIGINT))),
+                                        p.values(new PlanNodeId("valuesA"), p.symbol("A1", BIGINT)),
+                                        p.values(new PlanNodeId("valuesB"), p.symbol("B1", BIGINT))),
                                 ImmutableList.of(
                                         new JoinNode.EquiJoinClause(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT))),
                                 ImmutableList.of()))
                 .withStats(ImmutableMap.of(
-                        new PlanNodeId("values1"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
-                        new PlanNodeId("values2"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
+                        new PlanNodeId("valuesA"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
+                        new PlanNodeId("valuesB"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
                 .matches(join(
                         JoinNode.Type.INNER,
                         ImmutableList.of(equiJoinClause("A1", "B1")),
                         Optional.empty(),
-                        Optional.of(PARTITIONED), values(ImmutableMap.of("A1", 0)),
+                        Optional.of(PARTITIONED),
+                        values(ImmutableMap.of("A1", 0)),
                         values(ImmutableMap.of("B1", 0))
                 ));
     }
@@ -180,19 +184,20 @@ public class TestReorderJoins
                 .on(p ->
                         p.joinGraph(
                                 ImmutableList.of(
-                                        p.values(new PlanNodeId("values1"), p.symbol("A1", BIGINT)),
-                                        p.values(new PlanNodeId("values2"), p.symbol("B1", BIGINT))),
+                                        p.values(new PlanNodeId("valuesA"), p.symbol("A1", BIGINT)),
+                                        p.values(new PlanNodeId("valuesB"), p.symbol("B1", BIGINT))),
                                 ImmutableList.of(
                                         new JoinNode.EquiJoinClause(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT))),
                                 ImmutableList.of()))
                 .withStats(ImmutableMap.of(
-                        new PlanNodeId("values1"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
-                        new PlanNodeId("values2"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
+                        new PlanNodeId("valuesA"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
+                        new PlanNodeId("valuesB"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
                 .matches(join(
                         JoinNode.Type.INNER,
                         ImmutableList.of(equiJoinClause("A1", "B1")),
                         Optional.empty(),
-                        Optional.of(REPLICATED), values(ImmutableMap.of("A1", 0)),
+                        Optional.of(REPLICATED),
+                        values(ImmutableMap.of("A1", 0)),
                         values(ImmutableMap.of("B1", 0))
                 ));
     }

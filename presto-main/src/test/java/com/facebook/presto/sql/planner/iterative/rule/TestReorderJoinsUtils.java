@@ -35,7 +35,7 @@ import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.equiJo
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.join;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.joinGraph;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.values;
-import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.createBinaryJoin;
+import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.createJoinAccordingToPartitioning;
 import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.generatePartitions;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN;
@@ -57,6 +57,13 @@ public class TestReorderJoinsUtils
                         ImmutableSet.of(0, 1, 2),
                         ImmutableSet.of(0, 1, 3),
                         ImmutableSet.of(0, 2, 3)));
+
+        partitions = generatePartitions(3);
+        assertEquals(partitions,
+                ImmutableSet.of(
+                        ImmutableSet.of(0),
+                        ImmutableSet.of(0, 1),
+                        ImmutableSet.of(0, 2)));
     }
 
     @Test
@@ -81,12 +88,12 @@ public class TestReorderJoinsUtils
                 ImmutableList.of(
                         new ComparisonExpression(GREATER_THAN, planBuilder.symbol("A1", BIGINT).toSymbolReference(), planBuilder.symbol("C1", BIGINT).toSymbolReference())
                 ));
-        JoinNode actual = createBinaryJoin(joinGraphNode, ImmutableSet.of(0, 2), idAllocator);
+        JoinNode actual = createJoinAccordingToPartitioning(joinGraphNode, ImmutableSet.of(0, 2), idAllocator);
         assertPlan(
                 session,
                 queryRunner.getMetadata(),
                 queryRunner.getLookup(),
-                new Plan(actual, planBuilder.getSymbols()),
+                new Plan(actual, planBuilder.getSymbols(), queryRunner.getLookup(), queryRunner.getDefaultSession()),
                 join(
                         JoinNode.Type.INNER,
                         ImmutableList.of(equiJoinClause("A1", "B1"), equiJoinClause("C1", "D1")),
