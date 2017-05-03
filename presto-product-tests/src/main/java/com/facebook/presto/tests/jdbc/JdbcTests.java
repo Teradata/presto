@@ -113,6 +113,10 @@ public class JdbcTests
     public void shouldExecuteQueryWithSelectedCatalogAndSchema()
             throws SQLException
     {
+        if (usingTeradataJdbc4Driver(connection)) {
+            LOGGER.warn("shouldExecuteQueryWithSelectedCatalogAndSchema() does not apply to JDBC 4");
+            return;
+        }
         connection.setCatalog("hive");
         connection.setSchema("default");
         try (Statement statement = connection.createStatement()) {
