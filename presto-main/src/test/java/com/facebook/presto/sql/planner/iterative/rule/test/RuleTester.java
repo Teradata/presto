@@ -14,7 +14,6 @@
 package com.facebook.presto.sql.planner.iterative.rule.test;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.testing.LocalQueryRunner;
 import com.facebook.presto.testing.TestingLookup;
@@ -28,7 +27,7 @@ import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 public class RuleTester
         implements Closeable
 {
-    private final Lookup lookup;
+    private final TestingLookup lookup;
     private final LocalQueryRunner queryRunner;
 
     public RuleTester()
