@@ -16,7 +16,6 @@ package com.facebook.presto.sql.planner.iterative.rule.test;
 import com.facebook.presto.Session;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.testing.LocalQueryRunner;
-import com.facebook.presto.testing.TestingLookup;
 import com.facebook.presto.tpch.TpchConnectorFactory;
 import com.google.common.collect.ImmutableMap;
 
@@ -27,7 +26,6 @@ import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 public class RuleTester
         implements Closeable
 {
-    private final TestingLookup lookup;
     private final LocalQueryRunner queryRunner;
 
     public RuleTester()
@@ -42,18 +40,16 @@ public class RuleTester
         queryRunner.createCatalog(session.getCatalog().get(),
                 new TpchConnectorFactory(1),
                 ImmutableMap.of());
-        this.lookup = new TestingLookup(queryRunner.getStatsCalculator(), queryRunner.getEstimatedExchangesCostCalculator());
     }
 
     public RuleTester(LocalQueryRunner queryRunner)
     {
         this.queryRunner = queryRunner;
-        this.lookup = new TestingLookup(queryRunner.getStatsCalculator(), queryRunner.getEstimatedExchangesCostCalculator());
     }
 
     public RuleAssert assertThat(Rule rule)
     {
-        return new RuleAssert(queryRunner, lookup, rule);
+        return new RuleAssert(queryRunner, rule);
     }
 
     @Override

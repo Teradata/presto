@@ -45,14 +45,14 @@ public class RuleAssert
     private final LocalQueryRunner queryRunner;
 
     private Map<Symbol, Type> symbols;
+    private TestingLookup lookup;
     private PlanNode plan;
-    private final TestingLookup lookup;
 
-    public RuleAssert(LocalQueryRunner queryRunner, TestingLookup lookup, Rule rule)
+    public RuleAssert(LocalQueryRunner queryRunner, Rule rule)
     {
         this.queryRunner = queryRunner;
         this.rule = rule;
-        this.lookup = lookup;
+        this.lookup = new TestingLookup(queryRunner.getStatsCalculator(), queryRunner.getEstimatedExchangesCostCalculator());
     }
 
     public RuleAssert on(Function<PlanBuilder, PlanNode> planProvider)
@@ -71,13 +71,17 @@ public class RuleAssert
         return this;
     }
 
-    private void setStats(PlanNode node, Map<PlanNodeId, PlanNodeStatsEstimate> idStatsMap)
+    private void setStats(PlanNode node, Map<PlanNodeId, PlanNodeStatsEstimate> stats)
     {
-        if (idStatsMap.containsKey(node.getId())) {
-            lookup.setStats(node, idStatsMap.get(node.getId()));
+        if (stats.containsKey(node.getId())) {
+            lookup = TestingLookup.builder(lookup)
+                    .withStats(node, stats.get(node.getId()))
+                    .build();
         }
-        for (PlanNode source : node.getSources()) {
-            setStats(source, idStatsMap);
+        else {
+            for (PlanNode source : node.getSources()) {
+                setStats(source, stats);
+            }
         }
     }
 
