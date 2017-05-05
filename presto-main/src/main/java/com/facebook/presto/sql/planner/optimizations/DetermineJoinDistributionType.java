@@ -114,7 +114,7 @@ public class DetermineJoinDistributionType
         {
             // The implementation of full outer join only works if the data is hash partitioned. See LookupJoinOperators#buildSideOuterJoinUnvisitedPositions
             JoinNode.Type type = node.getType();
-            if (type == RIGHT || type == FULL || (isDistributedJoinEnabled(session) && !mustBroadcastJoin(node))) {
+            if (type == RIGHT || type == FULL || (isRepartitionedJoinEnabled(session) && !mustBroadcastJoin(node))) {
                 return JoinNode.DistributionType.PARTITIONED;
             }
 
@@ -133,14 +133,14 @@ public class DetermineJoinDistributionType
 
         private SemiJoinNode.DistributionType getTargetSemiJoinDistributionType(boolean isDeleteQuery)
         {
-            if (isDistributedJoinEnabled(session) && !isDeleteQuery) {
+            if (isRepartitionedJoinEnabled(session) && !isDeleteQuery) {
                 return SemiJoinNode.DistributionType.PARTITIONED;
             }
 
             return SemiJoinNode.DistributionType.REPLICATED;
         }
 
-        private static boolean isDistributedJoinEnabled(Session session)
+        private static boolean isRepartitionedJoinEnabled(Session session)
         {
             return !getJoinDistributionType(session).equals(FeaturesConfig.JoinDistributionType.REPLICATED);
         }

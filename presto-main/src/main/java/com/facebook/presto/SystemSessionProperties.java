@@ -34,18 +34,16 @@ import static com.facebook.presto.spi.session.PropertyMetadata.stringSessionProp
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
-import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType.AUTOMATIC;
-import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType.REPARTITIONED;
-import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType.REPLICATED;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.units.DataSize.succinctBytes;
 import static java.lang.String.format;
+import static java.util.stream.Collectors.joining;
 
 public final class SystemSessionProperties
 {
     public static final String OPTIMIZE_HASH_GENERATION = "optimize_hash_generation";
-    public static final String DISTRIBUTED_INDEX_JOIN = "distributed_index_join";
     public static final String JOIN_DISTRIBUTION_TYPE = "join_distribution_type";
+    public static final String DISTRIBUTED_INDEX_JOIN = "distributed_index_join";
     public static final String HASH_PARTITION_COUNT = "hash_partition_count";
     public static final String PREFER_STREAMING_OPERATORS = "prefer_streaming_operators";
     public static final String TASK_WRITER_COUNT = "task_writer_count";
@@ -100,14 +98,10 @@ public final class SystemSessionProperties
                         "Compute hash codes for distribution, joins, and aggregations early in query plan",
                         featuresConfig.isOptimizeHashGeneration(),
                         false),
-                booleanSessionProperty(
-                        DISTRIBUTED_INDEX_JOIN,
-                        "Distribute index joins on join keys instead of executing inline",
-                        featuresConfig.isDistributedIndexJoinsEnabled(),
-                        false),
                 new PropertyMetadata<>(
                         JOIN_DISTRIBUTION_TYPE,
-                        String.format("The join method to use. Options are %s, %s, and %s", REPARTITIONED, REPLICATED, AUTOMATIC),
+                        String.format("The join method to use. Options are %s", FeaturesConfig.JoinDistributionType.AVAILABLE_OPTIONS.stream()
+                                .collect(joining(", "))),
                         VARCHAR,
                         String.class,
                         featuresConfig.getJoinDistributionType(),
@@ -123,6 +117,11 @@ public final class SystemSessionProperties
                         },
                         value -> value
                 ),
+                booleanSessionProperty(
+                        DISTRIBUTED_INDEX_JOIN,
+                        "Distribute index joins on join keys instead of executing inline",
+                        featuresConfig.isDistributedIndexJoinsEnabled(),
+                        false),
                 integerSessionProperty(
                         HASH_PARTITION_COUNT,
                         "Number of partitions for distributed joins and aggregations",

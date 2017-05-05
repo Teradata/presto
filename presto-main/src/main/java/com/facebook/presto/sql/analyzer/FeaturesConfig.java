@@ -25,12 +25,10 @@ import javax.validation.constraints.Min;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.List;
 
 import static com.facebook.presto.sql.analyzer.RegexLibrary.JONI;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static java.lang.Enum.valueOf;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 @DefunctConfig({
