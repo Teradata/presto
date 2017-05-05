@@ -256,7 +256,7 @@ public class LocalQueryRunner
         this(defaultSession, featuresConfig, false, 1);
     }
 
-    private LocalQueryRunner(Session defaultSession, FeaturesConfig featuresConfig, boolean withInitialTransaction, int nodeCount)
+    private LocalQueryRunner(Session defaultSession, FeaturesConfig featuresConfig, boolean withInitialTransaction, int nodeCountForStats)
     {
         requireNonNull(defaultSession, "defaultSession is null");
         checkArgument(!defaultSession.getTransactionId().isPresent() || !withInitialTransaction, "Already in transaction");
@@ -373,8 +373,8 @@ public class LocalQueryRunner
         SpillerStats spillerStats = new SpillerStats();
         this.spillerFactory = new GenericSpillerFactory(new FileSingleStreamSpillerFactory(blockEncodingSerde, spillerStats, featuresConfig));
         this.statsCalculator = new CoefficientBasedStatsCalculator(metadata);
-        this.costCalculator = new CostCalculatorUsingExchanges(nodeCount);
-        this.estimatedExchangesCostCalculator = new CostCalculatorWithEstimatedExchanges(costCalculator, nodeCount);
+        this.costCalculator = new CostCalculatorUsingExchanges(nodeCountForStats);
+        this.estimatedExchangesCostCalculator = new CostCalculatorWithEstimatedExchanges(costCalculator, nodeCountForStats);
         this.lookup = new StatelessLookup(statsCalculator, costCalculator);
     }
 
@@ -384,7 +384,7 @@ public class LocalQueryRunner
         return new LocalQueryRunner(defaultSession, new FeaturesConfig(), true, 1);
     }
 
-    public static LocalQueryRunner queryRunnerWithDummyNodeCount(Session defaultSession, int nodeCount)
+    public static LocalQueryRunner queryRunnerWithFakeNodeCount(Session defaultSession, int nodeCount)
     {
         return new LocalQueryRunner(defaultSession, new FeaturesConfig(), false, nodeCount);
     }
