@@ -19,15 +19,15 @@ import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
+import com.facebook.presto.sql.planner.plan.Assignments;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
-import com.facebook.presto.sql.tree.Expression;
+import com.facebook.presto.sql.planner.plan.ProjectNode;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
-import static com.facebook.presto.sql.ExpressionUtils.extractConjuncts;
+import static com.facebook.presto.SystemSessionProperties.isJoinReorderingEnabled;
+import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 
 public class ConvertJoinTreeToJoinGraph
         implements Rule
@@ -35,42 +35,21 @@ public class ConvertJoinTreeToJoinGraph
     @Override
     public Optional<PlanNode> apply(PlanNode node, Lookup lookup, PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator, Session session)
     {
-        // We check that join distribution type is absent because we only want to do this transformation once.
-        if (node instanceof JoinNode && ((JoinNode) node).getType().equals(JoinNode.Type.INNER) && !((JoinNode) node).getDistributionType().isPresent()) {
-            return Optional.of(new FlattenedJoinTree((JoinNode) node).toJoinGraphNode(idAllocator));
-        }
-        else {
+        // We check that join distribution type is absent because we only want to do this transformation once (reordered joins will have distribution type already set).
+        if (!(node instanceof JoinNode) || !isJoinReorderingEnabled(session)) {
             return Optional.empty();
         }
-    }
 
-    private static class FlattenedJoinTree
-    {
-        private final List<PlanNode> nodes = new ArrayList<>();
-        private final List<JoinNode.EquiJoinClause> criteria = new ArrayList<>();
-        private final List<Expression> filters = new ArrayList<>();
-
-        private FlattenedJoinTree(JoinNode node)
-        {
-            flattenNode(node);
-        }
-
-        private void flattenNode(PlanNode node)
-        {
-            if (node instanceof JoinNode && ((JoinNode) node).getType() == JoinNode.Type.INNER) {
-                flattenNode(((JoinNode) node).getLeft());
-                flattenNode(((JoinNode) node).getRight());
-                criteria.addAll(((JoinNode) node).getCriteria());
-                ((JoinNode) node).getFilter().ifPresent(f -> filters.addAll(extractConjuncts(f)));
+        JoinNode joinNode = (JoinNode) node;
+        if (joinNode.getType().equals(INNER) && !joinNode.getDistributionType().isPresent()) {
+            PlanNode result = new JoinGraphNode.JoinGraphNodeBuilder(joinNode, lookup).toJoinGraphNode(idAllocator);
+            if (!result.getOutputSymbols().equals(node.getOutputSymbols())) {
+                Assignments assignments = Assignments.builder().putIdentities(node.getOutputSymbols()).build();
+                result = new ProjectNode(idAllocator.getNextId(), result, assignments);
             }
-            else {
-                nodes.add(node);
-            }
+            return Optional.of(result);
         }
 
-        private JoinGraphNode toJoinGraphNode(PlanNodeIdAllocator idAllocator)
-        {
-            return new JoinGraphNode(idAllocator.getNextId(), nodes, criteria, filters);
-        }
+        return Optional.empty();
     }
 }

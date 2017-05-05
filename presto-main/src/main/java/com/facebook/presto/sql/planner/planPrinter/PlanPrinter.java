@@ -81,7 +81,6 @@ import com.facebook.presto.sql.planner.plan.UnnestNode;
 import com.facebook.presto.sql.planner.plan.ValuesNode;
 import com.facebook.presto.sql.planner.plan.WindowNode;
 import com.facebook.presto.sql.tree.ComparisonExpression;
-import com.facebook.presto.sql.tree.ComparisonExpressionType;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FrameBound;
 import com.facebook.presto.sql.tree.FunctionCall;
@@ -117,6 +116,7 @@ import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.sql.planner.DomainUtils.simplifyDomain;
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static com.facebook.presto.sql.planner.planPrinter.PlanNodeStatsSummarizer.aggregatePlanNodeStats;
+import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.google.common.base.CaseFormat.UPPER_UNDERSCORE;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -474,7 +474,7 @@ public class PlanPrinter
         {
             List<Expression> joinExpressions = new ArrayList<>();
             for (JoinNode.EquiJoinClause clause : node.getCriteria()) {
-                joinExpressions.add(new ComparisonExpression(ComparisonExpressionType.EQUAL,
+                joinExpressions.add(new ComparisonExpression(EQUAL,
                         clause.getLeft().toSymbolReference(),
                         clause.getRight().toSymbolReference()));
             }
@@ -535,7 +535,7 @@ public class PlanPrinter
         {
             List<Expression> joinExpressions = new ArrayList<>();
             for (IndexJoinNode.EquiJoinClause clause : node.getCriteria()) {
-                joinExpressions.add(new ComparisonExpression(ComparisonExpressionType.EQUAL,
+                joinExpressions.add(new ComparisonExpression(EQUAL,
                         clause.getProbe().toSymbolReference(),
                         clause.getIndex().toSymbolReference()));
             }
@@ -1108,16 +1108,8 @@ public class PlanPrinter
         @Override
         public Void visitJoinGraph(JoinGraphNode node, Integer indent)
         {
-            List<Expression> joinExpressions = new ArrayList<>();
-            for (JoinNode.EquiJoinClause equiJoinClause : node.getCriteria()) {
-                joinExpressions.add(new ComparisonExpression(ComparisonExpressionType.EQUAL,
-                        equiJoinClause.getLeft().toSymbolReference(),
-                        equiJoinClause.getRight().toSymbolReference()));
-            }
-
-            print(indent, "- JoinGraph[%s, %s] => [%s] %s",
-                    joinExpressions,
-                    node.getFilters(),
+            print(indent, "- JoinGraph[%s] => [%s] %s",
+                    node.getFilter(),
                     formatOutputs(node.getOutputSymbols()),
                     formatCost(node));
 

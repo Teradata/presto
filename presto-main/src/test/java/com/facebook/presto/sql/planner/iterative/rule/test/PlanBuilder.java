@@ -173,9 +173,9 @@ public class PlanBuilder
         return new JoinNode(idAllocator.getNextId(), type, left, right, criteria, outputSymbols, filter, Optional.empty(), Optional.empty(), Optional.empty());
     }
 
-    public JoinGraphNode joinGraph(List<PlanNode> sources, List<JoinNode.EquiJoinClause> criteria, List<Expression> filters)
+    public JoinGraphNode joinGraph(List<PlanNode> sources, Expression filter)
     {
-        return new JoinGraphNode(idAllocator.getNextId(), sources, criteria, filters);
+        return new JoinGraphNode(idAllocator.getNextId(), sources, filter);
     }
 
     public class ExchangeBuilder

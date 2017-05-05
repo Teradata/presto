@@ -21,13 +21,15 @@ import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.tree.Expression;
+import com.google.common.collect.ImmutableSet;
 
 import java.util.List;
+import java.util.Set;
 
 import static com.facebook.presto.sql.planner.assertions.MatchResult.NO_MATCH;
 import static com.facebook.presto.sql.planner.assertions.MatchResult.match;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 public class JoinGraphMatcher
         implements Matcher
@@ -55,23 +57,21 @@ public class JoinGraphMatcher
         if (joinGraph.getCriteria().size() != expectedEquiCriteria.size()) {
             return NO_MATCH;
         }
-        List<JoinNode.EquiJoinClause> actualCriteria = joinGraph.getCriteria();
-
-        List<JoinNode.EquiJoinClause> expected = expectedEquiCriteria.stream()
+        Set<JoinNode.EquiJoinClause> actualCriteria = ImmutableSet.copyOf(joinGraph.getCriteria());
+        Set<JoinNode.EquiJoinClause> expectedCriteria = expectedEquiCriteria.stream()
                 .map(maker -> maker.getExpectedValue(symbolAliases))
-                .collect(toImmutableList());
-        if (!expected.equals(actualCriteria)) {
+                .collect(toImmutableSet());
+        if (!expectedCriteria.equals(actualCriteria)) {
             return NO_MATCH;
         }
 
+        Set<Expression> actualFilters = ImmutableSet.copyOf(joinGraph.getFilters());
+        Set<Expression> expectedfilters = expectedFilters.stream().map(symbolAliases::replaceSymbolAliasesInExpression).collect(toImmutableSet());
         if (joinGraph.getFilters().size() != expectedFilters.size()) {
             return NO_MATCH;
         }
-        List<Expression> actualFilters = joinGraph.getFilters();
-        for (int i = 0; i < actualFilters.size(); i++) {
-            if (!new ExpressionVerifier(symbolAliases).process(actualFilters.get(i), expectedFilters.get(i))) {
-                return NO_MATCH;
-            }
+        if (!expectedfilters.equals(actualFilters)) {
+            return NO_MATCH;
         }
 
         return match();
