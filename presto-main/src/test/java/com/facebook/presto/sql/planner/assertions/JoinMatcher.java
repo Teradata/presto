@@ -83,7 +83,7 @@ final class JoinMatcher
             }
         }
 
-        if (!distributionType.equals(joinNode.getDistributionType())) {
+        if (distributionType.isPresent() && !distributionType.equals(joinNode.getDistributionType())) {
             return NO_MATCH;
         }
 
