@@ -20,7 +20,6 @@ import com.facebook.presto.sql.planner.iterative.rule.test.RuleTester;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import org.testng.annotations.Test;
 
 import java.util.function.Function;
@@ -34,14 +33,13 @@ import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.projec
 
 public class TestEliminateCrossJoins
 {
-    private final RuleTester tester = new RuleTester(ImmutableMap.of(
-            REORDER_JOINS, "true"
-    ));
+    private final RuleTester tester = new RuleTester();
 
     @Test
     public void testEliminateCrossJoin()
     {
         tester.assertThat(new EliminateCrossJoins())
+                .setSystemProperty(REORDER_JOINS, "true")
                 .on(crossJoinAndJoin(JoinNode.Type.INNER))
                 .matches(
                         project(
@@ -80,6 +78,7 @@ public class TestEliminateCrossJoins
     public void testDoNotReorderOuterJoin()
     {
         tester.assertThat(new EliminateCrossJoins())
+                .setSystemProperty(REORDER_JOINS, "true")
                 .on(crossJoinAndJoin(JoinNode.Type.LEFT))
                 .doesNotFire();
     }
