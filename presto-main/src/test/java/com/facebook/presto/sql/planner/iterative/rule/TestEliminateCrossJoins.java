@@ -60,6 +60,7 @@ public class TestEliminateCrossJoins
     public void testRetainOutgoingGroupReferences()
     {
         tester.assertThat(new EliminateCrossJoins())
+                .setSystemProperty(REORDER_JOINS, "true")
                 .on(crossJoinAndJoin(JoinNode.Type.INNER))
                 .matches(
                         any(
