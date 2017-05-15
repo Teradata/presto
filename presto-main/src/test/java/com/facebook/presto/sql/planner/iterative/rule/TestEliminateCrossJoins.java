@@ -95,10 +95,10 @@ public class TestEliminateCrossJoins
             // (a inner join b) inner join c on c.x = a.x and c.y = b.y
             return p.join(JoinNode.Type.INNER,
                     p.join(secondJoinType,
-                            p.tableScan(ImmutableList.of(axSymbol)),
-                            p.tableScan(ImmutableList.of(bySymbol))
+                            p.values(axSymbol),
+                            p.values(bySymbol)
                     ),
-                    p.tableScan(ImmutableList.of(cxSymbol, cySymbol)),
+                    p.values(cxSymbol, cySymbol),
                     new JoinNode.EquiJoinClause(cxSymbol, axSymbol),
                     new JoinNode.EquiJoinClause(cySymbol, bySymbol)
             );
