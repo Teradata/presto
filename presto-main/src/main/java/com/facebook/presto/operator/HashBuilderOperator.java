@@ -15,6 +15,7 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spiller.SingleStreamSpiller;
 import com.facebook.presto.spiller.SingleStreamSpillerFactory;
 import com.facebook.presto.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
 import com.facebook.presto.sql.planner.Symbol;
@@ -24,13 +25,19 @@ import com.google.common.util.concurrent.ListenableFuture;
 
 import javax.annotation.concurrent.ThreadSafe;
 
+import java.util.ArrayDeque;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 
+import static com.facebook.presto.operator.Operators.checkNoFailure;
+import static com.facebook.presto.operator.Operators.getDone;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
@@ -173,6 +180,45 @@ public class HashBuilderOperator
         }
     }
 
+    private enum State
+    {
+        /**
+         * Operator accepts input
+         */
+        CONSUMING_INPUT,
+
+        /**
+         * Memory revoking occurred during {@link #CONSUMING_INPUT}. Operator accepts input and spills it
+         */
+        SPILLING_INPUT,
+
+        /**
+         * LookupSource has been built and passed on without any spill occurring
+         */
+        LOOKUP_SOURCE_BUILT,
+
+        /**
+         * Input has been finished and spilled
+         */
+        LOOKUP_SOURCE_SPILLED,
+
+        /**
+         * Spilled input is being unspilled
+         */
+        LOOKUP_SOURCE_UNSPILLING,
+
+        /**
+         * Spilled input has been unspilled, LookupSource built from it
+         */
+        // TODO consider merging this state with LOOKUP_SOURCE_BUILT
+        LOOKUP_SOURCE_UNSPILLED_AND_BUILT,
+
+        /**
+         * No longer needed
+         */
+        DISPOSED
+    }
+
     private final OperatorContext operatorContext;
     private final PartitionedLookupSourceFactory lookupSourceFactory;
     private final int partitionIndex;
@@ -187,8 +233,15 @@ public class HashBuilderOperator
     private final boolean spillEnabled;
     private final SingleStreamSpillerFactory singleStreamSpillerFactory;
 
-    private boolean finishing;
     private final HashCollisionsCounter hashCollisionsCounter;
+
+    private State state = State.CONSUMING_INPUT;
+    private Optional<ListenableFuture<?>> lookupSourceNotNeeded = Optional.empty();
+    private SpilledLookupSourceHandle spilledLookupSourceHandle = new SpilledLookupSourceHandle();
+    private Optional<SingleStreamSpiller> spiller = Optional.empty();
+    private long spilledPagesInMemorySize;
+    private ListenableFuture<?> spillInProgress = NOT_BLOCKED;
+    private Optional<ListenableFuture<List<Page>>> unspillInProgress = Optional.empty();
 
     public HashBuilderOperator(
             OperatorContext operatorContext,
@@ -238,30 +291,136 @@ public class HashBuilderOperator
     @Override
     public ListenableFuture<?> isBlocked()
     {
-        if (!finishing) {
-            return NOT_BLOCKED;
+        switch (state) {
+            case CONSUMING_INPUT:
+                return NOT_BLOCKED;
+
+            case SPILLING_INPUT:
+                return spillInProgress;
+
+            case LOOKUP_SOURCE_BUILT:
+                return lookupSourceNotNeeded.get();
+
+            case LOOKUP_SOURCE_SPILLED:
+                return spilledLookupSourceHandle.getUnspillingRequested();
+
+            case LOOKUP_SOURCE_UNSPILLING:
+                return unspillInProgress.get();
+
+            case LOOKUP_SOURCE_UNSPILLED_AND_BUILT:
+                return spilledLookupSourceHandle.getDisposeRequested();
+
+            case DISPOSED:
+                return lookupSourceFactory.isDestroyed();
         }
-        return lookupSourceFactory.isDestroyed();
+        throw new IllegalStateException("Unhandled state: " + state);
     }
 
     @Override
     public boolean needsInput()
     {
-        return !finishing;
+        return state == State.CONSUMING_INPUT
+                || (state == State.SPILLING_INPUT && spillInProgress.isDone());
     }
 
     @Override
     public void addInput(Page page)
     {
         requireNonNull(page, "page is null");
-        checkState(!isFinished(), "Operator is already finished");
 
-        index.addPage(page);
-        if (!operatorContext.trySetMemoryReservation(index.getEstimatedSize().toBytes())) {
-            index.compact();
+        if (state == State.SPILLING_INPUT) {
+            spillInput(page);
+            return;
         }
-        operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
+
+        checkState(state == State.CONSUMING_INPUT);
+        updateIndex(page);
+    }
+
+    private void updateIndex(Page page)
+    {
+        index.addPage(page);
+
+        if (spillEnabled) {
+            // TODO trySetRevocableMemoryReservation else index.compact()
+
+            operatorContext.setRevocableMemoryReservation(index.getEstimatedSize().toBytes());
+        }
+        else {
+            if (!operatorContext.trySetMemoryReservation(index.getEstimatedSize().toBytes())) {
+                index.compact();
+                operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
+            }
+        }
         operatorContext.recordGeneratedOutput(page.getSizeInBytes(), page.getPositionCount());
+    }
+
+    private void spillInput(Page page)
+    {
+        checkState(spillInProgress.isDone(), "Previous spill still in progress");
+        checkNoFailure(spillInProgress);
+        spillInProgress = spiller.orElseThrow(() -> new IllegalStateException("Spiller not loaded"))
+                .spill(page);
+        spilledPagesInMemorySize += page.getSizeInBytes();
+    }
+
+    @Override
+    public ListenableFuture<?> startMemoryRevoke()
+    {
+        checkState(spillEnabled, "Spill not enabled, no revokable memory should be reserved");
+
+        if (state == State.LOOKUP_SOURCE_BUILT) {
+            // TODO compute checksum of lookupSource's position links for validation when lookupSource is rebuilt
+        }
+
+        if (state == State.CONSUMING_INPUT || state == State.LOOKUP_SOURCE_BUILT) {
+            checkState(!spiller.isPresent(), "Spiller already loaded");
+            spiller = Optional.of(createSpiller());
+            return spiller.get().spill(index.getPages());
+        }
+
+        // Otherwise this is stale revoking request
+        long reservedRevocableBytes = operatorContext.getReservedRevocableBytes();
+        if (reservedRevocableBytes == 0) {
+            return immediateFuture(null);
+        }
+        throw new IllegalStateException(format("Remaining %s revocable bytes which I don't know how to revoke", reservedRevocableBytes));
+    }
+
+    private SingleStreamSpiller createSpiller()
+    {
+        return singleStreamSpillerFactory.create(index.getTypes(),
+                operatorContext.getSpillContext().newLocalSpillContext(),
+                operatorContext.getSystemMemoryContext().newLocalMemoryContext());
+    }
+
+    @Override
+    public void finishMemoryRevoke()
+    {
+        if (state == State.CONSUMING_INPUT) {
+            index.clear();
+            operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
+            operatorContext.setRevocableMemoryReservation(0L);
+            state = State.SPILLING_INPUT;
+            return;
+        }
+
+        if (state == State.LOOKUP_SOURCE_BUILT) {
+            // TODO is there any risk of starvation here? RW-lock in PLSF...
+            lookupSourceFactory.setPartitionSpilledLookupSource(partitionIndex, spilledLookupSourceHandle);
+            index.clear();
+            operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
+            operatorContext.setRevocableMemoryReservation(0L);
+            state = State.LOOKUP_SOURCE_SPILLED;
+            return;
+        }
+
+        long reservedRevocableBytes = operatorContext.getReservedRevocableBytes();
+        if (reservedRevocableBytes == 0) {
+            return;
+        }
+
+        throw new IllegalStateException("Cannot finish unknown revoking");
     }
 
     @Override
@@ -273,21 +432,155 @@ public class HashBuilderOperator
     @Override
     public void finish()
     {
-        if (finishing) {
+        switch (state) {
+            case CONSUMING_INPUT:
+                finishInput();
+                return;
+
+            case LOOKUP_SOURCE_BUILT:
+                disposeLookupSourceIfRequested();
+                return;
+
+            case SPILLING_INPUT:
+                finishSpilledInput();
+                return;
+
+            case LOOKUP_SOURCE_SPILLED:
+                unspillLookupSourceIfRequested();
+                return;
+
+            case LOOKUP_SOURCE_UNSPILLING:
+                finishLookupSourceUnspilling();
+                return;
+
+            case LOOKUP_SOURCE_UNSPILLED_AND_BUILT:
+                disposeUnspilledLookupSourceIfRequested();
+                return;
+
+            case DISPOSED:
+                // no-op
+                return;
+        }
+        throw new IllegalStateException("Unhandled state: " + state);
+    }
+
+    private void finishInput()
+    {
+        LookupSourceSupplier partition = buildLookupSource();
+        if (spillEnabled) {
+            operatorContext.setRevocableMemoryReservation(partition.get().getInMemorySizeInBytes());
+        }
+        else {
+            operatorContext.setMemoryReservation(partition.get().getInMemorySizeInBytes());
+        }
+        lookupSourceNotNeeded = Optional.of(lookupSourceFactory.setPartitionLookupSourceSupplier(partitionIndex, partition));
+
+        state = State.LOOKUP_SOURCE_BUILT;
+    }
+
+    private void disposeLookupSourceIfRequested()
+    {
+        checkState(lookupSourceNotNeeded.isPresent());
+        if (!lookupSourceNotNeeded.get().isDone()) {
             return;
         }
-        finishing = true;
+
+        index.clear();
+        operatorContext.setRevocableMemoryReservation(0L);
+        operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
+        state = State.DISPOSED;
+    }
+
+    private void finishSpilledInput()
+    {
+        if (!spillInProgress.isDone()) {
+            // Not ready to handle finish() yet
+            return;
+        }
+        checkNoFailure(spillInProgress);
+        lookupSourceFactory.setPartitionSpilledLookupSource(partitionIndex, spilledLookupSourceHandle);
+
+        state = State.LOOKUP_SOURCE_SPILLED;
+    }
+
+    private void unspillLookupSourceIfRequested()
+    {
+        if (!spilledLookupSourceHandle.getUnspillingRequested().isDone()) {
+            // Nothing to do yet.
+            return;
+        }
+
+        checkState(!unspillInProgress.isPresent());
+        operatorContext.setMemoryReservation(spilledPagesInMemorySize + index.getEstimatedSize().toBytes());
+        unspillInProgress = Optional.of(spiller.get().getAllSpilledPages());
+
+        state = State.LOOKUP_SOURCE_UNSPILLING;
+    }
+
+    private void finishLookupSourceUnspilling()
+    {
+        if (!unspillInProgress.get().isDone()) {
+            // Pages have not be unspilled yet.
+            return;
+        }
+
+        // Use Queue so that Pages already consumed by Index are not retained by us.
+        Queue<Page> pages = new ArrayDeque<>(getDone(unspillInProgress.get()));
+        long memoryRetainedByRemainingPages = pages.stream()
+                .mapToLong(Page::getRetainedSizeInBytes)
+                .sum();
+        operatorContext.setMemoryReservation(memoryRetainedByRemainingPages + index.getEstimatedSize().toBytes());
+
+        while (!pages.isEmpty()) {
+            Page next = pages.remove();
+            index.addPage(next);
+            // There is no attempt to compact index, since unspilled pages are unlikely to have blocks with retained size > logical size.
+            memoryRetainedByRemainingPages -= next.getRetainedSizeInBytes();
+            operatorContext.setMemoryReservation(memoryRetainedByRemainingPages + index.getEstimatedSize().toBytes());
+        }
+
+        LookupSource lookupSource = buildLookupSource().get();
+        operatorContext.setMemoryReservation(lookupSource.getInMemorySizeInBytes());
+
+        // TODO shared LS or Supplier<LS> ?
+        spilledLookupSourceHandle.setLookupSource(lookupSource);
+
+        state = State.LOOKUP_SOURCE_UNSPILLED_AND_BUILT;
+    }
+
+    private void disposeUnspilledLookupSourceIfRequested()
+    {
+        if (!spilledLookupSourceHandle.getDisposeRequested().isDone()) {
+            return;
+        }
+
+        index.clear();
+        operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
+
+        state = State.DISPOSED;
+    }
+
+    private LookupSourceSupplier buildLookupSource()
+    {
+        // TODO when partition is disposed (either normal or unspilled one), make sure no-one holds references to it. PartitionedConsumption currently does. Who else?
+        // TODO Maybe finished, but not closed yet, LJOs? Who else
 
         LookupSourceSupplier partition = index.createLookupSourceSupplier(operatorContext.getSession(), hashChannels, preComputedHashChannel, filterFunctionFactory, Optional.of(outputChannels));
-        lookupSourceFactory.setPartitionLookupSourceSupplier(partitionIndex, partition);
-
-        operatorContext.setMemoryReservation(partition.get().getInMemorySizeInBytes());
         hashCollisionsCounter.recordHashCollision(partition.getHashCollisions(), partition.getExpectedHashCollisions());
+        return partition;
     }
 
     @Override
     public boolean isFinished()
     {
-        return finishing && lookupSourceFactory.isDestroyed().isDone();
+        // TODO FIXME state == DISPOSED || LSF is destroyed ?
+        return lookupSourceFactory.isDestroyed().isDone();
+    }
+
+    @Override
+    public void close()
+            throws Exception
+    {
+        spiller.ifPresent(SingleStreamSpiller::close);
     }
 }
