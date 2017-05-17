@@ -132,7 +132,7 @@ public class JoinNode
     {
         return joinCriteria
                 .stream()
-                .map(equiJoinClause -> new EquiJoinClause(equiJoinClause.getRight(), equiJoinClause.getLeft()))
+                .map(EquiJoinClause::flip)
                 .collect(toImmutableList());
     }
 
@@ -307,6 +307,11 @@ public class JoinNode
         public Symbol getRight()
         {
             return right;
+        }
+
+        public EquiJoinClause flip()
+        {
+            return new EquiJoinClause(right, left);
         }
 
         @Override

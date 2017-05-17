@@ -18,29 +18,25 @@ import com.facebook.presto.Session;
 import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
-import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.tree.Expression;
 import com.google.common.collect.ImmutableSet;
 
-import java.util.List;
 import java.util.Set;
 
+import static com.facebook.presto.sql.ExpressionUtils.extractConjuncts;
 import static com.facebook.presto.sql.planner.assertions.MatchResult.NO_MATCH;
 import static com.facebook.presto.sql.planner.assertions.MatchResult.match;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 public class JoinGraphMatcher
         implements Matcher
 {
-    private final List<ExpectedValueProvider<JoinNode.EquiJoinClause>> expectedEquiCriteria;
-    private final List<Expression> expectedFilters;
+    private final Expression expectedFilter;
 
-    public JoinGraphMatcher(List<ExpectedValueProvider<JoinNode.EquiJoinClause>> expectedEquiCriteria, List<Expression> expectedFilters)
+    public JoinGraphMatcher(Expression expectedFilter)
     {
-        this.expectedEquiCriteria = expectedEquiCriteria;
-        this.expectedFilters = expectedFilters;
+        this.expectedFilter = expectedFilter;
     }
 
     @Override
@@ -54,23 +50,12 @@ public class JoinGraphMatcher
     {
         checkState(shapeMatches(node), "Plan testing framework error: shapeMatches returned false in detailMatches in %s", this.getClass().getName());
         JoinGraphNode joinGraph = (JoinGraphNode) node;
-        if (joinGraph.getCriteria().size() != expectedEquiCriteria.size()) {
+        Set<Expression> actualFilters = ImmutableSet.copyOf(extractConjuncts(joinGraph.getFilter()));
+        Set<Expression> expectedFilters = ImmutableSet.copyOf(extractConjuncts(symbolAliases.replaceSymbolAliasesInExpression(expectedFilter)));
+        if (actualFilters.size() != expectedFilters.size()) {
             return NO_MATCH;
         }
-        Set<JoinNode.EquiJoinClause> actualCriteria = ImmutableSet.copyOf(joinGraph.getCriteria());
-        Set<JoinNode.EquiJoinClause> expectedCriteria = expectedEquiCriteria.stream()
-                .map(maker -> maker.getExpectedValue(symbolAliases))
-                .collect(toImmutableSet());
-        if (!expectedCriteria.equals(actualCriteria)) {
-            return NO_MATCH;
-        }
-
-        Set<Expression> actualFilters = ImmutableSet.copyOf(joinGraph.getFilters());
-        Set<Expression> expectedfilters = expectedFilters.stream().map(symbolAliases::replaceSymbolAliasesInExpression).collect(toImmutableSet());
-        if (joinGraph.getFilters().size() != expectedFilters.size()) {
-            return NO_MATCH;
-        }
-        if (!expectedfilters.equals(actualFilters)) {
+        if (!expectedFilters.equals(actualFilters)) {
             return NO_MATCH;
         }
 

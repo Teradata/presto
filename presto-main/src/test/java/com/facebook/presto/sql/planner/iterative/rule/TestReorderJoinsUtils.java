@@ -20,6 +20,7 @@ import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.tree.ComparisonExpression;
+import com.facebook.presto.sql.tree.SymbolReference;
 import com.facebook.presto.testing.LocalQueryRunner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -30,14 +31,16 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
+import static com.facebook.presto.sql.ExpressionUtils.and;
 import static com.facebook.presto.sql.planner.assertions.PlanAssert.assertPlan;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.join;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.joinGraph;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.values;
-import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.createJoinAccordingToPartitioning;
-import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoinsUtils.generatePartitions;
+import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.createJoinAccordingToPartitioning;
+import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.generatePartitions;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
+import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static org.testng.Assert.assertEquals;
@@ -79,15 +82,10 @@ public class TestReorderJoinsUtils
                         planBuilder.values(planBuilder.symbol("B1", BIGINT)),
                         planBuilder.values(planBuilder.symbol("C1", BIGINT)),
                         planBuilder.values(planBuilder.symbol("D1", BIGINT))),
-                ImmutableList.of(
-                        new JoinNode.EquiJoinClause(planBuilder.symbol("A1", BIGINT), planBuilder.symbol("B1", BIGINT)),
-                        new JoinNode.EquiJoinClause(planBuilder.symbol("A1", BIGINT), planBuilder.symbol("C1", BIGINT)),
-                        new JoinNode.EquiJoinClause(planBuilder.symbol("D1", BIGINT), planBuilder.symbol("C1", BIGINT)),
-                        new JoinNode.EquiJoinClause(planBuilder.symbol("B1", BIGINT), planBuilder.symbol("D1", BIGINT))
-                ),
-                ImmutableList.of(
-                        new ComparisonExpression(GREATER_THAN, planBuilder.symbol("A1", BIGINT).toSymbolReference(), planBuilder.symbol("C1", BIGINT).toSymbolReference())
-                ));
+                and(
+                        new ComparisonExpression(EQUAL, new SymbolReference("A1"), new SymbolReference("B1")),
+                        new ComparisonExpression(EQUAL, new SymbolReference("B1"), new SymbolReference("D1")),
+                        new ComparisonExpression(GREATER_THAN, planBuilder.symbol("A1", BIGINT).toSymbolReference(), planBuilder.symbol("C1", BIGINT).toSymbolReference())));
         JoinNode actual = createJoinAccordingToPartitioning(joinGraphNode, ImmutableSet.of(0, 2), idAllocator);
         assertPlan(
                 session,
@@ -96,17 +94,15 @@ public class TestReorderJoinsUtils
                 new Plan(actual, planBuilder.getSymbols(), queryRunner.getLookup(), queryRunner.getDefaultSession()),
                 join(
                         JoinNode.Type.INNER,
-                        ImmutableList.of(equiJoinClause("A1", "B1"), equiJoinClause("C1", "D1")),
+                        ImmutableList.of(equiJoinClause("A1", "B1")),
                         Optional.empty(),
-                        Optional.of(PARTITIONED),
+                        Optional.empty(),
                         joinGraph(
-                                ImmutableList.of(equiJoinClause("A1", "C1")),
-                                ImmutableList.of("A1 > C1"),
+                                "A1 > C1",
                                 values(ImmutableMap.of("A1", 0)),
                                 values(ImmutableMap.of("C1", 0))),
                         joinGraph(
-                                ImmutableList.of(equiJoinClause("B1", "D1")),
-                                ImmutableList.of(),
+                                "B1 = D1",
                                 values(ImmutableMap.of("B1", 0)),
                                 values(ImmutableMap.of("D1", 0)))));
     }
