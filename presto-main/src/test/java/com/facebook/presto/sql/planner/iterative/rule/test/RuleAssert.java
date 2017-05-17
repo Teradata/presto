@@ -140,6 +140,9 @@ public class RuleAssert
     {
         return transaction(transactionManager, accessControl)
                 .singleStatement()
-                .execute(session, transactionSessionConsumer);
+                .execute(session, session -> {
+                    session.getCatalog().ifPresent(catalog -> metadata.getCatalogHandle(session, catalog));
+                    return transactionSessionConsumer.apply(session);
+                });
     }
 }
