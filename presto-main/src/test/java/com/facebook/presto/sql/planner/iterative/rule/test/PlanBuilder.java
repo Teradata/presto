@@ -259,6 +259,16 @@ public class PlanBuilder
         return exchangeBuilder.build();
     }
 
+    public JoinNode join(JoinNode.Type type, PlanNode left, PlanNode right, List<JoinNode.EquiJoinClause> criteria, List<Symbol> outputSymbols, Optional<Expression> filter)
+    {
+        return new JoinNode(idAllocator.getNextId(), type, left, right, criteria, outputSymbols, filter, Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
+    public JoinGraphNode joinGraph(List<PlanNode> sources, Expression filter)
+    {
+        return new JoinGraphNode(idAllocator.getNextId(), sources, filter);
+    }
+
     public class ExchangeBuilder
     {
         private ExchangeNode.Type type = ExchangeNode.Type.GATHER;
