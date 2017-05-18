@@ -247,15 +247,16 @@ public class LocalQueryRunner
                 new FeaturesConfig()
                         .setOptimizeMixedDistinctAggregations(true)
                         .setIterativeOptimizerEnabled(true),
-                false);
+                false,
+                1);
     }
 
     public LocalQueryRunner(Session defaultSession, FeaturesConfig featuresConfig)
     {
-        this(defaultSession, featuresConfig, false);
+        this(defaultSession, featuresConfig, false, 1);
     }
 
-    private LocalQueryRunner(Session defaultSession, FeaturesConfig featuresConfig, boolean withInitialTransaction)
+    private LocalQueryRunner(Session defaultSession, FeaturesConfig featuresConfig, boolean withInitialTransaction, int nodeCountForStats)
     {
         requireNonNull(defaultSession, "defaultSession is null");
         checkArgument(!defaultSession.getTransactionId().isPresent() || !withInitialTransaction, "Already in transaction");
@@ -372,15 +373,20 @@ public class LocalQueryRunner
         SpillerStats spillerStats = new SpillerStats();
         this.spillerFactory = new GenericSpillerFactory(new FileSingleStreamSpillerFactory(blockEncodingSerde, spillerStats, featuresConfig));
         this.statsCalculator = new CoefficientBasedStatsCalculator(metadata);
-        this.costCalculator = new CostCalculatorUsingExchanges(getNodeCount());
-        this.estimatedExchangesCostCalculator = new CostCalculatorWithEstimatedExchanges(costCalculator, getNodeCount());
+        this.costCalculator = new CostCalculatorUsingExchanges(nodeCountForStats);
+        this.estimatedExchangesCostCalculator = new CostCalculatorWithEstimatedExchanges(costCalculator, nodeCountForStats);
         this.lookup = new StatelessLookup(statsCalculator, costCalculator);
     }
 
     public static LocalQueryRunner queryRunnerWithInitialTransaction(Session defaultSession)
     {
         checkArgument(!defaultSession.getTransactionId().isPresent(), "Already in transaction!");
-        return new LocalQueryRunner(defaultSession, new FeaturesConfig(), true);
+        return new LocalQueryRunner(defaultSession, new FeaturesConfig(), true, 1);
+    }
+
+    public static LocalQueryRunner queryRunnerWithFakeNodeCount(Session defaultSession, int nodeCount)
+    {
+        return new LocalQueryRunner(defaultSession, new FeaturesConfig(), false, nodeCount);
     }
 
     @Override
