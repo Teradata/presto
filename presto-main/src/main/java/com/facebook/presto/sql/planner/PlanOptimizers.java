@@ -23,6 +23,7 @@ import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.iterative.IterativeOptimizer;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.iterative.rule.AddIntermediateAggregations;
+import com.facebook.presto.sql.planner.iterative.rule.ConvertJoinTreeToJoinGraph;
 import com.facebook.presto.sql.planner.iterative.rule.CreatePartialTopN;
 import com.facebook.presto.sql.planner.iterative.rule.EvaluateZeroLimit;
 import com.facebook.presto.sql.planner.iterative.rule.EvaluateZeroSample;
@@ -46,6 +47,7 @@ import com.facebook.presto.sql.planner.iterative.rule.PushTopNThroughUnion;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveEmptyDelete;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveFullSample;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveRedundantIdentityProjections;
+import com.facebook.presto.sql.planner.iterative.rule.ReorderJoins;
 import com.facebook.presto.sql.planner.iterative.rule.SimplifyCountOverConstant;
 import com.facebook.presto.sql.planner.iterative.rule.SingleMarkDistinctToGroupBy;
 import com.facebook.presto.sql.planner.iterative.rule.SwapAdjacentWindowsBySpecifications;
@@ -258,6 +260,19 @@ public class PlanOptimizers
                 new MetadataQueryOptimizer(metadata),
                 new EliminateCrossJoins(), // This can pull up Filter and Project nodes from between Joins, so we need to push them down again
                 new PredicatePushDown(metadata, sqlParser),
+                new PruneUnreferencedOutputs(),
+                new IterativeOptimizer(
+                        stats,
+                        statsCalculator,
+                        estimatedExchangesCostCalculator,
+                        ImmutableSet.of(new RemoveRedundantIdentityProjections())
+                ),
+                new IterativeOptimizer(
+                        stats,
+                        statsCalculator,
+                        estimatedExchangesCostCalculator,
+                        ImmutableSet.of(new ConvertJoinTreeToJoinGraph(), new ReorderJoins(costComparator))
+                ),
                 new IterativeOptimizer(
                         stats,
                         statsCalculator,
