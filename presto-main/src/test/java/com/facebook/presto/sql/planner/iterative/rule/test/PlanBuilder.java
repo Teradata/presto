@@ -29,6 +29,7 @@ import com.facebook.presto.sql.planner.PartitioningScheme;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.TestingTableHandle;
+import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Aggregation;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Step;
@@ -40,6 +41,7 @@ import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.LimitNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.facebook.presto.sql.planner.plan.SampleNode;
 import com.facebook.presto.sql.planner.plan.TableFinishNode;
@@ -83,8 +85,13 @@ public class PlanBuilder
 
     public ValuesNode values(Symbol... columns)
     {
+        return values(idAllocator.getNextId(), columns);
+    }
+
+    public ValuesNode values(PlanNodeId id, Symbol... columns)
+    {
         return new ValuesNode(
-                idAllocator.getNextId(),
+                id,
                 ImmutableList.copyOf(columns),
                 ImmutableList.of());
     }

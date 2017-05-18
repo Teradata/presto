@@ -253,14 +253,11 @@ public final class PlanMatchPattern
                         distributionType));
     }
 
-    public static PlanMatchPattern joinGraph(List<ExpectedValueProvider<JoinNode.EquiJoinClause>> expectedEquiCriteria, List<String> expectedFilters, PlanMatchPattern... sources)
+    public static PlanMatchPattern joinGraph(String filter, PlanMatchPattern... sources)
     {
         return node(JoinGraphNode.class, sources).with(
                 new JoinGraphMatcher(
-                        expectedEquiCriteria,
-                        expectedFilters.stream()
-                                .map(stringExpression -> rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(stringExpression)))
-                                .collect(toImmutableList())));
+                        rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(filter))));
     }
 
     public static PlanMatchPattern exchange(PlanMatchPattern... sources)
