@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import static com.facebook.presto.sql.ExpressionUtils.and;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
@@ -90,13 +91,23 @@ public class JoinGraphNode
         return new JoinGraphNode(getId(), newChildren, filter, outputSymbols);
     }
 
-    //TODO: provide more efficient key implementation
-    public String getKey()
+    @Override
+    public int hashCode()
     {
-        List<String> sourceIds = sources.stream()
-                .map(source -> source.getId().toString())
-                .collect(toImmutableList());
-        return sourceIds.toString() + filter.toString();
+        return Objects.hash(this.getOutputSymbols(), this.getFilter(), this.getSources().stream().map(PlanNode::getId).collect(toImmutableList()));
+    }
+
+    @Override
+    public boolean equals(Object other)
+    {
+        if (!(other instanceof JoinGraphNode)) {
+            return false;
+        }
+
+        JoinGraphNode otherJoinGraph = (JoinGraphNode) other;
+        return this.getOutputSymbols().equals(otherJoinGraph.getOutputSymbols())
+                && this.getFilter().equals(otherJoinGraph.getFilter())
+                && this.getSources().stream().map(PlanNode::getId).collect(toImmutableList()).equals(otherJoinGraph.getSources().stream().map(PlanNode::getId));
     }
 
     public static class JoinGraphNodeBuilder
@@ -120,8 +131,8 @@ public class JoinGraphNode
                 flattenNode(joinNode.getLeft(), lookup);
                 flattenNode(joinNode.getRight(), lookup);
                 joinNode.getCriteria().stream()
-                                .map(criterion -> new ComparisonExpression(EQUAL, criterion.getLeft().toSymbolReference(), criterion.getRight().toSymbolReference()))
-                                .forEach(filters::add);
+                        .map(criterion -> new ComparisonExpression(EQUAL, criterion.getLeft().toSymbolReference(), criterion.getRight().toSymbolReference()))
+                        .forEach(filters::add);
                 joinNode.getFilter().ifPresent(filters::add);
             }
             else {

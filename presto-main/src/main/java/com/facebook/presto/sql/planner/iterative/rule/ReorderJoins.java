@@ -91,7 +91,7 @@ public class ReorderJoins
     @VisibleForTesting
     public static class JoinEnumerator
     {
-        private final Map<String, JoinNode> memo = new HashMap<>();
+        private final Map<JoinGraphNode, JoinNode> memo = new HashMap<>();
         private final PlanNodeIdAllocator idAllocator;
         private final Session session;
         private final Ordering<PlanNode> planNodeOrdering;
@@ -237,14 +237,13 @@ public class ReorderJoins
 
         private JoinNode chooseJoinOrder(JoinGraphNode joinGraph)
         {
-            String key = joinGraph.getKey();
-            JoinNode join = memo.get(key);
+            JoinNode join = memo.get(joinGraph);
             if (join == null) {
                 join = generatePartitions(joinGraph.getSources().size())
                         .map(partitioning -> createJoinNodeTree(joinGraph, partitioning, idAllocator))
                         .min(planNodeOrdering)
                         .orElseThrow(() -> new IllegalStateException("joinOrders cannot be empty"));
-                memo.put(key, join);
+                memo.put(joinGraph, join);
             }
             return join;
         }
