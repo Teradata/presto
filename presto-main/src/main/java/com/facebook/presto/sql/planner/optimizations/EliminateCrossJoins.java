@@ -39,6 +39,7 @@ import java.util.PriorityQueue;
 import java.util.Set;
 
 import static com.facebook.presto.SystemSessionProperties.isCrossJoinEliminationEnabled;
+import static com.facebook.presto.SystemSessionProperties.isJoinReorderingEnabled;
 import static com.facebook.presto.sql.planner.plan.SimplePlanRewriter.rewriteWith;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -55,7 +56,7 @@ public class EliminateCrossJoins
             SymbolAllocator symbolAllocator,
             PlanNodeIdAllocator idAllocator)
     {
-        if (!isCrossJoinEliminationEnabled(session)) {
+        if (!isCrossJoinEliminationEnabled(session) || isJoinReorderingEnabled(session)) {
             return plan;
         }
 
