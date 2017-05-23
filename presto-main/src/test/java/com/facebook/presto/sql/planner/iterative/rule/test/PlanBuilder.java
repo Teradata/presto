@@ -273,7 +273,13 @@ public class PlanBuilder
 
     public JoinGraphNode joinGraph(List<PlanNode> sources, Expression filter)
     {
-        return new JoinGraphNode(idAllocator.getNextId(), sources, filter);
+        return new JoinGraphNode(
+                idAllocator.getNextId(),
+                sources,
+                filter,
+                sources.stream()
+                        .flatMap(source -> source.getOutputSymbols().stream())
+                        .collect(toImmutableList()));
     }
 
     public class ExchangeBuilder

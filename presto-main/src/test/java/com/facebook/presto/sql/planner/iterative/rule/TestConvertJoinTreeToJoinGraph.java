@@ -29,10 +29,8 @@ import java.util.Optional;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.sql.ExpressionUtils.and;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
-import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.expression;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.join;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.joinGraph;
-import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.project;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.values;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.LEFT;
@@ -78,6 +76,7 @@ public class TestConvertJoinTreeToJoinGraph
                         Optional.empty()))
                 .matches(joinGraph(
                         "A1=C1",
+                        ImmutableList.of("A1", "B1", "C1"),
                         join(LEFT, ImmutableList.of(equiJoinClause("A1", "B1")),
                                 values(ImmutableMap.of("A1", 0)),
                                 values(ImmutableMap.of("B1", 0))),
@@ -108,15 +107,12 @@ public class TestConvertJoinTreeToJoinGraph
                                 ImmutableList.of(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT)),
                                 Optional.empty()))
                 .matches(
-                        project(
-                                ImmutableMap.of(
-                                        "A1", expression("A1"),
-                                        "B1", expression("B1")),
-                                joinGraph(
-                                        "B1=C1 AND A1=B1",
-                                        values(ImmutableMap.of("A1", 0)),
-                                        values(ImmutableMap.of("B1", 0, "B2", 1)),
-                                        values(ImmutableMap.of("C1", 0, "C2", 1)))));
+                        joinGraph(
+                                "B1=C1 AND A1=B1",
+                                ImmutableList.of("A1", "B1"),
+                                values(ImmutableMap.of("A1", 0)),
+                                values(ImmutableMap.of("B1", 0, "B2", 1)),
+                                values(ImmutableMap.of("C1", 0, "C2", 1))));
     }
 
     @Test
@@ -150,6 +146,7 @@ public class TestConvertJoinTreeToJoinGraph
                                         p.symbol("B1", BIGINT).toSymbolReference()))))
                 .matches(joinGraph(
                         "B1=C1 AND A1=B1 AND C2 > 0 AND C2 <>7 AND B2 > C2 AND A1+ C1 < B1",
+                        ImmutableList.of("A1", "B1", "B2", "C1", "C2"),
                         values(ImmutableMap.of("A1", 0)),
                         values(ImmutableMap.of("B1", 0, "B2", 1)),
                         values(ImmutableMap.of("C1", 0, "C2", 1))));
@@ -200,6 +197,7 @@ public class TestConvertJoinTreeToJoinGraph
                         Optional.empty()))
                 .matches(joinGraph(
                         "A1=B1 AND A1=C1 AND D1=E1 AND D2=E2 AND B1=E1",
+                        ImmutableList.of("A1", "B1", "C1", "D1", "D2", "E1", "E2"),
                         values(ImmutableMap.of("A1", 0)),
                         values(ImmutableMap.of("B1", 0)),
                         values(ImmutableMap.of("C1", 0)),

@@ -46,8 +46,9 @@ public class JoinGraphNode
 {
     private final List<PlanNode> sources;
     private final Expression filter;
+    private final List<Symbol> outputSymbols;
 
-    public JoinGraphNode(PlanNodeId id, List<PlanNode> sources, Expression filter)
+    public JoinGraphNode(PlanNodeId id, List<PlanNode> sources, Expression filter, List<Symbol> outputSymbols)
     {
         super(id);
 
@@ -56,6 +57,7 @@ public class JoinGraphNode
 
         this.sources = ImmutableList.copyOf(sources);
         this.filter = filter;
+        this.outputSymbols = ImmutableList.copyOf(outputSymbols);
     }
 
     public Expression getFilter()
@@ -78,15 +80,13 @@ public class JoinGraphNode
     @Override
     public List<Symbol> getOutputSymbols()
     {
-        return sources.stream()
-                .flatMap(source -> source.getOutputSymbols().stream())
-                .collect(toImmutableList());
+        return outputSymbols;
     }
 
     @Override
     public PlanNode replaceChildren(List<PlanNode> newChildren)
     {
-        return new JoinGraphNode(getId(), newChildren, filter);
+        return new JoinGraphNode(getId(), newChildren, filter, outputSymbols);
     }
 
     //TODO: provide more efficient key implementation
@@ -102,11 +102,11 @@ public class JoinGraphNode
     {
         private final List<PlanNode> sources = new ArrayList<>();
         private final List<Expression> filters = new ArrayList<>();
+        private final List<Symbol> outputSymbols;
 
-        // WARNING: this does not maintain the output symbols of the input joins.
-        // a project may need to be added above the JoinGraphNode to ensure correctness.
         public JoinGraphNodeBuilder(JoinNode node, Lookup lookup)
         {
+            this.outputSymbols = node.getOutputSymbols();
             flattenNode(node, lookup);
         }
 
@@ -117,10 +117,9 @@ public class JoinGraphNode
                 JoinNode joinNode = (JoinNode) resolved;
                 flattenNode(joinNode.getLeft(), lookup);
                 flattenNode(joinNode.getRight(), lookup);
-                filters.addAll(
-                        joinNode.getCriteria().stream()
+                joinNode.getCriteria().stream()
                                 .map(criterion -> new ComparisonExpression(EQUAL, criterion.getLeft().toSymbolReference(), criterion.getRight().toSymbolReference()))
-                                .collect(toImmutableList()));
+                                .forEach(filters::add);
                 joinNode.getFilter().ifPresent(filters::add);
             }
             else {
@@ -133,7 +132,7 @@ public class JoinGraphNode
             if (filters.isEmpty()) {
                 filters.add(TRUE_LITERAL);
             }
-            return new JoinGraphNode(idAllocator.getNextId(), sources, and(filters));
+            return new JoinGraphNode(idAllocator.getNextId(), sources, and(filters), outputSymbols);
         }
     }
 }

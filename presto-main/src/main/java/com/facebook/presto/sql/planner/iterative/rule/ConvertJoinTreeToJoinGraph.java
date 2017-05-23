@@ -19,10 +19,8 @@ import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
-import com.facebook.presto.sql.planner.plan.Assignments;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
-import com.facebook.presto.sql.planner.plan.ProjectNode;
 
 import java.util.Optional;
 
@@ -45,10 +43,6 @@ public class ConvertJoinTreeToJoinGraph
             return Optional.empty();
         }
         PlanNode result = new JoinGraphNode.JoinGraphNodeBuilder(joinNode, lookup).toJoinGraphNode(idAllocator);
-        if (!result.getOutputSymbols().equals(node.getOutputSymbols())) {
-            Assignments assignments = Assignments.builder().putIdentities(node.getOutputSymbols()).build();
-            result = new ProjectNode(idAllocator.getNextId(), result, assignments);
-        }
         return Optional.of(result);
     }
 }

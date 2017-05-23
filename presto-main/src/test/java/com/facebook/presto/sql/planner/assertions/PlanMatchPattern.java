@@ -253,11 +253,12 @@ public final class PlanMatchPattern
                         distributionType));
     }
 
-    public static PlanMatchPattern joinGraph(String filter, PlanMatchPattern... sources)
+    public static PlanMatchPattern joinGraph(String filter, List<String> outputSymbols, PlanMatchPattern... sources)
     {
         return node(JoinGraphNode.class, sources).with(
                 new JoinGraphMatcher(
-                        rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(filter))));
+                        rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(filter))))
+                .withExactOutputs(outputSymbols);
     }
 
     public static PlanMatchPattern exchange(PlanMatchPattern... sources)
