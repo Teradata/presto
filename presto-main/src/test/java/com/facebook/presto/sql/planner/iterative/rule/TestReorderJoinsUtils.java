@@ -38,8 +38,8 @@ import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.equiJo
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.join;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.joinGraph;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.values;
-import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.createJoinAccordingToPartitioning;
-import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.generatePartitions;
+import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.JoinEnumerator.createJoinAccordingToPartitioning;
+import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.JoinEnumerator.generatePartitions;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;

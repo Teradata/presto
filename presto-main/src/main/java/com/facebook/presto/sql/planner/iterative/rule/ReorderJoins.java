@@ -127,6 +127,108 @@ public class ReorderJoins
             return new JoinNode.EquiJoinClause(leftSymbol, rightSymbol);
         }
 
+        /**
+         * This method generates all the ways of dividing  totalNodes into two sets
+         * each containing at least one node. It will generate one set for each
+         * possible partitioning. The other partition is implied in the absent values.
+         * In order not to generate the inverse of any set, we always include the 0th
+         * node in our sets.
+         *
+         * @param totalNodes
+         * @return A set of sets each of which defines a partitioning of totalNodes
+         */
+        public static Stream<Set<Integer>> generatePartitions(int totalNodes)
+        {
+            checkArgument(totalNodes > 0, "totalNodes must be greater than 0");
+            Set<Integer> numbers = IntStream.range(0, totalNodes)
+                    .boxed()
+                    .collect(toImmutableSet());
+            return Sets.powerSet(numbers).stream()
+                    .filter(subSet -> subSet.contains(0))
+                    .filter(subSet -> subSet.size() < numbers.size());
+        }
+
+        public static JoinNode createJoinAccordingToPartitioning(JoinGraphNode joinGraph, Set<Integer> partitioning, PlanNodeIdAllocator idAllocator)
+        {
+            List<PlanNode> sources = joinGraph.getSources();
+            List<PlanNode> leftSources = partitioning.stream()
+                    .map(sources::get)
+                    .collect(toImmutableList());
+            List<PlanNode> rightSources = ImmutableList.copyOf(Sets.difference(ImmutableSet.copyOf(sources), ImmutableSet.copyOf(leftSources)));
+            Set<Symbol> leftSymbols = leftSources.stream()
+                    .flatMap(node -> node.getOutputSymbols().stream())
+                    .collect(toImmutableSet());
+
+            InnerJoinPredicateUtils.InnerJoinPushDownResult pushDownResult = sortPredicatesForInnerJoin(leftSymbols, ImmutableList.of(joinGraph.getFilter()), ImmutableList.of());
+
+            Set<Symbol> joinSymbols = ImmutableSet.<Symbol>builder()
+                    .addAll(joinGraph.getOutputSymbols())
+                    .addAll(DependencyExtractor.extractUnique(pushDownResult.getJoinPredicate()))
+                    .build();
+            PlanNode left = getJoinSource(
+                    idAllocator,
+                    leftSources,
+                    pushDownResult.getLeftPredicate(),
+                    joinSymbols.stream().filter(leftSymbols::contains).collect(toImmutableList()));
+            PlanNode right = getJoinSource(
+                    idAllocator,
+                    rightSources,
+                    pushDownResult.getRightPredicate(),
+                    joinSymbols.stream()
+                            .filter(symbol -> !leftSymbols.contains(symbol))
+                            .collect(toImmutableList()));
+
+            List<Expression> joinPredicates = extractConjuncts(pushDownResult.getJoinPredicate());
+            List<JoinNode.EquiJoinClause> joinConditions = joinPredicates.stream()
+                    .filter(JoinEnumerator::isJoinEqualityCondition)
+                    .map(predicate -> toEquiJoinClause((ComparisonExpression) predicate, leftSymbols))
+                    .collect(toImmutableList());
+            List<Expression> joinFilters = joinPredicates.stream()
+                    .filter(predicate -> !isJoinEqualityCondition(predicate))
+                    .collect(toImmutableList());
+
+            // sort join symbols so that the left input symbols are first
+            List<Symbol> inputSymbols = ImmutableList.<Symbol>builder()
+                    .addAll(left.getOutputSymbols())
+                    .addAll(right.getOutputSymbols())
+                    .build();
+            List<Symbol> outputSymbols = inputSymbols.stream()
+                    .filter(joinSymbols::contains)
+                    .collect(toImmutableList());
+            return new JoinNode(
+                    idAllocator.getNextId(),
+                    JoinNode.Type.INNER,
+                    left,
+                    right,
+                    flipJoinCriteriaIfNecessary(joinConditions, left),
+                    outputSymbols,
+                    joinFilters.isEmpty() ? Optional.empty() : Optional.of(ExpressionUtils.and(joinFilters)),
+                    Optional.empty(),
+                    Optional.empty(),
+                    Optional.empty());
+        }
+
+        private static List<JoinNode.EquiJoinClause> flipJoinCriteriaIfNecessary(List<JoinNode.EquiJoinClause> joinCriteria, PlanNode left)
+        {
+            return joinCriteria
+                    .stream()
+                    .map(criterion -> left.getOutputSymbols().contains(criterion.getLeft()) ? criterion : criterion.flip())
+                    .collect(toImmutableList());
+        }
+
+        private static PlanNode getJoinSource(PlanNodeIdAllocator idAllocator, List<PlanNode> nodes, Expression filter, List<Symbol> outputSymbols)
+        {
+            PlanNode planNode;
+            if (nodes.size() == 1) {
+                planNode = getOnlyElement(nodes);
+                if (!(BooleanLiteral.TRUE_LITERAL).equals(filter)) {
+                    return new FilterNode(idAllocator.getNextId(), planNode, filter);
+                }
+                return planNode;
+            }
+            return new JoinGraphNode(idAllocator.getNextId(), nodes, filter, outputSymbols);
+        }
+
         private JoinNode chooseJoinOrder(JoinGraphNode joinGraph)
         {
             String key = joinGraph.getKey();
@@ -172,107 +274,5 @@ public class ReorderJoins
 
             return planNodeOrdering.min(possibleJoinNodes);
         }
-    }
-
-    /**
-     * This method generates all the ways of dividing  totalNodes into two sets
-     * each containing at least one node. It will generate one set for each
-     * possible partitioning. The other partition is implied in the absent values.
-     * In order not to generate the inverse of any set, we always include the 0th
-     * node in our sets.
-     *
-     * @param totalNodes
-     * @return A set of sets each of which defines a partitioning of totalNodes
-     */
-    public static Stream<Set<Integer>> generatePartitions(int totalNodes)
-    {
-        checkArgument(totalNodes > 0, "totalNodes must be greater than 0");
-        Set<Integer> numbers = IntStream.range(0, totalNodes)
-                .boxed()
-                .collect(toImmutableSet());
-        return Sets.powerSet(numbers).stream()
-                .filter(subSet -> subSet.contains(0))
-                .filter(subSet -> subSet.size() < numbers.size());
-    }
-
-    public static JoinNode createJoinAccordingToPartitioning(JoinGraphNode joinGraph, Set<Integer> partitioning, PlanNodeIdAllocator idAllocator)
-    {
-        List<PlanNode> sources = joinGraph.getSources();
-        List<PlanNode> leftSources = partitioning.stream()
-                .map(sources::get)
-                .collect(toImmutableList());
-        List<PlanNode> rightSources = ImmutableList.copyOf(Sets.difference(ImmutableSet.copyOf(sources), ImmutableSet.copyOf(leftSources)));
-        Set<Symbol> leftSymbols = leftSources.stream()
-                .flatMap(node -> node.getOutputSymbols().stream())
-                .collect(toImmutableSet());
-
-        InnerJoinPredicateUtils.InnerJoinPushDownResult pushDownResult = sortPredicatesForInnerJoin(leftSymbols, ImmutableList.of(joinGraph.getFilter()), ImmutableList.of());
-
-        Set<Symbol> joinSymbols = ImmutableSet.<Symbol>builder()
-                .addAll(joinGraph.getOutputSymbols())
-                .addAll(DependencyExtractor.extractUnique(pushDownResult.getJoinPredicate()))
-                .build();
-        PlanNode left = getJoinSource(
-                idAllocator,
-                leftSources,
-                pushDownResult.getLeftPredicate(),
-                joinSymbols.stream().filter(leftSymbols::contains).collect(toImmutableList()));
-        PlanNode right = getJoinSource(
-                idAllocator,
-                rightSources,
-                pushDownResult.getRightPredicate(),
-                joinSymbols.stream()
-                        .filter(symbol -> !leftSymbols.contains(symbol))
-                        .collect(toImmutableList()));
-
-        List<Expression> joinPredicates = extractConjuncts(pushDownResult.getJoinPredicate());
-        List<JoinNode.EquiJoinClause> joinConditions = joinPredicates.stream()
-                .filter(JoinEnumerator::isJoinEqualityCondition)
-                .map(predicate -> JoinEnumerator.toEquiJoinClause((ComparisonExpression) predicate, leftSymbols))
-                .collect(toImmutableList());
-        List<Expression> joinFilters = joinPredicates.stream()
-                .filter(predicate -> !JoinEnumerator.isJoinEqualityCondition(predicate))
-                .collect(toImmutableList());
-
-        // sort join symbols so that the left input symbols are first
-        List<Symbol> inputSymbols = ImmutableList.<Symbol>builder()
-                .addAll(left.getOutputSymbols())
-                .addAll(right.getOutputSymbols())
-                .build();
-        List<Symbol> outputSymbols = inputSymbols.stream()
-                .filter(joinSymbols::contains)
-                .collect(toImmutableList());
-        return new JoinNode(
-                idAllocator.getNextId(),
-                JoinNode.Type.INNER,
-                left,
-                right,
-                flipJoinCriteriaIfNecessary(joinConditions, left),
-                outputSymbols,
-                joinFilters.isEmpty() ? Optional.empty() : Optional.of(ExpressionUtils.and(joinFilters)),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty());
-    }
-
-    private static List<JoinNode.EquiJoinClause> flipJoinCriteriaIfNecessary(List<JoinNode.EquiJoinClause> joinCriteria, PlanNode left)
-    {
-        return joinCriteria
-                .stream()
-                .map(criterion -> left.getOutputSymbols().contains(criterion.getLeft()) ? criterion : criterion.flip())
-                .collect(toImmutableList());
-    }
-
-    private static PlanNode getJoinSource(PlanNodeIdAllocator idAllocator, List<PlanNode> nodes, Expression filter, List<Symbol> outputSymbols)
-    {
-        PlanNode planNode;
-        if (nodes.size() == 1) {
-            planNode = getOnlyElement(nodes);
-            if (!(BooleanLiteral.TRUE_LITERAL).equals(filter)) {
-                return new FilterNode(idAllocator.getNextId(), planNode, filter);
-            }
-            return planNode;
-        }
-        return new JoinGraphNode(idAllocator.getNextId(), nodes, filter, outputSymbols);
     }
 }
