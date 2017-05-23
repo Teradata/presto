@@ -23,7 +23,6 @@ import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.iterative.IterativeOptimizer;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.iterative.rule.AddIntermediateAggregations;
-import com.facebook.presto.sql.planner.iterative.rule.ConvertJoinTreeToJoinGraph;
 import com.facebook.presto.sql.planner.iterative.rule.CreatePartialTopN;
 import com.facebook.presto.sql.planner.iterative.rule.EvaluateZeroLimit;
 import com.facebook.presto.sql.planner.iterative.rule.EvaluateZeroSample;
@@ -280,7 +279,7 @@ public class PlanOptimizers
                         stats,
                         statsCalculator,
                         estimatedExchangesCostCalculator,
-                        ImmutableSet.of(new ConvertJoinTreeToJoinGraph(), new ReorderJoins(costComparator))
+                        ImmutableSet.of(new ReorderJoins(costComparator))
                 ),
                 new ProjectionPushDown());
 

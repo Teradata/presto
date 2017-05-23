@@ -32,6 +32,7 @@ import static com.facebook.presto.sql.ExpressionUtils.and;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
@@ -106,6 +107,7 @@ public class JoinGraphNode
 
         public JoinGraphNodeBuilder(JoinNode node, Lookup lookup)
         {
+            checkState(node.getType() == INNER, "join type must be INNER");
             this.outputSymbols = node.getOutputSymbols();
             flattenNode(node, lookup);
         }

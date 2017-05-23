@@ -54,6 +54,7 @@ import static com.facebook.presto.sql.ExpressionUtils.extractConjuncts;
 import static com.facebook.presto.sql.planner.optimizations.InnerJoinPredicateUtils.sortPredicatesForInnerJoin;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
+import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -73,13 +74,18 @@ public class ReorderJoins
     @Override
     public Optional<PlanNode> apply(PlanNode node, Lookup lookup, PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator, Session session)
     {
-        if (!(node instanceof JoinGraphNode) || !isJoinReorderingEnabled(session)) {
+        // We check that join distribution type is absent because we only want to do this transformation once (reordered joins will have distribution type already set).
+        if (!(node instanceof JoinNode) || !isJoinReorderingEnabled(session)) {
             return Optional.empty();
         }
 
-        JoinGraphNode joinGraph = (JoinGraphNode) node;
-        JoinNode joinNode = new JoinEnumerator(idAllocator, symbolAllocator, session, lookup, joinGraph, costComparator).chooseJoinOrder(joinGraph);
-        return Optional.of(joinNode);
+        JoinNode joinNode = (JoinNode) node;
+        if (!(joinNode.getType() == INNER) || joinNode.getDistributionType().isPresent()) {
+            return Optional.empty();
+        }
+
+        JoinGraphNode joinGraph = new JoinGraphNode.JoinGraphNodeBuilder(joinNode, lookup).toJoinGraphNode(idAllocator);
+        return Optional.of(new JoinEnumerator(idAllocator, symbolAllocator, session, lookup, joinGraph, costComparator).chooseJoinOrder(joinGraph));
     }
 
     @VisibleForTesting
@@ -197,7 +203,7 @@ public class ReorderJoins
                     .collect(toImmutableList());
             return new JoinNode(
                     idAllocator.getNextId(),
-                    JoinNode.Type.INNER,
+                    INNER,
                     left,
                     right,
                     flipJoinCriteriaIfNecessary(joinConditions, left),
