@@ -50,7 +50,7 @@ public class InnerJoinPredicateUtils
         EqualityInference allInference = createEqualityInference(predicates.toArray(new Expression[predicates.size()]));
 
         // See if we can push any parts of the predicates to either side
-        for (Expression predicate : explicitPredicates) {
+        for (Expression predicate : predicates) {
             for (Expression conjunct : nonInferrableConjuncts(predicate)) {
                 if (isDeterministic(conjunct) && !mayReturnNullOnNonNullInput(conjunct)) {
                     Expression leftRewritten = allInference.rewriteExpression(conjunct, in(leftSymbols));
