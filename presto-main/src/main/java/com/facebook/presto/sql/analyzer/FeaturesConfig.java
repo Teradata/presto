@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
+import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType.REPARTITIONED;
 import static com.facebook.presto.sql.analyzer.RegexLibrary.JONI;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -43,13 +44,21 @@ public class FeaturesConfig
     private double memoryCostWeight = 0;
     private double networkCostWeight = 0.25;
 
-    public static class JoinDistributionType
+    public enum JoinDistributionType
     {
-        public static final String AUTOMATIC = "automatic";
-        public static final String REPLICATED = "replicated";
-        public static final String REPARTITIONED = "repartitioned";
+        AUTOMATIC,
+        REPLICATED,
+        REPARTITIONED;
 
-        public static final List<String> AVAILABLE_OPTIONS = ImmutableList.of(AUTOMATIC, REPLICATED, REPARTITIONED);
+        public boolean canRepartition()
+        {
+            return this == REPARTITIONED || this == AUTOMATIC;
+        }
+
+        public boolean canReplicate()
+        {
+            return this == REPLICATED || this == AUTOMATIC;
+        }
     }
 
     private boolean distributedIndexJoinsEnabled;
@@ -68,7 +77,7 @@ public class FeaturesConfig
     private boolean legacyOrderBy;
     private boolean legacyMapSubscript;
     private boolean optimizeMixedDistinctAggregations;
-    private String joinDistributionType = JoinDistributionType.REPARTITIONED;
+    private JoinDistributionType joinDistributionType = REPARTITIONED;
 
     private boolean dictionaryAggregation;
     private boolean resourceGroups;
@@ -478,16 +487,13 @@ public class FeaturesConfig
     }
 
     @Config("join-distribution-type")
-    public FeaturesConfig setJoinDistributionType(String joinDistributionType)
+    public FeaturesConfig setJoinDistributionType(JoinDistributionType joinDistributionType)
     {
-        if (!JoinDistributionType.AVAILABLE_OPTIONS.contains(joinDistributionType)) {
-            throw new IllegalStateException(String.format("Value %s is not valid for join-distribution-type.", joinDistributionType));
-        }
         this.joinDistributionType = joinDistributionType;
         return this;
     }
 
-    public String getJoinDistributionType()
+    public JoinDistributionType getJoinDistributionType()
     {
         return joinDistributionType;
     }

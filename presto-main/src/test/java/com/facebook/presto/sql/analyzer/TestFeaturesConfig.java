@@ -21,6 +21,8 @@ import org.testng.annotations.Test;
 
 import java.util.Map;
 
+import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType.REPARTITIONED;
+import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType.REPLICATED;
 import static com.facebook.presto.sql.analyzer.RegexLibrary.JONI;
 import static com.facebook.presto.sql.analyzer.RegexLibrary.RE2J;
 import static io.airlift.configuration.testing.ConfigAssertions.assertDeprecatedEquivalence;
@@ -40,7 +42,7 @@ public class TestFeaturesConfig
                 .setNetworkCostWeight(0.25)
                 .setResourceGroupsEnabled(false)
                 .setDistributedIndexJoinsEnabled(false)
-                .setJoinDistributionType("repartitioned")
+                .setJoinDistributionType(REPARTITIONED)
                 .setFastInequalityJoins(true)
                 .setColocatedJoinsEnabled(false)
                 .setJoinReorderingEnabled(false)
@@ -152,7 +154,7 @@ public class TestFeaturesConfig
                 .setIterativeOptimizerEnabled(false)
                 .setIterativeOptimizerTimeout(new Duration(10, SECONDS))
                 .setDistributedIndexJoinsEnabled(true)
-                .setJoinDistributionType("replicated")
+                .setJoinDistributionType(REPLICATED)
                 .setFastInequalityJoins(false)
                 .setColocatedJoinsEnabled(true)
                 .setJoinReorderingEnabled(true)
