@@ -174,7 +174,7 @@ public class DistributedQueryRunner
                 .put("optimizer.optimize-mixed-distinct-aggregations", "true");
         if (coordinator) {
             propertiesBuilder.put("node-scheduler.include-coordinator", "true");
-            propertiesBuilder.put("join-distribution-type", "repartitioned");
+            propertiesBuilder.put("join-distribution-type", "REPARTITIONED");
         }
         HashMap<String, String> properties = new HashMap<>(propertiesBuilder.build());
         properties.putAll(extraProperties);
