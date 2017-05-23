@@ -99,7 +99,7 @@ public class JoinNode
         checkArgument(!isCrossJoin() || inputSymbols.equals(outputSymbols), "Cross join does not support output symbols pruning or reordering");
     }
 
-    public JoinNode flip()
+    public JoinNode flipChildren()
     {
         return new JoinNode(
                 getId(),

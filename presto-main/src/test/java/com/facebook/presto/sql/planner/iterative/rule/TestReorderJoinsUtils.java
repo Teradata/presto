@@ -20,6 +20,7 @@ import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.tree.ComparisonExpression;
+import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.SymbolReference;
 import com.facebook.presto.testing.LocalQueryRunner;
 import com.google.common.collect.ImmutableList;
@@ -42,6 +43,7 @@ import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.genera
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static org.testng.Assert.assertEquals;
 
 public class TestReorderJoinsUtils
@@ -49,7 +51,7 @@ public class TestReorderJoinsUtils
     @Test
     public void testGeneratePartitions()
     {
-        Set<Set<Integer>> partitions = generatePartitions(4);
+        Set<Set<Integer>> partitions = generatePartitions(4).collect(toImmutableSet());
         assertEquals(partitions,
                 ImmutableSet.of(
                         ImmutableSet.of(0),
@@ -60,7 +62,7 @@ public class TestReorderJoinsUtils
                         ImmutableSet.of(0, 1, 3),
                         ImmutableSet.of(0, 2, 3)));
 
-        partitions = generatePartitions(3);
+        partitions = generatePartitions(3).collect(toImmutableSet());
         assertEquals(partitions,
                 ImmutableSet.of(
                         ImmutableSet.of(0),
@@ -75,16 +77,18 @@ public class TestReorderJoinsUtils
         LocalQueryRunner queryRunner = new LocalQueryRunner(session);
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
         PlanBuilder planBuilder = new PlanBuilder(idAllocator, queryRunner.getMetadata());
+        Expression filter =
+                and(
+                        new ComparisonExpression(EQUAL, new SymbolReference("A1"), new SymbolReference("B1")),
+                        new ComparisonExpression(EQUAL, new SymbolReference("B1"), new SymbolReference("D1")),
+                        new ComparisonExpression(GREATER_THAN, planBuilder.symbol("A1", BIGINT).toSymbolReference(), planBuilder.symbol("C1", BIGINT).toSymbolReference()));
         JoinGraphNode joinGraphNode = planBuilder.joinGraph(
                 ImmutableList.of(
                         planBuilder.values(planBuilder.symbol("A1", BIGINT)),
                         planBuilder.values(planBuilder.symbol("B1", BIGINT)),
                         planBuilder.values(planBuilder.symbol("C1", BIGINT)),
                         planBuilder.values(planBuilder.symbol("D1", BIGINT))),
-                and(
-                        new ComparisonExpression(EQUAL, new SymbolReference("A1"), new SymbolReference("B1")),
-                        new ComparisonExpression(EQUAL, new SymbolReference("B1"), new SymbolReference("D1")),
-                        new ComparisonExpression(GREATER_THAN, planBuilder.symbol("A1", BIGINT).toSymbolReference(), planBuilder.symbol("C1", BIGINT).toSymbolReference())));
+                filter);
         JoinNode actual = createJoinAccordingToPartitioning(joinGraphNode, ImmutableSet.of(0, 2), idAllocator);
         assertPlan(
                 session,
@@ -98,10 +102,12 @@ public class TestReorderJoinsUtils
                         Optional.empty(),
                         joinGraph(
                                 "A1 > C1",
+                                ImmutableList.of("A1", "C1"),
                                 values(ImmutableMap.of("A1", 0)),
                                 values(ImmutableMap.of("C1", 0))),
                         joinGraph(
                                 "B1 = D1",
+                                ImmutableList.of("B1", "D1"),
                                 values(ImmutableMap.of("B1", 0)),
                                 values(ImmutableMap.of("D1", 0)))));
     }

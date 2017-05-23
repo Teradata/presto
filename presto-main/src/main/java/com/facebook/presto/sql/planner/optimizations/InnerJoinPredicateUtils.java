@@ -46,19 +46,17 @@ public class InnerJoinPredicateUtils
                 .addAll(explicitPredicates)
                 .addAll(effectivePredicates)
                 .build();
-        // Generate equality inferences
-        EqualityInference allInference = createEqualityInference(predicates.toArray(new Expression[predicates.size()]));
-
+        EqualityInference equalityInference = createEqualityInference(predicates.toArray(new Expression[predicates.size()]));
         // See if we can push any parts of the predicates to either side
         for (Expression predicate : predicates) {
             for (Expression conjunct : nonInferrableConjuncts(predicate)) {
                 if (isDeterministic(conjunct) && !mayReturnNullOnNonNullInput(conjunct)) {
-                    Expression leftRewritten = allInference.rewriteExpression(conjunct, in(leftSymbols));
+                    Expression leftRewritten = equalityInference.rewriteExpression(conjunct, in(leftSymbols));
                     if (leftRewritten != null) {
                         leftConjuncts.add(leftRewritten);
                     }
 
-                    Expression rightRewritten = allInference.rewriteExpression(conjunct, symbol -> !leftSymbols.contains(symbol));
+                    Expression rightRewritten = equalityInference.rewriteExpression(conjunct, symbol -> !leftSymbols.contains(symbol));
                     if (rightRewritten != null) {
                         rightConjuncts.add(rightRewritten);
                     }
@@ -83,9 +81,9 @@ public class InnerJoinPredicateUtils
         }
 
         // Add equalities from the inference back in
-        leftConjuncts.addAll(allInference.generateEqualitiesPartitionedBy(leftSymbols::contains).getScopeEqualities());
-        rightConjuncts.addAll(allInference.generateEqualitiesPartitionedBy(symbol -> !leftSymbols.contains(symbol)).getScopeEqualities());
-        joinConjuncts.addAll(allInference.generateEqualitiesPartitionedBy(leftSymbols::contains).getScopeStraddlingEqualities()); // scope straddling equalities get dropped in as part of the join predicate
+        leftConjuncts.addAll(equalityInference.generateEqualitiesPartitionedBy(leftSymbols::contains).getScopeEqualities());
+        rightConjuncts.addAll(equalityInference.generateEqualitiesPartitionedBy(symbol -> !leftSymbols.contains(symbol)).getScopeEqualities());
+        joinConjuncts.addAll(equalityInference.generateEqualitiesPartitionedBy(leftSymbols::contains).getScopeStraddlingEqualities()); // scope straddling equalities get dropped in as part of the join predicate
 
         return new InnerJoinPushDownResult(combineConjuncts(leftConjuncts.build()), combineConjuncts(rightConjuncts.build()), combineConjuncts(joinConjuncts.build()));
     }
