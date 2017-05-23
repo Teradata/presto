@@ -51,6 +51,11 @@ public class TestingLookup
         this.costs.putAll(costs);
     }
 
+    public static TestingLookupBuilder builder(TestingLookup lookup)
+    {
+        return new TestingLookupBuilder(lookup);
+    }
+
     @Override
     public PlanNode resolve(PlanNode node)
     {
@@ -78,35 +83,30 @@ public class TestingLookup
         ));
     }
 
-    public static TestingLookupBuilder builder(TestingLookup lookup)
-    {
-        return new TestingLookupBuilder(lookup);
-    }
-
     public static class TestingLookupBuilder
     {
-        private StatsCalculator statsCalculator;
-        private CostCalculator costCalculator;
-        private Map<PlanNode, PlanNodeStatsEstimate> stats = new HashMap<>();
-        private Map<PlanNode, PlanNodeCostEstimate> costs = new HashMap<>();
+        private final StatsCalculator statsCalculator;
+        private final CostCalculator costCalculator;
+        private Map<PlanNode, PlanNodeStatsEstimate> stats;
+        private Map<PlanNode, PlanNodeCostEstimate> costs;
 
         public TestingLookupBuilder(TestingLookup lookup)
         {
             this.statsCalculator = lookup.statsCalculator;
             this.costCalculator = lookup.costCalculator;
-            this.stats.putAll(lookup.stats);
-            this.costs.putAll(lookup.costs);
+            this.stats = lookup.stats;
+            this.costs = lookup.costs;
         }
 
-        public TestingLookupBuilder withStats(PlanNode node, PlanNodeStatsEstimate statsEstimate)
+        public TestingLookupBuilder withStats(Map<PlanNode, PlanNodeStatsEstimate> stats)
         {
-            stats.put(node, statsEstimate);
+            this.stats = stats;
             return this;
         }
 
-        public TestingLookupBuilder withCost(PlanNode node, PlanNodeCostEstimate costEstimate)
+        public TestingLookupBuilder withCost(Map<PlanNode, PlanNodeCostEstimate> costs)
         {
-            costs.put(node, costEstimate);
+            this.costs = costs;
             return this;
         }
 

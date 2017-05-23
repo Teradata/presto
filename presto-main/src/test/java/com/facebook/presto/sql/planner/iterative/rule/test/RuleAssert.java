@@ -40,6 +40,7 @@ import java.util.function.Function;
 import static com.facebook.presto.sql.planner.assertions.PlanAssert.assertPlan;
 import static com.facebook.presto.transaction.TransactionBuilder.transaction;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static org.testng.Assert.fail;
 
 public class RuleAssert
@@ -98,22 +99,30 @@ public class RuleAssert
 
     public RuleAssert withStats(Map<PlanNodeId, PlanNodeStatsEstimate> stats)
     {
-        setStats(plan, stats);
+        lookup = TestingLookup.builder(lookup)
+                .withStats(
+                        stats.entrySet()
+                                .stream()
+                                .collect(toImmutableMap(
+                                        entry -> getNodeForId(entry.getKey(), plan).orElseThrow(() -> new IllegalStateException("No PlanNode for id")),
+                                        Map.Entry::getValue)))
+                .build();
         return this;
     }
 
-    private void setStats(PlanNode node, Map<PlanNodeId, PlanNodeStatsEstimate> stats)
+    private Optional<PlanNode> getNodeForId(PlanNodeId planNodeId, PlanNode plan)
     {
-        if (stats.containsKey(node.getId())) {
-            lookup = TestingLookup.builder(lookup)
-                    .withStats(node, stats.get(node.getId()))
-                    .build();
+        if (plan.getId().equals(planNodeId)) {
+            return Optional.of(plan);
         }
-        else {
-            for (PlanNode source : node.getSources()) {
-                setStats(source, stats);
+        Optional<PlanNode> node = Optional.empty();
+        for (PlanNode source : plan.getSources()) {
+            node = getNodeForId(planNodeId, lookup.resolve(source));
+            if (node.isPresent()) {
+                return node;
             }
         }
+        return node;
     }
 
     public void doesNotFire()
