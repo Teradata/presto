@@ -173,6 +173,27 @@ public final class SymbolAliases
         return new SymbolAliases(getUpdatedAssignments(assignments));
     }
 
+    /**
+     * Return a new expression with symbol aliases replaced with the mapped symbol reference
+     *
+     * Example:
+     * SymbolAliases = { "ALIAS1": SymbolReference("foo"), "ALIAS2": SymbolReference("bar")}
+     * expression = ComparisonExpression(SymbolReference("ALIAS1"), SymbolReference("ALIAS2)
+     *
+     * replaceSymbolAliasesInExpression(expression) -> ComparisonExpression((SymbolReference("foo"), SymbolReference("bar"))
+     */
+    public Expression replaceSymbolAliasesInExpression(Expression expression)
+    {
+        return ExpressionTreeRewriter.rewriteWith(new ExpressionRewriter<Void>()
+        {
+            @Override
+            public Expression rewriteSymbolReference(SymbolReference node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
+            {
+                return map.get(node.getName());
+            }
+        }, expression);
+    }
+
     @Override
     public String toString()
     {
@@ -239,17 +260,5 @@ public final class SymbolAliases
         {
             return new SymbolAliases(bindings);
         }
-    }
-
-    public Expression replaceSymbolAliasesInExpression(Expression expression)
-    {
-        return ExpressionTreeRewriter.rewriteWith(new ExpressionRewriter<Void>()
-        {
-            @Override
-            public Expression rewriteSymbolReference(SymbolReference node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
-            {
-                return map.get(node.getName());
-            }
-        }, expression);
     }
 }
