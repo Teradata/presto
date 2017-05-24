@@ -38,9 +38,8 @@ import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 
 public class TestReorderJoins
 {
-    // TODO: Add tests for choosing the least cost join once limitations of the cost calculator are resolved
     @Test
-    public void testChoosesAJoin()
+    public void testChoosesLeastCostOrder()
     {
         LocalQueryRunner queryRunner = new LocalQueryRunner(testSessionBuilder().setSystemProperty("reorder_joins", "true").build());
         new RuleTester(queryRunner).assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
@@ -50,32 +49,32 @@ public class TestReorderJoins
                                 p.values(new PlanNodeId("valuesA"), p.symbol("A1", BIGINT)),
                                 p.join(
                                         JoinNode.Type.INNER,
-                                        p.values(new PlanNodeId("valuesB"), p.symbol("B1", BIGINT)),
+                                        p.values(new PlanNodeId("valuesB"), p.symbol("B1", BIGINT), p.symbol("B2", BIGINT)),
                                         p.values(new PlanNodeId("ValuesC"), p.symbol("C1", BIGINT)),
                                         ImmutableList.of(new JoinNode.EquiJoinClause(p.symbol("B1", BIGINT), p.symbol("C1", BIGINT))),
-                                        ImmutableList.of(p.symbol("B1", BIGINT), p.symbol("C1", BIGINT)),
+                                        ImmutableList.of(p.symbol("B1", BIGINT)),
                                         Optional.empty()),
-                                ImmutableList.of(new JoinNode.EquiJoinClause(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT))),
+                                ImmutableList.of(new JoinNode.EquiJoinClause(p.symbol("A1", BIGINT), p.symbol("B2", BIGINT))),
                                 ImmutableList.of(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT)),
                                 Optional.empty()))
                 .withStats(ImmutableMap.of(
-                        new PlanNodeId("valuesA"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
-                        new PlanNodeId("valuesB"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
-                        new PlanNodeId("ValuesC"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
+                        new PlanNodeId("valuesA"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10)).build(),
+                        new PlanNodeId("valuesB"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10)).build(),
+                        new PlanNodeId("ValuesC"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(1000)).build()))
                 .matches(join(
                         JoinNode.Type.INNER,
-                        ImmutableList.of(equiJoinClause("B1", "A1")),
+                        ImmutableList.of(equiJoinClause("C1", "B1")),
                         Optional.empty(),
                         Optional.of(PARTITIONED),
+                        values(ImmutableMap.of("C1", 0)),
                         join(
                                 JoinNode.Type.INNER,
-                                ImmutableList.of(equiJoinClause("B1", "C1")),
+                                ImmutableList.of(equiJoinClause("A1", "B2")),
                                 Optional.empty(),
                                 Optional.of(PARTITIONED),
-                                values(ImmutableMap.of("B1", 0)),
-                                values(ImmutableMap.of("C1", 0))
-                        ),
-                        values(ImmutableMap.of("A1", 0))
+                                values(ImmutableMap.of("A1", 0)),
+                                values(ImmutableMap.of("B1", 0, "B2", 1))
+                        )
                 ));
     }
 
