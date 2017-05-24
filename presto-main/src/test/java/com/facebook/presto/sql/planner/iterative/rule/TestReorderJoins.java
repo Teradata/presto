@@ -80,6 +80,32 @@ public class TestReorderJoins
     }
 
     @Test
+    public void testKeepsOutputSymbols()
+    {
+        LocalQueryRunner queryRunner = new LocalQueryRunner(testSessionBuilder().setSystemProperty("reorder_joins", "true").build());
+        new RuleTester(queryRunner).assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
+                .on(p ->
+                        p.join(
+                                JoinNode.Type.INNER,
+                                p.values(new PlanNodeId("valuesA"), p.symbol("A1", BIGINT), p.symbol("A2", BIGINT)),
+                                p.values(new PlanNodeId("valuesB"), p.symbol("B1", BIGINT)),
+                                ImmutableList.of(new JoinNode.EquiJoinClause(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT))),
+                                ImmutableList.of(p.symbol("A2", BIGINT)),
+                                Optional.empty()))
+                .withStats(ImmutableMap.of(
+                        new PlanNodeId("valuesA"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
+                        new PlanNodeId("valuesB"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
+                .matches(join(
+                        JoinNode.Type.INNER,
+                        ImmutableList.of(equiJoinClause("A1", "B1")),
+                        Optional.empty(),
+                        Optional.of(PARTITIONED),
+                        values(ImmutableMap.of("A1", 0, "A2", 1)),
+                        values(ImmutableMap.of("B1", 0))
+                ));
+    }
+
+    @Test
     public void testReplicatesAndFlipsWhenOneTableMuchSmaller()
     {
         Session session = testSessionBuilder()

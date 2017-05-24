@@ -193,13 +193,13 @@ public class ReorderJoins
                     .filter(predicate -> !isJoinEqualityCondition(predicate))
                     .collect(toImmutableList());
 
-            // sort join symbols so that the left input symbols are first
+            // sort output symbols so that the left input symbols are first
             List<Symbol> inputSymbols = ImmutableList.<Symbol>builder()
                     .addAll(left.getOutputSymbols())
                     .addAll(right.getOutputSymbols())
                     .build();
             List<Symbol> outputSymbols = inputSymbols.stream()
-                    .filter(joinSymbols::contains)
+                    .filter(joinGraph.getOutputSymbols()::contains)
                     .collect(toImmutableList());
             return new JoinNode(
                     idAllocator.getNextId(),
