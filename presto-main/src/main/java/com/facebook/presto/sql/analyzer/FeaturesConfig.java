@@ -27,6 +27,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
+import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType.REPARTITIONED;
 import static com.facebook.presto.sql.analyzer.RegexLibrary.JONI;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -42,11 +43,29 @@ public class FeaturesConfig
     private double cpuCostWeight = 0.75;
     private double memoryCostWeight = 0;
     private double networkCostWeight = 0.25;
+
+    public enum JoinDistributionType
+    {
+        AUTOMATIC,
+        REPLICATED,
+        REPARTITIONED;
+
+        public boolean canRepartition()
+        {
+            return this == REPARTITIONED || this == AUTOMATIC;
+        }
+
+        public boolean canReplicate()
+        {
+            return this == REPLICATED || this == AUTOMATIC;
+        }
+    }
+
     private boolean distributedIndexJoinsEnabled;
-    private boolean distributedJoinsEnabled = true;
     private boolean colocatedJoinsEnabled;
     private boolean fastInequalityJoins = true;
-    private boolean reorderJoins = true;
+    private boolean reorderJoins;
+    private boolean eliminateCrossJoins = true;
     private boolean redistributeWrites = true;
     private boolean optimizeMetadataQueries;
     private boolean optimizeHashGeneration = true;
@@ -58,6 +77,7 @@ public class FeaturesConfig
     private boolean legacyOrderBy;
     private boolean legacyMapSubscript;
     private boolean optimizeMixedDistinctAggregations;
+    private JoinDistributionType joinDistributionType = REPARTITIONED;
 
     private boolean dictionaryAggregation;
     private boolean resourceGroups;
@@ -135,11 +155,6 @@ public class FeaturesConfig
         return this;
     }
 
-    public boolean isDistributedJoinsEnabled()
-    {
-        return distributedJoinsEnabled;
-    }
-
     @Config("deprecated.legacy-array-agg")
     public FeaturesConfig setLegacyArrayAgg(boolean legacyArrayAgg)
     {
@@ -174,13 +189,6 @@ public class FeaturesConfig
     public boolean isLegacyMapSubscript()
     {
         return legacyMapSubscript;
-    }
-
-    @Config("distributed-joins-enabled")
-    public FeaturesConfig setDistributedJoinsEnabled(boolean distributedJoinsEnabled)
-    {
-        this.distributedJoinsEnabled = distributedJoinsEnabled;
-        return this;
     }
 
     public boolean isColocatedJoinsEnabled()
@@ -219,6 +227,19 @@ public class FeaturesConfig
     public FeaturesConfig setJoinReorderingEnabled(boolean reorderJoins)
     {
         this.reorderJoins = reorderJoins;
+        return this;
+    }
+
+    public boolean isEliminateCrossJoins()
+    {
+        return eliminateCrossJoins;
+    }
+
+    @Config("eliminate-cross-joins")
+    @ConfigDescription("Eliminate unnecessary cross joins to optimize plan")
+    public FeaturesConfig setEliminateCrossJoins(boolean eliminateCrossJoins)
+    {
+        this.eliminateCrossJoins = eliminateCrossJoins;
         return this;
     }
 
@@ -463,5 +484,17 @@ public class FeaturesConfig
     {
         this.pushAggregationThroughJoin = value;
         return this;
+    }
+
+    @Config("join-distribution-type")
+    public FeaturesConfig setJoinDistributionType(JoinDistributionType joinDistributionType)
+    {
+        this.joinDistributionType = joinDistributionType;
+        return this;
+    }
+
+    public JoinDistributionType getJoinDistributionType()
+    {
+        return joinDistributionType;
     }
 }

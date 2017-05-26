@@ -46,6 +46,7 @@ import com.facebook.presto.sql.planner.iterative.rule.PushTopNThroughUnion;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveEmptyDelete;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveFullSample;
 import com.facebook.presto.sql.planner.iterative.rule.RemoveRedundantIdentityProjections;
+import com.facebook.presto.sql.planner.iterative.rule.ReorderJoins;
 import com.facebook.presto.sql.planner.iterative.rule.SimplifyCountOverConstant;
 import com.facebook.presto.sql.planner.iterative.rule.SingleMarkDistinctToGroupBy;
 import com.facebook.presto.sql.planner.iterative.rule.SwapAdjacentWindowsBySpecifications;
@@ -257,12 +258,29 @@ public class PlanOptimizers
                 ),
                 new MetadataQueryOptimizer(metadata),
                 new EliminateCrossJoins(), // This can pull up Filter and Project nodes from between Joins, so we need to push them down again
+
+                // Because ReorderJoins runs only once,
+                // PredicatePushDown, PruneUnreferenedOutputpus and RemoveRedundantIdentityProjections
+                // need to run beforehand in order to produce an optimal join order
                 new PredicatePushDown(metadata, sqlParser),
                 new IterativeOptimizer(
                         stats,
                         statsCalculator,
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(new PushDownTableConstraints(metadata))),
+                new PruneUnreferencedOutputs(),
+                new IterativeOptimizer(
+                        stats,
+                        statsCalculator,
+                        estimatedExchangesCostCalculator,
+                        ImmutableSet.of(new RemoveRedundantIdentityProjections())
+                ),
+                new IterativeOptimizer(
+                        stats,
+                        statsCalculator,
+                        estimatedExchangesCostCalculator,
+                        ImmutableSet.of(new ReorderJoins(costComparator))
+                ),
                 new ProjectionPushDown());
 
         if (featuresConfig.isOptimizeSingleDistinct()) {

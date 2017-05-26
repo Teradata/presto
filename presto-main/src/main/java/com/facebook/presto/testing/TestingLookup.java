@@ -23,6 +23,7 @@ import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.google.common.collect.ImmutableMap;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -39,18 +40,20 @@ public class TestingLookup
 
     public TestingLookup(StatsCalculator statsCalculator, CostCalculator costCalculator)
     {
+        this(statsCalculator, costCalculator, ImmutableMap.of(), ImmutableMap.of());
+    }
+
+    private TestingLookup(StatsCalculator statsCalculator, CostCalculator costCalculator, Map<PlanNode, PlanNodeStatsEstimate> stats, Map<PlanNode, PlanNodeCostEstimate> costs)
+    {
         this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
+        this.stats.putAll(stats);
+        this.costs.putAll(costs);
     }
 
-    public void setStats(PlanNode node, PlanNodeStatsEstimate stats)
+    public static TestingLookupBuilder builder(TestingLookup lookup)
     {
-        this.stats.put(node, stats);
-    }
-
-    public void setCost(PlanNode node, PlanNodeCostEstimate cost)
-    {
-        costs.put(node, cost);
+        return new TestingLookupBuilder(lookup);
     }
 
     @Override
@@ -78,5 +81,38 @@ public class TestingLookup
                 session,
                 types
         ));
+    }
+
+    public static class TestingLookupBuilder
+    {
+        private final StatsCalculator statsCalculator;
+        private final CostCalculator costCalculator;
+        private Map<PlanNode, PlanNodeStatsEstimate> stats;
+        private Map<PlanNode, PlanNodeCostEstimate> costs;
+
+        public TestingLookupBuilder(TestingLookup lookup)
+        {
+            this.statsCalculator = lookup.statsCalculator;
+            this.costCalculator = lookup.costCalculator;
+            this.stats = lookup.stats;
+            this.costs = lookup.costs;
+        }
+
+        public TestingLookupBuilder withStats(Map<PlanNode, PlanNodeStatsEstimate> stats)
+        {
+            this.stats = stats;
+            return this;
+        }
+
+        public TestingLookupBuilder withCost(Map<PlanNode, PlanNodeCostEstimate> costs)
+        {
+            this.costs = costs;
+            return this;
+        }
+
+        public TestingLookup build()
+        {
+            return new TestingLookup(statsCalculator, costCalculator, stats, costs);
+        }
     }
 }

@@ -14,12 +14,12 @@
 package com.facebook.presto.sql.planner.iterative.rule.test;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.security.AccessControl;
-import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.testing.LocalQueryRunner;
-import com.facebook.presto.testing.TestingLookup;
 import com.facebook.presto.tpch.TpchConnectorFactory;
 import com.facebook.presto.transaction.TransactionManager;
 import com.google.common.collect.ImmutableMap;
@@ -33,10 +33,11 @@ public class RuleTester
 {
     private final Metadata metadata;
     private final Session session;
-    private final Lookup lookup;
     private final LocalQueryRunner queryRunner;
     private final TransactionManager transactionManager;
     private final AccessControl accessControl;
+    private final StatsCalculator statsCalculator;
+    private final CostCalculator costCalculator;
 
     public RuleTester()
     {
@@ -63,14 +64,15 @@ public class RuleTester
         this.queryRunner = queryRunner;
         this.session = queryRunner.getDefaultSession();
         this.metadata = queryRunner.getMetadata();
-        this.lookup = new TestingLookup(queryRunner.getStatsCalculator(), queryRunner.getEstimatedExchangesCostCalculator());
         this.transactionManager = queryRunner.getTransactionManager();
         this.accessControl = queryRunner.getAccessControl();
+        this.statsCalculator = queryRunner.getStatsCalculator();
+        this.costCalculator = queryRunner.getEstimatedExchangesCostCalculator();
     }
 
     public RuleAssert assertThat(Rule rule)
     {
-        return new RuleAssert(metadata, lookup, session, rule, transactionManager, accessControl);
+        return new RuleAssert(metadata, session, rule, transactionManager, accessControl, statsCalculator, costCalculator);
     }
 
     @Override
