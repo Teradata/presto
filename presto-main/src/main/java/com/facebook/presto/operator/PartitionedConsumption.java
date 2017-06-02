@@ -14,26 +14,22 @@
 package com.facebook.presto.operator;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.io.Closer;
-import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.log.Logger;
 
-import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.List;
-import java.util.function.Function;
+import java.util.function.IntConsumer;
+import java.util.function.IntFunction;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.allAsList;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
-import static io.airlift.concurrent.MoreFutures.getFutureValue;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -58,38 +54,47 @@ import static java.util.Objects.requireNonNull;
  *
  * @param <T> type of the object loaded for each {@code Partition}. Must be {@code Closable}.
  */
-public class PartitionedConsumption<T extends Closeable>
-        implements Closeable
+public class PartitionedConsumption<T>
 {
     private static final Logger log = Logger.get(PartitionedConsumption.class);
 
     private final int consumersCount;
-    private final Function<Integer, ListenableFuture<T>> loader;
 
     // TODO FIXME Queue or something? So that we don't keep content for already released partitions
 
     private final List<Partition<T>> partitions;
 
-    PartitionedConsumption(int consumersCount, Iterable<Integer> partitionNumbers, Function<Integer, ListenableFuture<T>> loader)
+    PartitionedConsumption(int consumersCount, Iterable<Integer> partitionNumbers, IntFunction<ListenableFuture<T>> loader, IntConsumer disposer)
     {
-        this(consumersCount, immediateFuture(null), partitionNumbers, loader);
+        this(consumersCount, immediateFuture(null), partitionNumbers, loader, disposer);
     }
 
-    PartitionedConsumption(int consumersCount, ListenableFuture<?> activator, Iterable<Integer> partitionNumbers, Function<Integer, ListenableFuture<T>> loader)
+    PartitionedConsumption(
+            int consumersCount,
+            ListenableFuture<?> activator,
+            Iterable<Integer> partitionNumbers,
+            IntFunction<ListenableFuture<T>> loader,
+            IntConsumer disposer)
     {
         checkArgument(consumersCount > 0, "consumersCount must be positive");
         this.consumersCount = consumersCount;
-        this.loader = requireNonNull(loader, "loader is null");
-        this.partitions = createPartitions(activator, partitionNumbers);
+        this.partitions = createPartitions(activator, partitionNumbers, loader, disposer);
     }
 
-    private List<Partition<T>> createPartitions(ListenableFuture<?> activator, Iterable<Integer> partitionNumbers)
+    private List<Partition<T>> createPartitions(
+            ListenableFuture<?> activator,
+            Iterable<Integer> partitionNumbers,
+            IntFunction<ListenableFuture<T>> loader,
+            IntConsumer disposer)
     {
         requireNonNull(partitionNumbers, "partitionNumbers is null");
+        requireNonNull(loader, "loader is null");
+        requireNonNull(disposer, "disposer is null");
+
         ImmutableList.Builder<Partition<T>> partitions = ImmutableList.builder();
         ListenableFuture<?> partitionActivator = activator;
         for (Integer partitionNumber : partitionNumbers) {
-            Partition<T> partition = new Partition<>(consumersCount, partitionNumber, loader, partitionActivator);
+            Partition<T> partition = new Partition<>(consumersCount, partitionNumber, loader, partitionActivator, disposer);
             partitions.add(partition);
             partitionActivator = partition.released;
         }
@@ -106,54 +111,7 @@ public class PartitionedConsumption<T extends Closeable>
         return partitions;
     }
 
-    @Override
-    public void close()
-            throws IOException
-    {
-        Closer closer = Closer.create();
-
-        // TODO let's get rid of all this closing here. The class cannot handle that in any reasonable way. Really. It must be source's responsibility, we're lending resources here.
-        partitions.stream()
-                .map(partition -> partition.loaded)
-                .forEach(future -> {
-                    if (future.isDone()) {
-                        // Gather already loaded so that exceptions from close are propagated, not ignored
-                        Closeable result;
-                        try {
-                            result = getFutureValue(future);
-                        }
-                        catch (RuntimeException e) {
-                            // must be execution exception, can ignore
-                            return;
-                        }
-                        closer.register(result);
-                    }
-                    else {
-                        Futures.addCallback(future, new FutureCallback<T>()
-                        {
-                            @Override
-                            public void onSuccess(@Nullable T result)
-                            {
-                                try {
-                                    result.close();
-                                }
-                                catch (IOException e) {
-                                    log.error("Error closing partition", e);
-                                }
-                            }
-
-                            @Override
-                            public void onFailure(Throwable t)
-                            {
-                            }
-                        });
-                    }
-                });
-
-        closer.close();
-    }
-
-    public static class Partition<T extends Closeable>
+    public static class Partition<T>
     {
         private final int partitionNumber;
         private final SettableFuture<?> requested;
@@ -166,8 +124,9 @@ public class PartitionedConsumption<T extends Closeable>
         public Partition(
                 int consumersCount,
                 int partitionNumber,
-                Function<Integer, ListenableFuture<T>> loader,
-                ListenableFuture<?> previousReleased)
+                IntFunction<ListenableFuture<T>> loader,
+                ListenableFuture<?> previousReleased,
+                IntConsumer disposer)
         {
             this.partitionNumber = partitionNumber;
             this.requested = SettableFuture.create();
@@ -175,6 +134,7 @@ public class PartitionedConsumption<T extends Closeable>
                     allAsList(requested, previousReleased),
                     ignored -> loader.apply(partitionNumber));
             this.released = SettableFuture.create();
+            released.addListener(() -> disposer.accept(partitionNumber), directExecutor());
             this.pendingReleases = consumersCount;
         }
 
@@ -195,12 +155,6 @@ public class PartitionedConsumption<T extends Closeable>
             pendingReleases--;
             checkState(pendingReleases >= 0);
             if (pendingReleases == 0) {
-                try {
-                    getFutureValue(loaded).close();
-                }
-                catch (Exception e) {
-                    throw new RuntimeException("Error while releasing partition", e);
-                }
                 released.set(null);
             }
         }
