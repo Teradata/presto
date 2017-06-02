@@ -38,8 +38,10 @@ public interface LookupSourceFactory
 
     default PartitionedConsumption<LookupSource> finishProbeOperator(OptionalInt lookupJoinsCount)
     {
-        return new PartitionedConsumption<LookupSource>(1, emptyList(), i -> {
-            throw new UnsupportedOperationException();
+        return new PartitionedConsumption<LookupSource>(1, emptyList(),
+                i -> {
+                    throw new UnsupportedOperationException();
+                }, i -> {
         });
     }
 

@@ -325,6 +325,8 @@ public class LookupJoinOperator
 
     private boolean tryUnspillNext()
     {
+        verify(probe == null);
+
         if (unspilledInputPages.hasNext()) {
             addInput(unspilledInputPages.next());
             verify(probe != null);
@@ -348,6 +350,8 @@ public class LookupJoinOperator
             SavedRow savedRow = savedRows.remove(partition);
             if (savedRow != null) {
                 addInput(savedRow.row);
+                verify(probe != null);
+                verify(probe.advanceNextPosition());
                 joinPosition = savedRow.joinPositionWithinPartition;
                 currentProbePositionProducedRow = savedRow.currentProbePositionProducedRow;
             }
@@ -432,6 +436,7 @@ public class LookupJoinOperator
             Page remaining = pageSlice(currentPage, currentPosition);
             addInput(remaining, hasSpilled, spillEpoch, spillMask);
             verify(probe != null, "first row wasn't spilled so the probe should exist");
+            verify(probe.advanceNextPosition());
             joinPosition = savedRow.absoluteJoinPosition;
             currentProbePositionProducedRow = savedRow.currentProbePositionProducedRow;
         }
@@ -533,8 +538,6 @@ public class LookupJoinOperator
                 // closing lookup source is only here for index join
                 () -> Optional.ofNullable(lookupSourceProvider).ifPresent(LookupSourceProvider::close),
                 () -> spiller.ifPresent(PartitioningSpiller::close),
-                () -> currentPartition.ifPresent(Partition::release),
-                // TODO release/close all remaining in lookupPartitions? Partiion.release() requires load() first.
                 onClose
         );
     }

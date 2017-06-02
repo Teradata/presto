@@ -550,7 +550,6 @@ public class HashBuilderOperator
 
     private void disposeUnspilledLookupSourceIfRequested()
     {
-        // TODO currently this is NOT implemented, no-one will pull this future
         if (!spilledLookupSourceHandle.getDisposeRequested().isDone()) {
             return;
         }

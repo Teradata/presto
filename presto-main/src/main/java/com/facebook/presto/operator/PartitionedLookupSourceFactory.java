@@ -310,6 +310,14 @@ public final class PartitionedLookupSourceFactory
     {
         destroyed.set(null);
         partitionsNoLongerNeeded.set(null);
+        rwLock.writeLock().lock();
+        try {
+            Arrays.fill(partitions, null);
+            spilledPartitions.values().forEach(SpilledLookupSourceHandle::dispose);
+        }
+        finally {
+            rwLock.writeLock().unlock();
+        }
     }
 
     public ListenableFuture<?> isDestroyed()
