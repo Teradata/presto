@@ -283,9 +283,24 @@ public final class PartitionedLookupSourceFactory
 
     private ListenableFuture<LookupSource> loadSpilledLookupSource(int partitionNumber)
     {
-        SpilledLookupSourceHandle spilledLookupSourceHandle = requireNonNull(spilledPartitions.get(partitionNumber), "spilledPartitions.get(partitionNumber) is null");
         // TODO can the LookupSource be shared? Don't we need Supplier<LookupSource> here?
-        return spilledLookupSourceHandle.getLookupSource();
+        return getSpilledLookupSourceHandle(partitionNumber).getLookupSource();
+    }
+
+    private void disposeSpilledLookupSource(int partitionNumber)
+    {
+        getSpilledLookupSourceHandle(partitionNumber).dispose();
+    }
+
+    private SpilledLookupSourceHandle getSpilledLookupSourceHandle(int partitionNumber)
+    {
+        rwLock.readLock().lock();
+        try {
+            return requireNonNull(spilledPartitions.get(partitionNumber), "spilledPartitions.get(partitionNumber) is null");
+        }
+        finally {
+            rwLock.readLock().unlock();
+        }
     }
 
     @Override

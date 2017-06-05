@@ -20,7 +20,6 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 
 import static com.facebook.presto.SystemSessionProperties.isFastInequalityJoin;
 import static java.util.Objects.requireNonNull;
@@ -32,7 +31,7 @@ public class JoinHashSupplier
     private final PagesHash pagesHash;
     private final LongArrayList addresses;
     private final List<List<Block>> channels;
-    private final Function<Optional<JoinFilterFunction>, PositionLinks> positionLinks;
+    private final PositionLinks.Factory positionLinks;
     private final Optional<JoinFilterFunctionFactory> filterFunctionFactory;
 
     public JoinHashSupplier(
@@ -48,21 +47,21 @@ public class JoinHashSupplier
         this.filterFunctionFactory = requireNonNull(filterFunctionFactory, "filterFunctionFactory is null");
         requireNonNull(pagesHashStrategy, "pagesHashStrategy is null");
 
-        PositionLinks.Builder positionLinksBuilder;
+        PositionLinks.FactoryBuilder positionLinksFactoryBuilder;
         if (filterFunctionFactory.isPresent() &&
                 filterFunctionFactory.get().getSortChannel().isPresent() &&
                 isFastInequalityJoin(session)) {
-            positionLinksBuilder = SortedPositionLinks.builder(
+            positionLinksFactoryBuilder = SortedPositionLinks.builder(
                     addresses.size(),
                     pagesHashStrategy,
                     addresses);
         }
         else {
-            positionLinksBuilder = ArrayPositionLinks.builder(addresses.size());
+            positionLinksFactoryBuilder = ArrayPositionLinks.builder(addresses.size());
         }
 
-        this.pagesHash = new PagesHash(addresses, pagesHashStrategy, positionLinksBuilder);
-        this.positionLinks = positionLinksBuilder.build();
+        this.pagesHash = new PagesHash(addresses, pagesHashStrategy, positionLinksFactoryBuilder);
+        this.positionLinks = positionLinksFactoryBuilder.build();
     }
 
     @Override
@@ -78,6 +77,12 @@ public class JoinHashSupplier
     }
 
     @Override
+    public long checksum()
+    {
+        return positionLinks.checksum();
+    }
+
+    @Override
     public JoinHash get()
     {
         // We need to create new JoinFilterFunction per each thread using it, since those functions
@@ -87,6 +92,6 @@ public class JoinHashSupplier
         return new JoinHash(
                 pagesHash,
                 filterFunction,
-                positionLinks.apply(filterFunction));
+                positionLinks.create(filterFunction));
     }
 }
