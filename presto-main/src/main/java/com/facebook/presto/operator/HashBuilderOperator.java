@@ -212,7 +212,6 @@ public class HashBuilderOperator
         /**
          * Spilled input has been unspilled, LookupSource built from it
          */
-        // TODO consider merging this state with LOOKUP_SOURCE_BUILT
         LOOKUP_SOURCE_UNSPILLED_AND_BUILT,
 
         /**
@@ -407,7 +406,6 @@ public class HashBuilderOperator
         }
 
         if (state == State.LOOKUP_SOURCE_BUILT) {
-            // TODO is there any risk of starvation here? RW-lock in PLSF...
             lookupSourceFactory.setPartitionSpilledLookupSource(partitionIndex, spilledLookupSourceHandle);
             index.clear();
             operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
@@ -584,8 +582,7 @@ public class HashBuilderOperator
     @Override
     public boolean isFinished()
     {
-        // TODO FIXME state == DISPOSED || LSF is destroyed ?
-        return lookupSourceFactory.isDestroyed().isDone();
+        return state == State.DISPOSED;
     }
 
     @Override
