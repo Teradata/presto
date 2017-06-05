@@ -35,8 +35,10 @@ import java.util.Queue;
 
 import static com.facebook.presto.operator.Operators.checkNoFailure;
 import static com.facebook.presto.operator.Operators.getDone;
+import static com.facebook.presto.operator.Operators.runAll;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Verify.verify;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static java.lang.String.format;
@@ -222,6 +224,7 @@ public class HashBuilderOperator
 
     private final OperatorContext operatorContext;
     private final PartitionedLookupSourceFactory lookupSourceFactory;
+    private final ListenableFuture<?> lookupSourceFactoryDestroyed;
     private final int partitionIndex;
 
     private final List<Integer> outputChannels;
@@ -244,6 +247,7 @@ public class HashBuilderOperator
     private ListenableFuture<?> spillInProgress = NOT_BLOCKED;
     private Optional<ListenableFuture<List<Page>>> unspillInProgress = Optional.empty();
     @Nullable
+    // TODO use WeakReference to that PLSF.freePartitions has immediate effect (sure we still need update memory accounting)
     private LookupSourceSupplier lookupSourceSupplier;
     private OptionalLong lookupSourceChecksum = OptionalLong.empty();
 
@@ -268,6 +272,7 @@ public class HashBuilderOperator
 
         this.index = pagesIndexFactory.newPagesIndex(lookupSourceFactory.getTypes(), expectedPositions);
         this.lookupSourceFactory = lookupSourceFactory;
+        lookupSourceFactoryDestroyed = lookupSourceFactory.isDestroyed();
 
         this.outputChannels = outputChannels;
         this.hashChannels = hashChannels;
@@ -306,7 +311,7 @@ public class HashBuilderOperator
                 return lookupSourceNotNeeded.get();
 
             case LOOKUP_SOURCE_SPILLED:
-                return spilledLookupSourceHandle.getUnspillingRequested();
+                return spilledLookupSourceHandle.getUnspillingOrDisposeRequested();
 
             case LOOKUP_SOURCE_UNSPILLING:
                 return unspillInProgress.get();
@@ -315,7 +320,7 @@ public class HashBuilderOperator
                 return spilledLookupSourceHandle.getDisposeRequested();
 
             case DISPOSED:
-                return lookupSourceFactory.isDestroyed();
+                return lookupSourceFactoryDestroyed;
         }
         throw new IllegalStateException("Unhandled state: " + state);
     }
@@ -323,14 +328,21 @@ public class HashBuilderOperator
     @Override
     public boolean needsInput()
     {
-        return state == State.CONSUMING_INPUT
+        boolean stateNeedsInput = state == State.CONSUMING_INPUT
                 || (state == State.SPILLING_INPUT && spillInProgress.isDone());
+
+        return stateNeedsInput && !lookupSourceFactoryDestroyed.isDone();
     }
 
     @Override
     public void addInput(Page page)
     {
         requireNonNull(page, "page is null");
+
+        if (lookupSourceFactoryDestroyed.isDone()) {
+            close();
+            return;
+        }
 
         if (state == State.SPILLING_INPUT) {
             spillInput(page);
@@ -407,6 +419,7 @@ public class HashBuilderOperator
 
         if (state == State.LOOKUP_SOURCE_BUILT) {
             lookupSourceFactory.setPartitionSpilledLookupSource(partitionIndex, spilledLookupSourceHandle);
+            lookupSourceNotNeeded = Optional.empty();
             index.clear();
             operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
             operatorContext.setRevocableMemoryReservation(0L);
@@ -433,6 +446,11 @@ public class HashBuilderOperator
     @Override
     public void finish()
     {
+        if (lookupSourceFactoryDestroyed.isDone()) {
+            close();
+            return;
+        }
+
         switch (state) {
             case CONSUMING_INPUT:
                 finishInput();
@@ -447,7 +465,10 @@ public class HashBuilderOperator
                 return;
 
             case LOOKUP_SOURCE_SPILLED:
-                unspillLookupSourceIfRequested();
+                disposeSpilledLookupSourceIfRequested();
+                if (state == State.LOOKUP_SOURCE_SPILLED) {
+                    unspillLookupSourceIfRequested();
+                }
                 return;
 
             case LOOKUP_SOURCE_UNSPILLING:
@@ -462,11 +483,17 @@ public class HashBuilderOperator
                 // no-op
                 return;
         }
+
         throw new IllegalStateException("Unhandled state: " + state);
     }
 
     private void finishInput()
     {
+        if (lookupSourceFactoryDestroyed.isDone()) {
+            close();
+            return;
+        }
+
         LookupSourceSupplier partition = buildLookupSource();
         if (spillEnabled) {
             operatorContext.setRevocableMemoryReservation(partition.get().getInMemorySizeInBytes());
@@ -481,7 +508,7 @@ public class HashBuilderOperator
 
     private void disposeLookupSourceIfRequested()
     {
-        checkState(lookupSourceNotNeeded.isPresent());
+        verify(lookupSourceNotNeeded.isPresent());
         if (!lookupSourceNotNeeded.get().isDone()) {
             return;
         }
@@ -503,6 +530,15 @@ public class HashBuilderOperator
         lookupSourceFactory.setPartitionSpilledLookupSource(partitionIndex, spilledLookupSourceHandle);
 
         state = State.LOOKUP_SOURCE_SPILLED;
+    }
+
+    private void disposeSpilledLookupSourceIfRequested()
+    {
+        if (!spilledLookupSourceHandle.getDisposeRequested().isDone()) {
+            return;
+        }
+
+        close();
     }
 
     private void unspillLookupSourceIfRequested()
@@ -570,7 +606,6 @@ public class HashBuilderOperator
     private LookupSourceSupplier buildLookupSource()
     {
         // TODO when partition is disposed (either normal or unspilled one), make sure no-one holds references to it. PartitionedConsumption currently does. Who else?
-        // TODO Maybe finished, but not closed yet, LJOs? Who else
 
         LookupSourceSupplier partition = index.createLookupSourceSupplier(operatorContext.getSession(), hashChannels, preComputedHashChannel, filterFunctionFactory, Optional.of(outputChannels));
         hashCollisionsCounter.recordHashCollision(partition.getHashCollisions(), partition.getExpectedHashCollisions());
@@ -582,13 +617,25 @@ public class HashBuilderOperator
     @Override
     public boolean isFinished()
     {
+        if (lookupSourceFactoryDestroyed.isDone()) {
+            // Finish early when the probe side is empty
+            close();
+            return true;
+        }
+
         return state == State.DISPOSED;
     }
 
     @Override
     public void close()
-            throws Exception
     {
-        spiller.ifPresent(SingleStreamSpiller::close);
+        // close() can be called in any state, due for example to query failure, and must clean resource up unconditionally
+
+        lookupSourceSupplier = null;
+        state = State.DISPOSED;
+
+        runAll(
+                () -> spiller.ifPresent(SingleStreamSpiller::close),
+                () -> index.clear());
     }
 }

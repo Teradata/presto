@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.operator;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 
@@ -21,6 +22,7 @@ import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
 import static com.google.common.base.Preconditions.checkState;
+import static io.airlift.concurrent.MoreFutures.whenAnyComplete;
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
@@ -44,6 +46,8 @@ final class SpilledLookupSourceHandle
     private SettableFuture<LookupSource> unspilledLookupSource;
 
     private final SettableFuture<?> disposeRequested = SettableFuture.create();
+
+    private final ListenableFuture<?> unspillingOrDisposeRequested = whenAnyComplete(ImmutableList.of(unspillingRequested, disposeRequested));
 
     public SettableFuture<?> getUnspillingRequested()
     {
@@ -78,6 +82,11 @@ final class SpilledLookupSourceHandle
     public SettableFuture<?> getDisposeRequested()
     {
         return disposeRequested;
+    }
+
+    public ListenableFuture<?> getUnspillingOrDisposeRequested()
+    {
+        return unspillingOrDisposeRequested;
     }
 
     @GuardedBy("this")
