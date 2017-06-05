@@ -482,7 +482,7 @@ public class JoinProbeCompiler
         public ReflectionJoinProbeFactory(Class<? extends JoinProbe> joinProbeClass)
         {
             try {
-                constructor = joinProbeClass.getConstructor(LookupSource.class, Page.class);
+                constructor = joinProbeClass.getConstructor(Page.class);
             }
             catch (NoSuchMethodException e) {
                 throw Throwables.propagate(e);
