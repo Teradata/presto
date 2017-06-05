@@ -32,7 +32,7 @@ public class JoinHashSupplier
     private final PagesHash pagesHash;
     private final LongArrayList addresses;
     private final List<List<Block>> channels;
-    private final Function<Optional<JoinFilterFunction>, PositionLinks> positionLinks;
+    private final PositionLinks.Factory positionLinks;
     private final Optional<JoinFilterFunctionFactory> filterFunctionFactory;
 
     public JoinHashSupplier(
@@ -87,6 +87,6 @@ public class JoinHashSupplier
         return new JoinHash(
                 pagesHash,
                 filterFunction,
-                positionLinks.apply(filterFunction));
+                positionLinks.create(filterFunction));
     }
 }
