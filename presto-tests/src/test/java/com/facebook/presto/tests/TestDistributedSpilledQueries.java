@@ -36,8 +36,6 @@ public class TestDistributedSpilledQueries
     private static DistributedQueryRunner createQueryRunner()
             throws Exception
     {
-        // TODO this test doesn't force any spill. :/
-
         Session defaultSession = testSessionBuilder()
                 .setCatalog("tpch")
                 .setSchema(TINY_SCHEMA_NAME)
@@ -46,10 +44,14 @@ public class TestDistributedSpilledQueries
                 .setSystemProperty(SystemSessionProperties.AGGREGATION_OPERATOR_UNSPILL_MEMORY_LIMIT, "128kB")
                 .build();
 
-        DistributedQueryRunner queryRunner = new DistributedQueryRunner(defaultSession, 2, ImmutableMap.of(
-                "experimental.spiller-spill-path", Paths.get(System.getProperty("java.io.tmpdir"), "presto", "spills").toString(),
-                "experimental.spiller-max-used-space-threshold", "1.0"
-        ), ImmutableMap.of(), new SqlParserOptions());
+        ImmutableMap<String, String> extraProperties = ImmutableMap.<String, String>builder()
+                .put("experimental.spiller-spill-path", Paths.get(System.getProperty("java.io.tmpdir"), "presto", "spills").toString())
+                .put("experimental.spiller-max-used-space-threshold", "1.0")
+                .put("experimental.memory-revoking-threshold", "0.0001")
+                .put("experimental.memory-revoking-target", "0.0")
+                .build();
+
+        DistributedQueryRunner queryRunner = new DistributedQueryRunner(defaultSession, 2, extraProperties, ImmutableMap.of(), new SqlParserOptions());
 
         try {
             queryRunner.installPlugin(new TpchPlugin());
