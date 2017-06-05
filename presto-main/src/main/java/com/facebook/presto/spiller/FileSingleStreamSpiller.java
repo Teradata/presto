@@ -146,15 +146,7 @@ public class FileSingleStreamSpiller
 
         writable = false;
         try {
-            InputStream input = null;
-            try {
-                input = new FileInputStream(targetFileName.toFile());
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-                System.out.println();
-                throw e;
-            }
+            InputStream input = new FileInputStream(targetFileName.toFile());
             memoryContext.setBytes(BUFFER_SIZE);
             closer.register(input);
             closer.register(() -> memoryContext.setBytes(0));
