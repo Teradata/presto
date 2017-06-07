@@ -62,6 +62,12 @@
         </artifact>
     </artifactSet>
 
+    <artifactSet to="plugin/hive-mapr3">
+        <artifact id="${project.groupId}:presto-hive-mapr3:zip:${project.version}">
+            <unpack />
+        </artifact>
+    </artifactSet>
+
     <artifactSet to="plugin/blackhole">
         <artifact id="${project.groupId}:presto-blackhole:zip:${project.version}">
             <unpack />
