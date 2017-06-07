@@ -28,13 +28,16 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import javax.annotation.concurrent.ThreadSafe;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Verify.verify;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static java.util.Objects.requireNonNull;
 
@@ -50,6 +53,7 @@ public class GenericPartitioningSpiller
     private final SingleStreamSpiller[] spillers;
     private final Closer closer = Closer.create();
     private boolean readingStarted;
+    private Set<Integer> spilledPartitions = new HashSet<>();
 
     public GenericPartitioningSpiller(
             List<Type> types,
@@ -79,7 +83,14 @@ public class GenericPartitioningSpiller
     {
         readingStarted = true;
         getFutureValue(flush(partition));
+        spilledPartitions.remove(partition);
         return spillers[partition].getSpilledPages();
+    }
+
+    @Override
+    public synchronized void verifyExhausted()
+    {
+        verify(spilledPartitions.isEmpty(), "Some partitions were spilled but not read: %s", spilledPartitions);
     }
 
     @Override
@@ -108,6 +119,7 @@ public class GenericPartitioningSpiller
                 continue;
             }
 
+            spilledPartitions.add(partition);
             PageBuilder pageBuilder = pageBuilders[partition];
             pageBuilder.declarePosition();
             for (int channel = 0; channel < types.size(); channel++) {

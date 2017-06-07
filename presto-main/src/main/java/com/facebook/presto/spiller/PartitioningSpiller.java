@@ -36,6 +36,8 @@ public interface PartitioningSpiller
      */
     Iterator<Page> getSpilledPages(int partition);
 
+    void verifyExhausted();
+
     /**
      * Close releases/removes all underlying resources used during spilling
      * like for example all created temporary files.
