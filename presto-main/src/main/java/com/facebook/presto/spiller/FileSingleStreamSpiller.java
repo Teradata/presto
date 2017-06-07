@@ -20,6 +20,7 @@ import com.facebook.presto.memory.LocalMemoryContext;
 import com.facebook.presto.operator.SpillContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.util.PrestoIterators;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
@@ -150,7 +151,8 @@ public class FileSingleStreamSpiller
             memoryContext.setBytes(BUFFER_SIZE);
             closer.register(input);
             closer.register(() -> memoryContext.setBytes(0));
-            return PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE));
+            Iterator<Page> pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE));
+            return PrestoIterators.closeWhenExhausted(pages, this);
         }
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to read spilled pages", e);
