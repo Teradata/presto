@@ -42,6 +42,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.units.DataSize.succinctBytes;
+import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
@@ -501,6 +502,12 @@ public class OperatorContext
     public <C, R> R accept(QueryContextVisitor<C, R> visitor, C context)
     {
         return visitor.visitOperatorContext(this, context);
+    }
+
+    @Override
+    public String toString()
+    {
+        return format("%s-%s", operatorType, planNodeId);
     }
 
     private long currentThreadUserTime()
