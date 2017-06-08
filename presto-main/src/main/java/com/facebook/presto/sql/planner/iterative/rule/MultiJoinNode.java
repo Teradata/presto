@@ -14,52 +14,48 @@
 
 package com.facebook.presto.sql.planner.iterative.rule;
 
-import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
-import com.facebook.presto.sql.planner.plan.PlanNodeId;
-import com.facebook.presto.sql.planner.plan.PlanVisitor;
-import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
 import static com.facebook.presto.sql.ExpressionUtils.and;
+import static com.facebook.presto.sql.ExpressionUtils.extractConjuncts;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
-import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
-import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.Objects.requireNonNull;
 
 /**
  * This class represents a set of inner joins that can be executed in any order.
- * The nodes of the join graph are the sources to be joined. The edges are
- * filters. If there is no filter between a pair
- * of sources, then a possible cross join is implied
  */
-public class JoinGraphNode
-        extends PlanNode
+public class MultiJoinNode
 {
     private final List<PlanNode> sources;
     private final Expression filter;
     private final List<Symbol> outputSymbols;
 
-    public JoinGraphNode(PlanNodeId id, List<PlanNode> sources, Expression filter, List<Symbol> outputSymbols)
+    public MultiJoinNode(List<PlanNode> sources, Expression filter, List<Symbol> outputSymbols)
     {
-        super(id);
-
         requireNonNull(sources, "sources is null");
         requireNonNull(filter, "filters is null");
+        requireNonNull(outputSymbols, "outputSymbols is null");
 
         this.sources = ImmutableList.copyOf(sources);
         this.filter = filter;
         this.outputSymbols = ImmutableList.copyOf(outputSymbols);
+
+        List<Symbol> inputSymbols = sources.stream().flatMap(source -> source.getOutputSymbols().stream()).collect(toImmutableList());
+        checkArgument(inputSymbols.containsAll(outputSymbols), "inputs do not contain all output symbols");
     }
 
     public Expression getFilter()
@@ -67,71 +63,70 @@ public class JoinGraphNode
         return filter;
     }
 
-    @Override
-    public <R, C> R accept(PlanVisitor<R, C> visitor, C context)
-    {
-        return visitor.visitJoinGraph(this, context);
-    }
-
-    @Override
     public List<PlanNode> getSources()
     {
         return sources;
     }
 
-    @Override
     public List<Symbol> getOutputSymbols()
     {
         return outputSymbols;
     }
 
     @Override
-    public PlanNode replaceChildren(List<PlanNode> newChildren)
-    {
-        return new JoinGraphNode(getId(), newChildren, filter, outputSymbols);
-    }
-
-    @Override
     public int hashCode()
     {
-        return Objects.hash(this.getOutputSymbols(), this.getFilter(), this.getSources().stream().map(PlanNode::getId).collect(toImmutableList()));
+        return Objects.hash(
+                ImmutableSet.copyOf(this.getOutputSymbols()),
+                ImmutableSet.copyOf(extractConjuncts(this.getFilter())),
+                this.getSources().stream()
+                        .map(PlanNode::getId)
+                        .collect(toImmutableSet()));
     }
 
     @Override
     public boolean equals(Object other)
     {
-        if (!(other instanceof JoinGraphNode)) {
+        if (!(other instanceof MultiJoinNode)) {
             return false;
         }
 
-        JoinGraphNode otherJoinGraph = (JoinGraphNode) other;
-        return this.getOutputSymbols().equals(otherJoinGraph.getOutputSymbols())
-                && this.getFilter().equals(otherJoinGraph.getFilter())
-                && this.getSources().stream().map(PlanNode::getId).collect(toImmutableList()).equals(otherJoinGraph.getSources().stream().map(PlanNode::getId));
+        MultiJoinNode otherNode = (MultiJoinNode) other;
+        return ImmutableSet.copyOf(this.getOutputSymbols()).equals(ImmutableSet.copyOf(otherNode.getOutputSymbols()))
+                && ImmutableSet.copyOf(extractConjuncts(this.getFilter())).equals(ImmutableSet.copyOf(extractConjuncts(otherNode.getFilter())))
+                && this.getSources().stream().map(PlanNode::getId).collect(toImmutableSet()).equals(otherNode.getSources().stream().map(PlanNode::getId).collect(toImmutableSet()));
     }
 
-    public static class JoinGraphNodeBuilder
+    static MultiJoinNode toMultiJoinNode(JoinNode joinNode, Lookup lookup)
+    {
+        return new MultiJoinNodeBuilder(joinNode, lookup).toMultiJoinNode();
+    }
+
+    private static class MultiJoinNodeBuilder
     {
         private final List<PlanNode> sources = new ArrayList<>();
         private final List<Expression> filters = new ArrayList<>();
         private final List<Symbol> outputSymbols;
+        private final Lookup lookup;
 
-        public JoinGraphNodeBuilder(JoinNode node, Lookup lookup)
+        MultiJoinNodeBuilder(JoinNode node, Lookup lookup)
         {
+            requireNonNull(node, "node is null");
             checkState(node.getType() == INNER, "join type must be INNER");
             this.outputSymbols = node.getOutputSymbols();
-            flattenNode(node, lookup);
+            this.lookup = requireNonNull(lookup, "lookup is null");
+            flattenNode(node);
         }
 
-        private void flattenNode(PlanNode node, Lookup lookup)
+        private void flattenNode(PlanNode node)
         {
             PlanNode resolved = lookup.resolve(node);
             if (resolved instanceof JoinNode && ((JoinNode) resolved).getType() == INNER) {
                 JoinNode joinNode = (JoinNode) resolved;
-                flattenNode(joinNode.getLeft(), lookup);
-                flattenNode(joinNode.getRight(), lookup);
+                flattenNode(joinNode.getLeft());
+                flattenNode(joinNode.getRight());
                 joinNode.getCriteria().stream()
-                        .map(criterion -> new ComparisonExpression(EQUAL, criterion.getLeft().toSymbolReference(), criterion.getRight().toSymbolReference()))
+                        .map(JoinNode.EquiJoinClause::toExpression)
                         .forEach(filters::add);
                 joinNode.getFilter().ifPresent(filters::add);
             }
@@ -140,12 +135,9 @@ public class JoinGraphNode
             }
         }
 
-        public JoinGraphNode toJoinGraphNode(PlanNodeIdAllocator idAllocator)
+        MultiJoinNode toMultiJoinNode()
         {
-            if (filters.isEmpty()) {
-                filters.add(TRUE_LITERAL);
-            }
-            return new JoinGraphNode(idAllocator.getNextId(), sources, and(filters), outputSymbols);
+            return new MultiJoinNode(sources, and(filters), outputSymbols);
         }
     }
 }

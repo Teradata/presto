@@ -28,7 +28,6 @@ import com.facebook.presto.sql.planner.Partitioning;
 import com.facebook.presto.sql.planner.PartitioningScheme;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Aggregation;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Step;
@@ -290,17 +289,6 @@ public class PlanBuilder
     public JoinNode join(JoinNode.Type type, PlanNode left, PlanNode right, List<JoinNode.EquiJoinClause> criteria, List<Symbol> outputSymbols, Optional<Expression> filter)
     {
         return new JoinNode(idAllocator.getNextId(), type, left, right, criteria, outputSymbols, filter, Optional.empty(), Optional.empty(), Optional.empty());
-    }
-
-    public JoinGraphNode joinGraph(List<PlanNode> sources, Expression filter)
-    {
-        return new JoinGraphNode(
-                idAllocator.getNextId(),
-                sources,
-                filter,
-                sources.stream()
-                        .flatMap(source -> source.getOutputSymbols().stream())
-                        .collect(toImmutableList()));
     }
 
     public class ExchangeBuilder

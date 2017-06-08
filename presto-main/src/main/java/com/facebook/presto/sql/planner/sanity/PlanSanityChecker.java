@@ -36,8 +36,7 @@ public final class PlanSanityChecker
             new NoDuplicatePlanNodeIdsChecker(),
             new NoApplyNodeLeftChecker(),
             new VerifyNoFilteredAggregations(),
-            new VerifyOnlyOneOutputNode(),
-            new NoJoinGraphNodeLeftChecker());
+            new VerifyOnlyOneOutputNode());
 
     private PlanSanityChecker() {}
 

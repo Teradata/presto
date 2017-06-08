@@ -134,8 +134,7 @@ public class JoinNode
 
     private static List<EquiJoinClause> flipJoinCriteria(List<EquiJoinClause> joinCriteria)
     {
-        return joinCriteria
-                .stream()
+        return joinCriteria.stream()
                 .map(EquiJoinClause::flip)
                 .collect(toImmutableList());
     }

@@ -16,8 +16,6 @@ package com.facebook.presto.sql.planner.assertions;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.plan.Assignments;
 import com.facebook.presto.sql.tree.Expression;
-import com.facebook.presto.sql.tree.ExpressionRewriter;
-import com.facebook.presto.sql.tree.ExpressionTreeRewriter;
 import com.facebook.presto.sql.tree.SymbolReference;
 import com.google.common.collect.ImmutableMap;
 
@@ -176,27 +174,6 @@ public final class SymbolAliases
     public SymbolAliases replaceAssignments(Assignments assignments)
     {
         return new SymbolAliases(getUpdatedAssignments(assignments));
-    }
-
-    /**
-     * Return a new expression with symbol aliases replaced with the mapped symbol reference
-     *
-     * Example:
-     * SymbolAliases = { "ALIAS1": SymbolReference("foo"), "ALIAS2": SymbolReference("bar")}
-     * expression = ComparisonExpression(SymbolReference("ALIAS1"), SymbolReference("ALIAS2)
-     *
-     * replaceSymbolAliasesInExpression(expression) -> ComparisonExpression((SymbolReference("foo"), SymbolReference("bar"))
-     */
-    public Expression replaceSymbolAliasesInExpression(Expression expression)
-    {
-        return ExpressionTreeRewriter.rewriteWith(new ExpressionRewriter<Void>()
-        {
-            @Override
-            public Expression rewriteSymbolReference(SymbolReference node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
-            {
-                return map.get(node.getName());
-            }
-        }, expression);
     }
 
     @Override

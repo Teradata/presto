@@ -15,8 +15,10 @@
 package com.facebook.presto.sql.planner.iterative.rule;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.sql.planner.Plan;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
+import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.tree.ComparisonExpression;
@@ -36,9 +38,7 @@ import static com.facebook.presto.sql.ExpressionUtils.and;
 import static com.facebook.presto.sql.planner.assertions.PlanAssert.assertPlan;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.equiJoinClause;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.join;
-import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.joinGraph;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.values;
-import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.JoinEnumerator.createJoinAccordingToPartitioning;
 import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.JoinEnumerator.generatePartitions;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN;
@@ -71,7 +71,7 @@ public class TestJoinEnumerator
     }
 
     @Test
-    public void testCreateBinaryJoin()
+    public void testCreatesJoinAccordingToPartitioning()
     {
         Session session = testSessionBuilder().build();
         LocalQueryRunner queryRunner = new LocalQueryRunner(session);
@@ -82,14 +82,16 @@ public class TestJoinEnumerator
                         new ComparisonExpression(EQUAL, new SymbolReference("A1"), new SymbolReference("B1")),
                         new ComparisonExpression(EQUAL, new SymbolReference("B1"), new SymbolReference("D1")),
                         new ComparisonExpression(GREATER_THAN, planBuilder.symbol("A1", BIGINT).toSymbolReference(), planBuilder.symbol("C1", BIGINT).toSymbolReference()));
-        JoinGraphNode joinGraphNode = planBuilder.joinGraph(
+        MultiJoinNode multiJoinNode = new MultiJoinNode(
                 ImmutableList.of(
                         planBuilder.values(planBuilder.symbol("A1", BIGINT)),
                         planBuilder.values(planBuilder.symbol("B1", BIGINT)),
                         planBuilder.values(planBuilder.symbol("C1", BIGINT)),
                         planBuilder.values(planBuilder.symbol("D1", BIGINT))),
-                filter);
-        JoinNode actual = createJoinAccordingToPartitioning(joinGraphNode, ImmutableSet.of(0, 2), idAllocator);
+                filter,
+                ImmutableList.of());
+        ReorderJoins.JoinEnumerator joinEnumerator = new ReorderJoins.JoinEnumerator(idAllocator, new SymbolAllocator(), queryRunner.getDefaultSession(), queryRunner.getLookup(), multiJoinNode, new CostComparator(1, 1, 1));
+        JoinNode actual = joinEnumerator.createJoinAccordingToPartitioning(multiJoinNode, ImmutableSet.of(0, 2), idAllocator);
         assertPlan(
                 session,
                 queryRunner.getMetadata(),
@@ -100,14 +102,15 @@ public class TestJoinEnumerator
                         ImmutableList.of(equiJoinClause("A1", "B1")),
                         Optional.empty(),
                         Optional.empty(),
-                        joinGraph(
-                                "A1 > C1",
-                                ImmutableList.of("A1", "C1"),
+                        join(
+                                JoinNode.Type.INNER,
+                                ImmutableList.of(),
+                                Optional.of("A1 > C1"),
                                 values(ImmutableMap.of("A1", 0)),
                                 values(ImmutableMap.of("C1", 0))),
-                        joinGraph(
-                                "B1 = D1",
-                                ImmutableList.of("B1", "D1"),
+                        join(
+                                JoinNode.Type.INNER,
+                                ImmutableList.of(equiJoinClause("B1", "D1")),
                                 values(ImmutableMap.of("B1", 0)),
                                 values(ImmutableMap.of("D1", 0)))));
     }

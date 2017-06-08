@@ -286,9 +286,6 @@ public class PlanOptimizers
                         ImmutableSet.of(new EliminateCrossJoins())
                 ),
 
-                // Because ReorderJoins runs only once,
-                // PredicatePushDown, PruneUnreferenedOutputpus and RemoveRedundantIdentityProjections
-                // need to run beforehand in order to produce an optimal join order
                 new PredicatePushDown(metadata, sqlParser),
                 new IterativeOptimizer(
                         stats,
@@ -303,6 +300,10 @@ public class PlanOptimizers
                         estimatedExchangesCostCalculator,
                         ImmutableSet.of(new RemoveRedundantIdentityProjections())
                 ),
+
+                // Because ReorderJoins runs only once,
+                // PredicatePushDown, PruneUnreferenedOutputpus and RemoveRedundantIdentityProjections
+                // need to run beforehand in order to produce an optimal join order
                 new IterativeOptimizer(
                         stats,
                         statsCalculator,

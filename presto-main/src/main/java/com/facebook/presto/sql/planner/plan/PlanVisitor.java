@@ -14,7 +14,6 @@
 package com.facebook.presto.sql.planner.plan;
 
 import com.facebook.presto.sql.planner.iterative.GroupReference;
-import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
 
 public abstract class PlanVisitor<R, C>
 {
@@ -191,11 +190,6 @@ public abstract class PlanVisitor<R, C>
     }
 
     public R visitGroupReference(GroupReference node, C context)
-    {
-        return visitPlan(node, context);
-    }
-
-    public R visitJoinGraph(JoinGraphNode node, C context)
     {
         return visitPlan(node, context);
     }

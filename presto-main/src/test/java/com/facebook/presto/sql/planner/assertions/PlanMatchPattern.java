@@ -20,7 +20,6 @@ import com.facebook.presto.spi.block.SortOrder;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Step;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
@@ -256,14 +255,6 @@ public final class PlanMatchPattern
                         distributionType));
     }
 
-    public static PlanMatchPattern joinGraph(String filter, List<String> outputSymbols, PlanMatchPattern... sources)
-    {
-        return node(JoinGraphNode.class, sources).with(
-                new JoinGraphMatcher(
-                        rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(filter))))
-                .withExactOutputs(outputSymbols);
-    }
-
     public static PlanMatchPattern exchange(PlanMatchPattern... sources)
     {
         return node(ExchangeNode.class, sources);
@@ -348,7 +339,7 @@ public final class PlanMatchPattern
         return values(aliasToIndex, Optional.empty(), Optional.empty());
     }
 
-    public static PlanMatchPattern values(String ... aliases)
+    public static PlanMatchPattern values(String... aliases)
     {
         return values(ImmutableList.copyOf(aliases));
     }
