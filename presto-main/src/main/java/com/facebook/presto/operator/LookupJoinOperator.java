@@ -288,7 +288,6 @@ public class LookupJoinOperator
         }
 
         if (!hasLookupSourceProvider()) {
-            // TODO handle the case when there probe side is empty and finish early
             return null;
         }
 
