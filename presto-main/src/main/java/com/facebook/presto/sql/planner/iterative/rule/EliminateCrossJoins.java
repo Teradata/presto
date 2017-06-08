@@ -54,7 +54,7 @@ public class EliminateCrossJoins
             return Optional.empty();
         }
 
-        if (!SystemSessionProperties.isJoinReorderingEnabled(session)) {
+        if (!SystemSessionProperties.isCrossJoinEliminationEnabled(session) || SystemSessionProperties.isJoinReorderingEnabled(session)) {
             return Optional.empty();
         }
 
