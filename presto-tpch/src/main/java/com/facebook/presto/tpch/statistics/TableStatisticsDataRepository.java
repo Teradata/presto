@@ -25,7 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Optional;
 
-import static com.facebook.presto.util.Optionals.withBoth;
+import static com.facebook.presto.tpch.util.Optionals.withBoth;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.String.format;
 
