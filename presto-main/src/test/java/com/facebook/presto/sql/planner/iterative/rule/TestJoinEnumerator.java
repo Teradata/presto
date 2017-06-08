@@ -18,6 +18,7 @@ import com.facebook.presto.Session;
 import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.sql.planner.Plan;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
+import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder;
 import com.facebook.presto.sql.planner.plan.JoinNode;
@@ -40,11 +41,14 @@ import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.equiJo
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.join;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.values;
 import static com.facebook.presto.sql.planner.iterative.rule.ReorderJoins.JoinEnumerator.generatePartitions;
+import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertTrue;
 
 public class TestJoinEnumerator
 {
@@ -91,12 +95,13 @@ public class TestJoinEnumerator
                 filter,
                 ImmutableList.of());
         ReorderJoins.JoinEnumerator joinEnumerator = new ReorderJoins.JoinEnumerator(idAllocator, new SymbolAllocator(), queryRunner.getDefaultSession(), queryRunner.getLookup(), multiJoinNode, new CostComparator(1, 1, 1));
-        JoinNode actual = joinEnumerator.createJoinAccordingToPartitioning(multiJoinNode, ImmutableSet.of(0, 2), idAllocator);
+        Optional<JoinNode> actual = joinEnumerator.createJoinAccordingToPartitioning(multiJoinNode, ImmutableSet.of(0, 2));
+        assertTrue(actual.isPresent());
         assertPlan(
                 session,
                 queryRunner.getMetadata(),
                 queryRunner.getLookup(),
-                new Plan(actual, planBuilder.getSymbols(), queryRunner.getLookup(), queryRunner.getDefaultSession()),
+                new Plan(actual.get(), planBuilder.getSymbols(), queryRunner.getLookup(), queryRunner.getDefaultSession()),
                 join(
                         JoinNode.Type.INNER,
                         ImmutableList.of(equiJoinClause("A1", "B1")),
@@ -113,5 +118,23 @@ public class TestJoinEnumerator
                                 ImmutableList.of(equiJoinClause("B1", "D1")),
                                 values(ImmutableMap.of("B1", 0)),
                                 values(ImmutableMap.of("D1", 0)))));
+    }
+
+    @Test
+    public void testDoesNotCreateJoinWhenPartitionedOnCrossJoin()
+    {
+        Session session = testSessionBuilder().build();
+        LocalQueryRunner queryRunner = new LocalQueryRunner(session);
+        PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
+        PlanBuilder planBuilder = new PlanBuilder(idAllocator, queryRunner.getMetadata());
+        Symbol a1 = planBuilder.symbol("A1", BIGINT);
+        Symbol b1 = planBuilder.symbol("B1", BIGINT);
+        MultiJoinNode multiJoinNode = new MultiJoinNode(
+                ImmutableList.of(planBuilder.values(a1), planBuilder.values(b1)),
+                TRUE_LITERAL,
+                ImmutableList.of(a1, b1));
+        ReorderJoins.JoinEnumerator joinEnumerator = new ReorderJoins.JoinEnumerator(idAllocator, new SymbolAllocator(), queryRunner.getDefaultSession(), queryRunner.getLookup(), multiJoinNode, new CostComparator(1, 1, 1));
+        Optional<JoinNode> actual = joinEnumerator.createJoinAccordingToPartitioning(multiJoinNode, ImmutableSet.of(0));
+        assertFalse(actual.isPresent());
     }
 }
