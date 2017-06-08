@@ -77,6 +77,12 @@ public class JoinHashSupplier
     }
 
     @Override
+    public long checksum()
+    {
+        return positionLinks.checksum();
+    }
+
+    @Override
     public JoinHash get()
     {
         // We need to create new JoinFilterFunction per each thread using it, since those functions

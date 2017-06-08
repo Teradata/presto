@@ -21,4 +21,9 @@ public interface LookupSourceSupplier
     long getHashCollisions();
 
     double getExpectedHashCollisions();
+
+    /**
+     * @return checksum of this entity, useful when entity is restored from spilled data
+     */
+    long checksum();
 }
