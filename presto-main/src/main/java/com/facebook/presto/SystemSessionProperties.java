@@ -20,14 +20,15 @@ import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.StandardErrorCode;
 import com.facebook.presto.spi.session.PropertyMetadata;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
+import com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType;
 import com.google.common.collect.ImmutableList;
 import io.airlift.units.DataSize;
 import io.airlift.units.Duration;
 
 import javax.inject.Inject;
 
-import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 import static com.facebook.presto.spi.session.PropertyMetadata.booleanSessionProperty;
 import static com.facebook.presto.spi.session.PropertyMetadata.integerSessionProperty;
@@ -38,7 +39,7 @@ import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.units.DataSize.succinctBytes;
 import static java.lang.String.format;
-import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.joining;
 
 public final class SystemSessionProperties
 {
@@ -105,13 +106,16 @@ public final class SystemSessionProperties
                         false),
                 new PropertyMetadata<>(
                         JOIN_DISTRIBUTION_TYPE,
-                        String.format("The join method to use. Options are %s", Arrays.stream(FeaturesConfig.JoinDistributionType.values()).collect(toList())).concat(","),
+                        format("The join method to use. Options are %s",
+                                Stream.of(JoinDistributionType.values())
+                                        .map(FeaturesConfig.JoinDistributionType::name)
+                                        .collect(joining(","))),
                         VARCHAR,
-                        FeaturesConfig.JoinDistributionType.class,
+                        JoinDistributionType.class,
                         featuresConfig.getJoinDistributionType(),
                         false,
-                        value -> FeaturesConfig.JoinDistributionType.valueOf(((String) value).toUpperCase()),
-                        Enum::toString),
+                        value -> JoinDistributionType.valueOf(((String) value).toUpperCase()),
+                        JoinDistributionType::name),
                 booleanSessionProperty(
                         DISTRIBUTED_INDEX_JOIN,
                         "Distribute index joins on join keys instead of executing inline",
@@ -517,8 +521,8 @@ public final class SystemSessionProperties
         return session.getSystemProperty(PUSH_PARTIAL_AGGREGATION_THROUGH_JOIN, Boolean.class);
     }
 
-    public static FeaturesConfig.JoinDistributionType getJoinDistributionType(Session session)
+    public static JoinDistributionType getJoinDistributionType(Session session)
     {
-        return session.getSystemProperty(JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.class);
+        return session.getSystemProperty(JOIN_DISTRIBUTION_TYPE, JoinDistributionType.class);
     }
 }

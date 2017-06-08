@@ -30,6 +30,7 @@ import java.util.List;
 import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType.REPARTITIONED;
 import static com.facebook.presto.sql.analyzer.RegexLibrary.JONI;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 @DefunctConfig({
@@ -489,7 +490,7 @@ public class FeaturesConfig
     @Config("join-distribution-type")
     public FeaturesConfig setJoinDistributionType(JoinDistributionType joinDistributionType)
     {
-        this.joinDistributionType = joinDistributionType;
+        this.joinDistributionType = requireNonNull(joinDistributionType, "joinDistributionType is null");
         return this;
     }
 

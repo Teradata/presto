@@ -15,7 +15,6 @@ package com.facebook.presto.sql.planner.optimizations;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolAllocator;
@@ -145,7 +144,7 @@ public class DetermineJoinDistributionType
 
         private static boolean isRepartitionedJoinEnabled(Session session)
         {
-            return !getJoinDistributionType(session).equals(FeaturesConfig.JoinDistributionType.REPLICATED);
+            return getJoinDistributionType(session).canRepartition();
         }
     }
 }

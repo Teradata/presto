@@ -14,6 +14,7 @@
 package com.facebook.presto.tests.jdbc;
 
 import com.facebook.presto.jdbc.PrestoConnection;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.teradata.tempto.BeforeTestWithContext;
 import com.teradata.tempto.ProductTest;
 import com.teradata.tempto.Requirement;
@@ -246,7 +247,7 @@ public class JdbcTests
             throws SQLException
     {
         final String joinDistributionType = "join_distribution_type";
-        final String defaultValue = "REPARTITIONED";
+        final String defaultValue = new FeaturesConfig().getJoinDistributionType().name();
 
         assertThat(getSessionProperty(connection, joinDistributionType)).isEqualTo(defaultValue);
         setSessionProperty(connection, joinDistributionType, "REPLICATED");
