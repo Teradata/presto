@@ -359,8 +359,6 @@ public class HashBuilderOperator
         index.addPage(page);
 
         if (spillEnabled) {
-            // TODO trySetRevocableMemoryReservation else index.compact()
-
             operatorContext.setRevocableMemoryReservation(index.getEstimatedSize().toBytes());
         }
         else {
@@ -387,6 +385,15 @@ public class HashBuilderOperator
         checkState(spillEnabled, "Spill not enabled, no revokable memory should be reserved");
 
         if (state == State.CONSUMING_INPUT) {
+            long indexSizeBeforeCompaction = index.getEstimatedSize().toBytes();
+            index.compact();
+            long indexSizeAfterCompaction = index.getEstimatedSize().toBytes();
+            if (indexSizeAfterCompaction < indexSizeBeforeCompaction * 0.8) {
+                finishMemoryRevoke = Optional.of(() -> {
+                });
+                return immediateFuture(null);
+            }
+
             finishMemoryRevoke = Optional.of(() -> {
                 index.clear();
                 operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
