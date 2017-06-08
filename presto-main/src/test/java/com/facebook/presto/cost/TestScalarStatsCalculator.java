@@ -17,13 +17,19 @@ import com.facebook.presto.Session;
 import com.facebook.presto.metadata.MetadataManager;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.tree.DecimalLiteral;
+import com.facebook.presto.sql.tree.DoubleLiteral;
 import com.facebook.presto.sql.tree.Expression;
+import com.facebook.presto.sql.tree.NullLiteral;
+import com.facebook.presto.sql.tree.StringLiteral;
 import org.testng.annotations.BeforeMethod;
+import org.testng.annotations.Test;
 
 import java.util.Map;
 
 import static com.facebook.presto.cost.PlanNodeStatsEstimate.UNKNOWN_STATS;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
+import static io.airlift.slice.Slices.utf8Slice;
 import static java.util.Collections.emptyMap;
 
 public class TestScalarStatsCalculator
@@ -52,5 +58,33 @@ public class TestScalarStatsCalculator
     private ColumnStatisticsAssertion assertCalculate(Expression scalarExpression, PlanNodeStatsEstimate inputStatistics, Map<Symbol, Type> types)
     {
         return ColumnStatisticsAssertion.assertThat(calculator.calculate(scalarExpression, inputStatistics, session, types));
+    }
+
+    @Test
+    public void testLiteral()
+    {
+        assertCalculate(new DoubleLiteral("7.5"))
+                .distinctValuesCount(1.0)
+                .lowValue(7.5)
+                .highValue(7.5)
+                .nullsFraction(0.0);
+
+        assertCalculate(new DecimalLiteral("7.5"))
+                .distinctValuesCount(1.0)
+                .lowValue(75L)
+                .highValue(75L)
+                .nullsFraction(0.0);
+
+        assertCalculate(new StringLiteral("blah"))
+                .distinctValuesCount(1.0)
+                .lowValue(utf8Slice("blah"))
+                .highValue(utf8Slice("blah"))
+                .nullsFraction(0.0);
+
+        assertCalculate(new NullLiteral())
+                .distinctValuesCount(0.0)
+                .lowValueUnknown()
+                .highValueUnknown()
+                .nullsFraction(1.0);
     }
 }

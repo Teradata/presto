@@ -23,6 +23,7 @@ import com.facebook.presto.sql.tree.AstVisitor;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Literal;
 import com.facebook.presto.sql.tree.Node;
+import com.facebook.presto.sql.tree.NullLiteral;
 import com.facebook.presto.sql.tree.SymbolReference;
 
 import javax.inject.Inject;
@@ -71,6 +72,17 @@ public class ScalarStatsCalculator
         protected ColumnStatistics visitSymbolReference(SymbolReference node, Void context)
         {
             return input.getSymbolStatistics().getOrDefault(Symbol.from(node), ColumnStatistics.UNKNOWN_COLUMN_STATISTICS);
+        }
+
+        @Override
+        protected ColumnStatistics visitNullLiteral(NullLiteral node, Void context)
+        {
+            ColumnStatistics.Builder builder = ColumnStatistics.builder();
+            builder.addRange(rb -> rb
+                    .setFraction(Estimate.of(0.0))
+                    .setDistinctValuesCount(Estimate.zeroValue()));
+            builder.setNullsFraction(Estimate.of(1.0));
+            return builder.build();
         }
 
         @Override
