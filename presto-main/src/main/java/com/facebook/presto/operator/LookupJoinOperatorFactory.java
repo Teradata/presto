@@ -21,7 +21,7 @@ import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.ListenableFuture;
 
 import java.util.List;
 import java.util.Optional;
@@ -81,14 +81,10 @@ public class LookupJoinOperatorFactory
             this.outerOperatorFactory = Optional.empty();
         }
         else {
-            // when all join operators finish, set the outer position future to start the outer operator
-            SettableFuture<OuterPositionIterator> outerPositionsFuture = SettableFuture.create();
-            probeReferenceCount.getFreeFuture().addListener(() -> {
-                // lookup source may not be finished yet, so add a listener
-                Futures.addCallback(
-                        lookupSourceFactory.createLookupSource(),
-                        new OnSuccessFutureCallback<>(lookupSource -> outerPositionsFuture.set(lookupSource.getOuterPositionIterator())));
-            }, directExecutor());
+            // when all join operators finish (and lookup source is ready), set the outer position future to start the outer operator
+            ListenableFuture<OuterPositionIterator> outerPositionsFuture = Futures.transform(
+                    Futures.transformAsync(probeReferenceCount.getFreeFuture(), ignored -> lookupSourceFactory.createLookupSource()),
+                    LookupSource::getOuterPositionIterator);
 
             lookupSourceFactoryUsersCount.retain();
             this.outerOperatorFactory = Optional.of(new LookupOuterOperatorFactory(operatorId, planNodeId, outerPositionsFuture, probeOutputTypes, buildOutputTypes, lookupSourceFactoryUsersCount));
