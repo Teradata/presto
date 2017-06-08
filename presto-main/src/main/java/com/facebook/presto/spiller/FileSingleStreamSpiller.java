@@ -20,7 +20,10 @@ import com.facebook.presto.memory.LocalMemoryContext;
 import com.facebook.presto.operator.SpillContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
+import com.facebook.presto.util.PrestoCloseables;
+import com.facebook.presto.util.PrestoIterators;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -31,20 +34,21 @@ import io.airlift.slice.SliceOutput;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.List;
 
 import static com.facebook.presto.execution.buffer.PagesSerdeUtil.writeSerializedPage;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static com.facebook.presto.spiller.FileSingleStreamSpillerFactory.SPILL_FILE_PREFIX;
 import static com.facebook.presto.spiller.FileSingleStreamSpillerFactory.SPILL_FILE_SUFFIX;
 import static com.google.common.base.Preconditions.checkState;
+import static java.nio.file.StandardOpenOption.APPEND;
 import static java.util.Objects.requireNonNull;
 
 @NotThreadSafe
@@ -54,7 +58,7 @@ public class FileSingleStreamSpiller
     @VisibleForTesting
     static final int BUFFER_SIZE = 4 * 1024;
 
-    private final Path targetFileName;
+    private final FileHolder targetFile;
     private final Closer closer = Closer.create();
     private final PagesSerde serde;
     private final SpillerStats spillerStats;
@@ -63,6 +67,8 @@ public class FileSingleStreamSpiller
 
     private final ListeningExecutorService executor;
 
+    private boolean writable = true;
+    private boolean read;
     private ListenableFuture<?> spillInProgress = Futures.immediateFuture(null);
 
     public FileSingleStreamSpiller(
@@ -79,7 +85,7 @@ public class FileSingleStreamSpiller
         this.localSpillContext = spillContext.newLocalSpillContext();
         this.memoryContext = requireNonNull(memoryContext, "memoryContext can not be null");
         try {
-            targetFileName = Files.createTempFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX);
+            this.targetFile = closer.register(new FileHolder(Files.createTempFile(spillPath, SPILL_FILE_PREFIX, SPILL_FILE_SUFFIX)));
         }
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to create spill file", e);
@@ -89,6 +95,7 @@ public class FileSingleStreamSpiller
     @Override
     public ListenableFuture<?> spill(Iterator<Page> pageIterator)
     {
+        requireNonNull(pageIterator, "pageIterator is null");
         checkNoSpillInProgress();
         spillInProgress = executor.submit(() -> writePages(pageIterator));
         return spillInProgress;
@@ -101,9 +108,17 @@ public class FileSingleStreamSpiller
         return readPages();
     }
 
+    @Override
+    public ListenableFuture<List<Page>> getAllSpilledPages()
+    {
+        return executor.submit(() -> ImmutableList.copyOf(getSpilledPages()));
+    }
+
     private void writePages(Iterator<Page> pageIterator)
     {
-        try (SliceOutput output = new OutputStreamSliceOutput(new FileOutputStream(targetFileName.toFile(), true), BUFFER_SIZE)) {
+        checkState(writable, "Spilling no longer allowed. The spiller has been made non-writable on first read for subsequent reads to be consistent");
+
+        try (SliceOutput output = new OutputStreamSliceOutput(targetFile.newOutputStream(APPEND), BUFFER_SIZE)) {
             memoryContext.setBytes(BUFFER_SIZE);
             while (pageIterator.hasNext()) {
                 Page page = pageIterator.next();
@@ -124,12 +139,21 @@ public class FileSingleStreamSpiller
 
     private Iterator<Page> readPages()
     {
+        if (read) {
+            /*
+             * Repeated reads would mean multiple opened InputStreams and effectively temporary, but dangerous, resource leak.
+             */
+            throw new RuntimeException("Already read");
+        }
+        read = true;
+
+        writable = false;
         try {
-            InputStream input = new FileInputStream(targetFileName.toFile());
             memoryContext.setBytes(BUFFER_SIZE);
-            closer.register(input);
-            closer.register(() -> memoryContext.setBytes(0));
-            return PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE));
+            InputStream input = targetFile.newInputStream();
+            Closeable resources = closer.register(PrestoCloseables.combine(input, () -> memoryContext.setBytes(0)));
+            Iterator<Page> pages = PagesSerdeUtil.readPages(serde, new InputStreamSliceInput(input, BUFFER_SIZE));
+            return PrestoIterators.closeWhenExhausted(pages, resources);
         }
         catch (IOException e) {
             throw new PrestoException(GENERIC_INTERNAL_ERROR, "Failed to read spilled pages", e);
@@ -139,7 +163,6 @@ public class FileSingleStreamSpiller
     @Override
     public void close()
     {
-        closer.register(() -> Files.delete(targetFileName));
         closer.register(localSpillContext);
 
         try {

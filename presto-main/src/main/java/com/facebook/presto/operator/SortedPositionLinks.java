@@ -23,7 +23,6 @@ import org.openjdk.jol.info.ClassLayout;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
 
 import static com.facebook.presto.operator.SyntheticAddress.decodePosition;
 import static com.facebook.presto.operator.SyntheticAddress.decodeSliceIndex;
@@ -58,8 +57,8 @@ public final class SortedPositionLinks
 {
     private static final int INSTANCE_SIZE = ClassLayout.parseClass(SortedPositionLinks.class).instanceSize();
 
-    public static class Builder
-            implements PositionLinks.Builder
+    public static class FactoryBuilder
+            implements PositionLinks.FactoryBuilder
     {
         private final Int2ObjectMap<IntArrayList> positionLinks;
         private final int size;
@@ -67,7 +66,7 @@ public final class SortedPositionLinks
         private final PagesHashStrategy pagesHashStrategy;
         private final LongArrayList addresses;
 
-        public Builder(int size, PagesHashStrategy pagesHashStrategy, LongArrayList addresses)
+        public FactoryBuilder(int size, PagesHashStrategy pagesHashStrategy, LongArrayList addresses)
         {
             this.size = size;
             this.comparator = new PositionComparator(pagesHashStrategy, addresses);
@@ -120,9 +119,9 @@ public final class SortedPositionLinks
         }
 
         @Override
-        public Function<Optional<JoinFilterFunction>, PositionLinks> build()
+        public Factory build()
         {
-            ArrayPositionLinks.Builder builder = ArrayPositionLinks.builder(size);
+            ArrayPositionLinks.FactoryBuilder arrayPositionLinksFactoryBuilder = ArrayPositionLinks.builder(size);
             int[][] sortedPositionLinks = new int[size][];
 
             for (Int2ObjectMap.Entry<IntArrayList> entry : positionLinks.int2ObjectEntrySet()) {
@@ -139,21 +138,33 @@ public final class SortedPositionLinks
                 // tail to head, so we must add them in descending order to have
                 // smallest element as a head
                 for (int i = positions.size() - 2; i >= 0; i--) {
-                    builder.link(positions.get(i), positions.get(i + 1));
+                    arrayPositionLinksFactoryBuilder.link(positions.get(i), positions.get(i + 1));
                 }
 
                 // add link from starting position to position links chain
                 if (!positions.isEmpty()) {
-                    builder.link(key, positions.get(0));
+                    arrayPositionLinksFactoryBuilder.link(key, positions.get(0));
                 }
             }
 
-            return lessThanFunction -> {
-                checkState(lessThanFunction.isPresent(), "Using SortedPositionLinks without lessThanFunction");
-                return new SortedPositionLinks(
-                        builder.build().apply(lessThanFunction),
-                        sortedPositionLinks,
-                        lessThanFunction.get());
+            Factory arrayPositionLinksFactory = arrayPositionLinksFactoryBuilder.build();
+            return new Factory()
+            {
+                @Override
+                public PositionLinks create(Optional<JoinFilterFunction> lessThanFunction)
+                {
+                    checkState(lessThanFunction.isPresent(), "Using SortedPositionLinks without lessThanFunction");
+                    return new SortedPositionLinks(
+                            arrayPositionLinksFactory.create(Optional.empty()),
+                            sortedPositionLinks,
+                            lessThanFunction.get());
+                }
+
+                @Override
+                public long checksum()
+                {
+                    return arrayPositionLinksFactory.checksum();
+                }
             };
         }
     }
@@ -180,9 +191,9 @@ public final class SortedPositionLinks
         return retainedSize;
     }
 
-    public static Builder builder(int size, PagesHashStrategy pagesHashStrategy, LongArrayList addresses)
+    public static FactoryBuilder builder(int size, PagesHashStrategy pagesHashStrategy, LongArrayList addresses)
     {
-        return new Builder(size, pagesHashStrategy, addresses);
+        return new FactoryBuilder(size, pagesHashStrategy, addresses);
     }
 
     @Override

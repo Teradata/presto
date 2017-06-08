@@ -15,21 +15,23 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.operator.LookupJoinOperators.JoinType;
 import com.facebook.presto.operator.LookupOuterOperator.LookupOuterOperatorFactory;
-import com.facebook.presto.operator.LookupSource.OuterPositionIterator;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spiller.PartitioningSpillerFactory;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
-import com.google.common.util.concurrent.SettableFuture;
+import com.google.common.util.concurrent.ListenableFuture;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.function.Consumer;
 
 import static com.facebook.presto.operator.LookupJoinOperators.JoinType.INNER;
 import static com.facebook.presto.operator.LookupJoinOperators.JoinType.PROBE_OUTER;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static java.util.Objects.requireNonNull;
 
@@ -46,7 +48,11 @@ public class LookupJoinOperatorFactory
     private final LookupSourceFactory lookupSourceFactory;
     private final JoinProbeFactory joinProbeFactory;
     private final Optional<OperatorFactory> outerOperatorFactory;
-    private final ReferenceCount referenceCount;
+    private final ReferenceCount probeReferenceCount;
+    private final ReferenceCount lookupSourceFactoryUsersCount;
+    private final OptionalInt totalOperatorsCount;
+    private final HashGenerator probeHashGenerator;
+    private final PartitioningSpillerFactory partitioningSpillerFactory;
     private boolean closed;
 
     public LookupJoinOperatorFactory(int operatorId,
@@ -55,7 +61,11 @@ public class LookupJoinOperatorFactory
             List<Type> probeTypes,
             List<Type> probeOutputTypes,
             JoinType joinType,
-            JoinProbeFactory joinProbeFactory)
+            JoinProbeFactory joinProbeFactory,
+            OptionalInt totalOperatorsCount,
+            List<Integer> probeJoinChannels,
+            OptionalInt probeHashChannel,
+            PartitioningSpillerFactory partitioningSpillerFactory)
     {
         this.operatorId = operatorId;
         this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -67,30 +77,42 @@ public class LookupJoinOperatorFactory
         this.joinType = requireNonNull(joinType, "joinType is null");
         this.joinProbeFactory = requireNonNull(joinProbeFactory, "joinProbeFactory is null");
 
-        this.referenceCount = new ReferenceCount();
+        probeReferenceCount = new ReferenceCount();
+        lookupSourceFactoryUsersCount = new ReferenceCount();
+
+        // when probe and build-outer operators finish, destroy the lookup source (freeing the memory)
+        lookupSourceFactoryUsersCount.getFreeFuture().addListener(lookupSourceFactory::destroy, directExecutor());
+
+        // Whole probe side is counted as 1 in lookupSourceFactoryUsersCount
+        probeReferenceCount.getFreeFuture().addListener(lookupSourceFactoryUsersCount::release, directExecutor());
 
         if (joinType == INNER || joinType == PROBE_OUTER) {
-            // when all join operators finish, destroy the lookup source (freeing the memory)
-            this.referenceCount.getFreeFuture().addListener(lookupSourceFactory::destroy, directExecutor());
             this.outerOperatorFactory = Optional.empty();
         }
         else {
-            // when all join operators finish, set the outer position future to start the outer operator
-            SettableFuture<OuterPositionIterator> outerPositionsFuture = SettableFuture.create();
-            this.referenceCount.getFreeFuture().addListener(() -> {
-                // lookup source may not be finished yet, so add a listener
-                Futures.addCallback(
-                        lookupSourceFactory.createLookupSource(),
-                        new OnSuccessFutureCallback<>(lookupSource -> outerPositionsFuture.set(lookupSource.getOuterPositionIterator())));
-            }, directExecutor());
+            // when all join operators finish (and lookup source is ready), set the outer position future to start the outer operator
+            ListenableFuture<OuterPositionIterator> outerPositionsFuture = Futures.transform(
+                    Futures.transformAsync(probeReferenceCount.getFreeFuture(), ignored -> lookupSourceFactory.createLookupSourceProvider()),
+                    ignored -> lookupSourceFactory.getOuterPositionIterator());
 
-            // when output operator finishes, destroy the lookup source
-            Runnable onOperatorClose = () -> {
-                // lookup source may not be finished yet, so add a listener, to free the memory
-                lookupSourceFactory.createLookupSource().addListener(lookupSourceFactory::destroy, directExecutor());
-            };
-            this.outerOperatorFactory = Optional.of(new LookupOuterOperatorFactory(operatorId, planNodeId, outerPositionsFuture, probeOutputTypes, buildOutputTypes, onOperatorClose));
+            lookupSourceFactoryUsersCount.retain();
+            this.outerOperatorFactory = Optional.of(new LookupOuterOperatorFactory(operatorId, planNodeId, outerPositionsFuture, probeOutputTypes, buildOutputTypes, lookupSourceFactoryUsersCount));
         }
+        this.totalOperatorsCount = requireNonNull(totalOperatorsCount, "totalOperatorsCount is null");
+
+        requireNonNull(probeHashChannel, "probeHashChannel is null");
+        if (probeHashChannel.isPresent()) {
+            this.probeHashGenerator = new PrecomputedHashGenerator(probeHashChannel.getAsInt());
+        }
+        else {
+            requireNonNull(probeJoinChannels, "probeJoinChannels is null");
+            List<Type> hashTypes = probeJoinChannels.stream()
+                    .map(probeTypes::get)
+                    .collect(toImmutableList());
+            this.probeHashGenerator = new InterpretedHashGenerator(hashTypes, probeJoinChannels);
+        }
+
+        this.partitioningSpillerFactory = requireNonNull(partitioningSpillerFactory, "partitioningSpillerFactory is null");
     }
 
     private LookupJoinOperatorFactory(LookupJoinOperatorFactory other)
@@ -105,10 +127,14 @@ public class LookupJoinOperatorFactory
         joinType = other.joinType;
         lookupSourceFactory = other.lookupSourceFactory;
         joinProbeFactory = other.joinProbeFactory;
-        referenceCount = other.referenceCount;
+        probeReferenceCount = other.probeReferenceCount;
+        lookupSourceFactoryUsersCount = other.lookupSourceFactoryUsersCount;
         outerOperatorFactory = other.outerOperatorFactory;
+        totalOperatorsCount = other.totalOperatorsCount;
+        probeHashGenerator = other.probeHashGenerator;
+        partitioningSpillerFactory = other.partitioningSpillerFactory;
 
-        referenceCount.retain();
+        probeReferenceCount.retain();
     }
 
     public int getOperatorId()
@@ -133,14 +159,18 @@ public class LookupJoinOperatorFactory
 
         lookupSourceFactory.setTaskContext(driverContext.getPipelineContext().getTaskContext());
 
-        referenceCount.retain();
+        probeReferenceCount.retain();
         return new LookupJoinOperator(
                 operatorContext,
                 getTypes(),
+                probeTypes,
                 joinType,
-                lookupSourceFactory.createLookupSource(),
+                lookupSourceFactory,
                 joinProbeFactory,
-                referenceCount::release);
+                probeReferenceCount::release,
+                totalOperatorsCount,
+                probeHashGenerator,
+                partitioningSpillerFactory);
     }
 
     @Override
@@ -150,7 +180,7 @@ public class LookupJoinOperatorFactory
             return;
         }
         closed = true;
-        referenceCount.release();
+        probeReferenceCount.release();
     }
 
     @Override

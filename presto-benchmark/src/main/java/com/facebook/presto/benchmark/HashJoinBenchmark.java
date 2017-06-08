@@ -19,6 +19,7 @@ import com.facebook.presto.operator.DriverFactory;
 import com.facebook.presto.operator.HashBuilderOperator.HashBuilderOperatorFactory;
 import com.facebook.presto.operator.LookupJoinOperators;
 import com.facebook.presto.operator.LookupSourceFactory;
+import com.facebook.presto.operator.LookupSourceProvider;
 import com.facebook.presto.operator.OperatorFactory;
 import com.facebook.presto.operator.PagesIndex;
 import com.facebook.presto.operator.TaskContext;
@@ -33,8 +34,11 @@ import com.google.common.primitives.Ints;
 import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.concurrent.Future;
 
 import static com.facebook.presto.benchmark.BenchmarkQueryRunner.createLocalQueryRunner;
+import static com.facebook.presto.spiller.PartitioningSpillerFactory.unsupportedPartitioningSpillerFactory;
+import static io.airlift.concurrent.MoreFutures.getFutureValue;
 
 public class HashJoinBenchmark
         extends AbstractOperatorBenchmark
@@ -73,15 +77,17 @@ public class HashJoinBenchmark
 
             DriverContext driverContext = taskContext.addPipelineContext(0, false, false).addDriverContext();
             Driver driver = new DriverFactory(0, false, false, ImmutableList.of(ordersTableScan, hashBuilder), OptionalInt.empty()).createDriver(driverContext);
-            while (!hashBuilder.getLookupSourceFactory().createLookupSource().isDone()) {
+            Future<LookupSourceProvider> lookupSourceBuilt = hashBuilder.getLookupSourceFactory().createLookupSourceProvider();
+            while (!lookupSourceBuilt.isDone()) {
                 driver.process();
             }
+            getFutureValue(lookupSourceBuilt).close();
             lookupSourceFactory = hashBuilder.getLookupSourceFactory();
         }
 
         OperatorFactory lineItemTableScan = createTableScanOperator(0, new PlanNodeId("test"), "lineitem", "orderkey", "quantity");
 
-        OperatorFactory joinOperator = LOOKUP_JOIN_OPERATORS.innerJoin(1, new PlanNodeId("test"), lookupSourceFactory, lineItemTableScan.getTypes(), Ints.asList(0), Optional.empty(), Optional.empty());
+        OperatorFactory joinOperator = LOOKUP_JOIN_OPERATORS.innerJoin(1, new PlanNodeId("test"), lookupSourceFactory, lineItemTableScan.getTypes(), Ints.asList(0), Optional.empty(), Optional.empty(), OptionalInt.empty(), unsupportedPartitioningSpillerFactory());
 
         NullOutputOperatorFactory output = new NullOutputOperatorFactory(2, new PlanNodeId("test"), joinOperator.getTypes());
 

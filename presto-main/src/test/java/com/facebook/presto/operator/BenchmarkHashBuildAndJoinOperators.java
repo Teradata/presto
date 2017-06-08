@@ -23,6 +23,7 @@ import com.facebook.presto.testing.TestingTaskContext;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Ints;
+import com.google.common.util.concurrent.ListenableFuture;
 import io.airlift.units.DataSize;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
@@ -42,6 +43,7 @@ import org.openjdk.jmh.runner.options.VerboseMode;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
 
@@ -49,6 +51,8 @@ import static com.facebook.presto.RowPagesBuilder.rowPagesBuilder;
 import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static com.facebook.presto.spiller.PartitioningSpillerFactory.unsupportedPartitioningSpillerFactory;
+import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static java.lang.String.format;
@@ -291,9 +295,11 @@ public class BenchmarkHashBuildAndJoinOperators
         }
         operator.finish();
 
-        if (!hashBuilderOperatorFactory.getLookupSourceFactory().createLookupSource().isDone()) {
+        ListenableFuture<LookupSourceProvider> lookupSourceProvider = hashBuilderOperatorFactory.getLookupSourceFactory().createLookupSourceProvider();
+        if (!lookupSourceProvider.isDone()) {
             throw new AssertionError("Expected lookup source to be done");
         }
+        getFutureValue(lookupSourceProvider).close();
 
         return hashBuilderOperatorFactory.getLookupSourceFactory();
     }
@@ -310,7 +316,9 @@ public class BenchmarkHashBuildAndJoinOperators
                 joinContext.getTypes(),
                 joinContext.getHashChannels(),
                 joinContext.getHashChannel(),
-                Optional.of(joinContext.getOutputChannels()));
+                Optional.of(joinContext.getOutputChannels()),
+                OptionalInt.empty(),
+                unsupportedPartitioningSpillerFactory());
 
         DriverContext driverContext = joinContext.createTaskContext().addPipelineContext(0, true, true).addDriverContext();
         Operator joinOperator = joinOperatorFactory.createOperator(driverContext);
