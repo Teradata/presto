@@ -386,7 +386,7 @@ public class LocalQueryRunner
         return new LocalQueryRunner(defaultSession, new FeaturesConfig(), true, 1);
     }
 
-    public static LocalQueryRunner queryRunnerWithFakeNodeCount(Session defaultSession, int nodeCount)
+    public static LocalQueryRunner queryRunnerWithFakeNodeCountForStats(Session defaultSession, int nodeCount)
     {
         return new LocalQueryRunner(defaultSession, new FeaturesConfig(), false, nodeCount);
     }

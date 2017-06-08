@@ -33,7 +33,7 @@ import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.join;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.values;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
-import static com.facebook.presto.testing.LocalQueryRunner.queryRunnerWithFakeNodeCount;
+import static com.facebook.presto.testing.LocalQueryRunner.queryRunnerWithFakeNodeCountForStats;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 
 public class TestReorderJoins
@@ -113,7 +113,7 @@ public class TestReorderJoins
                 .setSystemProperty("join_distribution_type", "automatic")
                 .setSystemProperty("reorder_joins", "true")
                 .build();
-        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCount(session, 4);
+        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
         new RuleTester(queryRunner)
                 .assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
@@ -146,7 +146,7 @@ public class TestReorderJoins
                 .setSystemProperty("join_distribution_type", "repartitioned")
                 .setSystemProperty("reorder_joins", "true")
                 .build();
-        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCount(session, 4);
+        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
         new RuleTester(queryRunner)
                 .assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
@@ -179,7 +179,7 @@ public class TestReorderJoins
                 .setSystemProperty("join_distribution_type", "automatic")
                 .setSystemProperty("reorder_joins", "true")
                 .build();
-        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCount(session, 4);
+        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
         new RuleTester(queryRunner)
                 .assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
@@ -212,7 +212,7 @@ public class TestReorderJoins
                 .setSystemProperty("join_distribution_type", "replicated")
                 .setSystemProperty("reorder_joins", "true")
                 .build();
-        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCount(session, 4);
+        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
         new RuleTester(queryRunner)
                 .assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
