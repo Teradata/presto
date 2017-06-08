@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 
+import static com.facebook.presto.operator.Operators.runAll;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
@@ -195,15 +196,11 @@ public class SpillableHashAggregationBuilder
     @Override
     public void close()
     {
-        if (merger.isPresent()) {
-            merger.get().close();
-        }
-        if (spiller.isPresent()) {
-            spiller.get().close();
-        }
-        if (mergeHashSort.isPresent()) {
-            mergeHashSort.get().close();
-        }
+        runAll(
+                () -> merger.ifPresent(MergingHashAggregationBuilder::close),
+                () -> spiller.ifPresent(Spiller::close),
+                () -> mergeHashSort.ifPresent(MergeHashSort::close)
+        );
     }
 
     private ListenableFuture<?> spillToDisk()
