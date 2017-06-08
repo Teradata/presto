@@ -15,7 +15,6 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.operator.LookupJoinOperators.JoinType;
 import com.facebook.presto.operator.LookupOuterOperator.LookupOuterOperatorFactory;
-import com.facebook.presto.operator.LookupSource.OuterPositionIterator;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spiller.PartitioningSpillerFactory;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
@@ -94,7 +93,7 @@ public class LookupJoinOperatorFactory
             // when all join operators finish (and lookup source is ready), set the outer position future to start the outer operator
             ListenableFuture<OuterPositionIterator> outerPositionsFuture = Futures.transform(
                     Futures.transformAsync(probeReferenceCount.getFreeFuture(), ignored -> lookupSourceFactory.createLookupSource()),
-                    LookupSource::getOuterPositionIterator);
+                    ignored -> lookupSourceFactory.getOuterPositionIterator());
 
             lookupSourceFactoryUsersCount.retain();
             this.outerOperatorFactory = Optional.of(new LookupOuterOperatorFactory(operatorId, planNodeId, outerPositionsFuture, probeOutputTypes, buildOutputTypes, lookupSourceFactoryUsersCount));
