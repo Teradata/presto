@@ -52,8 +52,6 @@ import static com.teradata.tempto.fulfillment.table.hive.tpch.TpchTableDefinitio
 import static com.teradata.tempto.internal.convention.SqlResultDescriptor.sqlResultDescriptorForResource;
 import static com.teradata.tempto.query.QueryExecutor.defaultQueryExecutor;
 import static com.teradata.tempto.query.QueryExecutor.query;
-import static java.lang.Boolean.FALSE;
-import static java.lang.Boolean.TRUE;
 import static java.util.Locale.CHINESE;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -247,13 +245,14 @@ public class JdbcTests
     public void testSessionProperties()
             throws SQLException
     {
-        final String distributedJoin = "distributed_join";
+        final String joinDistributionType = "join_distribution_type";
+        final String defaultValue = "REPARTITIONED";
 
-        assertThat(getSessionProperty(connection, distributedJoin)).isEqualTo(TRUE.toString());
-        setSessionProperty(connection, distributedJoin, FALSE.toString());
-        assertThat(getSessionProperty(connection, distributedJoin)).isEqualTo(FALSE.toString());
-        resetSessionProperty(connection, distributedJoin);
-        assertThat(getSessionProperty(connection, distributedJoin)).isEqualTo(TRUE.toString());
+        assertThat(getSessionProperty(connection, joinDistributionType)).isEqualTo(defaultValue);
+        setSessionProperty(connection, joinDistributionType, "REPLICATED");
+        assertThat(getSessionProperty(connection, joinDistributionType)).isEqualTo("REPLICATED");
+        resetSessionProperty(connection, joinDistributionType);
+        assertThat(getSessionProperty(connection, joinDistributionType)).isEqualTo(defaultValue);
     }
 
     private QueryResult queryResult(Statement statement, String query)

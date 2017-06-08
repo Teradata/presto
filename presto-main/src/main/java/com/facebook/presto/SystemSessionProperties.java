@@ -26,6 +26,7 @@ import io.airlift.units.Duration;
 
 import javax.inject.Inject;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static com.facebook.presto.spi.session.PropertyMetadata.booleanSessionProperty;
@@ -37,11 +38,12 @@ import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.base.Preconditions.checkArgument;
 import static io.airlift.units.DataSize.succinctBytes;
 import static java.lang.String.format;
+import static java.util.stream.Collectors.toList;
 
 public final class SystemSessionProperties
 {
     public static final String OPTIMIZE_HASH_GENERATION = "optimize_hash_generation";
-    public static final String DISTRIBUTED_JOIN = "distributed_join";
+    public static final String JOIN_DISTRIBUTION_TYPE = "join_distribution_type";
     public static final String DISTRIBUTED_INDEX_JOIN = "distributed_index_join";
     public static final String HASH_PARTITION_COUNT = "hash_partition_count";
     public static final String PREFER_STREAMING_OPERATORS = "prefer_streaming_operators";
@@ -100,11 +102,15 @@ public final class SystemSessionProperties
                         "Compute hash codes for distribution, joins, and aggregations early in query plan",
                         featuresConfig.isOptimizeHashGeneration(),
                         false),
-                booleanSessionProperty(
-                        DISTRIBUTED_JOIN,
-                        "Use a distributed join instead of a broadcast join",
-                        featuresConfig.isDistributedJoinsEnabled(),
-                        false),
+                new PropertyMetadata<>(
+                        JOIN_DISTRIBUTION_TYPE,
+                        String.format("The join method to use. Options are %s", Arrays.stream(FeaturesConfig.JoinDistributionType.values()).collect(toList())).concat(","),
+                        VARCHAR,
+                        FeaturesConfig.JoinDistributionType.class,
+                        featuresConfig.getJoinDistributionType(),
+                        false,
+                        value -> FeaturesConfig.JoinDistributionType.valueOf(((String) value).toUpperCase()),
+                        Enum::toString),
                 booleanSessionProperty(
                         DISTRIBUTED_INDEX_JOIN,
                         "Distribute index joins on join keys instead of executing inline",
@@ -341,11 +347,6 @@ public final class SystemSessionProperties
         return session.getSystemProperty(OPTIMIZE_HASH_GENERATION, Boolean.class);
     }
 
-    public static boolean isDistributedJoinEnabled(Session session)
-    {
-        return session.getSystemProperty(DISTRIBUTED_JOIN, Boolean.class);
-    }
-
     public static boolean isDistributedIndexJoinEnabled(Session session)
     {
         return session.getSystemProperty(DISTRIBUTED_INDEX_JOIN, Boolean.class);
@@ -503,5 +504,10 @@ public final class SystemSessionProperties
     public static boolean isPushAggregationThroughJoin(Session session)
     {
         return session.getSystemProperty(PUSH_PARTIAL_AGGREGATION_THROUGH_JOIN, Boolean.class);
+    }
+
+    public static FeaturesConfig.JoinDistributionType getJoinDistributionType(Session session)
+    {
+        return session.getSystemProperty(JOIN_DISTRIBUTION_TYPE, FeaturesConfig.JoinDistributionType.class);
     }
 }
