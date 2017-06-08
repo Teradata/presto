@@ -55,9 +55,9 @@ public class TestingLookup
         this.resolver = requireNonNull(resolver, "resolver is null");
     }
 
-    public static TestingLookupBuilder builder(TestingLookup lookup)
+    public TestingLookup withStats(Map<PlanNode, PlanNodeStatsEstimate> stats)
     {
-        return new TestingLookupBuilder(lookup);
+        return new TestingLookup(statsCalculator, costCalculator, stats, costs, resolver);
     }
 
     @Override
@@ -72,62 +72,24 @@ public class TestingLookup
     @Override
     public PlanNodeStatsEstimate getStats(PlanNode planNode, Session session, Map<Symbol, Type> types)
     {
-        return stats.computeIfAbsent(resolve(planNode), node -> statsCalculator.calculateStats(
-                node,
-                this,
-                session,
-                types));
+        PlanNode resolved = resolve(planNode);
+        PlanNodeStatsEstimate statsEstimate = stats.get(resolved);
+        if (statsEstimate == null) {
+            statsEstimate = statsCalculator.calculateStats(resolved, this, session, types);
+            stats.put(resolved, statsEstimate);
+        }
+        return statsEstimate;
     }
 
     @Override
     public PlanNodeCostEstimate getCumulativeCost(PlanNode planNode, Session session, Map<Symbol, Type> types)
     {
-        return costs.computeIfAbsent(resolve(planNode), node -> costCalculator.calculateCumulativeCost(
-                node,
-                this,
-                session,
-                types
-        ));
-    }
-
-    public static class TestingLookupBuilder
-    {
-        private final StatsCalculator statsCalculator;
-        private final CostCalculator costCalculator;
-        private Map<PlanNode, PlanNodeStatsEstimate> stats;
-        private Map<PlanNode, PlanNodeCostEstimate> costs;
-        private Function<GroupReference, PlanNode> resolver;
-
-        public TestingLookupBuilder(TestingLookup lookup)
-        {
-            this.statsCalculator = lookup.statsCalculator;
-            this.costCalculator = lookup.costCalculator;
-            this.resolver = lookup.resolver;
-            this.stats = lookup.stats;
-            this.costs = lookup.costs;
+        PlanNode resolved = resolve(planNode);
+        PlanNodeCostEstimate costEstimate = costs.get(resolved);
+        if (costEstimate == null) {
+            costEstimate = costCalculator.calculateCost(resolved, this, session, types);
+            costs.put(resolved, costEstimate);
         }
-
-        public TestingLookupBuilder withStats(Map<PlanNode, PlanNodeStatsEstimate> stats)
-        {
-            this.stats = stats;
-            return this;
-        }
-
-        public TestingLookupBuilder withCost(Map<PlanNode, PlanNodeCostEstimate> costs)
-        {
-            this.costs = costs;
-            return this;
-        }
-
-        public TestingLookupBuilder withResolver(Function<GroupReference, PlanNode> resolver)
-        {
-            this.resolver = resolver;
-            return this;
-        }
-
-        public TestingLookup build()
-        {
-            return new TestingLookup(statsCalculator, costCalculator, stats, costs, resolver);
-        }
+        return costEstimate;
     }
 }

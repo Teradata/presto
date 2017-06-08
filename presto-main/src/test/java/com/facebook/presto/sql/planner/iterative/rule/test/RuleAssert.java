@@ -33,8 +33,10 @@ import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.facebook.presto.sql.planner.planPrinter.PlanPrinter;
 import com.facebook.presto.testing.TestingLookup;
 import com.facebook.presto.transaction.TransactionManager;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -42,6 +44,7 @@ import java.util.function.Function;
 import static com.facebook.presto.sql.planner.assertions.PlanAssert.assertPlan;
 import static com.facebook.presto.transaction.TransactionBuilder.transaction;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.Objects.requireNonNull;
 import static org.testng.Assert.fail;
@@ -49,6 +52,8 @@ import static org.testng.Assert.fail;
 public class RuleAssert
 {
     private final Metadata metadata;
+    private final StatsCalculator statsCalculator;
+    private final CostCalculator costCalculator;
     private Session session;
     private final Rule rule;
 
@@ -74,7 +79,8 @@ public class RuleAssert
         this.rule = rule;
         this.transactionManager = transactionManager;
         this.accessControl = accessControl;
-        this.lookup = new TestingLookup(statsCalculator, costCalculator, node -> node);
+        this.statsCalculator = statsCalculator;
+        this.costCalculator = costCalculator;
     }
 
     public RuleAssert setSystemProperty(String key, String value)
@@ -98,36 +104,38 @@ public class RuleAssert
         plan = planProvider.apply(builder);
         symbols = builder.getSymbols();
         Memo memo = new Memo(idAllocator, plan);
-        lookup = TestingLookup.builder(lookup).withResolver(memo::resolve).build();
+        lookup = new TestingLookup(statsCalculator, costCalculator, memo::resolve);
         return this;
     }
 
     public RuleAssert withStats(Map<PlanNodeId, PlanNodeStatsEstimate> stats)
     {
-        lookup = TestingLookup.builder(lookup)
-                .withStats(
-                        stats.entrySet()
-                                .stream()
-                                .collect(toImmutableMap(
-                                        entry -> getNodeForId(entry.getKey(), plan).orElseThrow(() -> new IllegalStateException("No PlanNode for id")),
-                                        Map.Entry::getValue)))
-                .build();
+        checkState(lookup != null, "lookup has not yet been initialized");
+        Map<PlanNodeId, PlanNode> planNodeMap = buildPlanNodeMap();
+        lookup = lookup.withStats(
+                stats.entrySet()
+                        .stream()
+                        .collect(toImmutableMap(
+                                entry -> {
+                                    checkState(planNodeMap.containsKey(entry.getKey()), "planNodeMap does not contain key");
+                                    return planNodeMap.get(entry.getKey());
+                                },
+                                Map.Entry::getValue)));
         return this;
     }
 
-    private Optional<PlanNode> getNodeForId(PlanNodeId planNodeId, PlanNode plan)
+    private Map<PlanNodeId, PlanNode> buildPlanNodeMap()
     {
-        if (plan.getId().equals(planNodeId)) {
-            return Optional.of(plan);
+        return ImmutableMap.copyOf(buildPlanNodeMap(plan, new HashMap<>()));
+    }
+
+    private Map<PlanNodeId, PlanNode> buildPlanNodeMap(PlanNode planNode, Map<PlanNodeId, PlanNode> planNodeMap)
+    {
+        for (PlanNode source : planNode.getSources()) {
+            buildPlanNodeMap(source, planNodeMap);
         }
-        Optional<PlanNode> node = Optional.empty();
-        for (PlanNode source : plan.getSources()) {
-            node = getNodeForId(planNodeId, lookup.resolve(source));
-            if (node.isPresent()) {
-                return node;
-            }
-        }
-        return node;
+        planNodeMap.put(planNode.getId(), planNode);
+        return planNodeMap;
     }
 
     public void doesNotFire()
