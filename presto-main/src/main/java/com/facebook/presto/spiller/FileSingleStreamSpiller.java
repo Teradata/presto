@@ -21,6 +21,7 @@ import com.facebook.presto.operator.SpillContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PrestoException;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -39,6 +40,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Iterator;
+import java.util.List;
 
 import static com.facebook.presto.execution.buffer.PagesSerdeUtil.writeSerializedPage;
 import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
@@ -101,6 +103,12 @@ public class FileSingleStreamSpiller
     {
         checkNoSpillInProgress();
         return readPages();
+    }
+
+    @Override
+    public ListenableFuture<List<Page>> getAllSpilledPages()
+    {
+        return executor.submit(() -> ImmutableList.copyOf(getSpilledPages()));
     }
 
     private void writePages(Iterator<Page> pageIterator)
