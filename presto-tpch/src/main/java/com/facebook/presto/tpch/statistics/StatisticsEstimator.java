@@ -13,7 +13,7 @@
  */
 package com.facebook.presto.tpch.statistics;
 
-import com.facebook.presto.util.Types;
+import com.facebook.presto.tpch.util.Types;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.slice.Slice;
 import io.airlift.tpch.CustomerColumn;
@@ -31,11 +31,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
-import static com.facebook.presto.util.Optionals.checkPresent;
-import static com.facebook.presto.util.Optionals.combine;
-import static com.facebook.presto.util.Optionals.withBoth;
-import static com.facebook.presto.util.Types.checkSameType;
-import static com.facebook.presto.util.Types.checkType;
+import static com.facebook.presto.tpch.util.Optionals.checkPresent;
+import static com.facebook.presto.tpch.util.Optionals.combine;
+import static com.facebook.presto.tpch.util.Optionals.withBoth;
+import static com.facebook.presto.tpch.util.Types.checkSameType;
+import static com.facebook.presto.tpch.util.Types.checkType;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.Iterables.getOnlyElement;

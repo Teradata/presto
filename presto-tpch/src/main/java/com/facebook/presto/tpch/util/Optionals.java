@@ -11,7 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.facebook.presto.util;
+package com.facebook.presto.tpch.util;
 
 import java.util.Optional;
 import java.util.function.BiFunction;
