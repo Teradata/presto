@@ -36,10 +36,12 @@ import org.openjdk.jol.info.ClassLayout;
 
 import javax.inject.Inject;
 
+import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static com.facebook.presto.operator.SyntheticAddress.decodePosition;
 import static com.facebook.presto.operator.SyntheticAddress.decodeSliceIndex;
@@ -468,5 +470,29 @@ public class PagesIndex
                 .add("types", types)
                 .add("estimatedSize", estimatedSize)
                 .toString();
+    }
+
+    public Iterator<Page> getPages()
+    {
+        return new Iterator<Page>()
+        {
+            private int pageCounter;
+
+            @Override
+            public boolean hasNext()
+            {
+                return pageCounter < channels[0].size();
+            }
+
+            @Override
+            public Page next()
+            {
+                Block[] blocks = Stream.of(channels)
+                        .map(channel -> channel.get(pageCounter))
+                        .toArray(Block[]::new);
+                pageCounter++;
+                return new Page(blocks);
+            }
+        };
     }
 }
