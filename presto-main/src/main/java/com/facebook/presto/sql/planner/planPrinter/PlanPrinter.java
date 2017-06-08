@@ -40,6 +40,7 @@ import com.facebook.presto.sql.planner.SubPlan;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.GroupReference;
 import com.facebook.presto.sql.planner.iterative.Lookup;
+import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
 import com.facebook.presto.sql.planner.plan.AssignUniqueId;
@@ -1113,6 +1114,19 @@ public class PlanPrinter
             printAssignments(node.getSubqueryAssignments(), indent + 4);
 
             return processChildren(node, indent + 1);
+        }
+
+        @Override
+        public Void visitJoinGraph(JoinGraphNode node, Integer indent)
+        {
+            print(indent, "- JoinGraph[%s] => [%s] %s",
+                    node.getFilter(),
+                    formatOutputs(node.getOutputSymbols()),
+                    formatCost(node));
+
+            printStats(indent + 2, node.getId());
+            processChildren(node, indent + 1);
+            return null;
         }
 
         @Override

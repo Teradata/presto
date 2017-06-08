@@ -28,6 +28,7 @@ import com.facebook.presto.sql.planner.Partitioning;
 import com.facebook.presto.sql.planner.PartitioningScheme;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Aggregation;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Step;
@@ -40,6 +41,7 @@ import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.LimitNode;
 import com.facebook.presto.sql.planner.plan.OutputNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.facebook.presto.sql.planner.plan.SampleNode;
 import com.facebook.presto.sql.planner.plan.TableFinishNode;
@@ -86,8 +88,13 @@ public class PlanBuilder
 
     public ValuesNode values(Symbol... columns)
     {
+        return values(idAllocator.getNextId(), columns);
+    }
+
+    public ValuesNode values(PlanNodeId id, Symbol... columns)
+    {
         return new ValuesNode(
-                idAllocator.getNextId(),
+                id,
                 ImmutableList.copyOf(columns),
                 ImmutableList.of());
     }
@@ -278,6 +285,22 @@ public class PlanBuilder
         ExchangeBuilder exchangeBuilder = new ExchangeBuilder();
         exchangeBuilderConsumer.accept(exchangeBuilder);
         return exchangeBuilder.build();
+    }
+
+    public JoinNode join(JoinNode.Type type, PlanNode left, PlanNode right, List<JoinNode.EquiJoinClause> criteria, List<Symbol> outputSymbols, Optional<Expression> filter)
+    {
+        return new JoinNode(idAllocator.getNextId(), type, left, right, criteria, outputSymbols, filter, Optional.empty(), Optional.empty(), Optional.empty());
+    }
+
+    public JoinGraphNode joinGraph(List<PlanNode> sources, Expression filter)
+    {
+        return new JoinGraphNode(
+                idAllocator.getNextId(),
+                sources,
+                filter,
+                sources.stream()
+                        .flatMap(source -> source.getOutputSymbols().stream())
+                        .collect(toImmutableList()));
     }
 
     public class ExchangeBuilder

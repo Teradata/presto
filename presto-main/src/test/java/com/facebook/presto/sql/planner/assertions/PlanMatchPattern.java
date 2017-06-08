@@ -20,6 +20,7 @@ import com.facebook.presto.spi.block.SortOrder;
 import com.facebook.presto.spi.predicate.Domain;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.planner.iterative.rule.JoinGraphNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Step;
 import com.facebook.presto.sql.planner.plan.ApplyNode;
@@ -253,6 +254,14 @@ public final class PlanMatchPattern
                         expectedEquiCriteria,
                         expectedFilter.map(predicate -> rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(predicate))),
                         distributionType));
+    }
+
+    public static PlanMatchPattern joinGraph(String filter, List<String> outputSymbols, PlanMatchPattern... sources)
+    {
+        return node(JoinGraphNode.class, sources).with(
+                new JoinGraphMatcher(
+                        rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(filter))))
+                .withExactOutputs(outputSymbols);
     }
 
     public static PlanMatchPattern exchange(PlanMatchPattern... sources)
