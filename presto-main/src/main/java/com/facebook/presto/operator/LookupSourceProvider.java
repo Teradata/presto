@@ -13,6 +13,8 @@
  */
 package com.facebook.presto.operator;
 
+import java.util.function.IntPredicate;
+
 public interface LookupSourceProvider
         extends AutoCloseable
 {
@@ -25,6 +27,12 @@ public interface LookupSourceProvider
             extends AutoCloseable
     {
         LookupSource getLookupSource();
+
+        boolean hasSpilled();
+
+        long spillEpoch();
+
+        IntPredicate getSpillMask();
 
         @Override
         void close();

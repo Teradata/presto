@@ -13,6 +13,8 @@
  */
 package com.facebook.presto.operator;
 
+import java.util.function.IntPredicate;
+
 import static java.util.Objects.requireNonNull;
 
 public final class SimpleLookupSourceProvider
@@ -44,6 +46,24 @@ public final class SimpleLookupSourceProvider
         public LookupSource getLookupSource()
         {
             return lookupSource;
+        }
+
+        @Override
+        public boolean hasSpilled()
+        {
+            return false;
+        }
+
+        @Override
+        public long spillEpoch()
+        {
+            return 0;
+        }
+
+        @Override
+        public IntPredicate getSpillMask()
+        {
+            return i -> false;
         }
 
         @Override
