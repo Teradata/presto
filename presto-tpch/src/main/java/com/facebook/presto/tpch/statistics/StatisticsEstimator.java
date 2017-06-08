@@ -31,9 +31,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
-import static com.facebook.presto.util.Optionals.checkPresent;
-import static com.facebook.presto.util.Optionals.combine;
-import static com.facebook.presto.util.Optionals.withBoth;
+import static com.facebook.presto.tpch.util.Optionals.checkPresent;
+import static com.facebook.presto.tpch.util.Optionals.combine;
+import static com.facebook.presto.tpch.util.Optionals.withBoth;
 import static com.facebook.presto.util.Types.checkSameType;
 import static com.facebook.presto.util.Types.checkType;
 import static com.google.common.base.Preconditions.checkArgument;
