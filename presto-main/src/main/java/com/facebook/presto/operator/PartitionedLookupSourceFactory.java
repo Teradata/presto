@@ -91,7 +91,7 @@ public final class PartitionedLookupSourceFactory
     private OptionalInt partitionedConsumptionParticipants = OptionalInt.empty();
 
     @GuardedBy("rwLock")
-    private SettableFuture<PartitionedConsumption<LookupSource>> partitionedConsumption = SettableFuture.create();
+    private SettableFuture<PartitionedConsumption<Supplier<LookupSource>>> partitionedConsumption = SettableFuture.create();
 
     public PartitionedLookupSourceFactory(List<Type> types, List<Type> outputTypes, List<Integer> hashChannels, int partitionCount, Map<Symbol, Integer> layout, boolean outer)
     {
@@ -252,7 +252,7 @@ public final class PartitionedLookupSourceFactory
     }
 
     @Override
-    public ListenableFuture<PartitionedConsumption<LookupSource>> finishProbeOperator(OptionalInt lookupJoinsCount)
+    public ListenableFuture<PartitionedConsumption<Supplier<LookupSource>>> finishProbeOperator(OptionalInt lookupJoinsCount)
     {
         rwLock.writeLock().lock();
         try {
@@ -292,9 +292,8 @@ public final class PartitionedLookupSourceFactory
         }
     }
 
-    private ListenableFuture<LookupSource> loadSpilledLookupSource(int partitionNumber)
+    private ListenableFuture<Supplier<LookupSource>> loadSpilledLookupSource(int partitionNumber)
     {
-        // TODO can the LookupSource be shared? Don't we need Supplier<LookupSource> here?
         return getSpilledLookupSourceHandle(partitionNumber).getLookupSource();
     }
 

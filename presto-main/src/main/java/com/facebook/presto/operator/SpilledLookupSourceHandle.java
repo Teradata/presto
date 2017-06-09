@@ -21,6 +21,8 @@ import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 import javax.annotation.concurrent.ThreadSafe;
 
+import java.util.function.Supplier;
+
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.MoreFutures.whenAnyComplete;
 import static java.util.Objects.requireNonNull;
@@ -43,7 +45,7 @@ final class SpilledLookupSourceHandle
 
     @GuardedBy("this")
     @Nullable
-    private SettableFuture<LookupSource> unspilledLookupSource;
+    private SettableFuture<Supplier<LookupSource>> unspilledLookupSource;
 
     private final SettableFuture<?> disposeRequested = SettableFuture.create();
 
@@ -54,7 +56,7 @@ final class SpilledLookupSourceHandle
         return unspillingRequested;
     }
 
-    public synchronized ListenableFuture<LookupSource> getLookupSource()
+    public synchronized ListenableFuture<Supplier<LookupSource>> getLookupSource()
     {
         assertIn(State.SPILLED);
         unspillingRequested.set(null);
@@ -63,7 +65,7 @@ final class SpilledLookupSourceHandle
         return unspilledLookupSource;
     }
 
-    public synchronized void setLookupSource(LookupSource lookupSource)
+    public synchronized void setLookupSource(Supplier<LookupSource> lookupSource)
     {
         requireNonNull(lookupSource, "lookupSource is null");
 

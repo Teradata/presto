@@ -20,6 +20,7 @@ import com.google.common.util.concurrent.ListenableFuture;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
+import java.util.function.Supplier;
 
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static java.util.Collections.emptyList;
@@ -37,7 +38,7 @@ public interface LookupSourceFactory
         throw new UnsupportedOperationException();
     }
 
-    default ListenableFuture<PartitionedConsumption<LookupSource>> finishProbeOperator(OptionalInt lookupJoinsCount)
+    default ListenableFuture<PartitionedConsumption<Supplier<LookupSource>>> finishProbeOperator(OptionalInt lookupJoinsCount)
     {
         return immediateFuture(new PartitionedConsumption<>(1, emptyList(),
                 i -> {

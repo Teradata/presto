@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.function.IntPredicate;
+import java.util.function.Supplier;
 
 import static com.facebook.presto.operator.LookupJoinOperators.JoinType.FULL_OUTER;
 import static com.facebook.presto.operator.LookupJoinOperators.JoinType.PROBE_OUTER;
@@ -92,11 +93,11 @@ public class LookupJoinOperator
 
     private final Map<Integer, SavedRow> savedRows = new HashMap<>();
     @Nullable
-    private ListenableFuture<PartitionedConsumption<LookupSource>> partitionedConsumption;
+    private ListenableFuture<PartitionedConsumption<Supplier<LookupSource>>> partitionedConsumption;
     @Nullable
-    private Iterator<Partition<LookupSource>> lookupPartitions;
-    private Optional<Partition<LookupSource>> currentPartition = Optional.empty();
-    private Optional<ListenableFuture<LookupSource>> unspilledLookupSource = Optional.empty();
+    private Iterator<Partition<Supplier<LookupSource>>> lookupPartitions;
+    private Optional<Partition<Supplier<LookupSource>>> currentPartition = Optional.empty();
+    private Optional<ListenableFuture<Supplier<LookupSource>>> unspilledLookupSource = Optional.empty();
     private Iterator<Page> unspilledInputPages = emptyIterator();
 
     public LookupJoinOperator(
@@ -331,7 +332,7 @@ public class LookupJoinOperator
             return false;
         }
         if (lookupPartitions == null) {
-            lookupPartitions = getDone(partitionedConsumption).getPartitions().iterator();
+            lookupPartitions = getDone(partitionedConsumption).beginConsumption();
         }
 
         if (unspilledInputPages.hasNext()) {
@@ -344,7 +345,7 @@ public class LookupJoinOperator
                 // Not unspilled yet
                 return false;
             }
-            LookupSource lookupSource = getDone(unspilledLookupSource.get());
+            LookupSource lookupSource = getDone(unspilledLookupSource.get()).get();
             unspilledLookupSource = Optional.empty();
 
             lookupSourceProvider.close();
@@ -373,6 +374,11 @@ public class LookupJoinOperator
             return false;
         }
         else {
+            currentPartition.ifPresent(Partition::release);
+            if (lookupSourceProvider != null) {
+                lookupSourceProvider.close();
+                lookupSourceProvider = null;
+            }
             spiller.ifPresent(PartitioningSpiller::verifyExhausted);
             finished = true;
             /*

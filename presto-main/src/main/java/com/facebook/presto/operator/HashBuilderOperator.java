@@ -576,16 +576,14 @@ public class HashBuilderOperator
             operatorContext.setMemoryReservation(memoryRetainedByRemainingPages + index.getEstimatedSize().toBytes());
         }
 
-        LookupSourceSupplier lookupSourceSupplier = buildLookupSource();
+        LookupSourceSupplier partition = buildLookupSource();
         lookupSourceChecksum.ifPresent(lookupSourceSupplierChecksum ->
                 checkState(
-                        lookupSourceSupplier.checksum() == lookupSourceSupplierChecksum,
+                        partition.checksum() == lookupSourceSupplierChecksum,
                         "Unspilled lookupSourceSource checksum changed after spilling and unspilling"));
-        LookupSource lookupSource = lookupSourceSupplier.get();
-        operatorContext.setMemoryReservation(lookupSource.getInMemorySizeInBytes());
+        operatorContext.setMemoryReservation(partition.get().getInMemorySizeInBytes());
 
-        // TODO shared LS or Supplier<LS> ?
-        spilledLookupSourceHandle.setLookupSource(lookupSource);
+        spilledLookupSourceHandle.setLookupSource(partition);
 
         state = State.LOOKUP_SOURCE_UNSPILLED_AND_BUILT;
     }
