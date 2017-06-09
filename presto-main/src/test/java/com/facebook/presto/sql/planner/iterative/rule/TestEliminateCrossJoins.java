@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.Optional;
 import java.util.function.Function;
 
+import static com.facebook.presto.SystemSessionProperties.REORDER_JOINS;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.any;
 import static com.facebook.presto.sql.planner.assertions.PlanMatchPattern.join;
@@ -61,6 +62,7 @@ public class TestEliminateCrossJoins
     public void testEliminateCrossJoin()
     {
         tester.assertThat(new EliminateCrossJoins())
+                .setSystemProperty(REORDER_JOINS, "true")
                 .on(crossJoinAndJoin(INNER))
                 .matches(
                         project(
@@ -81,6 +83,7 @@ public class TestEliminateCrossJoins
     public void testRetainOutgoingGroupReferences()
     {
         tester.assertThat(new EliminateCrossJoins())
+                .setSystemProperty(REORDER_JOINS, "true")
                 .on(crossJoinAndJoin(INNER))
                 .matches(
                         any(
@@ -99,6 +102,7 @@ public class TestEliminateCrossJoins
     public void testDoNotReorderOuterJoin()
     {
         tester.assertThat(new EliminateCrossJoins())
+                .setSystemProperty(REORDER_JOINS, "true")
                 .on(crossJoinAndJoin(JoinNode.Type.LEFT))
                 .doesNotFire();
     }

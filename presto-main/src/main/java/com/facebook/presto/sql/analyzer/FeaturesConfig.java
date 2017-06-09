@@ -65,8 +65,7 @@ public class FeaturesConfig
     private boolean distributedIndexJoinsEnabled;
     private boolean colocatedJoinsEnabled;
     private boolean fastInequalityJoins = true;
-    private boolean reorderJoins;
-    private boolean eliminateCrossJoins = true;
+    private boolean reorderJoins = true;
     private boolean redistributeWrites = true;
     private boolean optimizeMetadataQueries;
     private boolean optimizeHashGeneration = true;
@@ -228,19 +227,6 @@ public class FeaturesConfig
     public FeaturesConfig setJoinReorderingEnabled(boolean reorderJoins)
     {
         this.reorderJoins = reorderJoins;
-        return this;
-    }
-
-    public boolean isEliminateCrossJoins()
-    {
-        return eliminateCrossJoins;
-    }
-
-    @Config("eliminate-cross-joins")
-    @ConfigDescription("Eliminate unnecessary cross joins to optimize plan")
-    public FeaturesConfig setEliminateCrossJoins(boolean eliminateCrossJoins)
-    {
-        this.eliminateCrossJoins = eliminateCrossJoins;
         return this;
     }
 

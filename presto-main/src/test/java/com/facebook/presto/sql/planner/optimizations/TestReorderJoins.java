@@ -13,6 +13,7 @@
  */
 package com.facebook.presto.sql.planner.optimizations;
 
+import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.sql.planner.assertions.BasePlanTest;
 import com.facebook.presto.sql.planner.assertions.PlanMatchPattern;
 import com.google.common.collect.ImmutableList;
@@ -55,6 +56,11 @@ public class TestReorderJoins
                     "L_PARTKEY", "partkey",
                     "L_ORDERKEY", "orderkey",
                     "L_COMMENT", "comment"));
+
+    public TestReorderJoins()
+    {
+        super(ImmutableMap.of(SystemSessionProperties.REORDER_JOINS, "true"));
+    }
 
     @Test
     public void testEliminateSimpleCrossJoin()
