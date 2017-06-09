@@ -52,8 +52,9 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static com.facebook.presto.SystemSessionProperties.getJoinDistributionType;
-import static com.facebook.presto.SystemSessionProperties.isJoinReorderingEnabled;
+import static com.facebook.presto.SystemSessionProperties.getJoinReorderingStrategy;
 import static com.facebook.presto.sql.ExpressionUtils.extractConjuncts;
+import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.COST_BASED;
 import static com.facebook.presto.sql.planner.EqualityInference.createEqualityInference;
 import static com.facebook.presto.sql.planner.iterative.rule.MultiJoinNode.toMultiJoinNode;
 import static com.facebook.presto.sql.planner.optimizations.ReorderJoinsPredicateUtils.sortPredicatesForJoin;
@@ -83,7 +84,7 @@ public class ReorderJoins
     @Override
     public Optional<PlanNode> apply(PlanNode node, Lookup lookup, PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator, Session session)
     {
-        if (!(node instanceof JoinNode) || !isJoinReorderingEnabled(session)) {
+        if (!(node instanceof JoinNode) || getJoinReorderingStrategy(session) != COST_BASED) {
             return Optional.empty();
         }
 

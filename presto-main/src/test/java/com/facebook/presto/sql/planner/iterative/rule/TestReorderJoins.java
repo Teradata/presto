@@ -41,7 +41,7 @@ public class TestReorderJoins
     @Test
     public void testChoosesLeastCostOrder()
     {
-        LocalQueryRunner queryRunner = new LocalQueryRunner(testSessionBuilder().setSystemProperty("reorder_joins", "true").build());
+        LocalQueryRunner queryRunner = new LocalQueryRunner(testSessionBuilder().setSystemProperty("join_reordering_strategy", "COST_BASED").build());
         new RuleTester(queryRunner).assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
                         p.join(
@@ -81,7 +81,7 @@ public class TestReorderJoins
     @Test
     public void testKeepsOutputSymbols()
     {
-        LocalQueryRunner queryRunner = new LocalQueryRunner(testSessionBuilder().setSystemProperty("reorder_joins", "true").build());
+        LocalQueryRunner queryRunner = new LocalQueryRunner(testSessionBuilder().setSystemProperty("join_reordering_strategy", "COST_BASED").build());
         new RuleTester(queryRunner).assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
                         p.join(
@@ -111,7 +111,7 @@ public class TestReorderJoins
                 .setCatalog("local")
                 .setSchema("tiny")
                 .setSystemProperty("join_distribution_type", "automatic")
-                .setSystemProperty("reorder_joins", "true")
+                .setSystemProperty("join_reordering_strategy", "COST_BASED")
                 .build();
         LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
         new RuleTester(queryRunner)
@@ -144,7 +144,7 @@ public class TestReorderJoins
                 .setCatalog("local")
                 .setSchema("tiny")
                 .setSystemProperty("join_distribution_type", "repartitioned")
-                .setSystemProperty("reorder_joins", "true")
+                .setSystemProperty("join_reordering_strategy", "COST_BASED")
                 .build();
         LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
         new RuleTester(queryRunner)
@@ -177,7 +177,7 @@ public class TestReorderJoins
                 .setCatalog("local")
                 .setSchema("tiny")
                 .setSystemProperty("join_distribution_type", "automatic")
-                .setSystemProperty("reorder_joins", "true")
+                .setSystemProperty("join_reordering_strategy", "COST_BASED")
                 .build();
         LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
         new RuleTester(queryRunner)
@@ -210,7 +210,7 @@ public class TestReorderJoins
                 .setCatalog("local")
                 .setSchema("tiny")
                 .setSystemProperty("join_distribution_type", "replicated")
-                .setSystemProperty("reorder_joins", "true")
+                .setSystemProperty("join_reordering_strategy", "COST_BASED")
                 .build();
         LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
         new RuleTester(queryRunner)
