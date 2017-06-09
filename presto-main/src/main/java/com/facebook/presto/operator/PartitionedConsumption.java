@@ -13,15 +13,22 @@
  */
 package com.facebook.presto.operator;
 
+import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.airlift.log.Logger;
 
+import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
+import javax.annotation.concurrent.ThreadSafe;
 
+import java.util.ArrayDeque;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.IntConsumer;
 import java.util.function.IntFunction;
 
@@ -54,15 +61,15 @@ import static java.util.Objects.requireNonNull;
  *
  * @param <T> type of the object loaded for each {@code Partition}. Must be {@code Closable}.
  */
+@ThreadSafe
 public class PartitionedConsumption<T>
 {
     private static final Logger log = Logger.get(PartitionedConsumption.class);
 
     private final int consumersCount;
-
-    // TODO FIXME Queue or something? So that we don't keep content for already released partitions
-
-    private final List<Partition<T>> partitions;
+    private final AtomicInteger consumed = new AtomicInteger();
+    @Nullable
+    private List<Partition<T>> partitions;
 
     PartitionedConsumption(int consumersCount, Iterable<Integer> partitionNumbers, IntFunction<ListenableFuture<T>> loader, IntConsumer disposer)
     {
@@ -106,9 +113,27 @@ public class PartitionedConsumption<T>
         return consumersCount;
     }
 
-    public Iterable<Partition<T>> getPartitions()
+    public Iterator<Partition<T>> beginConsumption()
     {
-        return partitions;
+        Queue<Partition<T>> partitions = new ArrayDeque<>(requireNonNull(this.partitions, "partitions is already null"));
+        if (consumed.incrementAndGet() >= consumersCount) {
+            // Unreference futures to allow GC
+            this.partitions = null;
+        }
+        return new AbstractIterator<Partition<T>>()
+        {
+            @Override
+            protected Partition<T> computeNext()
+            {
+                Partition<T> next = partitions.poll();
+                if (next != null) {
+                    return next;
+                }
+                else {
+                    return endOfData();
+                }
+            }
+        };
     }
 
     public static class Partition<T>
