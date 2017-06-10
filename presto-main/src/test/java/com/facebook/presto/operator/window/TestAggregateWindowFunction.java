@@ -532,4 +532,237 @@ public class TestAggregateWindowFunction
                         .row(null, null, null)
                         .build());
     }
+
+    @Test
+    public void testSumRangePrecedingBounded()
+    {
+        assertWindowQueryWithNulls("sum(orderkey) OVER (ORDER BY orderstatus " +
+                        "RANGE 2 PRECEDING)",
+                resultBuilder(TEST_SESSION, BIGINT, VARCHAR, BIGINT)
+                        .row(3L, "F", 14L)
+                        .row(5L, "F", 14L)
+                        .row(6L, "F", 14L)
+                        .row(null, "F", 14L)
+                        .row(34L, "O", 48L)
+                        .row(null, "O", 48L)
+                        .row(1L, null, 56L)
+                        .row(7L, null, 56L)
+                        .row(null, null, 56L)
+                        .row(null, null, 56L)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE 2 PRECEDING)",
+                resultBuilder(TEST_SESSION, BIGINT, VARCHAR, BIGINT)
+                        .row(3L, "F", 3L)
+                        .row(5L, "F", 8L)
+                        .row(6L, "F", 14L)
+                        .row(null, "F", 11L)
+                        .row(34L, "O", 34L)
+                        .row(null, "O", 34L)
+                        .row(1L, null, 1L)
+                        .row(7L, null, 8L)
+                        .row(null, null, 8L)
+                        .row(null, null, 8L)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN 2 PRECEDING AND 1 PRECEDING)",
+                resultBuilder(TEST_SESSION, INTEGER, VARCHAR, BIGINT)
+                        .row(3L, "F", null)
+                        .row(5L, "F", 3L)
+                        .row(6L, "F", 8L)
+                        .row(null, "F", 11L)
+                        .row(34L, "O", null)
+                        .row(null, "O", 34L)
+                        .row(1L, null, null)
+                        .row(7L, null, 1L)
+                        .row(null, null, 8L)
+                        .row(null, null, 8L)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN UNBOUNDED PRECEDING AND 0 PRECEDING)",
+                resultBuilder(TEST_SESSION, INTEGER, VARCHAR, BIGINT)
+                        .row(3L, "F", 3L)
+                        .row(5L, "F", 8L)
+                        .row(6L, "F", 14L)
+                        .row(null, "F", 14L)
+                        .row(34L, "O", 34L)
+                        .row(null, "O", 34L)
+                        .row(1L, null, 1L)
+                        .row(7L, null, 8L)
+                        .row(null, null, 8L)
+                        .row(null, null, 8L)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN UNBOUNDED PRECEDING AND 2 PRECEDING)",
+                resultBuilder(TEST_SESSION, INTEGER, VARCHAR, BIGINT)
+                        .row(3L, "F", null)
+                        .row(5L, "F", null)
+                        .row(6L, "F", 3L)
+                        .row(null, "F", 8L)
+                        .row(34L, "O", null)
+                        .row(null, "O", null)
+                        .row(1L, null, null)
+                        .row(7L, null, null)
+                        .row(null, null, 1L)
+                        .row(null, null, 1L)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN UNBOUNDED PRECEDING AND 4 PRECEDING)",
+                resultBuilder(TEST_SESSION, INTEGER, VARCHAR, BIGINT)
+                        .row(3L, "F", null)
+                        .row(5L, "F", null)
+                        .row(6L, "F", null)
+                        .row(null, "F", null)
+                        .row(34L, "O", null)
+                        .row(null, "O", null)
+                        .row(1L, null, null)
+                        .row(7L, null, null)
+                        .row(null, null, null)
+                        .row(null, null, null)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN 2 PRECEDING AND 3 PRECEDING)",
+                resultBuilder(TEST_SESSION, INTEGER, VARCHAR, BIGINT)
+                        .row(3L, "F", null)
+                        .row(5L, "F", null)
+                        .row(6L, "F", null)
+                        .row(null, "F", null)
+                        .row(34L, "O", null)
+                        .row(null, "O", null)
+                        .row(1L, null, null)
+                        .row(7L, null, null)
+                        .row(null, null, null)
+                        .row(null, null, null)
+                        .build());
+    }
+
+    @Test
+    public void testSumRangeFollowingBounded()
+    {
+        assertWindowQueryWithNulls("sum(orderkey) OVER (ORDER BY orderstatus " +
+                        "RANGE BETWEEN current row AND 1 FOLLOWING)",
+                resultBuilder(TEST_SESSION, BIGINT, VARCHAR, BIGINT)
+                        .row(3L, "F", 48L)
+                        .row(5L, "F", 48L)
+                        .row(6L, "F", 48L)
+                        .row(null, "F", 48L)
+                        .row(34L, "O", 42L)
+                        .row(null, "O", 42L)
+                        .row(1L, null, 8L)
+                        .row(7L, null, 8L)
+                        .row(null, null, 8L)
+                        .row(null, null, 8L)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN current row AND 1 FOLLOWING)",
+                resultBuilder(TEST_SESSION, BIGINT, VARCHAR, BIGINT)
+                        .row(3L, "F", 8L)
+                        .row(5L, "F", 11L)
+                        .row(6L, "F", 6L)
+                        .row(null, "F", null)
+                        .row(34L, "O", 34L)
+                        .row(null, "O", null)
+                        .row(1L, null, 8L)
+                        .row(7L, null, 7L)
+                        .row(null, null, null)
+                        .row(null, null, null)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN current row AND 0 FOLLOWING)",
+                resultBuilder(TEST_SESSION, BIGINT, VARCHAR, BIGINT)
+                        .row(3L, "F", 3L)
+                        .row(5L, "F", 5L)
+                        .row(6L, "F", 6L)
+                        .row(null, "F", null)
+                        .row(34L, "O", 34L)
+                        .row(null, "O", null)
+                        .row(1L, null, 1L)
+                        .row(7L, null, 7L)
+                        .row(null, null, null)
+                        .row(null, null, null)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN 1 FOLLOWING AND 2 FOLLOWING)",
+                resultBuilder(TEST_SESSION, INTEGER, VARCHAR, BIGINT)
+                        .row(3L, "F", 11L)
+                        .row(5L, "F", 6L)
+                        .row(6L, "F", null)
+                        .row(null, "F", null)
+                        .row(34L, "O", null)
+                        .row(null, "O", null)
+                        .row(1L, null, 7L)
+                        .row(7L, null, null)
+                        .row(null, null, null)
+                        .row(null, null, null)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN 0 FOLLOWING AND UNBOUNDED FOLLOWING)",
+                resultBuilder(TEST_SESSION, INTEGER, VARCHAR, BIGINT)
+                        .row(3L, "F", 14L)
+                        .row(5L, "F", 11L)
+                        .row(6L, "F", 6L)
+                        .row(null, "F", null)
+                        .row(34L, "O", 34L)
+                        .row(null, "O", null)
+                        .row(1L, null, 8L)
+                        .row(7L, null, 7L)
+                        .row(null, null, null)
+                        .row(null, null, null)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN 2 FOLLOWING AND UNBOUNDED FOLLOWING)",
+                resultBuilder(TEST_SESSION, INTEGER, VARCHAR, BIGINT)
+                        .row(3L, "F", 6L)
+                        .row(5L, "F", null)
+                        .row(6L, "F", null)
+                        .row(null, "F", null)
+                        .row(34L, "O", null)
+                        .row(null, "O", null)
+                        .row(1L, null, null)
+                        .row(7L, null, null)
+                        .row(null, null, null)
+                        .row(null, null, null)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN 4 FOLLOWING AND UNBOUNDED FOLLOWING)",
+                resultBuilder(TEST_SESSION, INTEGER, VARCHAR, BIGINT)
+                        .row(3L, "F", null)
+                        .row(5L, "F", null)
+                        .row(6L, "F", null)
+                        .row(null, "F", null)
+                        .row(34L, "O", null)
+                        .row(null, "O", null)
+                        .row(1L, null, null)
+                        .row(7L, null, null)
+                        .row(null, null, null)
+                        .row(null, null, null)
+                        .build());
+
+        assertWindowQueryWithNulls("sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN 3 FOLLOWING AND 2 FOLLOWING)",
+                resultBuilder(TEST_SESSION, INTEGER, VARCHAR, BIGINT)
+                        .row(3L, "F", null)
+                        .row(5L, "F", null)
+                        .row(6L, "F", null)
+                        .row(null, "F", null)
+                        .row(34L, "O", null)
+                        .row(null, "O", null)
+                        .row(1L, null, null)
+                        .row(7L, null, null)
+                        .row(null, null, null)
+                        .row(null, null, null)
+                        .build());
+    }
 }

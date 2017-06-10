@@ -217,4 +217,39 @@ public class TestMultipleWindowSpecifications
                         .row(null, null, 2L, null)
                         .build());
     }
+
+    @Test
+    public void testMultipleWindowSpecificationsWithRange()
+    {
+        // Intersection previous to current row
+        assertWindowQueryWithNulls("count(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey RANGE BETWEEN 3 PRECEDING AND 1 FOLLOWING), " +
+                        "sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey RANGE BETWEEN 2 PRECEDING AND CURRENT ROW)",
+                resultBuilder(TEST_SESSION, BIGINT, VARCHAR, BIGINT, BIGINT)
+                        .row(3L, "F", 2L, 3L)
+                        .row(5L, "F", 3L, 8L)
+                        .row(6L, "F", 3L, 14L)
+                        .row(null, "F", 3L, 11L)
+                        .row(34L, "O", 1L, 34L)
+                        .row(null, "O", 1L, 34L)
+                        .row(1L, null, 2L, 1L)
+                        .row(7L, null, 2L, 8L)
+                        .row(null, null, 2L, 8L)
+                        .row(null, null, 2L, 8L)
+                        .build());
+        // Disjoint
+        assertWindowQueryWithNulls("count(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey RANGE BETWEEN 3 PRECEDING AND 2 FOLLOWING), " +
+                        "sum(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey RANGE BETWEEN 1 PRECEDING AND CURRENT ROW)",
+                resultBuilder(TEST_SESSION, BIGINT, VARCHAR, BIGINT, BIGINT)
+                        .row(3L, "F", 3L, 3L)
+                        .row(5L, "F", 3L, 8L)
+                        .row(6L, "F", 3L, 11L)
+                        .row(null, "F", 3L, 6L)
+                        .row(34L, "O", 1L, 34L)
+                        .row(null, "O", 1L, 34L)
+                        .row(1L, null, 2L, 1L)
+                        .row(7L, null, 2L, 8L)
+                        .row(null, null, 2L, 7L)
+                        .row(null, null, 2L, 7L)
+                        .build());
+    }
 }

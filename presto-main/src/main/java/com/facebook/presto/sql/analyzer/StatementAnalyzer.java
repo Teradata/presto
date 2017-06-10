@@ -187,7 +187,6 @@ import static com.facebook.presto.sql.tree.FrameBound.Type.FOLLOWING;
 import static com.facebook.presto.sql.tree.FrameBound.Type.PRECEDING;
 import static com.facebook.presto.sql.tree.FrameBound.Type.UNBOUNDED_FOLLOWING;
 import static com.facebook.presto.sql.tree.FrameBound.Type.UNBOUNDED_PRECEDING;
-import static com.facebook.presto.sql.tree.WindowFrame.Type.RANGE;
 import static com.facebook.presto.type.UnknownType.UNKNOWN;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -1259,12 +1258,6 @@ class StatementAnalyzer
             }
             if ((startType == FOLLOWING) && (endType == CURRENT_ROW)) {
                 throw new SemanticException(INVALID_WINDOW_FRAME, frame, "Window frame starting from FOLLOWING cannot end with CURRENT ROW");
-            }
-            if ((frame.getType() == RANGE) && ((startType == PRECEDING) || (endType == PRECEDING))) {
-                throw new SemanticException(INVALID_WINDOW_FRAME, frame, "Window frame RANGE PRECEDING is only supported with UNBOUNDED");
-            }
-            if ((frame.getType() == RANGE) && ((startType == FOLLOWING) || (endType == FOLLOWING))) {
-                throw new SemanticException(INVALID_WINDOW_FRAME, frame, "Window frame RANGE FOLLOWING is only supported with UNBOUNDED");
             }
         }
 

@@ -128,5 +128,33 @@ public class TestFirstValueFunction
                         .row(null, null, 1L)
                         .row(null, null, 7L)
                         .build());
+        assertWindowQueryWithNulls("first_value(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN 2 PRECEDING AND 1 PRECEDING)",
+                resultBuilder(TEST_SESSION, BIGINT, VARCHAR, BIGINT)
+                        .row(3L, "F", null)
+                        .row(5L, "F", 3L)
+                        .row(6L, "F", 3L)
+                        .row(null, "F", 5L)
+                        .row(34L, "O", null)
+                        .row(null, "O", 34L)
+                        .row(1L, null, null)
+                        .row(7L, null, 1L)
+                        .row(null, null, 1L)
+                        .row(null, null, 1L)
+                        .build());
+        assertWindowQueryWithNulls("first_value(orderkey) OVER (PARTITION BY orderstatus ORDER BY orderkey " +
+                        "RANGE BETWEEN 2 PRECEDING AND 2 FOLLOWING)",
+                resultBuilder(TEST_SESSION, BIGINT, VARCHAR, BIGINT)
+                        .row(3L, "F", 3L)
+                        .row(5L, "F", 3L)
+                        .row(6L, "F", 3L)
+                        .row(null, "F", 5L)
+                        .row(34L, "O", 34L)
+                        .row(null, "O", 34L)
+                        .row(1L, null, 1L)
+                        .row(7L, null, 1L)
+                        .row(null, null, 1L)
+                        .row(null, null, 1L)
+                        .build());
     }
 }

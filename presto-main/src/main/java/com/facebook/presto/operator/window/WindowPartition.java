@@ -20,6 +20,7 @@ import com.facebook.presto.spi.function.WindowIndex;
 import com.facebook.presto.sql.tree.FrameBound;
 import com.google.common.collect.ImmutableList;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static com.facebook.presto.spi.StandardErrorCode.INVALID_WINDOW_FRAME;
@@ -28,6 +29,7 @@ import static com.facebook.presto.sql.tree.FrameBound.Type.PRECEDING;
 import static com.facebook.presto.sql.tree.FrameBound.Type.UNBOUNDED_FOLLOWING;
 import static com.facebook.presto.sql.tree.FrameBound.Type.UNBOUNDED_PRECEDING;
 import static com.facebook.presto.sql.tree.WindowFrame.Type.RANGE;
+import static com.facebook.presto.sql.tree.WindowFrame.Type.ROWS;
 import static com.facebook.presto.util.Failures.checkCondition;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Math.toIntExact;
@@ -46,6 +48,8 @@ public final class WindowPartition
     private int peerGroupEnd;
 
     private int currentPosition;
+    private List<Integer> peerGroupStartIndices = new ArrayList<>();
+    private List<Integer> peerGroupEndIndices = new ArrayList<>();
 
     public WindowPartition(PagesIndex pagesIndex,
             int partitionStart,
@@ -142,6 +146,8 @@ public final class WindowPartition
         while ((peerGroupEnd < partitionEnd) && pagesIndex.positionEqualsPosition(peerGroupHashStrategy, peerGroupStart, peerGroupEnd)) {
             peerGroupEnd++;
         }
+        peerGroupStartIndices.add(peerGroupStart);
+        peerGroupEndIndices.add(peerGroupEnd);
     }
 
     private Range getFrameRange(FrameInfo frameInfo)
@@ -150,7 +156,11 @@ public final class WindowPartition
         int endPosition = partitionEnd - partitionStart - 1;
 
         // handle empty frame
-        if (emptyFrame(frameInfo, rowPosition, endPosition)) {
+        if (frameInfo.getType() == ROWS && emptyFrame(frameInfo, rowPosition, endPosition - rowPosition)) {
+            return new Range(-1, -1);
+        }
+
+        if (frameInfo.getType() == RANGE && emptyFrame(frameInfo, peerGroupStart, endPosition - (peerGroupEnd - 1))) {
             return new Range(-1, -1);
         }
 
@@ -160,6 +170,12 @@ public final class WindowPartition
         // frame start
         if (frameInfo.getStartType() == UNBOUNDED_PRECEDING) {
             frameStart = 0;
+        }
+        else if (frameInfo.getType() == RANGE && frameInfo.getStartType() == PRECEDING) {
+            frameStart = precedingStartRange(getStartValue(frameInfo));
+        }
+        else if (frameInfo.getType() == RANGE && frameInfo.getStartType() == FOLLOWING) {
+            frameStart = followingRange(rowPosition, endPosition, getStartValue(frameInfo));
         }
         else if (frameInfo.getStartType() == PRECEDING) {
             frameStart = preceding(rowPosition, getStartValue(frameInfo));
@@ -178,6 +194,12 @@ public final class WindowPartition
         if (frameInfo.getEndType() == UNBOUNDED_FOLLOWING) {
             frameEnd = endPosition;
         }
+        else if (frameInfo.getType() == RANGE && frameInfo.getEndType() == PRECEDING) {
+            frameEnd = precedingEndRange(getEndValue(frameInfo));
+        }
+        else if (frameInfo.getType() == RANGE && frameInfo.getEndType() == FOLLOWING) {
+            frameEnd = followingRange(peerGroupEnd, endPosition + 1, getEndValue(frameInfo)) - 1;
+        }
         else if (frameInfo.getEndType() == PRECEDING) {
             frameEnd = preceding(rowPosition, getEndValue(frameInfo));
         }
@@ -194,19 +216,62 @@ public final class WindowPartition
         return new Range(frameStart, frameEnd);
     }
 
-    private boolean emptyFrame(FrameInfo frameInfo, int rowPosition, int endPosition)
+    private int precedingEndRange(long endValue)
+    {
+        int peerGroupEndIndex = peerGroupEndIndices.indexOf(peerGroupEnd);
+        if (peerGroupEndIndex < endValue) {
+            return peerGroupEnd - 1;
+        }
+        return peerGroupEndIndices.get(toIntExact(peerGroupEndIndex - endValue)) - 1;
+    }
+
+    private int precedingStartRange(long startValue)
+    {
+        int peerGroupStartIndex = peerGroupStartIndices.indexOf(peerGroupStart);
+        if (peerGroupStartIndex < startValue) {
+            return 0;
+        }
+        return peerGroupStartIndices.get(toIntExact(peerGroupStartIndex - startValue));
+    }
+
+    private int followingRange(int followingPeerGroupStart, int endPosition, long value)
+    {
+        if (value == 0) {
+            return followingPeerGroupStart;
+        }
+        // TODO: Optimize this to *not* look for peers often, probably have pageIndex keep the peer groups
+        int followingPeerGroupEnd = 0;
+        int currentValue = 0;
+        while (currentValue < value) {
+            boolean peerFound = false;
+            followingPeerGroupEnd = followingPeerGroupStart + 1;
+            while ((followingPeerGroupEnd < partitionEnd) && pagesIndex.positionEqualsPosition(peerGroupHashStrategy, followingPeerGroupStart, followingPeerGroupEnd)) {
+                followingPeerGroupEnd++;
+                peerFound = true;
+            }
+            if (followingPeerGroupEnd >= partitionEnd) {
+                return endPosition;
+            }
+
+            if (!peerFound) {
+                currentValue++;
+            }
+            followingPeerGroupStart++;
+        }
+        return followingPeerGroupEnd;
+    }
+
+    private boolean emptyFrame(FrameInfo frameInfo, int rowPosition, int position)
     {
         FrameBound.Type startType = frameInfo.getStartType();
         FrameBound.Type endType = frameInfo.getEndType();
-
-        int positions = endPosition - rowPosition;
 
         if ((startType == UNBOUNDED_PRECEDING) && (endType == PRECEDING)) {
             return getEndValue(frameInfo) > rowPosition;
         }
 
         if ((startType == FOLLOWING) && (endType == UNBOUNDED_FOLLOWING)) {
-            return getStartValue(frameInfo) > positions;
+            return getStartValue(frameInfo) > position;
         }
 
         if (startType != endType) {
@@ -225,7 +290,7 @@ public final class WindowPartition
             return (start < end) || ((start > rowPosition) && (end > rowPosition));
         }
 
-        return (start > end) || ((start > positions) && (end > positions));
+        return (start > end) || ((start > position) && (end > position));
     }
 
     private static int preceding(int rowPosition, long value)
