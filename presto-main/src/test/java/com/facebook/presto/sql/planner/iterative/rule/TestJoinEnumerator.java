@@ -22,6 +22,7 @@ import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder;
 import com.facebook.presto.sql.planner.plan.JoinNode;
+import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.SymbolReference;
@@ -94,8 +95,14 @@ public class TestJoinEnumerator
                         planBuilder.values(planBuilder.symbol("D1", BIGINT))),
                 filter,
                 ImmutableList.of());
-        ReorderJoins.JoinEnumerator joinEnumerator = new ReorderJoins.JoinEnumerator(idAllocator, new SymbolAllocator(), queryRunner.getDefaultSession(), queryRunner.getLookup(), multiJoinNode, new CostComparator(1, 1, 1));
-        Optional<JoinNode> actual = joinEnumerator.createJoinAccordingToPartitioning(multiJoinNode, ImmutableSet.of(0, 2));
+        ReorderJoins.JoinEnumerator joinEnumerator = new ReorderJoins.JoinEnumerator(
+                idAllocator,
+                new SymbolAllocator(),
+                queryRunner.getDefaultSession(),
+                queryRunner.getLookup(),
+                multiJoinNode.getFilter(),
+                new CostComparator(1, 1, 1));
+        Optional<PlanNode> actual = joinEnumerator.createJoinAccordingToPartitioning(multiJoinNode.getSources(), multiJoinNode.getOutputSymbols(), ImmutableSet.of(0, 2));
         assertTrue(actual.isPresent());
         assertPlan(
                 session,
@@ -133,8 +140,14 @@ public class TestJoinEnumerator
                 ImmutableList.of(planBuilder.values(a1), planBuilder.values(b1)),
                 TRUE_LITERAL,
                 ImmutableList.of(a1, b1));
-        ReorderJoins.JoinEnumerator joinEnumerator = new ReorderJoins.JoinEnumerator(idAllocator, new SymbolAllocator(), queryRunner.getDefaultSession(), queryRunner.getLookup(), multiJoinNode, new CostComparator(1, 1, 1));
-        Optional<JoinNode> actual = joinEnumerator.createJoinAccordingToPartitioning(multiJoinNode, ImmutableSet.of(0));
+        ReorderJoins.JoinEnumerator joinEnumerator = new ReorderJoins.JoinEnumerator(
+                idAllocator,
+                new SymbolAllocator(),
+                queryRunner.getDefaultSession(),
+                queryRunner.getLookup(),
+                multiJoinNode.getFilter(),
+                new CostComparator(1, 1, 1));
+        Optional<PlanNode> actual = joinEnumerator.createJoinAccordingToPartitioning(multiJoinNode.getSources(), multiJoinNode.getOutputSymbols(), ImmutableSet.of(0));
         assertFalse(actual.isPresent());
     }
 }

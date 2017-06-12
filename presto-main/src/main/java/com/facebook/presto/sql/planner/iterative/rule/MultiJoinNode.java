@@ -28,7 +28,9 @@ import java.util.Objects;
 
 import static com.facebook.presto.sql.ExpressionUtils.and;
 import static com.facebook.presto.sql.ExpressionUtils.extractConjuncts;
+import static com.facebook.presto.sql.planner.DeterminismEvaluator.isDeterministic;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
+import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
@@ -46,13 +48,9 @@ public class MultiJoinNode
 
     public MultiJoinNode(List<PlanNode> sources, Expression filter, List<Symbol> outputSymbols)
     {
-        requireNonNull(sources, "sources is null");
-        requireNonNull(filter, "filters is null");
-        requireNonNull(outputSymbols, "outputSymbols is null");
-
-        this.sources = ImmutableList.copyOf(sources);
-        this.filter = filter;
-        this.outputSymbols = ImmutableList.copyOf(outputSymbols);
+        this.sources = ImmutableList.copyOf(requireNonNull(sources, "sources is null"));
+        this.filter = requireNonNull(filter, "filter is null");
+        this.outputSymbols = ImmutableList.copyOf(requireNonNull(outputSymbols, "outputSymbols is null"));
 
         List<Symbol> inputSymbols = sources.stream().flatMap(source -> source.getOutputSymbols().stream()).collect(toImmutableList());
         checkArgument(inputSymbols.containsAll(outputSymbols), "inputs do not contain all output symbols");
@@ -121,7 +119,7 @@ public class MultiJoinNode
         private void flattenNode(PlanNode node)
         {
             PlanNode resolved = lookup.resolve(node);
-            if (resolved instanceof JoinNode && ((JoinNode) resolved).getType() == INNER) {
+            if (resolved instanceof JoinNode && ((JoinNode) resolved).getType() == INNER && isDeterministic(((JoinNode) resolved).getFilter().orElse(TRUE_LITERAL))) {
                 JoinNode joinNode = (JoinNode) resolved;
                 flattenNode(joinNode.getLeft());
                 flattenNode(joinNode.getRight());

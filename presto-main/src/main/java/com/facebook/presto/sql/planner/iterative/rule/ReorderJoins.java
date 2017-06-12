@@ -17,7 +17,6 @@ package com.facebook.presto.sql.planner.iterative.rule;
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.cost.PlanNodeCostEstimate;
-import com.facebook.presto.sql.ExpressionUtils;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.planner.DependencyExtractor;
 import com.facebook.presto.sql.planner.EqualityInference;
@@ -26,10 +25,10 @@ import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Rule;
-import com.facebook.presto.sql.planner.optimizations.ReorderJoinsPredicateUtils.SortedPredicatesResult;
 import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.facebook.presto.sql.tree.BooleanLiteral;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
@@ -45,25 +44,29 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static com.facebook.presto.SystemSessionProperties.getJoinDistributionType;
 import static com.facebook.presto.SystemSessionProperties.getJoinReorderingStrategy;
-import static com.facebook.presto.sql.ExpressionUtils.extractConjuncts;
+import static com.facebook.presto.sql.ExpressionUtils.and;
+import static com.facebook.presto.sql.ExpressionUtils.combineConjuncts;
 import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.COST_BASED;
 import static com.facebook.presto.sql.planner.EqualityInference.createEqualityInference;
 import static com.facebook.presto.sql.planner.iterative.rule.MultiJoinNode.toMultiJoinNode;
-import static com.facebook.presto.sql.planner.optimizations.ReorderJoinsPredicateUtils.sortPredicatesForJoin;
+import static com.facebook.presto.sql.planner.plan.Assignments.identity;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Predicates.in;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.getOnlyElement;
@@ -95,30 +98,32 @@ public class ReorderJoins
         }
 
         MultiJoinNode multiJoinNode = toMultiJoinNode(joinNode, lookup);
-        return Optional.of(new JoinEnumerator(idAllocator, symbolAllocator, session, lookup, multiJoinNode, costComparator).chooseJoinOrder(multiJoinNode));
+        return Optional.of(new JoinEnumerator(idAllocator, symbolAllocator, session, lookup, multiJoinNode.getFilter(), costComparator).chooseJoinOrder(multiJoinNode.getSources(), multiJoinNode.getOutputSymbols()));
     }
 
     @VisibleForTesting
     public static class JoinEnumerator
     {
-        private final Map<MultiJoinNode, JoinNode> memo = new HashMap<>();
+        private final Map<Set<PlanNode>, PlanNode> memo = new HashMap<>();
         private final PlanNodeIdAllocator idAllocator;
         private final Session session;
         private final Ordering<PlanNode> planNodeOrdering;
         private final EqualityInference allInference;
+        private final Expression allFilter;
 
-        public JoinEnumerator(PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator, Session session, Lookup lookup, MultiJoinNode multiJoinNode, CostComparator costComparator)
+        public JoinEnumerator(PlanNodeIdAllocator idAllocator, SymbolAllocator symbolAllocator, Session session, Lookup lookup, Expression filter, CostComparator costComparator)
         {
             requireNonNull(idAllocator, "idAllocator is null");
             requireNonNull(symbolAllocator, "symbolAllocator is null");
             requireNonNull(session, "session is null");
             requireNonNull(lookup, "lookup is null");
-            requireNonNull(multiJoinNode, "multiJoinNode is null");
+            requireNonNull(filter, "filter is null");
             requireNonNull(costComparator, "costComparator is null");
             this.idAllocator = idAllocator;
             this.session = session;
             this.planNodeOrdering = getPlanNodeOrdering(costComparator, lookup, session, symbolAllocator);
-            this.allInference = createEqualityInference(multiJoinNode.getFilter());
+            this.allInference = createEqualityInference(filter);
+            this.allFilter = filter;
         }
 
         private static Ordering<PlanNode> getPlanNodeOrdering(CostComparator costComparator, Lookup lookup, Session session, SymbolAllocator symbolAllocator)
@@ -135,36 +140,42 @@ public class ReorderJoins
             };
         }
 
-        private JoinNode chooseJoinOrder(MultiJoinNode multiJoinNode)
+        private PlanNode chooseJoinOrder(List<PlanNode> sources, List<Symbol> outputSymbols)
         {
-            JoinNode join = memo.get(multiJoinNode);
-            if (join == null) {
-                checkState(multiJoinNode.getSources().size() > 1);
-                join = generatePartitions(multiJoinNode.getSources().size())
-                        .map(partitioning -> createJoinAccordingToPartitioning(multiJoinNode, partitioning))
+            Set<PlanNode> multiJoinKey = ImmutableSet.copyOf(sources);
+            PlanNode node = memo.get(multiJoinKey);
+            if (node == null) {
+                checkState(sources.size() > 1);
+                node = generatePartitions(sources.size())
+                        .map(partitioning -> createJoinAccordingToPartitioning(sources, outputSymbols, partitioning))
                         .filter(Optional::isPresent)
                         .map(Optional::get)
                         .min(planNodeOrdering)
-                        .orElseGet(() -> createCrossJoins(multiJoinNode));
-                log.debug("Least cost join was: " + join.toString());
-                memo.put(multiJoinNode, join);
+                        .orElseGet(() -> createCrossJoins(sources, outputSymbols));
+                log.debug("Least cost join was: " + node.toString());
+                memo.put(multiJoinKey, node);
             }
-            return join;
+            return node;
         }
 
         /**
          * This method produces a cross join of all the sources in multiJoinNode.
          * This gets called once there are no longer edges between any of the join sources.
          */
-        private JoinNode createCrossJoins(MultiJoinNode multiJoinNode)
+        private PlanNode createCrossJoins(List<PlanNode> sources, List<Symbol> outputSymbols)
         {
-            return createJoin(
-                    ImmutableSet.of(multiJoinNode.getSources().get(0)),
-                    ImmutableSet.copyOf(multiJoinNode.getSources().subList(1, multiJoinNode.getSources().size())),
-                    multiJoinNode.getOutputSymbols(),
-                    multiJoinNode.getFilter(),
+            // cross joins cannot filter output symbols
+            List<Symbol> crossJoinSymbols = sources.stream().flatMap(source -> source.getOutputSymbols().stream()).collect(toImmutableList());
+            PlanNode result = createJoin(
+                    ImmutableSet.of(sources.get(0)),
+                    ImmutableSet.copyOf(sources.subList(1, sources.size())),
+                    crossJoinSymbols,
                     true,
                     this::createCrossJoins).orElseThrow(() -> new IllegalStateException("cross join not present"));
+            if (!crossJoinSymbols.equals(outputSymbols)) {
+                result = new ProjectNode(idAllocator.getNextId(), result, identity(outputSymbols));
+            }
+            return result;
         }
 
         /**
@@ -190,25 +201,46 @@ public class ReorderJoins
         }
 
         @VisibleForTesting
-        Optional<JoinNode> createJoinAccordingToPartitioning(MultiJoinNode multiJoinNode, Set<Integer> partitioning)
+        Optional<PlanNode> createJoinAccordingToPartitioning(List<PlanNode> sources, List<Symbol> outputSymbols, Set<Integer> partitioning)
         {
-            List<PlanNode> sources = multiJoinNode.getSources();
             Set<PlanNode> leftSources = partitioning.stream()
                     .map(sources::get)
                     .collect(toImmutableSet());
             Set<PlanNode> rightSources = Sets.difference(ImmutableSet.copyOf(sources), ImmutableSet.copyOf(leftSources));
-            return createJoin(leftSources, rightSources, multiJoinNode.getOutputSymbols(), multiJoinNode.getFilter(), false, this::chooseJoinOrder);
+            return createJoin(leftSources, rightSources, outputSymbols, false, this::chooseJoinOrder);
         }
 
-        public Optional<JoinNode> createJoin(Set<PlanNode> leftSources, Set<PlanNode> rightSources, List<Symbol> outputSymbols, Expression filter, boolean allowCrossJoins, Function<MultiJoinNode, PlanNode> joinCreationFunction)
+        private Optional<PlanNode> createJoin(
+                Set<PlanNode> leftSources,
+                Set<PlanNode> rightSources,
+                List<Symbol> outputSymbols,
+                boolean allowCrossJoins,
+                BiFunction<List<PlanNode>, List<Symbol>, PlanNode> joinCreationFunction)
         {
             Set<Symbol> leftSymbols = leftSources.stream()
                     .flatMap(node -> node.getOutputSymbols().stream())
                     .collect(toImmutableSet());
+            Set<Symbol> rightSymbols = rightSources.stream()
+                    .flatMap(node -> node.getOutputSymbols().stream())
+                    .collect(toImmutableSet());
+            ImmutableList.Builder<Expression> joinPredicatesBuilder = ImmutableList.builder();
 
-            SortedPredicatesResult pushDownResult = sortPredicatesForJoin(leftSymbols, filter);
+            // add join conjucts that were not used for inference
+            StreamSupport.stream(EqualityInference.nonInferrableConjuncts(allFilter).spliterator(), false)
+                    .map(conjuct -> allInference.rewriteExpression(conjuct, symbol -> leftSymbols.contains(symbol) || rightSymbols.contains(symbol)))
+                    .filter(Objects::nonNull)
+                    // filter expressions that contain only left or right symbols
+                    .filter(conjuct -> allInference.rewriteExpression(conjuct, leftSymbols::contains) == null)
+                    .filter(conjuct -> allInference.rewriteExpression(conjuct, rightSymbols::contains) == null)
+                    .forEach(joinPredicatesBuilder::add);
 
-            List<Expression> joinPredicates = extractConjuncts(pushDownResult.getJoinPredicate());
+            // create equality inference on available symbols
+            // TODO: make generateEqualitiesPartitionedBy take left and right scope
+            List<Expression> joinEqualities = allInference.generateEqualitiesPartitionedBy(symbol -> leftSymbols.contains(symbol) || rightSymbols.contains(symbol)).getScopeEqualities();
+            EqualityInference joinInference = createEqualityInference(joinEqualities.toArray(new Expression[joinEqualities.size()]));
+            joinPredicatesBuilder.addAll(joinInference.generateEqualitiesPartitionedBy(in(leftSymbols)).getScopeStraddlingEqualities());
+
+            List<Expression> joinPredicates = joinPredicatesBuilder.build();
             List<JoinNode.EquiJoinClause> joinConditions = joinPredicates.stream()
                     .filter(JoinEnumerator::isJoinEqualityCondition)
                     .map(predicate -> toEquiJoinClause((ComparisonExpression) predicate, leftSymbols))
@@ -222,18 +254,16 @@ public class ReorderJoins
 
             Set<Symbol> requiredJoinSymbols = ImmutableSet.<Symbol>builder()
                     .addAll(outputSymbols)
-                    .addAll(DependencyExtractor.extractUnique(pushDownResult.getJoinPredicate()))
+                    .addAll(DependencyExtractor.extractUnique(joinFilters))
                     .build();
             PlanNode left = getJoinSource(
                     idAllocator,
                     ImmutableList.copyOf(leftSources),
-                    pushDownResult.getLeftPredicate(),
                     requiredJoinSymbols.stream().filter(leftSymbols::contains).collect(toImmutableList()),
                     joinCreationFunction);
             PlanNode right = getJoinSource(
                     idAllocator,
                     ImmutableList.copyOf(rightSources),
-                    pushDownResult.getRightPredicate(),
                     requiredJoinSymbols.stream()
                             .filter(symbol -> !leftSymbols.contains(symbol))
                             .collect(toImmutableList()),
@@ -251,23 +281,24 @@ public class ReorderJoins
                             right,
                             joinConditions,
                             sortedOutputSymbols,
-                            joinFilters.isEmpty() ? Optional.empty() : Optional.of(ExpressionUtils.and(joinFilters)),
+                            joinFilters.isEmpty() ? Optional.empty() : Optional.of(and(joinFilters)),
                             Optional.empty(),
                             Optional.empty(),
                             Optional.empty())));
         }
 
-        private PlanNode getJoinSource(PlanNodeIdAllocator idAllocator, List<PlanNode> nodes, Expression filter, List<Symbol> outputSymbols, Function<MultiJoinNode, PlanNode> joinCreationFunction)
+        private PlanNode getJoinSource(PlanNodeIdAllocator idAllocator, List<PlanNode> nodes, List<Symbol> outputSymbols, BiFunction<List<PlanNode>, List<Symbol>, PlanNode> joinCreationFunction)
         {
             PlanNode planNode;
             if (nodes.size() == 1) {
                 planNode = getOnlyElement(nodes);
+                Expression filter = combineConjuncts(allInference.generateEqualitiesPartitionedBy(outputSymbols::contains).getScopeEqualities());
                 if (!(BooleanLiteral.TRUE_LITERAL).equals(filter)) {
                     return new FilterNode(idAllocator.getNextId(), planNode, filter);
                 }
                 return planNode;
             }
-            return joinCreationFunction.apply(new MultiJoinNode(nodes, filter, outputSymbols));
+            return joinCreationFunction.apply(nodes, outputSymbols);
         }
 
         private static boolean isJoinEqualityCondition(Expression expression)
