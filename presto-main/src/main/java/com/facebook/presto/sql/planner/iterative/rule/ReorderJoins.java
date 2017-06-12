@@ -29,7 +29,6 @@ import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.ProjectNode;
-import com.facebook.presto.sql.tree.BooleanLiteral;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.SymbolReference;
@@ -63,6 +62,7 @@ import static com.facebook.presto.sql.planner.plan.Assignments.identity;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.PARTITIONED;
 import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.REPLICATED;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
+import static com.facebook.presto.sql.tree.BooleanLiteral.TRUE_LITERAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -165,16 +165,12 @@ public class ReorderJoins
         private PlanNode createCrossJoins(List<PlanNode> sources, List<Symbol> outputSymbols)
         {
             // cross joins cannot filter output symbols
-            List<Symbol> crossJoinSymbols = sources.stream().flatMap(source -> source.getOutputSymbols().stream()).collect(toImmutableList());
             PlanNode result = createJoin(
                     ImmutableSet.of(sources.get(0)),
                     ImmutableSet.copyOf(sources.subList(1, sources.size())),
-                    crossJoinSymbols,
+                    outputSymbols,
                     true,
                     this::createCrossJoins).orElseThrow(() -> new IllegalStateException("cross join not present"));
-            if (!crossJoinSymbols.equals(outputSymbols)) {
-                result = new ProjectNode(idAllocator.getNextId(), result, identity(outputSymbols));
-            }
             return result;
         }
 
@@ -268,23 +264,37 @@ public class ReorderJoins
                             .filter(symbol -> !leftSymbols.contains(symbol))
                             .collect(toImmutableList()),
                     joinCreationFunction);
+
             // sort output symbols so that the left input symbols are first
             List<Symbol> sortedOutputSymbols = Stream.concat(left.getOutputSymbols().stream(), right.getOutputSymbols().stream())
                     .filter(outputSymbols::contains)
                     .collect(toImmutableList());
 
-            return Optional.of(
+            // Cross joins can't filter symbols as part of the join
+            // If we're doing a cross join, use all output symbols from the inputs and add a project node
+            // on top
+            List<Symbol> joinOutputSymbols = sortedOutputSymbols;
+            if (joinConditions.isEmpty() && joinFilters.isEmpty()) {
+                joinOutputSymbols = Stream.concat(left.getOutputSymbols().stream(), right.getOutputSymbols().stream())
+                        .collect(toImmutableList());
+            }
+
+            PlanNode result =
                     setJoinNodeProperties(new JoinNode(
                             idAllocator.getNextId(),
                             INNER,
                             left,
                             right,
                             joinConditions,
-                            sortedOutputSymbols,
+                            joinOutputSymbols,
                             joinFilters.isEmpty() ? Optional.empty() : Optional.of(and(joinFilters)),
                             Optional.empty(),
                             Optional.empty(),
-                            Optional.empty())));
+                            Optional.empty()));
+            if (!joinOutputSymbols.equals(sortedOutputSymbols)) {
+                result = new ProjectNode(idAllocator.getNextId(), result, identity(sortedOutputSymbols));
+            }
+            return Optional.of(result);
         }
 
         private PlanNode getJoinSource(PlanNodeIdAllocator idAllocator, List<PlanNode> nodes, List<Symbol> outputSymbols, BiFunction<List<PlanNode>, List<Symbol>, PlanNode> joinCreationFunction)
@@ -293,7 +303,7 @@ public class ReorderJoins
             if (nodes.size() == 1) {
                 planNode = getOnlyElement(nodes);
                 Expression filter = combineConjuncts(allInference.generateEqualitiesPartitionedBy(outputSymbols::contains).getScopeEqualities());
-                if (!(BooleanLiteral.TRUE_LITERAL).equals(filter)) {
+                if (!(TRUE_LITERAL).equals(filter)) {
                     return new FilterNode(idAllocator.getNextId(), planNode, filter);
                 }
                 return planNode;

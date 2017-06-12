@@ -23,6 +23,8 @@ import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.facebook.presto.testing.LocalQueryRunner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
@@ -36,14 +38,36 @@ import static com.facebook.presto.sql.planner.plan.JoinNode.DistributionType.REP
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 import static com.facebook.presto.testing.LocalQueryRunner.queryRunnerWithFakeNodeCountForStats;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
+import static io.airlift.testing.Closeables.closeAllRuntimeException;
 
 public class TestReorderJoins
 {
+    private RuleTester tester;
+
+    @BeforeClass
+    public void setUp()
+    {
+        Session session = testSessionBuilder()
+                .setCatalog("local")
+                .setSchema("tiny")
+                .setSystemProperty("join_distribution_type", "automatic")
+                .setSystemProperty("join_reordering_strategy", "COST_BASED")
+                .build();
+        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
+        tester = new RuleTester(queryRunner);
+    }
+
+    @AfterClass(alwaysRun = true)
+    public void tearDown()
+    {
+        closeAllRuntimeException(tester);
+        tester = null;
+    }
+
     @Test
     public void testChoosesLeastCostOrder()
     {
-        LocalQueryRunner queryRunner = new LocalQueryRunner(testSessionBuilder().setSystemProperty("join_reordering_strategy", "COST_BASED").build());
-        new RuleTester(queryRunner).assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
                         p.join(
                                 INNER,
@@ -66,7 +90,7 @@ public class TestReorderJoins
                         INNER,
                         ImmutableList.of(equiJoinClause("C1", "B1")),
                         Optional.empty(),
-                        Optional.of(PARTITIONED),
+                        Optional.of(REPLICATED),
                         values(ImmutableMap.of("C1", 0)),
                         join(
                                 INNER,
@@ -82,8 +106,7 @@ public class TestReorderJoins
     @Test
     public void testKeepsOutputSymbols()
     {
-        LocalQueryRunner queryRunner = new LocalQueryRunner(testSessionBuilder().setSystemProperty("join_reordering_strategy", "COST_BASED").build());
-        new RuleTester(queryRunner).assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
                         p.join(
                                 INNER,
@@ -108,15 +131,7 @@ public class TestReorderJoins
     @Test
     public void testReplicatesAndFlipsWhenOneTableMuchSmaller()
     {
-        Session session = testSessionBuilder()
-                .setCatalog("local")
-                .setSchema("tiny")
-                .setSystemProperty("join_distribution_type", "automatic")
-                .setSystemProperty("join_reordering_strategy", "COST_BASED")
-                .build();
-        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
-        new RuleTester(queryRunner)
-                .assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
                         p.join(
                                 INNER,
@@ -141,15 +156,7 @@ public class TestReorderJoins
     @Test
     public void testRepartitionsWhenRequiredBySession()
     {
-        Session session = testSessionBuilder()
-                .setCatalog("local")
-                .setSchema("tiny")
-                .setSystemProperty("join_distribution_type", "repartitioned")
-                .setSystemProperty("join_reordering_strategy", "COST_BASED")
-                .build();
-        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
-        new RuleTester(queryRunner)
-                .assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
                         p.join(
                                 INNER,
@@ -158,6 +165,7 @@ public class TestReorderJoins
                                 ImmutableList.of(new JoinNode.EquiJoinClause(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT))),
                                 ImmutableList.of(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT)),
                                 Optional.empty()))
+                .setSystemProperty("join_distribution_type", "REPARTITIONED")
                 .withStats(ImmutableMap.of(
                         new PlanNodeId("valuesA"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(100)).build(),
                         new PlanNodeId("valuesB"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))
@@ -174,15 +182,7 @@ public class TestReorderJoins
     @Test
     public void testRepartitionsWhenBothTablesEqual()
     {
-        Session session = testSessionBuilder()
-                .setCatalog("local")
-                .setSchema("tiny")
-                .setSystemProperty("join_distribution_type", "automatic")
-                .setSystemProperty("join_reordering_strategy", "COST_BASED")
-                .build();
-        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
-        new RuleTester(queryRunner)
-                .assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
                         p.join(
                                 INNER,
@@ -207,15 +207,7 @@ public class TestReorderJoins
     @Test
     public void testReplicatesWhenRequiredBySession()
     {
-        Session session = testSessionBuilder()
-                .setCatalog("local")
-                .setSchema("tiny")
-                .setSystemProperty("join_distribution_type", "replicated")
-                .setSystemProperty("join_reordering_strategy", "COST_BASED")
-                .build();
-        LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
-        new RuleTester(queryRunner)
-                .assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1)))
                 .on(p ->
                         p.join(
                                 INNER,
@@ -224,6 +216,7 @@ public class TestReorderJoins
                                 ImmutableList.of(new JoinNode.EquiJoinClause(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT))),
                                 ImmutableList.of(p.symbol("A1", BIGINT), p.symbol("B1", BIGINT)),
                                 Optional.empty()))
+                .setSystemProperty("join_distribution_type", "REPLICATED")
                 .withStats(ImmutableMap.of(
                         new PlanNodeId("valuesA"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build(),
                         new PlanNodeId("valuesB"), PlanNodeStatsEstimate.builder().setOutputRowCount(new Estimate(10000)).build()))

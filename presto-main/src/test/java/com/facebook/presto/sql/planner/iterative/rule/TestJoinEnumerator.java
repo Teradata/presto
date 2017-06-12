@@ -30,6 +30,8 @@ import com.facebook.presto.testing.LocalQueryRunner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
@@ -47,12 +49,28 @@ import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.airlift.testing.Closeables.closeAllRuntimeException;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertTrue;
 
 public class TestJoinEnumerator
 {
+    private LocalQueryRunner queryRunner;
+
+    @BeforeClass
+    public void setUp()
+    {
+        queryRunner = new LocalQueryRunner(testSessionBuilder().build());
+    }
+
+    @AfterClass(alwaysRun = true)
+    public void tearDown()
+    {
+        closeAllRuntimeException(queryRunner);
+        queryRunner = null;
+    }
+
     @Test
     public void testGeneratePartitions()
     {
@@ -130,8 +148,6 @@ public class TestJoinEnumerator
     @Test
     public void testDoesNotCreateJoinWhenPartitionedOnCrossJoin()
     {
-        Session session = testSessionBuilder().build();
-        LocalQueryRunner queryRunner = new LocalQueryRunner(session);
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
         PlanBuilder planBuilder = new PlanBuilder(idAllocator, queryRunner.getMetadata());
         Symbol a1 = planBuilder.symbol("A1", BIGINT);
