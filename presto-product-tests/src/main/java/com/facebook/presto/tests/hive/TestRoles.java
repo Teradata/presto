@@ -21,6 +21,7 @@ import com.teradata.tempto.ProductTest;
 import com.teradata.tempto.assertions.QueryAssert;
 import com.teradata.tempto.query.QueryExecutor;
 import com.teradata.tempto.query.QueryResult;
+import io.airlift.log.Logger;
 import org.testng.annotations.Test;
 
 import java.util.List;
@@ -29,6 +30,7 @@ import java.util.Set;
 import static com.facebook.presto.tests.TestGroups.AUTHORIZATION;
 import static com.facebook.presto.tests.TestGroups.HIVE_CONNECTOR;
 import static com.facebook.presto.tests.TestGroups.PROFILE_SPECIFIC_TESTS;
+import static com.facebook.presto.tests.TestGroups.QUARANTINE;
 import static com.facebook.presto.tests.TestGroups.ROLES;
 import static com.facebook.presto.tests.utils.QueryExecutors.connectToPresto;
 import static com.facebook.presto.tests.utils.QueryExecutors.onHive;
@@ -41,10 +43,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class TestRoles
         extends ProductTest
 {
+    private static final String ALICE = "alice";
+    private static final String BOB = "bob";
     private static final String ROLE1 = "role1";
     private static final String ROLE2 = "role2";
     private static final String ROLE3 = "role3";
+    private static final String SHORT_TABLE_NAME = "test_table";
+    private static final String SCHEMA_NAME = "default";
+    private static final String TABLE_NAME = format("%s.%s", SCHEMA_NAME, SHORT_TABLE_NAME);
+    private static final String CREATE_TABLE_SQL = format("CREATE TABLE %s (foo BIGINT)", TABLE_NAME);
     private static final Set<String> TEST_ROLES = ImmutableSet.of(ROLE1, ROLE2, ROLE3);
+    private static final Set<String> TEST_USERS = ImmutableSet.of(ALICE, BOB);
 
     @BeforeTestWithContext
     public void setUp()
@@ -69,6 +78,26 @@ public class TestRoles
             if (existentRoles.contains(role)) {
                 onHive().executeQuery(format("DROP ROLE %s", role));
             }
+        }
+
+        try {
+            onPresto().executeQuery(format("REVOKE ALL PRIVILEGES ON %s FROM ROLE PUBLIC", TABLE_NAME));
+
+            for (String user : TEST_USERS) {
+                onPresto().executeQuery(format("REVOKE ALL PRIVILEGES ON %s FROM USER %s", TABLE_NAME, user));
+            }
+        }
+        catch (Exception e) {
+            if (!e.getMessage().contains("does not exist")) {
+                Logger.get(getClass()).warn(e, "failed to revoke privileges");
+            }
+        }
+
+        try {
+            onPresto().executeQuery(format("DROP TABLE IF EXISTS %s", TABLE_NAME));
+        }
+        catch (Exception e) {
+            Logger.get(getClass()).warn(e, "failed to drop table");
         }
     }
 
@@ -221,18 +250,25 @@ public class TestRoles
                         row("role1", "ROLE", "role2", "YES"));
     }
 
-    @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
+    // QUARANTINE due to SWARM-4677
+    @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS, QUARANTINE})
     public void testRevokeRoleFromUser()
             throws Exception
     {
+        onPresto().executeQuery(CREATE_TABLE_SQL);
         onPresto().executeQuery("CREATE ROLE role1");
+        onPresto().executeQuery(format("GRANT select on %s to ROLE role1", TABLE_NAME));
         onPresto().executeQuery("GRANT role1 TO USER alice");
         QueryAssert.assertThat(onPrestoAlice().executeQuery("SELECT * FROM hive.information_schema.applicable_roles"))
                 .containsOnly(
                         row("alice", "USER", "public", "NO"),
                         row("alice", "USER", "role1", "NO"));
-
+        onPrestoAlice().executeQuery("SET ROLE role1");
+        QueryAssert.assertThat(onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).hasNoRows();
         onPresto().executeQuery("REVOKE role1 FROM USER alice");
+        QueryAssert.assertThat(() -> onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).
+                failsWithMessage(format("Access Denied: Cannot set role role1"));
+        onPrestoAlice().executeQuery("SET ROLE public");
         QueryAssert.assertThat(onPrestoAlice().executeQuery("SELECT * FROM hive.information_schema.applicable_roles"))
                 .containsOnly(
                         row("alice", "USER", "public", "NO"));
@@ -544,6 +580,96 @@ public class TestRoles
     }
 
     @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
+    public void testGrantAllRevokeSelect()
+            throws Exception
+    {
+        onPresto().executeQuery("CREATE ROLE role1");
+        onPresto().executeQuery("GRANT role1 TO USER alice");
+        onPresto().executeQuery(CREATE_TABLE_SQL);
+        QueryAssert.assertThat(() -> onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).
+                failsWithMessage(format("Access Denied: Cannot select from table %s", TABLE_NAME));
+        onPresto().executeQuery(format("GRANT ALL PRIVILEGES ON %s TO ROLE role1", TABLE_NAME));
+        QueryAssert.assertThat(onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).hasNoRows();
+        onPresto().executeQuery(format("REVOKE SELECT ON %s FROM ROLE role1", TABLE_NAME));
+        QueryAssert.assertThat(() -> onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).
+                failsWithMessage(format("Access Denied: Cannot select from table %s", TABLE_NAME));
+    }
+
+    @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
+    public void testGrantSelectRevokeAll()
+            throws Exception
+    {
+        onPresto().executeQuery("CREATE ROLE role1");
+        onPresto().executeQuery("GRANT role1 TO USER alice");
+        onPresto().executeQuery(CREATE_TABLE_SQL);
+        onPresto().executeQuery(format("GRANT SELECT ON %s TO ROLE role1", TABLE_NAME));
+        QueryAssert.assertThat(onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).hasNoRows();
+        onPresto().executeQuery(format("REVOKE ALL PRIVILEGES ON %s FROM ROLE role1", TABLE_NAME));
+        QueryAssert.assertThat(() -> onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).
+                failsWithMessage(format("Access Denied: Cannot select from table %s", TABLE_NAME));
+    }
+
+    @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
+    public void testGrantToRoleRevokeFromUser()
+            throws Exception
+    {
+        onPresto().executeQuery("CREATE ROLE role1");
+        onPresto().executeQuery("GRANT role1 TO USER alice");
+        onPresto().executeQuery(CREATE_TABLE_SQL);
+        QueryAssert.assertThat(() -> onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).
+                failsWithMessage(format("Access Denied: Cannot select from table %s", TABLE_NAME));
+        onPresto().executeQuery(format("GRANT SELECT ON %s TO ROLE role1", TABLE_NAME));
+        QueryAssert.assertThat(onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).hasNoRows();
+        onPresto().executeQuery(format("REVOKE SELECT ON %s FROM USER alice", TABLE_NAME));
+        QueryAssert.assertThat(onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).hasNoRows();
+    }
+
+    @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
+    public void testGrantToUserRevokeFromRole()
+            throws Exception
+    {
+        onPresto().executeQuery("CREATE ROLE role1");
+        onPresto().executeQuery("GRANT role1 TO USER alice");
+        onPresto().executeQuery(CREATE_TABLE_SQL);
+        onPresto().executeQuery(format("GRANT SELECT ON %s TO ROLE role1", TABLE_NAME));
+        onPresto().executeQuery(format("GRANT SELECT ON %s TO USER alice", TABLE_NAME));
+        QueryAssert.assertThat(onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).hasNoRows();
+        onPresto().executeQuery(format("REVOKE SELECT ON %s FROM ROLE role1", TABLE_NAME));
+        QueryAssert.assertThat(onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).hasNoRows();
+    }
+
+    @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
+    public void testGrantToPublicRevokeFromUser()
+            throws Exception
+    {
+        onPresto().executeQuery(CREATE_TABLE_SQL);
+        QueryAssert.assertThat(() -> onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).
+                failsWithMessage(format("Access Denied: Cannot select from table %s", TABLE_NAME));
+        onPresto().executeQuery(format("GRANT SELECT ON %s TO ROLE public", TABLE_NAME));
+        QueryAssert.assertThat(onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).hasNoRows();
+        onPresto().executeQuery(format("REVOKE SELECT ON %s FROM USER alice", TABLE_NAME));
+        QueryAssert.assertThat(onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).hasNoRows();
+    }
+
+    @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
+    public void testGrantOption()
+            throws Exception
+    {
+        onPresto().executeQuery(CREATE_TABLE_SQL);
+        onPresto().executeQuery("CREATE ROLE role1");
+        onPresto().executeQuery("GRANT role1 TO USER alice");
+        onPresto().executeQuery(format("GRANT select ON %s TO ROLE role1 WITH GRANT OPTION", TABLE_NAME));
+        QueryAssert.assertThat(onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).hasNoRows();
+        onPrestoAlice().executeQuery(format("GRANT select ON %s TO USER bob WITH GRANT OPTION", TABLE_NAME));
+        QueryAssert.assertThat(onPrestoBob().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).hasNoRows();
+        onPrestoBob().executeQuery(format("REVOKE select ON %s FROM USER alice", TABLE_NAME));
+        onPrestoAlice().executeQuery(format("SELECT * FROM %s", TABLE_NAME));
+        onPrestoBob().executeQuery(format("REVOKE select ON %s FROM USER bob", TABLE_NAME));
+        QueryAssert.assertThat(() -> onPrestoBob().executeQuery(format("SELECT * FROM %s", TABLE_NAME))).
+                failsWithMessage(format("Access Denied: Cannot select from table %s", TABLE_NAME));
+    }
+
+        @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
     public void testShowCurrentRoles()
             throws Exception
     {
@@ -552,8 +678,8 @@ public class TestRoles
                         row("public"));
         onPresto().executeQuery("CREATE ROLE role1");
         onPresto().executeQuery("CREATE ROLE role2");
-        onPresto().executeQuery("GRANT role1 TO alice");
-        onPresto().executeQuery("GRANT role2 TO alice");
+        onPresto().executeQuery("GRANT role1 TO USER alice");
+        onPresto().executeQuery("GRANT role2 TO USER alice");
         QueryAssert.assertThat(onPrestoAlice().executeQuery("SHOW CURRENT ROLES"))
                 .containsOnly(
                         row("public"),
@@ -579,8 +705,8 @@ public class TestRoles
                         row("public"));
         onPresto().executeQuery("CREATE ROLE role1");
         onPresto().executeQuery("CREATE ROLE role2");
-        onPresto().executeQuery("GRANT role1 TO alice");
-        onPresto().executeQuery("GRANT role2 TO role1");
+        onPresto().executeQuery("GRANT role1 TO USER alice");
+        onPresto().executeQuery("GRANT role2 TO ROLE role1");
         QueryAssert.assertThat(onPresto().executeQuery("SHOW ROLE GRANTS"))
                 .containsOnly(
                         row("public"),
@@ -603,35 +729,35 @@ public class TestRoles
     public void testAdminCanDropAnyTable()
             throws Exception
     {
-        onPrestoAlice().executeQuery("CREATE TABLE hive.default.test_table (foo BIGINT)");
-        assertAdminExecute("DROP TABLE hive.default.test_table");
+        onPrestoAlice().executeQuery(CREATE_TABLE_SQL);
+        assertAdminExecute(format("DROP TABLE hive.%s", TABLE_NAME));
     }
 
     @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
     public void testAdminCanRenameAnyTable()
             throws Exception
     {
-        onPrestoAlice().executeQuery("CREATE TABLE hive.default.test_table (foo BIGINT)");
-        assertAdminExecute("ALTER TABLE hive.default.test_table RENAME TO hive.default.test_table_1");
-        onPrestoAlice().executeQuery("DROP TABLE hive.default.test_table_1");
+        onPrestoAlice().executeQuery(CREATE_TABLE_SQL);
+        assertAdminExecute(format("ALTER TABLE hive.%s RENAME TO hive.%s_1", TABLE_NAME, TABLE_NAME));
+        onPrestoAlice().executeQuery(format("DROP TABLE hive.%s_1", TABLE_NAME));
     }
 
     @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
     public void testAdminCanAddColumnToAnyTable()
             throws Exception
     {
-        onPrestoAlice().executeQuery("CREATE TABLE hive.default.test_table (foo BIGINT)");
-        assertAdminExecute("ALTER TABLE hive.default.test_table ADD COLUMN bar DATE");
-        onPrestoAlice().executeQuery("DROP TABLE hive.default.test_table");
+        onPrestoAlice().executeQuery(CREATE_TABLE_SQL);
+        assertAdminExecute(format("ALTER TABLE hive.%s ADD COLUMN bar DATE", TABLE_NAME));
+        onPrestoAlice().executeQuery(format("DROP TABLE hive.%s", TABLE_NAME));
     }
 
     @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
     public void testAdminCanRenameColumnInAnyTable()
             throws Exception
     {
-        onPrestoAlice().executeQuery("CREATE TABLE hive.default.test_table (foo BIGINT)");
-        assertAdminExecute("ALTER TABLE hive.default.test_table RENAME COLUMN foo TO bar");
-        onPrestoAlice().executeQuery("DROP TABLE hive.default.test_table");
+        onPrestoAlice().executeQuery(CREATE_TABLE_SQL);
+        assertAdminExecute(format("ALTER TABLE hive.%s RENAME COLUMN foo TO bar", TABLE_NAME));
+        onPrestoAlice().executeQuery(format("DROP TABLE hive.%s", TABLE_NAME));
     }
 
     @Test(groups = {HIVE_CONNECTOR, ROLES, AUTHORIZATION, PROFILE_SPECIFIC_TESTS})
@@ -644,56 +770,56 @@ public class TestRoles
         onPresto().executeQuery("GRANT role1 TO USER bob");
         onPresto().executeQuery("GRANT role2 TO USER bob");
 
-        onPrestoAlice().executeQuery("CREATE TABLE hive.default.test_table (foo BIGINT)");
-        onPrestoAlice().executeQuery("GRANT SELECT ON hive.default.test_table TO ROLE role1");
-        onPrestoAlice().executeQuery("GRANT INSERT ON hive.default.test_table TO ROLE role2");
+        onPrestoAlice().executeQuery(CREATE_TABLE_SQL);
+        onPrestoAlice().executeQuery(format("GRANT SELECT ON hive.%s TO ROLE role1", TABLE_NAME));
+        onPrestoAlice().executeQuery(format("GRANT INSERT ON hive.%s TO ROLE role2", TABLE_NAME));
 
-        String select = "SELECT * FROM hive.default.test_table";
-        String insert = "INSERT INTO hive.default.test_table (foo) VALUES (1)";
+        String select = format("SELECT * FROM hive.%s", TABLE_NAME);
+        String insert = format("INSERT INTO hive.%s (foo) VALUES (1)", TABLE_NAME);
 
         assertAdminExecute(select);
         assertAdminExecute(insert);
 
         onPrestoBob().executeQuery(select);
         onPrestoBob().executeQuery(insert);
-        QueryAssert.assertThat(onPrestoBob().executeQuery("SHOW GRANTS ON hive.default.test_table"))
+        QueryAssert.assertThat(onPrestoBob().executeQuery(format("SHOW GRANTS ON hive.%s", TABLE_NAME)))
                 .containsOnly(ImmutableList.of(
-                        row("alice", "USER", "role1", "ROLE", "hive", "default", "test_table", "SELECT", "NO", null),
-                        row("alice", "USER", "role2", "ROLE", "hive", "default", "test_table", "INSERT", "NO", null)));
+                        row("alice", "USER", "role1", "ROLE", "hive", SCHEMA_NAME, SHORT_TABLE_NAME, "SELECT", "NO", null),
+                        row("alice", "USER", "role2", "ROLE", "hive", SCHEMA_NAME, SHORT_TABLE_NAME, "INSERT", "NO", null)));
 
         onPrestoBob().executeQuery("SET ROLE ALL");
         onPrestoBob().executeQuery(select);
         onPrestoBob().executeQuery(insert);
-        QueryAssert.assertThat(onPrestoBob().executeQuery("SHOW GRANTS ON hive.default.test_table"))
+        QueryAssert.assertThat(onPrestoBob().executeQuery(format("SHOW GRANTS ON hive.%s", TABLE_NAME)))
                 .containsOnly(ImmutableList.of(
-                        row("alice", "USER", "role1", "ROLE", "hive", "default", "test_table", "SELECT", "NO", null),
-                        row("alice", "USER", "role2", "ROLE", "hive", "default", "test_table", "INSERT", "NO", null)));
+                        row("alice", "USER", "role1", "ROLE", "hive", SCHEMA_NAME, SHORT_TABLE_NAME, "SELECT", "NO", null),
+                        row("alice", "USER", "role2", "ROLE", "hive", SCHEMA_NAME, SHORT_TABLE_NAME, "INSERT", "NO", null)));
 
         onPrestoBob().executeQuery("SET ROLE NONE");
         QueryAssert.assertThat(() -> onPrestoBob().executeQuery(select))
                 .failsWithMessage("Access Denied");
         QueryAssert.assertThat(() -> onPrestoBob().executeQuery(insert))
                 .failsWithMessage("Access Denied");
-        QueryAssert.assertThat(onPrestoBob().executeQuery("SHOW GRANTS ON hive.default.test_table"))
+        QueryAssert.assertThat(onPrestoBob().executeQuery(format("SHOW GRANTS ON hive.%s", TABLE_NAME)))
                 .containsOnly(ImmutableList.of());
 
         onPrestoBob().executeQuery("SET ROLE role1");
         onPrestoBob().executeQuery(select);
         QueryAssert.assertThat(() -> onPrestoBob().executeQuery(insert))
                 .failsWithMessage("Access Denied");
-        QueryAssert.assertThat(onPrestoBob().executeQuery("SHOW GRANTS ON hive.default.test_table"))
+        QueryAssert.assertThat(onPrestoBob().executeQuery(format("SHOW GRANTS ON hive.%s", TABLE_NAME)))
                 .containsOnly(ImmutableList.of(
-                        row("alice", "USER", "role1", "ROLE", "hive", "default", "test_table", "SELECT", "NO", null)));
+                        row("alice", "USER", "role1", "ROLE", "hive", SCHEMA_NAME, SHORT_TABLE_NAME, "SELECT", "NO", null)));
 
         onPrestoBob().executeQuery("SET ROLE role2");
         QueryAssert.assertThat(() -> onPrestoBob().executeQuery(select))
                 .failsWithMessage("Access Denied");
         onPrestoBob().executeQuery(insert);
-        QueryAssert.assertThat(onPrestoBob().executeQuery("SHOW GRANTS ON hive.default.test_table"))
+        QueryAssert.assertThat(onPrestoBob().executeQuery(format("SHOW GRANTS ON hive.%s", TABLE_NAME)))
                 .containsOnly(ImmutableList.of(
-                        row("alice", "USER", "role2", "ROLE", "hive", "default", "test_table", "INSERT", "NO", null)));
+                        row("alice", "USER", "role2", "ROLE", "hive", SCHEMA_NAME, SHORT_TABLE_NAME, "INSERT", "NO", null)));
 
-        onPrestoAlice().executeQuery("DROP TABLE hive.default.test_table");
+        onPrestoAlice().executeQuery(format("DROP TABLE hive.%s", TABLE_NAME));
     }
 
     private static void assertAdminExecute(String query)
