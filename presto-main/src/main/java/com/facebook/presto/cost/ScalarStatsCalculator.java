@@ -15,16 +15,25 @@ package com.facebook.presto.cost;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.metadata.Metadata;
+import com.facebook.presto.metadata.Signature;
+import com.facebook.presto.operator.scalar.ScalarFunctionImplementation;
 import com.facebook.presto.spi.statistics.ColumnStatistics;
 import com.facebook.presto.spi.statistics.Estimate;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spi.type.TypeSignature;
+import com.facebook.presto.sql.analyzer.ExpressionAnalyzer;
+import com.facebook.presto.sql.analyzer.Scope;
+import com.facebook.presto.sql.planner.ExpressionInterpreter;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.tree.AstVisitor;
+import com.facebook.presto.sql.tree.Cast;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Literal;
 import com.facebook.presto.sql.tree.Node;
+import com.facebook.presto.sql.tree.NodeRef;
 import com.facebook.presto.sql.tree.NullLiteral;
 import com.facebook.presto.sql.tree.SymbolReference;
+import com.google.common.collect.ImmutableList;
 
 import javax.inject.Inject;
 
@@ -95,6 +104,38 @@ public class ScalarStatsCalculator
                     .setDistinctValuesCount(Estimate.of(1.0)));
             builder.setNullsFraction(Estimate.zeroValue());
             return builder.build();
+        }
+
+        protected ColumnStatistics visitCast(Cast node, Void context)
+        {
+            // todo - are there cases that lowValue/highValue does not map to lowValue/highValue after cast?
+            // todo - compute ndv more cleverly for cases when cast may flatten domain (e.g. double -> bigint)
+            ColumnStatistics sourceStats = process(node.getExpression());
+            TypeSignature sourceType = getExpressionType(node.getExpression()).getTypeSignature();
+            TypeSignature targetType = TypeSignature.parseTypeSignature(node.getType());
+
+            return ColumnStatistics.builder()
+                    .setNullsFraction(sourceStats.getNullsFraction())
+                    .addRange(rangeStatistics -> rangeStatistics
+                            .setLowValue(sourceStats.getOnlyRangeColumnStatistics().getLowValue().map(value -> castLiteral(value, sourceType, targetType)))
+                            .setHighValue(sourceStats.getOnlyRangeColumnStatistics().getHighValue().map(value -> castLiteral(value, sourceType, targetType)))
+                            .setDistinctValuesCount(sourceStats.getOnlyRangeColumnStatistics().getDistinctValuesCount())
+                            .setFraction(sourceStats.getOnlyRangeColumnStatistics().getFraction()))
+                    .build();
+        }
+
+        private Object castLiteral(Object value, TypeSignature sourceType, TypeSignature targetType)
+        {
+            Signature signature = metadata.getFunctionRegistry().getCoercion(sourceType, targetType);
+            ScalarFunctionImplementation castFunction = metadata.getFunctionRegistry().getScalarFunctionImplementation(signature);
+            return ExpressionInterpreter.invoke(session.toConnectorSession(), castFunction, ImmutableList.of(value));
+        }
+
+        private Type getExpressionType(Expression expression)
+        {
+            ExpressionAnalyzer expressionAnalyzer = ExpressionAnalyzer.createWithoutSubqueries(metadata.getFunctionRegistry(), metadata.getTypeManager(), session, types);
+            expressionAnalyzer.analyze(expression, Scope.create());
+            return expressionAnalyzer.getExpressionTypes().get(NodeRef.of(expression));
         }
     }
 }
