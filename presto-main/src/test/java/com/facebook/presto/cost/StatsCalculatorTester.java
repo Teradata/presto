@@ -45,11 +45,7 @@ public class StatsCalculatorTester
 
     private static LocalQueryRunner createQueryRunner()
     {
-        Session session = testSessionBuilder()
-                .setCatalog("local")
-                .setSchema("tiny")
-                .setSystemProperty("task_concurrency", "1") // these tests don't handle exchanges from local parallel
-                .build();
+        Session session = testSessionBuilder().build();
 
         LocalQueryRunner queryRunner = new LocalQueryRunner(session);
         queryRunner.createCatalog(session.getCatalog().get(),
