@@ -413,6 +413,17 @@ public class PlanBuilder
         return outputBuilder.build();
     }
 
+    public OutputNode output(PlanNode source, List<String> columnNames, List<Symbol> symbols)
+    {
+        checkArgument(columnNames.size() == symbols.size(), "columnNames and outputs size do not match");
+        OutputBuilder outputBuilder = new OutputBuilder();
+        outputBuilder.source(source);
+        for (int columnIndex = 0; columnIndex < columnNames.size(); ++columnIndex) {
+            outputBuilder.column(symbols.get(columnIndex), columnNames.get(columnIndex));
+        }
+        return outputBuilder.build();
+    }
+
     public class OutputBuilder
     {
         private PlanNode source;
@@ -441,17 +452,6 @@ public class PlanBuilder
         {
             return new OutputNode(idAllocator.getNextId(), source, columnNames, outputs);
         }
-    }
-
-    public OutputNode output(PlanNode source, List<String> columnNames, List<Symbol> symbols)
-    {
-        checkArgument(columnNames.size() == symbols.size(), "columnNames and outputs size do not match");
-        OutputBuilder outputBuilder = new OutputBuilder();
-        outputBuilder.source(source);
-        for (int columnIndex = 0; columnIndex < columnNames.size(); ++columnIndex) {
-            outputBuilder.column(symbols.get(columnIndex), columnNames.get(columnIndex));
-        }
-        return outputBuilder.build();
     }
 
     public static Expression expression(String sql)
