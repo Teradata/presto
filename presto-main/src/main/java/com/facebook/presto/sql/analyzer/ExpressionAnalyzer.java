@@ -1553,4 +1553,22 @@ public class ExpressionAnalyzer
             throw new SemanticException(errorCode, node, message);
         }, session, ImmutableMap.of(), parameters, isDescribe);
     }
+
+    public static ExpressionAnalyzer createWithoutSubqueries(
+            FunctionRegistry functionRegistry,
+            TypeManager typeManager,
+            Session session,
+            Map<Symbol, Type> symbolTypes)
+    {
+        return new ExpressionAnalyzer(
+                functionRegistry,
+                typeManager,
+                node -> {
+                    throw new UnsupportedOperationException("statement analyzer not supported");
+                },
+                session,
+                symbolTypes,
+                ImmutableList.of(),
+                false);
+    }
 }

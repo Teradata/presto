@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -168,6 +169,13 @@ public class PlanNodeStatsEstimate
         {
             this.symbolStatistics = new HashMap<>(symbolStatistics);
             return this;
+        }
+
+        public Builder addSymbolStatistics(Symbol symbol, Consumer<ColumnStatistics.Builder> statisticsBuilderConsumer)
+        {
+            ColumnStatistics.Builder statisticsBuilder = ColumnStatistics.builder();
+            statisticsBuilderConsumer.accept(statisticsBuilder);
+            return addSymbolStatistics(symbol, statisticsBuilder.build());
         }
 
         public Builder addSymbolStatistics(Symbol symbol, ColumnStatistics statistics)

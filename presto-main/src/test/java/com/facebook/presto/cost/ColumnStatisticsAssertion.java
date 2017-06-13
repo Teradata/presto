@@ -91,4 +91,17 @@ public class ColumnStatisticsAssertion
                 "expected unknown distinctValuesCount but got " + statistics.getOnlyRangeColumnStatistics().getDistinctValuesCount().getValue());
         return this;
     }
+
+    public ColumnStatisticsAssertion dataSize(double expected)
+    {
+        assertEquals(statistics.getOnlyRangeColumnStatistics().getDataSize().getValue(), expected, "dataSize mismatch");
+        return this;
+    }
+
+    public ColumnStatisticsAssertion dataSizeUnknown()
+    {
+        assertTrue(statistics.getOnlyRangeColumnStatistics().getDataSize().isValueUnknown(),
+                "expected unknown dataSize but got " + statistics.getOnlyRangeColumnStatistics().getDataSize().getValue());
+        return this;
+    }
 }
