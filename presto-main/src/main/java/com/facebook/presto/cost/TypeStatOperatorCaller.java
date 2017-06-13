@@ -24,9 +24,11 @@ import com.facebook.presto.spi.type.VarcharType;
 import com.facebook.presto.sql.planner.ExpressionInterpreter;
 import com.facebook.presto.sql.tree.ComparisonExpressionType;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Ordering;
 import io.airlift.slice.Slice;
 
 import static com.facebook.presto.spi.function.OperatorType.BETWEEN;
+import static com.google.common.base.Preconditions.checkNotNull;
 import static java.util.Collections.singletonList;
 
 /**
@@ -74,5 +76,22 @@ public class TypeStatOperatorCaller
             return (double) (long) object;
         }
         return (double) object; //fixme
+    }
+
+    public Ordering<Object> getOrdering()
+    {
+        return Ordering.from((o1, o2) -> {
+            checkNotNull(o1 != null, "nulls not supported");
+            checkNotNull(o2 != null, "nulls not supported");
+            if (callComparisonOperator(ComparisonExpressionType.LESS_THAN, o1, o2)) {
+                return -1;
+            }
+            else if (callComparisonOperator(ComparisonExpressionType.EQUAL, o1, o2)) {
+                return 0;
+            }
+            else {
+                return 1;
+            }
+        });
     }
 }
