@@ -14,18 +14,35 @@
 package com.facebook.presto.cost;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.ValuesNode;
+import com.google.common.collect.ImmutableList;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.stream.DoubleStream;
+
+import static com.facebook.presto.sql.planner.ExpressionInterpreter.evaluateConstantExpression;
+import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.stream.Collectors.toList;
 
 public class ValuesStatsRule
         implements ComposableStatsCalculator.Rule
 {
+    private final Metadata metadata;
+
+    public ValuesStatsRule(Metadata metadata)
+    {
+        this.metadata = metadata;
+    }
+
     @Override
     public Optional<PlanNodeStatsEstimate> calculate(PlanNode node, Lookup lookup, Session session, Map<Symbol, Type> types)
     {
@@ -34,9 +51,61 @@ public class ValuesStatsRule
         }
         ValuesNode valuesNode = (ValuesNode) node;
 
-        // TODO symbol stats
-        return Optional.of(PlanNodeStatsEstimate.builder()
-                .setOutputRowCount(valuesNode.getRows().size())
-                .build());
+        PlanNodeStatsEstimate.Builder statsBuilder = PlanNodeStatsEstimate.builder();
+        statsBuilder.setOutputRowCount(valuesNode.getRows().size());
+
+        for (int symbolId = 0; symbolId < valuesNode.getOutputSymbols().size(); ++symbolId) {
+            Symbol symbol = valuesNode.getOutputSymbols().get(symbolId);
+            List<Object> symbolValues = getSymbolValues(valuesNode, symbolId, session, types.get(symbol));
+            statsBuilder.addSymbolStatistics(symbol, buildSymbolStatistics(symbolValues, session, types.get(symbol)));
+        }
+
+        return Optional.of(statsBuilder.build());
+    }
+
+    private List<Object> getSymbolValues(ValuesNode valuesNode, int symbolId, Session session, Type symbolType)
+    {
+        return valuesNode.getRows().stream()
+                .map(row -> row.get(symbolId))
+                .map(expression -> evaluateConstantExpression(expression, symbolType, metadata, session, ImmutableList.of()))
+                .collect(toList());
+    }
+
+    private SymbolStatsEstimate buildSymbolStatistics(List<Object> values, Session session, Type type)
+    {
+        TypeStatOperatorCaller operatorCaller = new TypeStatOperatorCaller(type, metadata.getFunctionRegistry(), session.toConnectorSession());
+
+        List<Object> nonNullValues = values.stream()
+                .filter(Objects::nonNull)
+                .collect(toImmutableList());
+
+        if (nonNullValues.isEmpty()) {
+            return SymbolStatsEstimate.builder()
+                    .setLowValue(Double.NaN)
+                    .setHighValue(Double.NaN)
+                    .setNullsFraction(1.0)
+                    .setDistinctValuesCount(0.0)
+                    .build();
+        }
+        else {
+            double[] valuesAsDoubles = nonNullValues.stream()
+                    .map(operatorCaller::translateToDouble)
+                    .filter(OptionalDouble::isPresent)
+                    .mapToDouble(OptionalDouble::getAsDouble)
+                    .toArray();
+
+            double lowValue = DoubleStream.of(valuesAsDoubles).min().orElse(Double.NEGATIVE_INFINITY);
+            double highValue = DoubleStream.of(valuesAsDoubles).max().orElse(Double.POSITIVE_INFINITY);
+            double valuesCount = values.size();
+            double nonNullValuesCount = nonNullValues.size();
+            long distinctValuesCount = nonNullValues.stream().distinct().count();
+
+            return SymbolStatsEstimate.builder()
+                    .setNullsFraction((valuesCount - nonNullValuesCount) / valuesCount)
+                    .setLowValue(lowValue)
+                    .setHighValue(highValue)
+                    .setDistinctValuesCount(distinctValuesCount)
+                    .build();
+        }
     }
 }

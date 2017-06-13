@@ -478,7 +478,7 @@ public class ServerMainModule
         ImmutableList.Builder<ComposableStatsCalculator.Rule> rules = ImmutableList.builder();
         rules.add(new OutputStatsRule());
         rules.add(new TableScanStatsRule(metadata));
-        rules.add(new ValuesStatsRule());
+        rules.add(new ValuesStatsRule(metadata));
         rules.add(new LimitStatsRule());
         rules.add(new EnforceSingleRowStatsRule());
         rules.add(new ExchangeStatsRule());
