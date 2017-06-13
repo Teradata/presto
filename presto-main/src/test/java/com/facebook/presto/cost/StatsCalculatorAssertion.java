@@ -63,19 +63,15 @@ public class StatsCalculatorAssertion
     public StatsCalculatorAssertion withSourceStats(Consumer<PlanNodeStatsEstimate.Builder> sourceStatsBuilderConsumer)
     {
         checkPlanNodeSet();
-        for (int sourceId = 0; sourceId < planNode.getSources().size(); ++sourceId) {
-            return withSourceStats(sourceId, sourceStatsBuilderConsumer);
-        }
-        return this;
+        checkState(planNode.getSources().size() == 1, "expected single source");
+        return withSourceStats(0, sourceStatsBuilderConsumer);
     }
 
     public StatsCalculatorAssertion withSourceStats(PlanNodeStatsEstimate sourceStats)
     {
         checkPlanNodeSet();
-        for (int sourceId = 0; sourceId < planNode.getSources().size(); ++sourceId) {
-            return withSourceStats(sourceId, sourceStats);
-        }
-        return this;
+        checkState(planNode.getSources().size() == 1, "expected single source");
+        return withSourceStats(0, sourceStats);
     }
 
     public StatsCalculatorAssertion withSourceStats(int sourceIndex, Consumer<PlanNodeStatsEstimate.Builder> sourceStatsBuilderConsumer)
