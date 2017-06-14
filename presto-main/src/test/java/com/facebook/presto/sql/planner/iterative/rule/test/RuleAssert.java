@@ -15,6 +15,7 @@ package com.facebook.presto.sql.planner.iterative.rule.test;
 
 import com.facebook.presto.Session;
 import com.facebook.presto.cost.CostCalculator;
+import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.security.AccessControl;
@@ -28,10 +29,14 @@ import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.iterative.Memo;
 import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.facebook.presto.sql.planner.plan.PlanNodeId;
 import com.facebook.presto.sql.planner.planPrinter.PlanPrinter;
+import com.facebook.presto.testing.TestingLookup;
 import com.facebook.presto.transaction.TransactionManager;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -39,25 +44,35 @@ import java.util.function.Function;
 import static com.facebook.presto.sql.planner.assertions.PlanAssert.assertPlan;
 import static com.facebook.presto.transaction.TransactionBuilder.transaction;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static java.util.Objects.requireNonNull;
 import static org.testng.Assert.fail;
 
 public class RuleAssert
 {
     private final Metadata metadata;
+    private final StatsCalculator statsCalculator;
+    private final CostCalculator costCalculator;
     private Session session;
     private final Rule rule;
 
     private final PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
 
     private Map<Symbol, Type> symbols;
+    private TestingLookup lookup;
     private PlanNode plan;
     private final TransactionManager transactionManager;
     private final AccessControl accessControl;
-    private final StatsCalculator statsCalculator;
-    private final CostCalculator costCalculator;
 
-    public RuleAssert(Metadata metadata, Session session, Rule rule, TransactionManager transactionManager, AccessControl accessControl, StatsCalculator statsCalculator, CostCalculator costCalculator)
+    public RuleAssert(
+            Metadata metadata,
+            Session session,
+            Rule rule,
+            TransactionManager transactionManager,
+            AccessControl accessControl,
+            StatsCalculator statsCalculator,
+            CostCalculator costCalculator)
     {
         this.metadata = metadata;
         this.session = session;
@@ -88,7 +103,39 @@ public class RuleAssert
         PlanBuilder builder = new PlanBuilder(idAllocator, metadata);
         plan = planProvider.apply(builder);
         symbols = builder.getSymbols();
+        Memo memo = new Memo(idAllocator, plan);
+        lookup = new TestingLookup(statsCalculator, costCalculator, memo::resolve);
         return this;
+    }
+
+    public RuleAssert withStats(Map<PlanNodeId, PlanNodeStatsEstimate> stats)
+    {
+        checkState(lookup != null, "lookup has not yet been initialized");
+        Map<PlanNodeId, PlanNode> planNodeMap = buildPlanNodeMap();
+        lookup = lookup.withStats(
+                stats.entrySet()
+                        .stream()
+                        .collect(toImmutableMap(
+                                entry -> {
+                                    checkState(planNodeMap.containsKey(entry.getKey()), "planNodeMap does not contain key");
+                                    return planNodeMap.get(entry.getKey());
+                                },
+                                Map.Entry::getValue)));
+        return this;
+    }
+
+    private Map<PlanNodeId, PlanNode> buildPlanNodeMap()
+    {
+        return ImmutableMap.copyOf(buildPlanNodeMap(plan, new HashMap<>()));
+    }
+
+    private Map<PlanNodeId, PlanNode> buildPlanNodeMap(PlanNode planNode, Map<PlanNodeId, PlanNode> planNodeMap)
+    {
+        for (PlanNode source : planNode.getSources()) {
+            buildPlanNodeMap(source, planNodeMap);
+        }
+        planNodeMap.put(planNode.getId(), planNode);
+        return planNodeMap;
     }
 
     public void doesNotFire()
@@ -144,7 +191,6 @@ public class RuleAssert
     {
         SymbolAllocator symbolAllocator = new SymbolAllocator(symbols);
         Memo memo = new Memo(idAllocator, plan);
-        Lookup lookup = Lookup.from(memo::resolve, statsCalculator, costCalculator);
         Optional<PlanNode> result = inTransaction(session -> rule.apply(memo.getNode(memo.getRootGroup()), lookup, idAllocator, symbolAllocator, session));
 
         return new RuleApplication(lookup, symbolAllocator.getTypes(), result);
