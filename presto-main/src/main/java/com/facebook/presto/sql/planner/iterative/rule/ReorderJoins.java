@@ -250,7 +250,7 @@ public class ReorderJoins
 
             Set<Symbol> requiredJoinSymbols = ImmutableSet.<Symbol>builder()
                     .addAll(outputSymbols)
-                    .addAll(DependencyExtractor.extractUnique(joinFilters))
+                    .addAll(DependencyExtractor.extractUnique(joinPredicates))
                     .build();
             PlanNode left = getJoinSource(
                     idAllocator,
