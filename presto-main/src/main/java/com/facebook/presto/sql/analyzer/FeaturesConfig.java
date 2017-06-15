@@ -27,8 +27,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
+import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinDistributionType.REPARTITIONED;
+import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
 import static com.facebook.presto.sql.analyzer.RegexLibrary.JONI;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.MINUTES;
 
 @DefunctConfig({
@@ -42,11 +45,28 @@ public class FeaturesConfig
     private double cpuCostWeight = 0.75;
     private double memoryCostWeight = 0;
     private double networkCostWeight = 0.25;
+
+    public enum JoinDistributionType
+    {
+        AUTOMATIC,
+        REPLICATED,
+        REPARTITIONED;
+
+        public boolean canRepartition()
+        {
+            return this == REPARTITIONED || this == AUTOMATIC;
+        }
+
+        public boolean canReplicate()
+        {
+            return this == REPLICATED || this == AUTOMATIC;
+        }
+    }
+
     private boolean distributedIndexJoinsEnabled;
-    private boolean distributedJoinsEnabled = true;
     private boolean colocatedJoinsEnabled;
     private boolean fastInequalityJoins = true;
-    private boolean reorderJoins = true;
+    private JoinReorderingStrategy joinReorderingStrategy = ELIMINATE_CROSS_JOINS;
     private boolean redistributeWrites = true;
     private boolean optimizeMetadataQueries;
     private boolean optimizeHashGeneration = true;
@@ -58,6 +78,7 @@ public class FeaturesConfig
     private boolean legacyOrderBy;
     private boolean legacyMapSubscript;
     private boolean optimizeMixedDistinctAggregations;
+    private JoinDistributionType joinDistributionType = REPARTITIONED;
 
     private boolean dictionaryAggregation;
     private boolean resourceGroups;
@@ -74,6 +95,13 @@ public class FeaturesConfig
     private boolean pushAggregationThroughJoin = true;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
+
+    public enum JoinReorderingStrategy
+    {
+        ELIMINATE_CROSS_JOINS,
+        COST_BASED,
+        NONE
+    }
 
     public double getCpuCostWeight()
     {
@@ -135,11 +163,6 @@ public class FeaturesConfig
         return this;
     }
 
-    public boolean isDistributedJoinsEnabled()
-    {
-        return distributedJoinsEnabled;
-    }
-
     @Config("deprecated.legacy-array-agg")
     public FeaturesConfig setLegacyArrayAgg(boolean legacyArrayAgg)
     {
@@ -176,13 +199,6 @@ public class FeaturesConfig
         return legacyMapSubscript;
     }
 
-    @Config("distributed-joins-enabled")
-    public FeaturesConfig setDistributedJoinsEnabled(boolean distributedJoinsEnabled)
-    {
-        this.distributedJoinsEnabled = distributedJoinsEnabled;
-        return this;
-    }
-
     public boolean isColocatedJoinsEnabled()
     {
         return colocatedJoinsEnabled;
@@ -209,16 +225,16 @@ public class FeaturesConfig
         return fastInequalityJoins;
     }
 
-    public boolean isJoinReorderingEnabled()
+    public JoinReorderingStrategy getJoinReorderingStrategy()
     {
-        return reorderJoins;
+        return joinReorderingStrategy;
     }
 
-    @Config("reorder-joins")
-    @ConfigDescription("Experimental: Reorder joins to optimize plan")
-    public FeaturesConfig setJoinReorderingEnabled(boolean reorderJoins)
+    @Config("join-reordering-strategy")
+    @ConfigDescription("The strategy to use for reordering joins")
+    public FeaturesConfig setJoinReorderingStrategy(JoinReorderingStrategy joinReorderingStrategy)
     {
-        this.reorderJoins = reorderJoins;
+        this.joinReorderingStrategy = joinReorderingStrategy;
         return this;
     }
 
@@ -463,5 +479,17 @@ public class FeaturesConfig
     {
         this.pushAggregationThroughJoin = value;
         return this;
+    }
+
+    @Config("join-distribution-type")
+    public FeaturesConfig setJoinDistributionType(JoinDistributionType joinDistributionType)
+    {
+        this.joinDistributionType = requireNonNull(joinDistributionType, "joinDistributionType is null");
+        return this;
+    }
+
+    public JoinDistributionType getJoinDistributionType()
+    {
+        return joinDistributionType;
     }
 }

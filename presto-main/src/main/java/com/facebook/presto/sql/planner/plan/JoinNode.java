@@ -14,6 +14,8 @@
 package com.facebook.presto.sql.planner.plan;
 
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.tree.ComparisonExpression;
+import com.facebook.presto.sql.tree.ComparisonExpressionType;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Join;
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -26,10 +28,14 @@ import javax.annotation.concurrent.Immutable;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.facebook.presto.sql.planner.SortExpressionExtractor.extractSortExpression;
+import static com.facebook.presto.sql.planner.plan.JoinNode.Type.FULL;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
+import static com.facebook.presto.sql.planner.plan.JoinNode.Type.LEFT;
+import static com.facebook.presto.sql.planner.plan.JoinNode.Type.RIGHT;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
@@ -93,6 +99,58 @@ public class JoinNode
                 .build();
         checkArgument(inputSymbols.containsAll(outputSymbols), "Left and right join inputs do not contain all output symbols");
         checkArgument(!isCrossJoin() || inputSymbols.equals(outputSymbols), "Cross join does not support output symbols pruning or reordering");
+    }
+
+    public JoinNode flipChildren()
+    {
+        return new JoinNode(
+                getId(),
+                flipType(type),
+                right,
+                left,
+                flipJoinCriteria(criteria),
+                flipOutputSymbols(getOutputSymbols(), left, right),
+                filter,
+                rightHashSymbol,
+                leftHashSymbol,
+                distributionType);
+    }
+
+    private static Type flipType(Type type)
+    {
+        switch (type) {
+            case INNER:
+                return INNER;
+            case FULL:
+                return FULL;
+            case LEFT:
+                return RIGHT;
+            case RIGHT:
+                return LEFT;
+            default:
+                throw new IllegalStateException("No inverse defined for join type: " + type);
+        }
+    }
+
+    private static List<EquiJoinClause> flipJoinCriteria(List<EquiJoinClause> joinCriteria)
+    {
+        return joinCriteria.stream()
+                .map(EquiJoinClause::flip)
+                .collect(toImmutableList());
+    }
+
+    private static List<Symbol> flipOutputSymbols(List<Symbol> outputSymbols, PlanNode left, PlanNode right)
+    {
+        List<Symbol> leftSymbols = outputSymbols.stream()
+                .filter(symbol -> left.getOutputSymbols().contains(symbol))
+                .collect(Collectors.toList());
+        List<Symbol> rightSymbols = outputSymbols.stream()
+                .filter(symbol -> right.getOutputSymbols().contains(symbol))
+                .collect(Collectors.toList());
+        return ImmutableList.<Symbol>builder()
+                .addAll(rightSymbols)
+                .addAll(leftSymbols)
+                .build();
     }
 
     public enum DistributionType
@@ -225,6 +283,11 @@ public class JoinNode
         return new JoinNode(getId(), type, newLeft, newRight, criteria, newOutputSymbols, filter, leftHashSymbol, rightHashSymbol, distributionType);
     }
 
+    public JoinNode withDistributionType(DistributionType distributionType)
+    {
+        return new JoinNode(getId(), type, left, right, criteria, outputSymbols, filter, leftHashSymbol, rightHashSymbol, Optional.of(distributionType));
+    }
+
     public boolean isCrossJoin()
     {
         return criteria.isEmpty() && !filter.isPresent() && type == INNER;
@@ -252,6 +315,16 @@ public class JoinNode
         public Symbol getRight()
         {
             return right;
+        }
+
+        public ComparisonExpression toExpression()
+        {
+            return new ComparisonExpression(ComparisonExpressionType.EQUAL, left.toSymbolReference(), right.toSymbolReference());
+        }
+
+        public EquiJoinClause flip()
+        {
+            return new EquiJoinClause(right, left);
         }
 
         @Override

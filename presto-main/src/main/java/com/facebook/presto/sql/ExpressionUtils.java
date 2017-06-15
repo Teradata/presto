@@ -26,7 +26,6 @@ import com.facebook.presto.sql.tree.LambdaExpression;
 import com.facebook.presto.sql.tree.LogicalBinaryExpression;
 import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.SymbolReference;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
@@ -103,7 +102,10 @@ public final class ExpressionUtils
     {
         requireNonNull(type, "type is null");
         requireNonNull(expressions, "expressions is null");
-        Preconditions.checkArgument(!expressions.isEmpty(), "expressions is empty");
+
+        if (expressions.isEmpty()) {
+            return TRUE_LITERAL;
+        }
 
         // Build balanced tree for efficient recursive processing that
         // preserves the evaluation order of the input expressions.
@@ -309,7 +311,8 @@ public final class ExpressionUtils
 
     public static Expression rewriteIdentifiersToSymbolReferences(Expression expression)
     {
-        return ExpressionTreeRewriter.rewriteWith(new ExpressionRewriter<Void>() {
+        return ExpressionTreeRewriter.rewriteWith(new ExpressionRewriter<Void>()
+        {
             @Override
             public Expression rewriteIdentifier(Identifier node, Void context, ExpressionTreeRewriter<Void> treeRewriter)
             {
