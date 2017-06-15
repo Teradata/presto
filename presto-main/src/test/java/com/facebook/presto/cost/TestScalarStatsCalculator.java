@@ -16,6 +16,7 @@ package com.facebook.presto.cost;
 import com.facebook.presto.Session;
 import com.facebook.presto.metadata.MetadataManager;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.tree.DecimalLiteral;
 import com.facebook.presto.sql.tree.DoubleLiteral;
@@ -36,6 +37,7 @@ public class TestScalarStatsCalculator
 {
     private ScalarStatsCalculator calculator;
     private Session session;
+    private final SqlParser sqlParser = new SqlParser();
 
     @BeforeMethod
     public void setUp()
@@ -86,5 +88,44 @@ public class TestScalarStatsCalculator
                 .lowValueUnknown()
                 .highValueUnknown()
                 .nullsFraction(1.0);
+    }
+
+    @Test
+    public void testArythmeticBinaryExpression()
+    {
+        assertCalculate(expression("1 + 2"))
+                .distinctValuesCount(1.0)
+                .lowValue(3)
+                .highValue(3)
+                .nullsFraction(0.0);
+
+        assertCalculate(expression("1 - 2"))
+                .distinctValuesCount(1.0)
+                .lowValue(-1)
+                .highValue(-1)
+                .nullsFraction(0.0);
+
+        assertCalculate(expression("1 * 2"))
+                .distinctValuesCount(1.0)
+                .lowValue(2)
+                .highValue(2)
+                .nullsFraction(0.0);
+
+        assertCalculate(expression("1 / 2"))
+                .distinctValuesCount(1.0)
+                .lowValue(0)
+                .highValue(0)
+                .nullsFraction(0.0);
+    }
+
+    @Test(expectedExceptions = IllegalStateException.class)
+    public void testArythmeticBinaryModulusExpression()
+    {
+        assertCalculate(expression("1 % 2"));
+    }
+
+    private Expression expression(String sqlExpression)
+    {
+        return sqlParser.createExpression(sqlExpression);
     }
 }

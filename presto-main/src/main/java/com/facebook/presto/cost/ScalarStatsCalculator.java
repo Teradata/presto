@@ -17,6 +17,7 @@ import com.facebook.presto.Session;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.tree.ArithmeticBinaryExpression;
 import com.facebook.presto.sql.tree.AstVisitor;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Literal;
@@ -29,6 +30,9 @@ import javax.inject.Inject;
 import java.util.Map;
 
 import static com.facebook.presto.sql.planner.LiteralInterpreter.evaluate;
+import static com.google.common.base.Preconditions.checkArgument;
+import static java.lang.Math.max;
+import static java.lang.Math.min;
 import static java.util.Objects.requireNonNull;
 
 public class ScalarStatsCalculator
@@ -69,7 +73,8 @@ public class ScalarStatsCalculator
         @Override
         protected SymbolStatsEstimate visitSymbolReference(SymbolReference node, Void context)
         {
-            return input.getSymbolStatistics().getOrDefault(Symbol.from(node), SymbolStatsEstimate.UNKNOWN_STATS);
+            return input.getSymbolStatistics()
+                    .getOrDefault(Symbol.from(node), SymbolStatsEstimate.UNKNOWN_STATS);
         }
 
         @Override
@@ -90,6 +95,63 @@ public class ScalarStatsCalculator
                     .setNullsFraction(0)
                     .setDistinctValuesCount(1)
                     .build();
+        }
+
+        @Override
+        protected SymbolStatsEstimate visitArithmeticBinary(ArithmeticBinaryExpression node, Void context)
+        {
+            requireNonNull(node, "node is null");
+            checkArgument(node.getType() != ArithmeticBinaryExpression.Type.MODULUS, "Modulus operator not yet supported");
+            SymbolStatsEstimate left = process(node.getLeft());
+            SymbolStatsEstimate right = process(node.getRight());
+
+            SymbolStatsEstimate.Builder result = SymbolStatsEstimate.builder()
+                    .setDataSize(Math.max(left.getDataSize(), right.getDataSize()))
+                    .setNullsFraction(left.getNullsFraction() + right.getNullsFraction())
+                    .setDistinctValuesCount(left.getDistinctValuesCount() * right.getDistinctValuesCount());
+
+            double leftLow = left.getLowValue();
+            double leftHigh = left.getHighValue();
+            double rightLow = right.getLowValue();
+            double rightHigh = right.getHighValue();
+            if (isInfinity(leftLow) || isInfinity(leftHigh) || isInfinity(rightLow) || isInfinity(rightHigh)) {
+                result.setLowValue(Double.MIN_VALUE)
+                        .setHighValue(Double.MAX_VALUE);
+            }
+            else {
+                double v1 = operate(node.getType(), leftLow, rightLow);
+                double v2 = operate(node.getType(), leftLow, rightHigh);
+                double v3 = operate(node.getType(), leftHigh, rightLow);
+                double v4 = operate(node.getType(), leftHigh, rightHigh);
+
+                result.setLowValue(min(v1, min(v2, min(v3, v4))))
+                        .setHighValue(max(v1, max(v2, max(v3, v4))));
+            }
+
+            return result.build();
+        }
+
+        private boolean isInfinity(double value)
+        {
+            return value == Double.MIN_VALUE || value == Double.MAX_VALUE;
+        }
+
+        private double operate(ArithmeticBinaryExpression.Type type, double left, double right)
+        {
+            switch (type) {
+                case ADD:
+                    return left + right;
+                case SUBTRACT:
+                    return left - right;
+                case MULTIPLY:
+                    return left * right;
+                case DIVIDE:
+                    return left / right;
+                case MODULUS:
+                    return left % right;
+                default:
+                    throw new IllegalStateException("Unsupported ArithmeticBinaryExpression.Type: " + type);
+            }
         }
     }
 }
