@@ -36,6 +36,10 @@ import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.util.Objects.requireNonNull;
 
+/**
+ * All the formulas here comes from the statistic estimation document
+ * https://docs.google.com/document/d/1UgJepe9Ar5Aa1qXEmSOPJSNuO1a1hDV1mT7gvZPod04/edit#
+ */
 public class ScalarStatsCalculator
 {
     private final Metadata metadata;
