@@ -124,6 +124,33 @@ public class TestScalarStatsCalculator
         assertCalculate(expression("1 % 2"));
     }
 
+    @Test
+    public void testCoalesceExpression()
+    {
+        assertCalculate(expression("coalesce(1, 2"))
+                .distinctValuesCount(1.0)
+                .lowValue(1)
+                .highValue(1)
+                .nullsFraction(0.0);
+
+        assertCalculate(expression("coalesce(null, 2"))
+                .distinctValuesCount(1.0)
+                .lowValue(2)
+                .highValue(2)
+                .nullsFraction(0.0);
+        assertCalculate(expression("coalesce(1, null"))
+                .distinctValuesCount(1.0)
+                .lowValue(1)
+                .highValue(1)
+                .nullsFraction(0.0);
+
+        assertCalculate(expression("coalesce(null, null"))
+                .distinctValuesCount(1.0)
+                .lowValueUnknown()
+                .highValueUnknown()
+                .nullsFraction(1.0);
+    }
+
     private Expression expression(String sqlExpression)
     {
         return sqlParser.createExpression(sqlExpression);
