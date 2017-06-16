@@ -32,9 +32,7 @@ public class SymbolStatsEstimate
 
     public SymbolStatsEstimate(double lowValue, double highValue, double nullsFraction, double dataSize, double distinctValuesCount)
     {
-        checkArgument(!isNaN(lowValue), "NaN is not valid lowValue");
-        checkArgument(!isNaN(highValue), "NaN is not valid lowValue");
-        checkArgument(lowValue <= highValue, "lowValue must be less than or equal highValue");
+        checkArgument(lowValue <= highValue || (isNaN(lowValue) && isNaN(highValue)), "lowValue must be less than or equal highValue");
         this.lowValue = lowValue;
         this.highValue = highValue;
         this.nullsFraction = nullsFraction;
