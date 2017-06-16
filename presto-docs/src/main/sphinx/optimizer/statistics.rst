@@ -34,14 +34,14 @@ Currently, the following statistics are available in Presto:
  * For each column in a table:
 
    * **data size**: the data size that needs to be read
-   * **null count**: the number of null values
-   * **distinct value count**: the estimated number of distinct values
+   * **nulls fraction**: the fraction of null values
+   * **distinct value count**: the number of distinct values
    * **low value**: the smallest value in the column
    * **high value**: the largest value in the column
 
 
 The set of statistics available for a particular query depends on the connector being used and can also vary by table or
-even table layout. For example, the Hive connector does not currently provide statistics on data size.
+even by table layout. For example, the Hive connector does not currently provide statistics on data size.
 
 Displaying Table Statistics
 ---------------------------
