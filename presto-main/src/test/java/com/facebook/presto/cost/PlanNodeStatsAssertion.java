@@ -88,8 +88,8 @@ public class PlanNodeStatsAssertion
     {
         assertEquals(actual.getNullsFraction(), expected.getNullsFraction(), "nullsFraction mismatch for " + symbol.getName());
         assertEquals(actual.getLowValue(), expected.getLowValue(), "lowValue mismatch for " + symbol.getName());
-        assertEquals(actual.getHighValue(), expected.getHighValue(), "lowValue mismatch for " + symbol.getName());
-        assertEquals(actual.getDistinctValuesCount(), expected.getDistinctValuesCount(), "lowValue mismatch for " + symbol.getName());
-        assertEquals(actual.getDataSize(), expected.getDataSize(), "datasize mismatch for " + symbol.getName());
+        assertEquals(actual.getHighValue(), expected.getHighValue(), "highValue mismatch for " + symbol.getName());
+        assertEquals(actual.getDistinctValuesCount(), expected.getDistinctValuesCount(), "distinctValuesCount mismatch for " + symbol.getName());
+        assertEquals(actual.getDataSize(), expected.getDataSize(), "dataSize mismatch for " + symbol.getName());
     }
 }
