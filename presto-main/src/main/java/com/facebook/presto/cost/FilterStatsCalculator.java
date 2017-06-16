@@ -219,7 +219,8 @@ public class FilterStatsCalculator
             SymbolStatsEstimate leftStats = input.getSymbolStatistics().get(left);
             SymbolStatsEstimate rightStats = input.getSymbolStatistics().get(right);
 
-            if (isNaN(leftStats.getDistinctValuesCount()) || isNaN(rightStats.getDistinctValuesCount())) {
+            if (leftStats == null || rightStats == null ||
+                    isNaN(leftStats.getDistinctValuesCount()) || isNaN(rightStats.getDistinctValuesCount())) {
                 return filterStatsByFactor(0.5); //fixme
             }
 
