@@ -14,6 +14,7 @@
 package com.facebook.presto.cost;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder;
 import com.facebook.presto.sql.planner.plan.PlanNode;
@@ -23,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 
 import java.util.function.Function;
 
+import static com.facebook.presto.SystemSessionProperties.USE_NEW_STATS_CALCULATOR;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 
 public class StatsCalculatorTester
@@ -45,7 +47,9 @@ public class StatsCalculatorTester
 
     private static LocalQueryRunner createQueryRunner()
     {
-        Session session = testSessionBuilder().build();
+        Session session = testSessionBuilder()
+                .setSystemProperty(USE_NEW_STATS_CALCULATOR, "true")
+                .build();
 
         LocalQueryRunner queryRunner = new LocalQueryRunner(session);
         queryRunner.createCatalog(session.getCatalog().get(),
