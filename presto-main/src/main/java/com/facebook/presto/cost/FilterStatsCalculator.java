@@ -151,6 +151,10 @@ public class FilterStatsCalculator
         {
             SymbolStatsEstimate symbolStats = input.getSymbolStatistics().get(symbol);
 
+            if (symbolStats == null) {
+                return input;
+            }
+
             SimplifiedHistogramStats histogram = SimplifiedHistogramStats.of(symbolStats);
             SimplifiedHistogramStats newStats = histogram.intersect(new StatsHistogramRange(literal, POSITIVE_INFINITY, Optional.empty()));
             double filtered = newStats.getFilteredPercent();
@@ -186,6 +190,10 @@ public class FilterStatsCalculator
         private PlanNodeStatsEstimate symbolToLiteralEquality(Symbol symbol, double literal)
         {
             SymbolStatsEstimate symbolStats = input.getSymbolStatistics().get(symbol);
+
+            if (symbolStats == null) {
+                return input;
+            }
 
             SimplifiedHistogramStats histogram = SimplifiedHistogramStats.of(symbolStats);
             SimplifiedHistogramStats newStats = histogram.intersect(new StatsHistogramRange(literal, literal, Optional.empty()));
