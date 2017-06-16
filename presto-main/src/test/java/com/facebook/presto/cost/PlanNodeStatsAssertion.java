@@ -78,7 +78,7 @@ public class PlanNodeStatsAssertion
     {
         assertEquals(actual.getOutputRowCount(), expected.getOutputRowCount());
 
-        for (Symbol symbol : union(expected.getSymbolStatistics().keySet(), actual.getSymbolStatistics().keySet())) {
+        for (Symbol symbol : union(expected.getSymbolsWithKnownStatistics(), actual.getSymbolsWithKnownStatistics())) {
             assertSymbolStatsEqual(symbol, actual.getSymbolStatistics(symbol), expected.getSymbolStatistics(symbol));
         }
         return this;

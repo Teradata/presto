@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -88,7 +89,7 @@ public class PlanNodeStatsEstimate
     {
         // TODO this is broken (it does not operate on symbol stats at all). Remove or fix
         ImmutableMap.Builder<Symbol, SymbolStatsEstimate> symbolsStatsBuilder = ImmutableMap.builder();
-        symbolsStatsBuilder.putAll(getSymbolStatistics()).putAll(other.getSymbolStatistics()); // This may not count all information
+        symbolsStatsBuilder.putAll(symbolStatistics).putAll(other.symbolStatistics); // This may not count all information
 
         PlanNodeStatsEstimate.Builder statsBuilder = PlanNodeStatsEstimate.builder();
         return statsBuilder.setSymbolStatistics(symbolsStatsBuilder.build())
@@ -101,9 +102,9 @@ public class PlanNodeStatsEstimate
         return symbolStatistics.getOrDefault(symbol, SymbolStatsEstimate.UNKNOWN_STATS);
     }
 
-    public Map<Symbol, SymbolStatsEstimate> getSymbolStatistics()
+    public Set<Symbol> getSymbolsWithKnownStatistics()
     {
-        return symbolStatistics;
+        return symbolStatistics.keySet();
     }
 
     @Override
@@ -143,7 +144,7 @@ public class PlanNodeStatsEstimate
     public static Builder buildFrom(PlanNodeStatsEstimate other)
     {
         return builder().setOutputRowCount(other.getOutputRowCount())
-                .setSymbolStatistics(other.getSymbolStatistics());
+                .setSymbolStatistics(other.symbolStatistics);
     }
 
     public static final class Builder

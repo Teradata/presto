@@ -21,7 +21,6 @@ import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
-import com.google.common.collect.ImmutableMap;
 
 import java.util.List;
 import java.util.Map;
@@ -50,26 +49,33 @@ public class JoinStatsRule
         }
         JoinNode joinNode = (JoinNode) node;
 
-        PlanNodeStatsEstimate leftStats = lookup.getStats(joinNode.getLeft(), session, types);
-        PlanNodeStatsEstimate rightStats = lookup.getStats(joinNode.getRight(), session, types);
-
         List<Expression> comparisons = joinNode.getCriteria().stream()
                 .map(criteria -> new ComparisonExpression(EQUAL, criteria.getLeft().toSymbolReference(), criteria.getRight().toSymbolReference()))
                 .collect(toImmutableList());
 
-        PlanNodeStatsEstimate mergedInputCosts = crossJoinStats(leftStats, rightStats);
+        PlanNodeStatsEstimate mergedInputCosts = crossJoinStats(joinNode, lookup, session, types);
         Expression predicate = combineConjuncts(combineConjuncts(comparisons), joinNode.getFilter().orElse(TRUE_LITERAL));
         return Optional.of(filterStatsCalculator.filterStats(mergedInputCosts, predicate, session, types));
     }
 
-    private PlanNodeStatsEstimate crossJoinStats(PlanNodeStatsEstimate left, PlanNodeStatsEstimate right)
+    private PlanNodeStatsEstimate crossJoinStats(JoinNode joinNode, Lookup lookup, Session session, Map<Symbol, Type> types)
     {
-        ImmutableMap.Builder<Symbol, SymbolStatsEstimate> symbolsStatsBuilder = ImmutableMap.builder();
-        symbolsStatsBuilder.putAll(left.getSymbolStatistics()).putAll(right.getSymbolStatistics());
+        PlanNodeStatsEstimate leftStats = lookup.getStats(joinNode.getLeft(), session, types);
+        PlanNodeStatsEstimate rightStats = lookup.getStats(joinNode.getRight(), session, types);
 
-        PlanNodeStatsEstimate.Builder statsBuilder = PlanNodeStatsEstimate.builder();
-        return statsBuilder.setSymbolStatistics(symbolsStatsBuilder.build())
-                .setOutputRowCount(left.getOutputRowCount() * right.getOutputRowCount())
-                .build();
+        List<Symbol> outputSymbols = joinNode.getOutputSymbols();
+
+        PlanNodeStatsEstimate.Builder builder = PlanNodeStatsEstimate.builder()
+                .setOutputRowCount(leftStats.getOutputRowCount() * rightStats.getOutputRowCount());
+
+        joinNode.getLeft().getOutputSymbols().stream()
+                .filter(outputSymbols::contains)
+                .forEach(symbol -> builder.addSymbolStatistics(symbol, leftStats.getSymbolStatistics(symbol)));
+
+        joinNode.getRight().getOutputSymbols().stream()
+                .filter(outputSymbols::contains)
+                .forEach(symbol -> builder.addSymbolStatistics(symbol, rightStats.getSymbolStatistics(symbol)));
+
+        return builder.build();
     }
 }
