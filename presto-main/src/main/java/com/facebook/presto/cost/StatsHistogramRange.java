@@ -20,6 +20,7 @@ import java.util.stream.DoubleStream;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Double.NEGATIVE_INFINITY;
+import static java.lang.Double.NaN;
 import static java.lang.Double.POSITIVE_INFINITY;
 import static java.lang.Double.isFinite;
 import static java.lang.Double.isNaN;
@@ -30,11 +31,14 @@ public class StatsHistogramRange
     private final double high;
     private Optional<SimplifiedHistogramStats> statsParent;
 
+    public static StatsHistogramRange empty()
+    {
+        return new StatsHistogramRange(NaN, NaN, Optional.empty());
+    }
+
     public StatsHistogramRange(double low, double high, Optional<SimplifiedHistogramStats> statsParent)
     {
-        checkArgument(!isNaN(low), "NaN is not valid low");
-        checkArgument(!isNaN(high), "NaN is not valid low");
-        checkArgument(low <= high, "low must be less than or equal high");
+        checkArgument(low <= high || (isNaN(low) && isNaN(high)), "low must be less than or equal high (unless range is empty)");
         this.low = low;
         this.high = high;
         this.statsParent = statsParent;
@@ -55,6 +59,11 @@ public class StatsHistogramRange
         return low;
     }
 
+    public boolean isEmpty()
+    {
+        return isNaN(low);
+    }
+
     public OptionalDouble minKnown(double first, double second)
     {
         return DoubleStream.of(first, second).filter(Double::isFinite).min();
@@ -67,6 +76,9 @@ public class StatsHistogramRange
 
     public double overlapPartOf(StatsHistogramRange other)
     {
+        if (this.isEmpty() || other.isEmpty()) {
+            return 0.0;
+        }
         if (low != NEGATIVE_INFINITY && high != POSITIVE_INFINITY) {
             return overlapPartOfClosedRange(other);
         }
@@ -143,6 +155,11 @@ public class StatsHistogramRange
 
     public StatsHistogramRange intersect(StatsHistogramRange other)
     {
+        double newLow = Double.max(low, other.low);
+        double newHigh = Double.min(high, other.high);
+        if (newLow > newHigh) {
+            return empty();
+        }
         return new StatsHistogramRange(Double.max(low, other.low), Double.min(high, other.high), Optional.empty());
     }
 }

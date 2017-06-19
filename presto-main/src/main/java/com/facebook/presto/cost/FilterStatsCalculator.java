@@ -149,7 +149,7 @@ public class FilterStatsCalculator
 
         private PlanNodeStatsEstimate symbolToLiteralGreaterThan(Symbol symbol, double literal)
         {
-            SymbolStatsEstimate symbolStats = input.getSymbolStatistics().get(symbol);
+            SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
 
             SimplifiedHistogramStats histogram = SimplifiedHistogramStats.of(symbolStats);
             SimplifiedHistogramStats newStats = histogram.intersect(new StatsHistogramRange(literal, POSITIVE_INFINITY, Optional.empty()));
@@ -159,7 +159,7 @@ public class FilterStatsCalculator
 
         private PlanNodeStatsEstimate symbolToLiteralLessThan(Symbol symbol, double literal)
         {
-            SymbolStatsEstimate symbolStats = input.getSymbolStatistics().get(symbol);
+            SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
 
             SimplifiedHistogramStats histogram = SimplifiedHistogramStats.of(symbolStats);
             SimplifiedHistogramStats newStats = histogram.intersect(new StatsHistogramRange(NEGATIVE_INFINITY, literal, Optional.empty()));
@@ -169,7 +169,7 @@ public class FilterStatsCalculator
 
         private PlanNodeStatsEstimate symbolToLiteralNonEquality(Symbol symbol, double literal)
         {
-            SymbolStatsEstimate symbolStats = input.getSymbolStatistics().get(symbol);
+            SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
 
             SimplifiedHistogramStats histogram = SimplifiedHistogramStats.of(symbolStats);
             SimplifiedHistogramStats intersectStats = histogram.intersect(new StatsHistogramRange(literal, literal, Optional.empty()));
@@ -185,7 +185,7 @@ public class FilterStatsCalculator
 
         private PlanNodeStatsEstimate symbolToLiteralEquality(Symbol symbol, double literal)
         {
-            SymbolStatsEstimate symbolStats = input.getSymbolStatistics().get(symbol);
+            SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
 
             SimplifiedHistogramStats histogram = SimplifiedHistogramStats.of(symbolStats);
             SimplifiedHistogramStats newStats = histogram.intersect(new StatsHistogramRange(literal, literal, Optional.empty()));
@@ -216,8 +216,8 @@ public class FilterStatsCalculator
 
         private PlanNodeStatsEstimate symbolToSymbolEquality(Symbol left, Symbol right)
         {
-            SymbolStatsEstimate leftStats = input.getSymbolStatistics().get(left);
-            SymbolStatsEstimate rightStats = input.getSymbolStatistics().get(right);
+            SymbolStatsEstimate leftStats = input.getSymbolStatistics(left);
+            SymbolStatsEstimate rightStats = input.getSymbolStatistics(right);
 
             if (isNaN(leftStats.getDistinctValuesCount()) || isNaN(rightStats.getDistinctValuesCount())) {
                 return filterStatsByFactor(0.5); //fixme

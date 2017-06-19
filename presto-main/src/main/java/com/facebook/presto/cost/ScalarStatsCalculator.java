@@ -73,7 +73,7 @@ public class ScalarStatsCalculator
         @Override
         protected SymbolStatsEstimate visitSymbolReference(SymbolReference node, Void context)
         {
-            return input.getSymbolStatistics().getOrDefault(Symbol.from(node), SymbolStatsEstimate.UNKNOWN_STATS);
+            return input.getSymbolStatistics(Symbol.from(node));
         }
 
         @Override
