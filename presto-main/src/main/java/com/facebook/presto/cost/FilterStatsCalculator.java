@@ -24,14 +24,17 @@ import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.ComparisonExpressionType;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Literal;
+import com.facebook.presto.sql.tree.LogicalBinaryExpression;
+import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.SymbolReference;
 
 import javax.inject.Inject;
 
 import java.util.Map;
-import java.util.Optional;
 import java.util.OptionalDouble;
+import java.util.stream.Stream;
 
+import static com.facebook.presto.cost.SymbolStatsEstimate.buildFrom;
 import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.POSITIVE_INFINITY;
 import static java.lang.Double.isNaN;
@@ -80,6 +83,104 @@ public class FilterStatsCalculator
         private PlanNodeStatsEstimate filterForUnknownExpression()
         {
             return filterStatsByFactor(0.5);
+        }
+
+        protected PlanNodeStatsEstimate visitNotExpression(NotExpression node, Void context)
+        {
+            return input;
+        }
+
+        @Override
+        protected PlanNodeStatsEstimate visitLogicalBinaryExpression(LogicalBinaryExpression node, Void context)
+        {
+            PlanNodeStatsEstimate left = process(node.getLeft());
+            PlanNodeStatsEstimate right = process(node.getRight());
+            switch (node.getType()) {
+                case AND:
+                    return intersectStats(left, right);
+                break;
+                case OR:
+                    return unionStats(left, right);
+                break;
+            }
+        }
+
+        private PlanNodeStatsEstimate unionStats(PlanNodeStatsEstimate left, PlanNodeStatsEstimate right)
+        {
+            PlanNodeStatsEstimate.Builder statsBuilder = PlanNodeStatsEstimate.builder();
+
+            double leftFilterFactor = left.getOutputRowCount() / input.getOutputRowCount();
+            double rightFilterFactor = right.getOutputRowCount() / input.getOutputRowCount();
+            double totalRowsWithOverlaps = (leftFilterFactor + rightFilterFactor) * input.getOutputRowCount();
+            double intersectingRows = intersectStats(left, right).getOutputRowCount();
+            double newRowCount = totalRowsWithOverlaps - intersectingRows;
+
+            Stream.concat(left.getSymbolsWithKnownStatistics().stream(), right.getSymbolsWithKnownStatistics().stream())
+                    .forEach(symbol -> {
+                        statsBuilder.addSymbolStatistics(symbol,
+                                unionColumnStats(left.getSymbolStatistics(symbol),
+                                        left.getOutputRowCount(),
+                                        right.getSymbolStatistics(symbol),
+                                        right.getOutputRowCount(), newRowCount));
+                    });
+
+            return statsBuilder.setOutputRowCount(totalRowsWithOverlaps - intersectingRows).build();
+        }
+
+        private SymbolStatsEstimate unionColumnStats(SymbolStatsEstimate leftStats, double leftRows, SymbolStatsEstimate rightStats, double rightRows, double newRowCount)
+        {
+            StatisticRange leftRange = new StatisticRange(leftStats.getLowValue(), leftStats.getHighValue(), leftStats.getDistinctValuesCount());
+            StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
+
+            StatisticRange union = leftRange.union(rightRange);
+            double nullsCountLeft = leftStats.getNullsFraction() * rightRows;
+            double nullsCountRight = rightStats.getNullsFraction() * leftRows;
+
+            return SymbolStatsEstimate.builder()
+                    .setDistinctValuesCount(union.getDistinctValuesCount())
+                    .setHighValue(union.getHigh())
+                    .setLowValue(union.getLow())
+                    .setAverageRowSize((leftStats.getAverageRowSize() + rightStats.getAverageRowSize()) / 2) // left and right should be equal in most cases anyway
+                    .setNullsFraction(max(nullsCountLeft, nullsCountRight) / newRowCount)
+                    .build();
+        }
+
+        private PlanNodeStatsEstimate intersectStats(PlanNodeStatsEstimate left, PlanNodeStatsEstimate right)
+        {
+            PlanNodeStatsEstimate.Builder statsBuilder = PlanNodeStatsEstimate.builder();
+
+            double leftFilterFactor = left.getOutputRowCount() / input.getOutputRowCount();
+            double rightFilterFactor = right.getOutputRowCount() / input.getOutputRowCount();
+            double newRowCount = leftFilterFactor * rightFilterFactor * input.getOutputRowCount();
+
+            Stream.concat(left.getSymbolsWithKnownStatistics().stream(), right.getSymbolsWithKnownStatistics().stream())
+                    .forEach(symbol -> {
+                        statsBuilder.addSymbolStatistics(symbol,
+                                intersectColumnStats(left.getSymbolStatistics(symbol),
+                                        left.getOutputRowCount(),
+                                        right.getSymbolStatistics(symbol),
+                                        right.getOutputRowCount(), newRowCount));
+                    });
+
+            return statsBuilder.setOutputRowCount(newRowCount).build();
+        }
+
+        private SymbolStatsEstimate intersectColumnStats(SymbolStatsEstimate leftStats, double leftRows, SymbolStatsEstimate rightStats, double rightRows, double newRowCount)
+        {
+            StatisticRange leftRange = new StatisticRange(leftStats.getLowValue(), leftStats.getHighValue(), leftStats.getDistinctValuesCount());
+            StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
+
+            StatisticRange intersect = leftRange.intersect(rightRange);
+            double nullsCountLeft = leftStats.getNullsFraction() * rightRows;
+            double nullsCountRight = rightStats.getNullsFraction() * leftRows;
+
+            return SymbolStatsEstimate.builder()
+                    .setDistinctValuesCount(intersect.getDistinctValuesCount())
+                    .setHighValue(intersect.getHigh())
+                    .setLowValue(intersect.getLow())
+                    .setAverageRowSize((leftStats.getAverageRowSize() + rightStats.getAverageRowSize()) / 2) // left and right should be equal in most cases anyway
+                    .setNullsFraction(min(nullsCountLeft, nullsCountRight) / newRowCount)
+                    .build();
         }
 
         @Override
@@ -151,46 +252,77 @@ public class FilterStatsCalculator
         {
             SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
 
-            SimplifiedHistogramStats histogram = SimplifiedHistogramStats.of(symbolStats);
-            SimplifiedHistogramStats newStats = histogram.intersect(new StatsHistogramRange(literal, POSITIVE_INFINITY, Optional.empty()));
-            double filtered = newStats.getFilteredPercent();
-            return filterStatsByFactor(filtered).mapSymbolColumnStatistics(symbol, x -> newStats.toSymbolsStatistics());
+            StatisticRange range = new StatisticRange(symbolStats.getLowValue(), symbolStats.getHighValue(), symbolStats.getDistinctValuesCount());
+            StatisticRange intersectRange = range.intersect(new StatisticRange(literal, POSITIVE_INFINITY, POSITIVE_INFINITY));
+
+            double filterFactor = range.overlapPercentWith(intersectRange);
+            SymbolStatsEstimate symbolNewEstimate =
+                    SymbolStatsEstimate.builder()
+                            .setAverageRowSize(symbolStats.getAverageRowSize())
+                            .setDistinctValuesCount(filterFactor * intersectRange.getDistinctValuesCount())
+                            .setHighValue(intersectRange.getHigh())
+                            .setLowValue(intersectRange.getLow())
+                            .setNullsFraction(0.0).build();
+
+            return input.mapOutputRowCount(x -> filterFactor * x)
+                    .mapSymbolColumnStatistics(symbol, x -> symbolNewEstimate);
         }
 
         private PlanNodeStatsEstimate symbolToLiteralLessThan(Symbol symbol, double literal)
         {
             SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
 
-            SimplifiedHistogramStats histogram = SimplifiedHistogramStats.of(symbolStats);
-            SimplifiedHistogramStats newStats = histogram.intersect(new StatsHistogramRange(NEGATIVE_INFINITY, literal, Optional.empty()));
-            double filtered = newStats.getFilteredPercent();
-            return filterStatsByFactor(filtered).mapSymbolColumnStatistics(symbol, x -> newStats.toSymbolsStatistics());
+            StatisticRange range = new StatisticRange(symbolStats.getLowValue(), symbolStats.getHighValue(), symbolStats.getDistinctValuesCount());
+            StatisticRange intersectRange = range.intersect(new StatisticRange(NEGATIVE_INFINITY, literal, POSITIVE_INFINITY));
+
+            double filterFactor = range.overlapPercentWith(intersectRange);
+            SymbolStatsEstimate symbolNewEstimate =
+                    SymbolStatsEstimate.builder()
+                            .setAverageRowSize(symbolStats.getAverageRowSize())
+                            .setDistinctValuesCount(filterFactor * intersectRange.getDistinctValuesCount())
+                            .setHighValue(intersectRange.getHigh())
+                            .setLowValue(intersectRange.getLow())
+                            .setNullsFraction(0.0).build();
+
+            return input.mapOutputRowCount(x -> filterFactor * x)
+                    .mapSymbolColumnStatistics(symbol, x -> symbolNewEstimate);
         }
 
         private PlanNodeStatsEstimate symbolToLiteralNonEquality(Symbol symbol, double literal)
         {
             SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
 
-            SimplifiedHistogramStats histogram = SimplifiedHistogramStats.of(symbolStats);
-            SimplifiedHistogramStats intersectStats = histogram.intersect(new StatsHistogramRange(literal, literal, Optional.empty()));
-            double filtered = 1.0 - intersectStats.getFilteredPercent();
-            return filterStatsByFactor(filtered)
-                    .mapSymbolColumnStatistics(symbol,
-                            stats -> SymbolStatsEstimate.buildFrom(stats)
-                                    .setNullsFraction(0)
-                                    .setDataSize(stats.getDataSize() * filtered)
-                                    .setDistinctValuesCount(stats.getDistinctValuesCount() - 1)
-                                    .build());
+            StatisticRange range = new StatisticRange(symbolStats.getLowValue(), symbolStats.getHighValue(), symbolStats.getDistinctValuesCount());
+            StatisticRange intersectRange = range.intersect(new StatisticRange(literal, literal, 1));
+
+            double filterFactor = range.overlapPercentWith(intersectRange);
+
+            return input.mapOutputRowCount(x -> filterFactor * x)
+                    .mapSymbolColumnStatistics(symbol, x -> buildFrom(x)
+                            .setNullsFraction(0.0)
+                            .setDistinctValuesCount(x.getDistinctValuesCount() - 1)
+                            .setAverageRowSize(x.getAverageRowSize())
+                            .build());
         }
 
         private PlanNodeStatsEstimate symbolToLiteralEquality(Symbol symbol, double literal)
         {
             SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
 
-            SimplifiedHistogramStats histogram = SimplifiedHistogramStats.of(symbolStats);
-            SimplifiedHistogramStats newStats = histogram.intersect(new StatsHistogramRange(literal, literal, Optional.empty()));
-            double filtered = newStats.getFilteredPercent();
-            return filterStatsByFactor(filtered).mapSymbolColumnStatistics(symbol, x -> newStats.toSymbolsStatistics());
+            StatisticRange range = new StatisticRange(symbolStats.getLowValue(), symbolStats.getHighValue(), symbolStats.getDistinctValuesCount());
+            StatisticRange intersectRange = range.intersect(new StatisticRange(literal, literal, 1));
+
+            double filterFactor = range.overlapPercentWith(intersectRange);
+            SymbolStatsEstimate symbolNewEstimate =
+                    SymbolStatsEstimate.builder()
+                            .setAverageRowSize(symbolStats.getAverageRowSize())
+                            .setDistinctValuesCount(1)
+                            .setHighValue(intersectRange.getHigh())
+                            .setLowValue(intersectRange.getLow())
+                            .setNullsFraction(0.0).build();
+
+            return input.mapOutputRowCount(x -> filterFactor * x)
+                        .mapSymbolColumnStatistics(symbol, x -> symbolNewEstimate);
         }
 
         private PlanNodeStatsEstimate filterStatsByFactor(double filterRate)
@@ -228,11 +360,11 @@ public class FilterStatsCalculator
 
             double filterRate = 1 / maxDistinctValues * (1 - leftStats.getNullsFraction()) * (1 - rightStats.getNullsFraction());
 
-            SymbolStatsEstimate newRightStats = SymbolStatsEstimate.buildFrom(rightStats)
+            SymbolStatsEstimate newRightStats = buildFrom(rightStats)
                     .setNullsFraction(0)
                     .setDistinctValuesCount(minDistinctValues)
                     .build();
-            SymbolStatsEstimate newLeftStats = SymbolStatsEstimate.buildFrom(leftStats)
+            SymbolStatsEstimate newLeftStats = buildFrom(leftStats)
                     .setNullsFraction(0)
                     .setDistinctValuesCount(minDistinctValues)
                     .build();

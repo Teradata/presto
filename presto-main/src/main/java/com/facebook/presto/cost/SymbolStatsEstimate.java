@@ -27,16 +27,16 @@ public class SymbolStatsEstimate
     private final double lowValue;
     private final double highValue;
     private final double nullsFraction;
-    private final double dataSize;
+    private final double averageRowSize;
     private final double distinctValuesCount;
 
-    public SymbolStatsEstimate(double lowValue, double highValue, double nullsFraction, double dataSize, double distinctValuesCount)
+    public SymbolStatsEstimate(double lowValue, double highValue, double nullsFraction, double averageRowSize, double distinctValuesCount)
     {
         checkArgument(lowValue <= highValue || (isNaN(lowValue) && isNaN(highValue)), "lowValue must be less than or equal highValue");
         this.lowValue = lowValue;
         this.highValue = highValue;
         this.nullsFraction = nullsFraction;
-        this.dataSize = dataSize;
+        this.averageRowSize = averageRowSize;
         this.distinctValuesCount = distinctValuesCount;
     }
 
@@ -65,9 +65,9 @@ public class SymbolStatsEstimate
         return nullsFraction;
     }
 
-    public double getDataSize()
+    public double getAverageRowSize()
     {
-        return dataSize;
+        return averageRowSize;
     }
 
     public double getDistinctValuesCount()
@@ -86,7 +86,7 @@ public class SymbolStatsEstimate
         }
         SymbolStatsEstimate that = (SymbolStatsEstimate) o;
         return Double.compare(that.nullsFraction, nullsFraction) == 0 &&
-                Double.compare(that.dataSize, dataSize) == 0 &&
+                Double.compare(that.averageRowSize, averageRowSize) == 0 &&
                 Double.compare(that.distinctValuesCount, distinctValuesCount) == 0 &&
                 Objects.equals(lowValue, that.lowValue) &&
                 Objects.equals(highValue, that.highValue);
@@ -95,7 +95,7 @@ public class SymbolStatsEstimate
     @Override
     public int hashCode()
     {
-        return Objects.hash(lowValue, highValue, nullsFraction, dataSize, distinctValuesCount);
+        return Objects.hash(lowValue, highValue, nullsFraction, averageRowSize, distinctValuesCount);
     }
 
     public static Builder builder()
@@ -109,7 +109,7 @@ public class SymbolStatsEstimate
                 .setLowValue(other.getLowValue())
                 .setHighValue(other.getHighValue())
                 .setNullsFraction(other.getNullsFraction())
-                .setDataSize(other.getDataSize())
+                .setAverageRowSize(other.getAverageRowSize())
                 .setDistinctValuesCount(other.getDistinctValuesCount());
     }
 
@@ -118,7 +118,7 @@ public class SymbolStatsEstimate
         private double lowValue = Double.NEGATIVE_INFINITY;
         private double highValue = Double.POSITIVE_INFINITY;
         private double nullsFraction = NaN;
-        private double dataSize = NaN;
+        private double averageRowSize = NaN;
         private double distinctValuesCount = NaN;
 
         public Builder setLowValue(double lowValue)
@@ -139,9 +139,9 @@ public class SymbolStatsEstimate
             return this;
         }
 
-        public Builder setDataSize(double dataSize)
+        public Builder setAverageRowSize(double averageRowSize)
         {
-            this.dataSize = dataSize;
+            this.averageRowSize = averageRowSize;
             return this;
         }
 
@@ -153,7 +153,7 @@ public class SymbolStatsEstimate
 
         public SymbolStatsEstimate build()
         {
-            return new SymbolStatsEstimate(lowValue, highValue, nullsFraction, dataSize, distinctValuesCount);
+            return new SymbolStatsEstimate(lowValue, highValue, nullsFraction, averageRowSize, distinctValuesCount);
         }
     }
 }

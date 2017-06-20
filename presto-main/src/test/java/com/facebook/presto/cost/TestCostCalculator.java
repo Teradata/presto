@@ -54,6 +54,7 @@ import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.ImmutableList.toImmutableList;
+import static java.lang.Double.max;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toMap;
 import static org.testng.Assert.assertEquals;
@@ -244,12 +245,13 @@ public class TestCostCalculator
 
     private static PlanNodeStatsEstimate statsEstimate(int outputSizeInBytes)
     {
+        double rowCount = max(outputSizeInBytes / 8.0, 1.0);
         return PlanNodeStatsEstimate.builder()
-                .setOutputRowCount(Math.max(outputSizeInBytes / 8, 1))
+                .setOutputRowCount(rowCount)
                 .addSymbolStatistics(
                         new Symbol("s"),
                         SymbolStatsEstimate.builder()
-                                .setDataSize(outputSizeInBytes)
+                                .setAverageRowSize(outputSizeInBytes / rowCount)
                                 .build())
                 .build();
     }
