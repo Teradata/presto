@@ -24,12 +24,14 @@ import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.ComparisonExpressionType;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Literal;
+import com.facebook.presto.sql.tree.LogicalBinaryExpression;
 import com.facebook.presto.sql.tree.SymbolReference;
 
 import javax.inject.Inject;
 
 import java.util.Map;
 import java.util.OptionalDouble;
+import java.util.stream.Stream;
 
 import static com.facebook.presto.cost.SymbolStatsEstimate.buildFrom;
 import static java.lang.Double.NEGATIVE_INFINITY;
@@ -80,6 +82,58 @@ public class FilterStatsCalculator
         private PlanNodeStatsEstimate filterForUnknownExpression()
         {
             return filterStatsByFactor(0.5);
+        }
+
+        @Override
+        protected PlanNodeStatsEstimate visitLogicalBinaryExpression(LogicalBinaryExpression node, Void context)
+        {
+            PlanNodeStatsEstimate left = process(node.getLeft());
+            PlanNodeStatsEstimate right = process(node.getRight());
+            switch (node.getType()) {
+                case AND:
+                    return intersectStats(left, right);
+                break;
+                case OR:
+                    return unionStats(left, right);
+                break;
+            }
+        }
+
+        private PlanNodeStatsEstimate unionStats(PlanNodeStatsEstimate left, PlanNodeStatsEstimate right)
+        {
+            return input; // FIXME - implement this
+        }
+
+        private PlanNodeStatsEstimate intersectStats(PlanNodeStatsEstimate left, PlanNodeStatsEstimate right)
+        {
+            PlanNodeStatsEstimate.Builder statsBuilder = PlanNodeStatsEstimate.builder();
+
+            Stream.concat(left.getSymbolsWithKnownStatistics().stream(), right.getSymbolsWithKnownStatistics().stream())
+                    .forEach(symbol -> {
+                        statsBuilder.addSymbolStatistics(symbol,
+                                intersectColumnStats(left.getSymbolStatistics(symbol), right.getSymbolStatistics(symbol)));
+                    });
+
+            double leftFilterFactor = left.getOutputRowCount() / input.getOutputRowCount();
+            double rightFilterFactor = right.getOutputRowCount() / input.getOutputRowCount();
+
+            return statsBuilder.setOutputRowCount(leftFilterFactor * rightFilterFactor * input.getOutputRowCount()).build();
+        }
+
+        private SymbolStatsEstimate intersectColumnStats(SymbolStatsEstimate leftStats, SymbolStatsEstimate rightStats)
+        {
+            StatisticRange leftRange = new StatisticRange(leftStats.getLowValue(), leftStats.getHighValue(), leftStats.getDistinctValuesCount());
+            StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
+
+            StatisticRange intersect = leftRange.intersect(rightRange);
+
+            return SymbolStatsEstimate.builder()
+                    .setDistinctValuesCount(intersect.getDistinctValuesCount())
+                    .setHighValue(intersect.getHigh())
+                    .setLowValue(intersect.getLow())
+                    .setAverageRowSize((leftStats.getAverageRowSize() + rightStats.getAverageRowSize()) / 2) // left and right should be equal in most cases anyway
+                    .setNullsFraction(min(leftStats.getNullsFraction(), rightStats.getNullsFraction())) // is this right value?
+                    .build();
         }
 
         @Override
