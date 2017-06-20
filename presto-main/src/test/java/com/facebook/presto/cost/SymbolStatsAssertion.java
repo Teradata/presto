@@ -92,4 +92,13 @@ public class SymbolStatsAssertion
         assertTrue(isNaN(statistics.getDataSize()), "expected unknown dataSize but got " + statistics.getDistinctValuesCount());
         return this;
     }
+
+    public SymbolStatsAssertion isEqualTo(SymbolStatsEstimate expected) {
+        assertEstimateEquals(statistics.getNullsFraction(), expected.getNullsFraction(), "nullsFraction mismatch");
+        assertEstimateEquals(statistics.getLowValue(), expected.getLowValue(), "lowValue mismatch");
+        assertEstimateEquals(statistics.getHighValue(), expected.getHighValue(), "highValue mismatch");
+        assertEstimateEquals(statistics.getDistinctValuesCount(), expected.getDistinctValuesCount(), "distinct values count mismatch");
+        assertEstimateEquals(statistics.getDataSize(), expected.getDataSize(), "datasize mismatch for");
+        return this;
+    }
 }
