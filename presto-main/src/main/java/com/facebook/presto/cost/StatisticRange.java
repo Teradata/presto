@@ -83,4 +83,9 @@ public class StatisticRange
                 Math.max(high, other.high),
                 (distinctValues * (1 - overlapPercentWith(other))) + other.distinctValues);
     }
+
+    public StatisticRange subtract(StatisticRange rightRange)
+    {
+        return null;
+    }
 }

@@ -84,7 +84,41 @@ public class FilterStatsCalculator
 
         protected PlanNodeStatsEstimate visitNotExpression(NotExpression node, Void context)
         {
-            return input;
+            PlanNodeStatsEstimate innerStats = process(node.getValue());
+
+            PlanNodeStatsEstimate.Builder statsBuilder = PlanNodeStatsEstimate.builder();
+            double newRowCount = input.getOutputRowCount() - innerStats.getOutputRowCount();
+
+            Stream.concat(innerStats.getSymbolsWithKnownStatistics().stream(), input.getSymbolsWithKnownStatistics().stream())
+                    .forEach(symbol -> {
+                        statsBuilder.addSymbolStatistics(symbol,
+                                subtractStats(input.getSymbolStatistics(symbol),
+                                        input.getOutputRowCount(),
+                                        innerStats.getSymbolStatistics(symbol),
+                                        innerStats.getOutputRowCount(),
+                                        newRowCount));
+                    });
+
+            return statsBuilder.setOutputRowCount(newRowCount).build();
+        }
+
+        private SymbolStatsEstimate subtractStats(SymbolStatsEstimate leftStats, double leftRowCount, SymbolStatsEstimate rightStats, double rightRowCount, double newRowCount)
+        {
+            StatisticRange leftRange = new StatisticRange(leftStats.getLowValue(), leftStats.getHighValue(), leftStats.getDistinctValuesCount());
+            StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
+
+            StatisticRange union = leftRange.subtract(rightRange);
+            double nullsCountLeft = leftStats.getNullsFraction() * leftRowCount;
+            double nullsCountRight = rightStats.getNullsFraction() * rightRowCount;
+            double innerFilterFactor = nullsCountRight / nullsCountLeft;
+
+            return SymbolStatsEstimate.builder()
+                    .setDistinctValuesCount(union.getDistinctValuesCount())
+                    .setHighValue(union.getHigh())
+                    .setLowValue(union.getLow())
+                    .setAverageRowSize(leftStats.getAverageRowSize() * innerFilterFactor - (rightStats.getAverageRowSize() - leftStats.getAverageRowSize()) * (1 - innerFilterFactor)) //FIXME? // left and right should be equal in most cases anyway
+                    .setNullsFraction((nullsCountLeft - nullsCountRight) / newRowCount)
+                    .build();
         }
 
         @Override
@@ -122,7 +156,7 @@ public class FilterStatsCalculator
                                         right.getOutputRowCount(), newRowCount));
                     });
 
-            return statsBuilder.setOutputRowCount(totalRowsWithOverlaps - intersectingRows).build();
+            return statsBuilder.setOutputRowCount(newRowCount).build();
         }
 
         private SymbolStatsEstimate unionColumnStats(SymbolStatsEstimate leftStats, double leftRows, SymbolStatsEstimate rightStats, double rightRows, double newRowCount)
