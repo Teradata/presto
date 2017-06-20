@@ -117,6 +117,7 @@ public class ScalarStatsCalculator
             double highValue = sourceStats.getHighValue();
 
             if (isIntegralType(targetType)) {
+                // todo handle low/high value changes if range gets narrower due to cast (e.g. BIGINT -> SMALLINT)
                 if (isFinite(lowValue)) {
                     lowValue = Math.round(lowValue);
                 }
@@ -125,7 +126,7 @@ public class ScalarStatsCalculator
                 }
                 if (isFinite(lowValue) && isFinite(highValue)) {
                     double integersInRange = highValue - lowValue + 1;
-                    if (isNaN(distinctValuesCount) || distinctValuesCount > integersInRange) {
+                    if (!isNaN(distinctValuesCount) && distinctValuesCount > integersInRange) {
                         distinctValuesCount = integersInRange;
                     }
                 }

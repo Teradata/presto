@@ -124,6 +124,28 @@ public class TestScalarStatsCalculator
     }
 
     @Test
+    public void testCastDoubleToShortRangeUnknownDistinctValuesCount()
+    {
+        Map<Symbol, Type> types = ImmutableMap.of(new Symbol("a"), DOUBLE);
+
+        PlanNodeStatsEstimate inputStatistics = PlanNodeStatsEstimate.builder()
+                .addSymbolStatistics(new Symbol("a"), SymbolStatsEstimate.builder()
+                        .setNullsFraction(0.3)
+                        .setLowValue(1.6)
+                        .setHighValue(3.3)
+                        .setDataSize(5)
+                        .build())
+                .build();
+
+        assertCalculate(new Cast(new SymbolReference("a"), "bigint"), inputStatistics, types)
+                .lowValue(2.0)
+                .highValue(3.0)
+                .distinctValuesCountUnknown()
+                .nullsFraction(0.3)
+                .dataSizeUnknown();
+    }
+
+    @Test
     public void testCastBigintToDouble()
     {
         Map<Symbol, Type> types = ImmutableMap.of(new Symbol("a"), BIGINT);
