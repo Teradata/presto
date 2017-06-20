@@ -50,19 +50,18 @@ public class PlanNodeStatsEstimate
     {
         double outputSizeInBytes = 0;
         for (Map.Entry<Symbol, SymbolStatsEstimate> entry : symbolStatistics.entrySet()) {
-            outputSizeInBytes += getOutputSizeForSybol(entry.getKey(), entry.getValue());
+            outputSizeInBytes += outputRowCount * getAverageRowSizeForSybol(entry.getValue());
         }
         return outputSizeInBytes;
     }
 
-    private double getOutputSizeForSybol(Symbol key, SymbolStatsEstimate symbolStatistics)
+    private double getAverageRowSizeForSybol(SymbolStatsEstimate symbolStatistics)
     {
-        double dataSize = symbolStatistics.getDataSize();
-        if (isNaN(dataSize)) {
-            // TODO take into consderation data type of column
-            dataSize = outputRowCount * DEFAULT_DATA_SIZE_PER_COLUMN;
+        double averageRowSize = symbolStatistics.getAverageRowSize();
+        if (isNaN(averageRowSize)) {
+            return DEFAULT_DATA_SIZE_PER_COLUMN;
         }
-        return dataSize;
+        return averageRowSize;
     }
 
     public PlanNodeStatsEstimate mapOutputRowCount(Function<Double, Double> mappingFunction)

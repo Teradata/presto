@@ -90,6 +90,6 @@ public class PlanNodeStatsAssertion
         assertEquals(actual.getLowValue(), expected.getLowValue(), "lowValue mismatch for " + symbol.getName());
         assertEquals(actual.getHighValue(), expected.getHighValue(), "lowValue mismatch for " + symbol.getName());
         assertEquals(actual.getDistinctValuesCount(), expected.getDistinctValuesCount(), "lowValue mismatch for " + symbol.getName());
-        assertEquals(actual.getDataSize(), expected.getDataSize(), "datasize mismatch for " + symbol.getName());
+        assertEquals(actual.getAverageRowSize(), expected.getAverageRowSize(), "averageDataSize mismatch for " + symbol.getName());
     }
 }

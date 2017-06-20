@@ -21,7 +21,6 @@ import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.tree.AstVisitor;
 import com.facebook.presto.sql.tree.BooleanLiteral;
 import com.facebook.presto.sql.tree.ComparisonExpression;
-import com.facebook.presto.sql.tree.ComparisonExpressionType;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Literal;
 import com.facebook.presto.sql.tree.LogicalBinaryExpression;
@@ -31,15 +30,13 @@ import com.facebook.presto.sql.tree.SymbolReference;
 import javax.inject.Inject;
 
 import java.util.Map;
-import java.util.OptionalDouble;
 import java.util.stream.Stream;
 
-import static com.facebook.presto.cost.SymbolStatsEstimate.buildFrom;
-import static java.lang.Double.NEGATIVE_INFINITY;
-import static java.lang.Double.POSITIVE_INFINITY;
-import static java.lang.Double.isNaN;
+import static java.lang.Double.NaN;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
+import static java.lang.String.format;
+import static org.weakref.jmx.internal.guava.base.Preconditions.checkState;
 
 public class FilterStatsCalculator
 {
@@ -60,6 +57,11 @@ public class FilterStatsCalculator
         return new FilterExpressionStatsCalculatingVisitor(statsEstimate, session, types).process(predicate);
     }
 
+    public static PlanNodeStatsEstimate filterStatsForUnknownExpression(PlanNodeStatsEstimate inputStatistics)
+    {
+        return inputStatistics.mapOutputRowCount(size -> size * 0.5);
+    }
+
     private class FilterExpressionStatsCalculatingVisitor
             extends AstVisitor<PlanNodeStatsEstimate, Void>
     {
@@ -77,12 +79,7 @@ public class FilterStatsCalculator
         @Override
         protected PlanNodeStatsEstimate visitExpression(Expression node, Void context)
         {
-            return filterForUnknownExpression();
-        }
-
-        private PlanNodeStatsEstimate filterForUnknownExpression()
-        {
-            return filterStatsByFactor(0.5);
+            return filterStatsForUnknownExpression(input);
         }
 
         protected PlanNodeStatsEstimate visitNotExpression(NotExpression node, Void context)
@@ -98,10 +95,11 @@ public class FilterStatsCalculator
             switch (node.getType()) {
                 case AND:
                     return intersectStats(left, right);
-                break;
                 case OR:
                     return unionStats(left, right);
-                break;
+                default:
+                    checkState(false, format("Unimplemented logical binary operator expression %s", node.getType()));
+                    return PlanNodeStatsEstimate.UNKNOWN_STATS;
             }
         }
 
@@ -186,31 +184,42 @@ public class FilterStatsCalculator
         @Override
         protected PlanNodeStatsEstimate visitComparisonExpression(ComparisonExpression node, Void context)
         {
+            ComparisonStatsCalculator comparisonStatsCalculator = new ComparisonStatsCalculator(input);
+
             // FIXME left and right might not be exactly SymbolReference and Literal
             if (node.getLeft() instanceof SymbolReference && node.getRight() instanceof SymbolReference) {
-                return comparisonSymbolToSymbolStats(
+                return comparisonStatsCalculator.comparisonSymbolToSymbolStats(
                         Symbol.from(node.getLeft()),
                         Symbol.from(node.getRight()),
                         node.getType()
                 );
             }
             else if (node.getLeft() instanceof SymbolReference && node.getRight() instanceof Literal) {
-                return comparisonSymbolToLiteralStats(
-                        Symbol.from(node.getLeft()),
-                        (Literal) node.getRight(),
+                Symbol symbol = Symbol.from(node.getLeft());
+                return comparisonStatsCalculator.comparisonSymbolToLiteralStats(
+                        symbol,
+                        doubleValueFromLiteral(types.get(symbol), (Literal) node.getRight()),
                         node.getType()
                 );
             }
             else if (node.getLeft() instanceof Literal && node.getRight() instanceof SymbolReference) {
-                return comparisonSymbolToLiteralStats(
-                        Symbol.from(node.getRight()),
-                        (Literal) node.getLeft(),
+                Symbol symbol = Symbol.from(node.getRight());
+                return comparisonStatsCalculator.comparisonSymbolToLiteralStats(
+                        symbol,
+                        doubleValueFromLiteral(types.get(symbol), (Literal) node.getLeft()),
                         node.getType().flip()
                 );
             }
             else {
-                return filterForUnknownExpression();
+                return filterStatsForUnknownExpression(input);
             }
+        }
+
+        private double doubleValueFromLiteral(Type type, Literal literal)
+        {
+            Object literalValue = LiteralInterpreter.evaluate(metadata, session.toConnectorSession(), literal);
+            TypeStatOperatorCaller operatorCaller = new TypeStatOperatorCaller(type, metadata.getFunctionRegistry(), session.toConnectorSession());
+            return operatorCaller.translateToDouble(literalValue).orElse(NaN);
         }
 
         @Override
@@ -220,158 +229,8 @@ public class FilterStatsCalculator
                 return input;
             }
             else {
-                return filterStatsByFactor(0.0);
+                return input.mapOutputRowCount(size -> size * 0.0);
             }
-        }
-
-        private PlanNodeStatsEstimate comparisonSymbolToLiteralStats(Symbol symbol, Literal literal, ComparisonExpressionType type)
-        {
-            Object literalValue = LiteralInterpreter.evaluate(metadata, session.toConnectorSession(), literal);
-            TypeStatOperatorCaller operatorCaller = new TypeStatOperatorCaller(types.get(symbol), metadata.getFunctionRegistry(), session.toConnectorSession());
-            OptionalDouble doubleLiteral = operatorCaller.translateToDouble(literalValue);
-            if (doubleLiteral.isPresent()) {
-                switch (type) {
-                    case EQUAL:
-                        return symbolToLiteralEquality(symbol, doubleLiteral.getAsDouble());
-                    case NOT_EQUAL:
-                        return symbolToLiteralNonEquality(symbol, doubleLiteral.getAsDouble());
-                    case LESS_THAN:
-                    case LESS_THAN_OR_EQUAL:
-                        return symbolToLiteralLessThan(symbol, doubleLiteral.getAsDouble());
-                    case GREATER_THAN:
-                    case GREATER_THAN_OR_EQUAL:
-                        return symbolToLiteralGreaterThan(symbol, doubleLiteral.getAsDouble());
-                    case IS_DISTINCT_FROM:
-                        break;
-                }
-            }
-            return filterForUnknownExpression();
-        }
-
-        private PlanNodeStatsEstimate symbolToLiteralGreaterThan(Symbol symbol, double literal)
-        {
-            SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
-
-            StatisticRange range = new StatisticRange(symbolStats.getLowValue(), symbolStats.getHighValue(), symbolStats.getDistinctValuesCount());
-            StatisticRange intersectRange = range.intersect(new StatisticRange(literal, POSITIVE_INFINITY, POSITIVE_INFINITY));
-
-            double filterFactor = range.overlapPercentWith(intersectRange);
-            SymbolStatsEstimate symbolNewEstimate =
-                    SymbolStatsEstimate.builder()
-                            .setAverageRowSize(symbolStats.getAverageRowSize())
-                            .setDistinctValuesCount(filterFactor * intersectRange.getDistinctValuesCount())
-                            .setHighValue(intersectRange.getHigh())
-                            .setLowValue(intersectRange.getLow())
-                            .setNullsFraction(0.0).build();
-
-            return input.mapOutputRowCount(x -> filterFactor * x)
-                    .mapSymbolColumnStatistics(symbol, x -> symbolNewEstimate);
-        }
-
-        private PlanNodeStatsEstimate symbolToLiteralLessThan(Symbol symbol, double literal)
-        {
-            SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
-
-            StatisticRange range = new StatisticRange(symbolStats.getLowValue(), symbolStats.getHighValue(), symbolStats.getDistinctValuesCount());
-            StatisticRange intersectRange = range.intersect(new StatisticRange(NEGATIVE_INFINITY, literal, POSITIVE_INFINITY));
-
-            double filterFactor = range.overlapPercentWith(intersectRange);
-            SymbolStatsEstimate symbolNewEstimate =
-                    SymbolStatsEstimate.builder()
-                            .setAverageRowSize(symbolStats.getAverageRowSize())
-                            .setDistinctValuesCount(filterFactor * intersectRange.getDistinctValuesCount())
-                            .setHighValue(intersectRange.getHigh())
-                            .setLowValue(intersectRange.getLow())
-                            .setNullsFraction(0.0).build();
-
-            return input.mapOutputRowCount(x -> filterFactor * x)
-                    .mapSymbolColumnStatistics(symbol, x -> symbolNewEstimate);
-        }
-
-        private PlanNodeStatsEstimate symbolToLiteralNonEquality(Symbol symbol, double literal)
-        {
-            SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
-
-            StatisticRange range = new StatisticRange(symbolStats.getLowValue(), symbolStats.getHighValue(), symbolStats.getDistinctValuesCount());
-            StatisticRange intersectRange = range.intersect(new StatisticRange(literal, literal, 1));
-
-            double filterFactor = range.overlapPercentWith(intersectRange);
-
-            return input.mapOutputRowCount(x -> filterFactor * x)
-                    .mapSymbolColumnStatistics(symbol, x -> buildFrom(x)
-                            .setNullsFraction(0.0)
-                            .setDistinctValuesCount(x.getDistinctValuesCount() - 1)
-                            .setAverageRowSize(x.getAverageRowSize())
-                            .build());
-        }
-
-        private PlanNodeStatsEstimate symbolToLiteralEquality(Symbol symbol, double literal)
-        {
-            SymbolStatsEstimate symbolStats = input.getSymbolStatistics(symbol);
-
-            StatisticRange range = new StatisticRange(symbolStats.getLowValue(), symbolStats.getHighValue(), symbolStats.getDistinctValuesCount());
-            StatisticRange intersectRange = range.intersect(new StatisticRange(literal, literal, 1));
-
-            double filterFactor = range.overlapPercentWith(intersectRange);
-            SymbolStatsEstimate symbolNewEstimate =
-                    SymbolStatsEstimate.builder()
-                            .setAverageRowSize(symbolStats.getAverageRowSize())
-                            .setDistinctValuesCount(1)
-                            .setHighValue(intersectRange.getHigh())
-                            .setLowValue(intersectRange.getLow())
-                            .setNullsFraction(0.0).build();
-
-            return input.mapOutputRowCount(x -> filterFactor * x)
-                        .mapSymbolColumnStatistics(symbol, x -> symbolNewEstimate);
-        }
-
-        private PlanNodeStatsEstimate filterStatsByFactor(double filterRate)
-        {
-            return input
-                    .mapOutputRowCount(size -> size * filterRate);
-        }
-
-        private PlanNodeStatsEstimate comparisonSymbolToSymbolStats(Symbol left, Symbol right, ComparisonExpressionType type)
-        {
-            switch (type) {
-                case EQUAL:
-                    return symbolToSymbolEquality(left, right);
-                case NOT_EQUAL:
-                case LESS_THAN:
-                case LESS_THAN_OR_EQUAL:
-                case GREATER_THAN:
-                case GREATER_THAN_OR_EQUAL:
-                case IS_DISTINCT_FROM:
-            }
-            return filterStatsByFactor(0.5); //fixme
-        }
-
-        private PlanNodeStatsEstimate symbolToSymbolEquality(Symbol left, Symbol right)
-        {
-            SymbolStatsEstimate leftStats = input.getSymbolStatistics(left);
-            SymbolStatsEstimate rightStats = input.getSymbolStatistics(right);
-
-            if (isNaN(leftStats.getDistinctValuesCount()) || isNaN(rightStats.getDistinctValuesCount())) {
-                return filterStatsByFactor(0.5); //fixme
-            }
-
-            double maxDistinctValues = max(leftStats.getDistinctValuesCount(), rightStats.getDistinctValuesCount());
-            double minDistinctValues = min(leftStats.getDistinctValuesCount(), rightStats.getDistinctValuesCount());
-
-            double filterRate = 1 / maxDistinctValues * (1 - leftStats.getNullsFraction()) * (1 - rightStats.getNullsFraction());
-
-            SymbolStatsEstimate newRightStats = buildFrom(rightStats)
-                    .setNullsFraction(0)
-                    .setDistinctValuesCount(minDistinctValues)
-                    .build();
-            SymbolStatsEstimate newLeftStats = buildFrom(leftStats)
-                    .setNullsFraction(0)
-                    .setDistinctValuesCount(minDistinctValues)
-                    .build();
-
-            return filterStatsByFactor(filterRate)
-                    .mapSymbolColumnStatistics(left, x -> newLeftStats)
-                    .mapSymbolColumnStatistics(right, x -> newRightStats);
         }
     }
 }
