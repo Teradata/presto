@@ -67,7 +67,7 @@ public class TableScanStatsRule
             Symbol symbol = entry.getKey();
             Type symbolType = types.get(symbol);
             Optional<ColumnStatistics> columnStatistics = Optional.ofNullable(tableStatistics.getColumnStatistics().get(entry.getValue()));
-            outputSymbolStats.put(symbol, columnStatistics.map(statistics -> toSymbolStatistics(statistics, session, symbolType)).orElse(UNKNOWN_STATS));
+            outputSymbolStats.put(symbol, columnStatistics.map(statistics -> toSymbolStatistics(tableStatistics, statistics, session, symbolType)).orElse(UNKNOWN_STATS));
         }
 
         return Optional.of(PlanNodeStatsEstimate.builder()
@@ -76,7 +76,7 @@ public class TableScanStatsRule
                 .build());
     }
 
-    private SymbolStatsEstimate toSymbolStatistics(ColumnStatistics columnStatistics, Session session, Type type)
+    private SymbolStatsEstimate toSymbolStatistics(TableStatistics tableStatistics, ColumnStatistics columnStatistics, Session session, Type type)
     {
         TypeStatOperatorCaller operatorCaller = new TypeStatOperatorCaller(type, metadata.getFunctionRegistry(), session.toConnectorSession());
 
@@ -87,7 +87,7 @@ public class TableScanStatsRule
                         columnStatistics.getNullsFraction().getValue()
                                 / (columnStatistics.getNullsFraction().getValue() + columnStatistics.getOnlyRangeColumnStatistics().getFraction().getValue()))
                 .setDistinctValuesCount(columnStatistics.getOnlyRangeColumnStatistics().getDistinctValuesCount().getValue())
-                .setDataSize(columnStatistics.getOnlyRangeColumnStatistics().getDataSize().getValue())
+                .setAverageRowSize(columnStatistics.getOnlyRangeColumnStatistics().getDataSize().getValue() / tableStatistics.getRowCount().getValue())
                 .build();
     }
 

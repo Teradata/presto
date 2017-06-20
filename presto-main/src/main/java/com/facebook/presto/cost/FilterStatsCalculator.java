@@ -157,7 +157,7 @@ public class FilterStatsCalculator
             double filterFactor = range.overlapPercentWith(intersectRange);
             SymbolStatsEstimate symbolNewEstimate =
                     SymbolStatsEstimate.builder()
-                            .setDataSize(filterFactor * symbolStats.getDataSize())
+                            .setAverageRowSize(symbolStats.getAverageRowSize())
                             .setDistinctValuesCount(filterFactor * intersectRange.getDistinctValuesCount())
                             .setHighValue(intersectRange.getHigh())
                             .setLowValue(intersectRange.getLow())
@@ -177,7 +177,7 @@ public class FilterStatsCalculator
             double filterFactor = range.overlapPercentWith(intersectRange);
             SymbolStatsEstimate symbolNewEstimate =
                     SymbolStatsEstimate.builder()
-                            .setDataSize(filterFactor * symbolStats.getDataSize())
+                            .setAverageRowSize(symbolStats.getAverageRowSize())
                             .setDistinctValuesCount(filterFactor * intersectRange.getDistinctValuesCount())
                             .setHighValue(intersectRange.getHigh())
                             .setLowValue(intersectRange.getLow())
@@ -200,7 +200,7 @@ public class FilterStatsCalculator
                     .mapSymbolColumnStatistics(symbol, x -> buildFrom(x)
                             .setNullsFraction(0.0)
                             .setDistinctValuesCount(x.getDistinctValuesCount() - 1)
-                            .setDataSize(x.getDataSize() * filterFactor)
+                            .setAverageRowSize(x.getAverageRowSize())
                             .build());
         }
 
@@ -214,7 +214,7 @@ public class FilterStatsCalculator
             double filterFactor = range.overlapPercentWith(intersectRange);
             SymbolStatsEstimate symbolNewEstimate =
                     SymbolStatsEstimate.builder()
-                            .setDataSize(filterFactor * symbolStats.getDataSize())
+                            .setAverageRowSize(symbolStats.getAverageRowSize())
                             .setDistinctValuesCount(1)
                             .setHighValue(intersectRange.getHigh())
                             .setLowValue(intersectRange.getLow())
