@@ -34,6 +34,16 @@ public final class Estimate
         return new Estimate(UNKNOWN_VALUE);
     }
 
+    public static final Estimate zeroValue()
+    {
+        return new Estimate(0);
+    }
+
+    public static final Estimate of(double value)
+    {
+        return new Estimate(value);
+    }
+
     public Estimate(double value)
     {
         this.value = value;
@@ -49,6 +59,11 @@ public final class Estimate
         return value;
     }
 
+    public double valueOrDefault(double defaultValue)
+    {
+        return isValueUnknown() ? defaultValue : value;
+    }
+
     public Estimate map(Function<Double, Double> mappingFunction)
     {
         if (isValueUnknown()) {
@@ -57,6 +72,54 @@ public final class Estimate
         else {
             return new Estimate(mappingFunction.apply(value));
         }
+    }
+
+    public Estimate add(Estimate other)
+    {
+        if (isValueUnknown() || other.isValueUnknown()) {
+            return unknownValue();
+        }
+        return new Estimate(value + other.getValue());
+    }
+
+    public Estimate subtract(Estimate other)
+    {
+        if (isValueUnknown() || other.isValueUnknown()) {
+            return unknownValue();
+        }
+        return new Estimate(value - other.getValue());
+    }
+
+    public Estimate divide(Estimate other)
+    {
+        if (isValueUnknown() || other.isValueUnknown()) {
+            return unknownValue();
+        }
+        return new Estimate(value / other.getValue());
+    }
+
+    public Estimate multiply(Estimate other)
+    {
+        if (isValueUnknown() || other.isValueUnknown()) {
+            return unknownValue();
+        }
+        return new Estimate(value * other.getValue());
+    }
+
+    public static Estimate max(Estimate left, Estimate right)
+    {
+        if (left.isValueUnknown() || right.isValueUnknown()) {
+            return unknownValue();
+        }
+        return Estimate.of(Math.max(left.getValue(), right.getValue()));
+    }
+
+    public static Estimate min(Estimate left, Estimate right)
+    {
+        if (left.isValueUnknown() || right.isValueUnknown()) {
+            return unknownValue();
+        }
+        return Estimate.of(Math.min(left.getValue(), right.getValue()));
     }
 
     @Override

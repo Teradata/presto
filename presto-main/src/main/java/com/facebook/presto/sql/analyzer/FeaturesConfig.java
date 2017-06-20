@@ -39,6 +39,9 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 })
 public class FeaturesConfig
 {
+    private double cpuCostWeight = 0.75;
+    private double memoryCostWeight = 0;
+    private double networkCostWeight = 0.25;
     private boolean distributedIndexJoinsEnabled;
     private boolean distributedJoinsEnabled = true;
     private boolean colocatedJoinsEnabled;
@@ -69,8 +72,45 @@ public class FeaturesConfig
     private double spillMaxUsedSpaceThreshold = 0.9;
     private boolean iterativeOptimizerEnabled = true;
     private boolean pushAggregationThroughJoin = true;
+    private boolean useNewStatsCalculator = false;
 
     private Duration iterativeOptimizerTimeout = new Duration(3, MINUTES); // by default let optimizer wait a long time in case it retrieves some data from ConnectorMetadata
+
+    public double getCpuCostWeight()
+    {
+        return cpuCostWeight;
+    }
+
+    @Config("cpu-cost-weight")
+    public FeaturesConfig setCpuCostWeight(double cpuCostWeight)
+    {
+        this.cpuCostWeight = cpuCostWeight;
+        return this;
+    }
+
+    public double getMemoryCostWeight()
+    {
+        return memoryCostWeight;
+    }
+
+    @Config("memory-cost-weight")
+    public FeaturesConfig setMemoryCostWeight(double memoryCostWeight)
+    {
+        this.memoryCostWeight = memoryCostWeight;
+        return this;
+    }
+
+    public double getNetworkCostWeight()
+    {
+        return networkCostWeight;
+    }
+
+    @Config("network-cost-weight")
+    public FeaturesConfig setNetworkCostWeight(double networkCostWeight)
+    {
+        this.networkCostWeight = networkCostWeight;
+        return this;
+    }
 
     public boolean isResourceGroupsEnabled()
     {
@@ -424,5 +464,17 @@ public class FeaturesConfig
     {
         this.pushAggregationThroughJoin = value;
         return this;
+    }
+
+    @Config("experimental.use-new-stats-calculator")
+    public FeaturesConfig setUseNewStatsCalculator(boolean useNewStatsCalculator)
+    {
+        this.useNewStatsCalculator = useNewStatsCalculator;
+        return this;
+    }
+
+    public boolean isUseNewStatsCalculator()
+    {
+        return useNewStatsCalculator;
     }
 }

@@ -13,144 +13,127 @@
  */
 package com.facebook.presto.tests;
 
-import com.facebook.presto.execution.StageInfo;
-import com.facebook.presto.spi.QueryId;
-import com.facebook.presto.sql.planner.Plan;
-import com.facebook.presto.sql.planner.plan.PlanNode;
-import com.facebook.presto.tests.statistics.Metric;
-import com.facebook.presto.tests.statistics.MetricComparator;
-import com.facebook.presto.tests.statistics.MetricComparison;
+import com.facebook.presto.tests.statistics.StatisticsAssertion;
 import com.facebook.presto.tpch.ColumnNaming;
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.io.Resources;
+import com.google.common.collect.Range;
+import io.airlift.tpch.TpchTable;
 import org.testng.annotations.Test;
 
-import java.io.IOException;
-import java.nio.charset.Charset;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.IntStream;
-
-import static com.facebook.presto.sql.planner.optimizations.PlanNodeSearcher.searchFrom;
-import static com.facebook.presto.tests.statistics.MetricComparison.Result.DIFFER;
-import static com.facebook.presto.tests.statistics.MetricComparison.Result.MATCH;
-import static com.facebook.presto.tests.statistics.MetricComparison.Result.NO_BASELINE;
-import static com.facebook.presto.tests.statistics.MetricComparison.Result.NO_ESTIMATE;
+import static com.facebook.presto.tests.statistics.MetricComparisonStrategies.absoluteError;
+import static com.facebook.presto.tests.statistics.MetricComparisonStrategies.defaultTolerance;
+import static com.facebook.presto.tests.statistics.MetricComparisonStrategies.noError;
+import static com.facebook.presto.tests.statistics.MetricComparisonStrategies.relativeError;
+import static com.facebook.presto.tests.statistics.Metrics.OUTPUT_ROW_COUNT;
 import static com.facebook.presto.tests.tpch.TpchQueryRunner.createQueryRunnerWithoutCatalogs;
-import static java.lang.String.format;
-import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
-import static java.util.stream.Collectors.groupingBy;
-import static org.testng.Assert.assertEquals;
 
 public class TestTpchDistributedStats
 {
-    public static final int NUMBER_OF_TPCH_QUERIES = 22;
-
-    DistributedQueryRunner runner;
+    private final StatisticsAssertion statisticsAssertion;
 
     public TestTpchDistributedStats()
             throws Exception
     {
-        runner = createQueryRunnerWithoutCatalogs(emptyMap(), emptyMap());
+        DistributedQueryRunner runner = createQueryRunnerWithoutCatalogs(emptyMap(), emptyMap());
         runner.createCatalog("tpch", "tpch", ImmutableMap.of(
                 "tpch.column-naming", ColumnNaming.STANDARD.name()
         ));
+        statisticsAssertion = new StatisticsAssertion(runner);
     }
 
-    @Test
-    void testEstimateForSimpleQuery()
-    {
-        String queryId = executeQuery("SELECT * FROM NATION");
-
-        Plan queryPlan = getQueryPlan(queryId);
-
-        MetricComparison rootOutputRowCountComparison = getRootOutputRowCountComparison(queryId, queryPlan);
-        assertEquals(rootOutputRowCountComparison.result(), MATCH);
-    }
-
-    private MetricComparison getRootOutputRowCountComparison(String queryId, Plan queryPlan)
-    {
-        List<MetricComparison> comparisons = new MetricComparator().getMetricComparisons(queryPlan, getOutputStageInfo(queryId));
-        return comparisons.stream()
-                .filter(comparison -> comparison.getMetric().equals(Metric.OUTPUT_ROW_COUNT))
-                .filter(comparison -> comparison.getPlanNode().equals(queryPlan.getRoot()))
-                .findFirst()
-                .orElseThrow(() -> new AssertionError("No comparison for root node found"));
-    }
-
-    /**
-     * This is a development tool for manual inspection of differences between
-     * cost estimates and actual execution costs. Its outputs need to be inspected
-     * manually because at this point no sensible assertions can be formulated
-     * for the entirety of TPCH queries.
-     */
     @Test(enabled = false)
-    void testCostEstimatesVsRealityDifferences()
+    void testTableScanStats()
     {
-        IntStream.rangeClosed(1, NUMBER_OF_TPCH_QUERIES)
-                .filter(i -> i != 15) //query 15 creates a view, which TPCH connector does not support.
-                .forEach(i -> summarizeQuery(i, getTpchQuery(i)));
+        TpchTable.getTables()
+                .forEach(table -> statisticsAssertion.check("SELECT * FROM " + table.getTableName(),
+                        checks -> checks
+                                // TODO use noError
+                                .estimate(OUTPUT_ROW_COUNT, defaultTolerance())));
     }
 
-    private String getTpchQuery(int i)
+    @Test(enabled = false)
+    void testFilter()
     {
-        try {
-            String queryClassPath = "/io/airlift/tpch/queries/q" + i + ".sql";
-            return Resources.toString(getClass().getResource(queryClassPath), Charset.defaultCharset());
-        }
-        catch (IOException e) {
-            throw Throwables.propagate(e);
-        }
+        String query = "" +
+                "SELECT * " +
+                "FROM lineitem " +
+                "WHERE l_shipdate <= DATE '1998-12-01' - INTERVAL '90' DAY";
+        statisticsAssertion.check(query,
+                checks -> checks
+                        .estimate(OUTPUT_ROW_COUNT, relativeError(Range.closed(-.55, -.45))));
     }
 
-    private Plan getQueryPlan(String queryId)
+    @Test(enabled = false)
+    void testJoin()
     {
-        return runner.getQueryPlan(new QueryId(queryId));
+        statisticsAssertion.check("SELECT * FROM  part, partsupp WHERE p_partkey = ps_partkey",
+                checks -> checks
+                        .estimate(OUTPUT_ROW_COUNT, relativeError(Range.closed(.95, 1.05))));
     }
 
-    private void summarizeQuery(int queryNumber, String query)
+    @Test(enabled = false)
+    void testSetOperations()
     {
-        String queryId = executeQuery(query);
-        Plan queryPlan = getQueryPlan(queryId);
+        statisticsAssertion.check("SELECT * FROM nation UNION SELECT * FROM nation",
+                checks -> checks
+                        .noEstimate(OUTPUT_ROW_COUNT));
 
-        List<PlanNode> allPlanNodes = searchFrom(queryPlan.getRoot()).findAll();
+        statisticsAssertion.check("SELECT * FROM nation INTERSECT SELECT * FROM nation",
+                checks -> checks
+                        .noEstimate(OUTPUT_ROW_COUNT));
 
-        System.out.println(format("Query TPCH [%s] produces [%s] plan nodes.\n", queryNumber, allPlanNodes.size()));
-
-        List<MetricComparison> comparisons = new MetricComparator().getMetricComparisons(queryPlan, getOutputStageInfo(queryId));
-
-        Map<Metric, Map<MetricComparison.Result, List<MetricComparison>>> metricSummaries =
-                comparisons.stream()
-                        .collect(groupingBy(MetricComparison::getMetric, groupingBy(MetricComparison::result)));
-
-        metricSummaries.forEach((metricName, resultSummaries) -> {
-            System.out.println(format("Summary for metric [%s]", metricName));
-            outputSummary(resultSummaries, NO_ESTIMATE);
-            outputSummary(resultSummaries, NO_BASELINE);
-            outputSummary(resultSummaries, DIFFER);
-            outputSummary(resultSummaries, MATCH);
-            System.out.println();
-        });
-
-        System.out.println("Detailed results:\n");
-
-        comparisons.forEach(System.out::println);
+        statisticsAssertion.check("SELECT * FROM nation EXCEPT SELECT * FROM nation",
+                checks -> checks
+                        .noEstimate(OUTPUT_ROW_COUNT));
     }
 
-    private String executeQuery(String query)
+    @Test(enabled = false)
+    void testEnforceSingleRow()
     {
-        return runner.executeWithQueryId(runner.getDefaultSession(), query).getQueryId();
+        String query = "SELECT (SELECT n_regionkey FROM nation WHERE n_name = 'Germany')";
+        statisticsAssertion.check(query,
+                checks -> checks
+                        .estimate(OUTPUT_ROW_COUNT, noError()));
     }
 
-    private StageInfo getOutputStageInfo(String queryId)
+    @Test(enabled = false)
+    void testValues()
     {
-        return runner.getQueryInfo(new QueryId(queryId)).getOutputStage().get();
+        String query = "VALUES 1";
+        statisticsAssertion.check(query,
+                checks -> checks
+                        .estimate(OUTPUT_ROW_COUNT, noError()));
     }
 
-    private void outputSummary(Map<MetricComparison.Result, List<MetricComparison>> resultSummaries, MetricComparison.Result result)
+    @Test(enabled = false)
+    void testSemiJoin()
     {
-        System.out.println(format("[%s]\t-\t[%s]", result, resultSummaries.getOrDefault(result, emptyList()).size()));
+        statisticsAssertion.check("SELECT * FROM nation WHERE n_regionkey IN (SELECT r_regionkey FROM region)",
+                checks -> checks
+                        .estimate(OUTPUT_ROW_COUNT, noError()));
+        statisticsAssertion.check("SELECT * FROM nation WHERE n_regionkey IN (SELECT r_regionkey FROM region WHERE r_regionkey % 3 = 0)",
+                checks -> checks
+                        .estimate(OUTPUT_ROW_COUNT, absoluteError(Range.singleton(15.))));
+    }
+
+    @Test(enabled = false)
+    void testLimit()
+    {
+        statisticsAssertion.check("SELECT * FROM nation LIMIT 10",
+                checks -> checks
+                        .estimate(OUTPUT_ROW_COUNT, noError()));
+    }
+
+    @Test(enabled = false)
+    void testGroupBy()
+    {
+        String query = "" +
+                "SELECT l_returnflag, l_linestatus " +
+                "FROM lineitem " +
+                "GROUP BY l_returnflag, l_linestatus";
+        statisticsAssertion.check(query,
+                checks -> checks
+                        .noEstimate(OUTPUT_ROW_COUNT));
     }
 }
