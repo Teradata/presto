@@ -20,6 +20,7 @@ import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.ValuesNode;
+import com.facebook.presto.type.UnknownType;
 import com.google.common.collect.ImmutableList;
 
 import java.util.List;
