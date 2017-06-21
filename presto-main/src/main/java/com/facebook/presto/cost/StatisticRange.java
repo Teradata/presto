@@ -73,7 +73,8 @@ public class StatisticRange
         return NaN;
     }
 
-    private double overlappingDistinctValues(StatisticRange other) {
+    private double overlappingDistinctValues(StatisticRange other)
+    {
         double overlapPercentOfLeft = overlapPercentWith(other);
         double overlapPercentOfRight = other.overlapPercentWith(this);
         double overlapDistinctValuesLeft = overlapPercentOfLeft * distinctValues;
@@ -105,6 +106,20 @@ public class StatisticRange
 
     public StatisticRange subtract(StatisticRange rightRange)
     {
-        return null;
+        StatisticRange intersect = intersect(rightRange);
+        double newLow = getLow();
+        double newHigh = getHigh();
+        if (intersect.getLow() == getLow()) {
+            newLow = intersect.getHigh();
+        }
+        if (intersect.getHigh() == getHigh()) {
+            newHigh = intersect.getLow();
+        }
+        if (newLow > newHigh) {
+            newLow = NaN;
+            newHigh = NaN;
+        }
+
+        return new StatisticRange(newLow, newHigh, getDistinctValuesCount() * overlapPercentWith(intersect));
     }
 }
