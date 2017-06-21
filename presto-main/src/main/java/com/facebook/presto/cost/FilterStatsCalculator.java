@@ -32,11 +32,11 @@ import javax.inject.Inject;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.NaN;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 import static java.lang.String.format;
-import static org.weakref.jmx.internal.guava.base.Preconditions.checkState;
 
 public class FilterStatsCalculator
 {
