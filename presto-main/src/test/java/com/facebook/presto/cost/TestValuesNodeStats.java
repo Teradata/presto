@@ -21,6 +21,7 @@ import org.testng.annotations.Test;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder.expression;
+import static com.facebook.presto.type.UnknownType.UNKNOWN;
 import static java.lang.Double.NaN;
 
 public class TestValuesNodeStats
@@ -70,23 +71,35 @@ public class TestValuesNodeStats
     public void testStatsForValuesNodeWithJustNulls()
             throws Exception
     {
+        PlanNodeStatsEstimate nullAStats = PlanNodeStatsEstimate.builder()
+                .setOutputRowCount(1)
+                .addSymbolStatistics(
+                        new Symbol("a"),
+                        SymbolStatsEstimate.builder()
+                                .setLowValue(NaN)
+                                .setHighValue(NaN)
+                                .setNullsFraction(1.0)
+                                .setDistinctValuesCount(0.0)
+                                .build())
+                .build();
+
         tester.assertStatsFor(pb -> pb
                 .values(ImmutableList.of(pb.symbol("a", BIGINT)),
                         ImmutableList.of(
-                                ImmutableList.of(expression("3 + null")),
+                                ImmutableList.of(expression("3 + null")))))
+                .check(outputStats -> outputStats.equalTo(nullAStats));
+
+        tester.assertStatsFor(pb -> pb
+                .values(ImmutableList.of(pb.symbol("a", BIGINT)),
+                        ImmutableList.of(
                                 ImmutableList.of(expression("null")))))
-                .check(outputStats -> outputStats.equalTo(
-                        PlanNodeStatsEstimate.builder()
-                                .setOutputRowCount(2)
-                                .addSymbolStatistics(
-                                        new Symbol("a"),
-                                        SymbolStatsEstimate.builder()
-                                                .setLowValue(NaN)
-                                                .setHighValue(NaN)
-                                                .setNullsFraction(1.0)
-                                                .setDistinctValuesCount(0.0)
-                                                .build())
-                                .build()));
+                .check(outputStats -> outputStats.equalTo(nullAStats));
+
+        tester.assertStatsFor(pb -> pb
+                .values(ImmutableList.of(pb.symbol("a", UNKNOWN)),
+                        ImmutableList.of(
+                                ImmutableList.of(expression("null")))))
+                .check(outputStats -> outputStats.equalTo(nullAStats));
     }
 
     @Test

@@ -20,6 +20,7 @@ import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.ValuesNode;
+import com.facebook.presto.type.UnknownType;
 import com.google.common.collect.ImmutableList;
 
 import java.util.List;
@@ -28,8 +29,10 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.stream.DoubleStream;
+import java.util.stream.IntStream;
 
 import static com.facebook.presto.sql.planner.ExpressionInterpreter.evaluateConstantExpression;
+import static com.facebook.presto.type.UnknownType.UNKNOWN;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.stream.Collectors.toList;
 
@@ -65,6 +68,12 @@ public class ValuesStatsRule
 
     private List<Object> getSymbolValues(ValuesNode valuesNode, int symbolId, Session session, Type symbolType)
     {
+        if (UNKNOWN.equals(symbolType)) {
+            // special casing for UNKNOWN as evaluateConstantExpression does not handle that
+            return IntStream.range(0, valuesNode.getRows().size())
+                    .mapToObj(rowId -> null)
+                    .collect(toList());
+        }
         return valuesNode.getRows().stream()
                 .map(row -> row.get(symbolId))
                 .map(expression -> evaluateConstantExpression(expression, symbolType, metadata, session, ImmutableList.of()))
