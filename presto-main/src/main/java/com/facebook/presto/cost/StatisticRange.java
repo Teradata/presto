@@ -16,6 +16,8 @@ package com.facebook.presto.cost;
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.NaN;
 import static java.lang.Double.isNaN;
+import static java.lang.Math.max;
+import static java.lang.Math.min;
 
 public class StatisticRange
 {
@@ -25,7 +27,7 @@ public class StatisticRange
 
     public StatisticRange(double low, double high, double distinctValues)
     {
-        checkState(low <= high || (isNaN(low) && isNaN(high)));
+        checkState(low <= high || (isNaN(low) && isNaN(high)), "Low must be smaller or equal to high or range must be empty (NaN, NaN)");
         this.low = low;
         this.high = high;
         this.distinctValues = distinctValues;
@@ -58,30 +60,47 @@ public class StatisticRange
 
     public double overlapPercentWith(StatisticRange other)
     {
-        if (length() > 0) {
-            return intersect(other).length() / length();
+        double lengthOfIntersect = min(high, other.high) - max(low, other.low);
+        if (lengthOfIntersect > 0) {
+            return lengthOfIntersect / length();
         }
-        if (length() == 0) {
+        if (lengthOfIntersect == 0) {
             return 1 / distinctValues;
+        }
+        if (lengthOfIntersect < 0) {
+            return 0;
         }
         return NaN;
     }
 
+    private double overlappingDistinctValues(StatisticRange other) {
+        double overlapPercentOfLeft = overlapPercentWith(other);
+        double overlapPercentOfRight = other.overlapPercentWith(this);
+        double overlapDistinctValuesLeft = overlapPercentOfLeft * distinctValues;
+        double overlapDistinctValuesRight = overlapPercentOfRight * other.distinctValues;
+        return min(overlapDistinctValuesLeft, overlapDistinctValuesRight);
+    }
+
     public StatisticRange intersect(StatisticRange other)
     {
-        double newLow = Math.max(low, other.low);
-        double newHigh = Math.min(high, other.high);
+        double newLow = max(low, other.low);
+        double newHigh = min(high, other.high);
         if (newLow < newHigh) {
-            return new StatisticRange(newLow, newHigh, (newHigh - newLow) / length());
+            return new StatisticRange(newLow, newHigh, overlappingDistinctValues(other));
         }
         return empty();
     }
 
     public StatisticRange union(StatisticRange other)
     {
-        return new StatisticRange(Math.min(low, other.low),
-                Math.max(high, other.high),
-                (distinctValues * (1 - overlapPercentWith(other))) + other.distinctValues);
+        double overlapPercentOfLeft = overlapPercentWith(other);
+        double overlapPercentOfRight = other.overlapPercentWith(this);
+        double overlapDistinctValuesLeft = overlapPercentOfLeft * distinctValues;
+        double overlapDistinctValuesRight = overlapPercentOfRight * other.distinctValues;
+        double overlapDistinctValuesOptimistic = min(overlapDistinctValuesLeft, overlapDistinctValuesRight);
+        double newDistinctValues = distinctValues + other.distinctValues - overlapDistinctValuesOptimistic;
+
+        return new StatisticRange(min(low, other.low), max(high, other.high), newDistinctValues);
     }
 
     public StatisticRange subtract(StatisticRange rightRange)
