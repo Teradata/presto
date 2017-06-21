@@ -33,5 +33,5 @@ For example, for a ``ScanFilterProject`` operator three cost structures will be 
  * the second will correspond to ``Filter`` part of opertor
  * the third will corresponde to ``Project`` part of operator
 
-Estimated cost is also printed in ``EXPLAIN ANALYZE`` output as an addition to actual runtime statistics.
+Estimated cost is also printed in ``EXPLAIN ANALYZE`` in addition to actual runtime statistics.
 
