@@ -66,7 +66,7 @@ public class LogicalExpressionStatsCalculator
                 .setDistinctValuesCount(leftStats.getDistinctValuesCount() - rightStats.getDistinctValuesCount())
                 .setHighValue(subtracted.getHigh())
                 .setLowValue(subtracted.getLow())
-                .setAverageRowSize((totalSizeLeft - totalSizeRight) / newRowCount) //FIXME? // left and right should be equal in most cases anyway
+                .setAverageRowSize((totalSizeLeft - totalSizeRight) / newRowCount)
                 .setNullsFraction((nullsCountLeft - nullsCountRight) / newRowCount)
                 .build();
     }
