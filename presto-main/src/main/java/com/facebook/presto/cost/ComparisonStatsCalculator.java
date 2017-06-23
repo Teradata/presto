@@ -33,6 +33,16 @@ public class ComparisonStatsCalculator
         this.inputStatistics = inputStatistics;
     }
 
+    public static double nullsFilterFactor(SymbolStatsEstimate symbolStats)
+    {
+        StatisticRange statisticRange = new StatisticRange(symbolStats.getLowValue(), symbolStats.getHighValue(), symbolStats.getDistinctValuesCount());
+
+        if (statisticRange.isEmpty()) {
+            return 1.0; // If there are no values at all, we can avoid making output row count NaN as we know 1.0 is best value we can serve
+        }
+        return symbolStats.getNullsFraction();
+    }
+
     public PlanNodeStatsEstimate comparisonSymbolToLiteralStats(Symbol symbol, double doubleLiteral, ComparisonExpressionType type)
     {
         switch (type) {
@@ -69,8 +79,8 @@ public class ComparisonStatsCalculator
                         .setLowValue(intersectRange.getLow())
                         .setNullsFraction(0.0).build();
 
-        return inputStatistics.mapOutputRowCount(x -> filterFactor * x * nullsFilterFactor(symbolStats))
-                .mapSymbolColumnStatistics(symbol, x -> symbolNewEstimate);
+        return inputStatistics.mapOutputRowCount(rowCount -> filterFactor * (1 - nullsFilterFactor(symbolStats)) * rowCount)
+                .mapSymbolColumnStatistics(symbol, oldStats -> symbolNewEstimate);
     }
 
     private PlanNodeStatsEstimate symbolToLiteralLessThan(Symbol symbol, double literal)
@@ -89,8 +99,8 @@ public class ComparisonStatsCalculator
                         .setLowValue(intersectRange.getLow())
                         .setNullsFraction(0.0).build();
 
-        return inputStatistics.mapOutputRowCount(x -> filterFactor * x * nullsFilterFactor(symbolStats))
-                .mapSymbolColumnStatistics(symbol, x -> symbolNewEstimate);
+        return inputStatistics.mapOutputRowCount(rowCount -> filterFactor * (1 - nullsFilterFactor(symbolStats)) * rowCount)
+                .mapSymbolColumnStatistics(symbol, oldStats -> symbolNewEstimate);
     }
 
     private PlanNodeStatsEstimate symbolToLiteralNonEquality(Symbol symbol, double literal)
@@ -102,11 +112,11 @@ public class ComparisonStatsCalculator
 
         double filterFactor = 1 - range.overlapPercentWith(intersectRange);
 
-        return inputStatistics.mapOutputRowCount(x -> filterFactor * x * nullsFilterFactor(symbolStats))
-                .mapSymbolColumnStatistics(symbol, x -> buildFrom(x)
+        return inputStatistics.mapOutputRowCount(rowCount -> filterFactor * (1 - nullsFilterFactor(symbolStats)) * rowCount)
+                .mapSymbolColumnStatistics(symbol, oldStats -> buildFrom(oldStats)
                         .setNullsFraction(0.0)
-                        .setDistinctValuesCount(max(x.getDistinctValuesCount() - 1, 0))
-                        .setAverageRowSize(x.getAverageRowSize())
+                        .setDistinctValuesCount(max(oldStats.getDistinctValuesCount() - 1, 0))
+                        .setAverageRowSize(oldStats.getAverageRowSize())
                         .build());
     }
 
@@ -126,16 +136,8 @@ public class ComparisonStatsCalculator
                         .setLowValue(intersectRange.getLow())
                         .setNullsFraction(0.0).build();
 
-        return inputStatistics.mapOutputRowCount(x -> filterFactor * x * nullsFilterFactor(symbolStats))
-                .mapSymbolColumnStatistics(symbol, x -> symbolNewEstimate);
-    }
-
-    private double nullsFilterFactor(SymbolStatsEstimate symbolStats)
-    {
-        if (isNaN(symbolStats.getNullsFraction())) {
-            return 0.0; // If we don't know nullsFraction it means that there are no values at all, in this case we can avoid making output row count NaN as we know it should be 0
-        }
-        return (1 - symbolStats.getNullsFraction());
+        return inputStatistics.mapOutputRowCount(rowCount -> filterFactor * (1 - nullsFilterFactor(symbolStats)) * rowCount)
+                .mapSymbolColumnStatistics(symbol, oldStats -> symbolNewEstimate);
     }
 
     public PlanNodeStatsEstimate comparisonSymbolToSymbolStats(Symbol left, Symbol right, ComparisonExpressionType type)
@@ -177,7 +179,7 @@ public class ComparisonStatsCalculator
                 .build();
 
         return inputStatistics.mapOutputRowCount(size -> size * filterRate)
-                .mapSymbolColumnStatistics(left, x -> newLeftStats)
-                .mapSymbolColumnStatistics(right, x -> newRightStats);
+                .mapSymbolColumnStatistics(left, oldLeftStats -> newLeftStats)
+                .mapSymbolColumnStatistics(right, oldRightStats -> newRightStats);
     }
 }
