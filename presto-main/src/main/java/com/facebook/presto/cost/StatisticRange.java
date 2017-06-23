@@ -71,6 +71,10 @@ public class StatisticRange
 
     public double overlapPercentWith(StatisticRange other)
     {
+        if (this.equals(other)) {
+            return 1.0;
+        }
+
         if (isEmpty() || other.isEmpty()) {
             return 0.0; // zero is better than NaN as it will behave properly for calculating row count
         }
@@ -148,5 +152,19 @@ public class StatisticRange
         }
 
         return new StatisticRange(newLow, newHigh, getDistinctValuesCount() * overlapPercentWith(intersect));
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof StatisticRange)) {
+            return false;
+        }
+        StatisticRange other = (StatisticRange) obj;
+        return low == other.low &&
+                high == other.high &&
+                distinctValues == other.distinctValues;
     }
 }
