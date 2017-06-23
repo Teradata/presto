@@ -15,6 +15,7 @@ package com.facebook.presto.cost;
 
 import java.util.stream.Stream;
 
+import static com.facebook.presto.cost.ComparisonStatsCalculator.nullsFilterFactor;
 import static java.lang.Double.max;
 import static java.lang.Double.min;
 
@@ -27,7 +28,12 @@ public class LogicalExpressionStatsCalculator
         this.inputStatistics = inputStatistics;
     }
 
-    public PlanNodeStatsEstimate subtractStats(PlanNodeStatsEstimate left, PlanNodeStatsEstimate right)
+    public PlanNodeStatsEstimate negateStats(PlanNodeStatsEstimate innerStats)
+    {
+        return subtractStats(inputStatistics, innerStats);
+    }
+
+    public static PlanNodeStatsEstimate subtractStats(PlanNodeStatsEstimate left, PlanNodeStatsEstimate right)
     {
         PlanNodeStatsEstimate.Builder statsBuilder = PlanNodeStatsEstimate.builder();
         double newRowCount = left.getOutputRowCount() - right.getOutputRowCount();
@@ -45,21 +51,22 @@ public class LogicalExpressionStatsCalculator
         return statsBuilder.setOutputRowCount(newRowCount).build();
     }
 
-    private SymbolStatsEstimate subtractColumnStats(SymbolStatsEstimate leftStats, double leftRowCount, SymbolStatsEstimate rightStats, double rightRowCount, double newRowCount)
+    private static SymbolStatsEstimate subtractColumnStats(SymbolStatsEstimate leftStats, double leftRowCount, SymbolStatsEstimate rightStats, double rightRowCount, double newRowCount)
     {
         StatisticRange leftRange = new StatisticRange(leftStats.getLowValue(), leftStats.getHighValue(), leftStats.getDistinctValuesCount());
         StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
 
-        StatisticRange union = leftRange.subtract(rightRange);
+        StatisticRange subtracted = leftRange.subtract(rightRange);
         double nullsCountLeft = leftStats.getNullsFraction() * leftRowCount;
         double nullsCountRight = rightStats.getNullsFraction() * rightRowCount;
-        double innerFilterFactor = nullsCountRight / nullsCountLeft;
+        double totalSizeLeft = leftRowCount * leftStats.getAverageRowSize();
+        double totalSizeRight = rightRowCount * rightStats.getAverageRowSize();
 
         return SymbolStatsEstimate.builder()
-                .setDistinctValuesCount(union.getDistinctValuesCount())
-                .setHighValue(union.getHigh())
-                .setLowValue(union.getLow())
-                .setAverageRowSize(leftStats.getAverageRowSize() * innerFilterFactor - (rightStats.getAverageRowSize() - leftStats.getAverageRowSize()) * (1 - innerFilterFactor)) //FIXME? // left and right should be equal in most cases anyway
+                .setDistinctValuesCount(leftStats.getDistinctValuesCount() - rightStats.getDistinctValuesCount())
+                .setHighValue(subtracted.getHigh())
+                .setLowValue(subtracted.getLow())
+                .setAverageRowSize((totalSizeLeft - totalSizeRight) / newRowCount) //FIXME? // left and right should be equal in most cases anyway
                 .setNullsFraction((nullsCountLeft - nullsCountRight) / newRowCount)
                 .build();
     }
@@ -108,10 +115,14 @@ public class LogicalExpressionStatsCalculator
     {
         PlanNodeStatsEstimate.Builder statsBuilder = PlanNodeStatsEstimate.builder();
 
-        double minFilterFactor = Stream.concat(left.getSymbolsWithKnownStatistics().stream(), right.getSymbolsWithKnownStatistics().stream())
-                .mapToDouble(symbol -> filterFactorOfIntersect(inputStatistics.getSymbolStatistics(symbol), left.getSymbolStatistics(symbol), right.getSymbolStatistics(symbol)))
-                .min().orElse(1.0);
-        double newRowCount = minFilterFactor * inputStatistics.getOutputRowCount();
+        double newRowCount = Stream.concat(left.getSymbolsWithKnownStatistics().stream(), right.getSymbolsWithKnownStatistics().stream())
+                .mapToDouble(symbol ->
+                        rowCountOfIntersect(inputStatistics.getSymbolStatistics(symbol),
+                                left.getSymbolStatistics(symbol),
+                                left.getOutputRowCount(),
+                                right.getSymbolStatistics(symbol),
+                                right.getOutputRowCount()))
+                .min().orElse(0.0);
 
         Stream.concat(left.getSymbolsWithKnownStatistics().stream(), right.getSymbolsWithKnownStatistics().stream())
                 .forEach(symbol -> {
@@ -123,6 +134,15 @@ public class LogicalExpressionStatsCalculator
                 });
 
         return statsBuilder.setOutputRowCount(newRowCount).build();
+    }
+
+    private double rowCountOfIntersect(SymbolStatsEstimate inputStats, SymbolStatsEstimate leftStats, double leftRows, SymbolStatsEstimate rightStats, double rightRows)
+    {
+        double nullsCountLeft = nullsFilterFactor(leftStats) * rightRows;
+        double nullsCountRight = nullsFilterFactor(rightStats) * leftRows;
+        double nonNullRowCount = filterFactorOfIntersect(inputStats, leftStats, rightStats) * inputStatistics.getOutputRowCount();
+
+        return nonNullRowCount + min(nullsCountLeft, nullsCountRight);
     }
 
     private double filterFactorOfIntersect(SymbolStatsEstimate inputStats, SymbolStatsEstimate leftStats, SymbolStatsEstimate rightStats)

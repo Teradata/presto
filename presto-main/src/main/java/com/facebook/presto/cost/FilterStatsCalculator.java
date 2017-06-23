@@ -87,7 +87,7 @@ public class FilterStatsCalculator
         {
             LogicalExpressionStatsCalculator expressionStatsCalculator = new LogicalExpressionStatsCalculator(input);
             PlanNodeStatsEstimate innerStats = process(node.getValue());
-            return expressionStatsCalculator.subtractStats(input, innerStats);
+            return expressionStatsCalculator.negateStats(innerStats);
         }
 
         @Override
