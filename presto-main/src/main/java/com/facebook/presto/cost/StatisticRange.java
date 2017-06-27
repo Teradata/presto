@@ -122,16 +122,9 @@ public class StatisticRange
         return empty();
     }
 
-    public StatisticRange union(StatisticRange other)
+    public StatisticRange add(StatisticRange other)
     {
-        double overlapPercentOfLeft = overlapPercentWith(other);
-        double overlapPercentOfRight = other.overlapPercentWith(this);
-        double overlapDistinctValuesLeft = overlapPercentOfLeft * distinctValues;
-        double overlapDistinctValuesRight = overlapPercentOfRight * other.distinctValues;
-        double overlapDistinctValuesOptimistic = min(overlapDistinctValuesLeft, overlapDistinctValuesRight);
-
-        double newDistinctValues = distinctValues + other.distinctValues - overlapDistinctValuesOptimistic;
-
+        double newDistinctValues = distinctValues + other.distinctValues;
         return new StatisticRange(min(low, other.low), max(high, other.high), newDistinctValues);
     }
 
