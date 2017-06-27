@@ -186,13 +186,13 @@ public class TestLogicalExpressionStatsCalculator
         Expression innerExpression = new ComparisonExpression(ComparisonExpressionType.LESS_THAN, new SymbolReference("x"), new DoubleLiteral("0.0"));
 
         assertNot(innerExpression)
-                .outputRowsCount(375)
+                .outputRowsCount(625) // FIXME - nulls shouldn't be restored
                 .symbolStats(new Symbol("x"), symbolAssert ->
                         symbolAssert.averageRowSize(4.0)
                                 .lowValue(0.0)
                                 .highValue(10.0)
                                 .distinctValuesCount(20.0)
-                                .nullsFraction(0.0) // 40 nulls in INNER and universe has 250 nulls. 600 is new row count
+                                .nullsFraction(0.4) // FIXME - nulls shouldn't be restored
                 );
     }
 }
