@@ -53,6 +53,9 @@ public class LogicalExpressionStatsCalculator
 
     private static SymbolStatsEstimate subtractColumnStats(SymbolStatsEstimate leftStats, double leftRowCount, SymbolStatsEstimate rightStats, double rightRowCount, double newRowCount)
     {
+        if (leftStats.equals(rightStats)) {
+            return leftStats; // HACK - there should be other way to determine if symbol was touched at all. This way not (symbol1 = symbol1) will not work.
+        }
         StatisticRange leftRange = new StatisticRange(leftStats.getLowValue(), leftStats.getHighValue(), leftStats.getDistinctValuesCount());
         StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
 
@@ -75,9 +78,7 @@ public class LogicalExpressionStatsCalculator
     {
         PlanNodeStatsEstimate.Builder statsBuilder = PlanNodeStatsEstimate.builder();
 
-        double leftFilterFactor = left.getOutputRowCount() / inputStatistics.getOutputRowCount();
-        double rightFilterFactor = right.getOutputRowCount() / inputStatistics.getOutputRowCount();
-        double totalRowsWithOverlaps = (leftFilterFactor + rightFilterFactor) * inputStatistics.getOutputRowCount();
+        double totalRowsWithOverlaps = left.getOutputRowCount() + right.getOutputRowCount();
         double intersectingRows = intersectStats(left, right).getOutputRowCount();
         double newRowCount = totalRowsWithOverlaps - intersectingRows;
 
@@ -95,6 +96,9 @@ public class LogicalExpressionStatsCalculator
 
     private SymbolStatsEstimate unionColumnStats(SymbolStatsEstimate leftStats, double leftRows, SymbolStatsEstimate rightStats, double rightRows, double newRowCount)
     {
+        if (leftStats.equals(rightStats)) {
+            return leftStats;
+        }
         StatisticRange leftRange = new StatisticRange(leftStats.getLowValue(), leftStats.getHighValue(), leftStats.getDistinctValuesCount());
         StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
 
@@ -117,8 +121,7 @@ public class LogicalExpressionStatsCalculator
 
         double newRowCount = Stream.concat(left.getSymbolsWithKnownStatistics().stream(), right.getSymbolsWithKnownStatistics().stream())
                 .mapToDouble(symbol ->
-                        rowCountOfIntersect(inputStatistics.getSymbolStatistics(symbol),
-                                left.getSymbolStatistics(symbol),
+                        rowsOfIntersect(left.getSymbolStatistics(symbol),
                                 left.getOutputRowCount(),
                                 right.getSymbolStatistics(symbol),
                                 right.getOutputRowCount()))
@@ -136,22 +139,24 @@ public class LogicalExpressionStatsCalculator
         return statsBuilder.setOutputRowCount(newRowCount).build();
     }
 
-    private double rowCountOfIntersect(SymbolStatsEstimate inputStats, SymbolStatsEstimate leftStats, double leftRows, SymbolStatsEstimate rightStats, double rightRows)
+    private double rowsOfIntersect(SymbolStatsEstimate leftStats, double leftRows, SymbolStatsEstimate rightStats, double rightRows)
     {
-        double nullsCountLeft = nullsFilterFactor(leftStats) * rightRows;
-        double nullsCountRight = nullsFilterFactor(rightStats) * leftRows;
-        double nonNullRowCount = filterFactorOfIntersect(inputStats, leftStats, rightStats) * inputStatistics.getOutputRowCount();
+        double nullsCountLeft = nullsFilterFactor(leftStats) * leftRows;
+        double nullsCountRight = nullsFilterFactor(rightStats) * rightRows;
+        double nonNullRowCount = nonNullRowsOfIntersect(leftStats, leftRows, rightStats, rightRows);
 
         return nonNullRowCount + min(nullsCountLeft, nullsCountRight);
     }
 
-    private double filterFactorOfIntersect(SymbolStatsEstimate inputStats, SymbolStatsEstimate leftStats, SymbolStatsEstimate rightStats)
+    private double nonNullRowsOfIntersect(SymbolStatsEstimate leftStats, double leftRows, SymbolStatsEstimate rightStats, double rightRows)
     {
-        StatisticRange inputRange = new StatisticRange(inputStats.getLowValue(), inputStats.getHighValue(), inputStats.getDistinctValuesCount());
         StatisticRange leftRange = new StatisticRange(leftStats.getLowValue(), leftStats.getHighValue(), leftStats.getDistinctValuesCount());
         StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
+        double notNullLeftRows = leftRows * (1 - nullsFilterFactor(leftStats));
+        double notNullRightRows = rightRows * (1 - nullsFilterFactor(rightStats));
 
-        return inputRange.overlapPercentWith(leftRange.intersect(rightRange));
+        return min(max(leftRange.overlapPercentWith(rightRange) * notNullLeftRows, rightRange.overlapPercentWith(leftRange) * notNullRightRows),
+                   min(notNullLeftRows, notNullRightRows));
     }
 
     private SymbolStatsEstimate intersectColumnStats(SymbolStatsEstimate leftStats, double leftRows, SymbolStatsEstimate rightStats, double rightRows, double newRowCount)
@@ -160,8 +165,8 @@ public class LogicalExpressionStatsCalculator
         StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
 
         StatisticRange intersect = leftRange.intersect(rightRange);
-        double nullsCountLeft = leftStats.getNullsFraction() * rightRows;
-        double nullsCountRight = rightStats.getNullsFraction() * leftRows;
+        double nullsCountLeft = nullsFilterFactor(leftStats) * leftRows;
+        double nullsCountRight = nullsFilterFactor(rightStats) * rightRows;
 
         return SymbolStatsEstimate.builder()
                 .setDistinctValuesCount(intersect.getDistinctValuesCount())

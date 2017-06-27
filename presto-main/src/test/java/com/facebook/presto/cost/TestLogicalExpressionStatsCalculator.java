@@ -17,10 +17,14 @@ import com.facebook.presto.sql.planner.Symbol;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
 
+import java.util.Random;
+
 import static com.facebook.presto.cost.SymbolStatsEstimate.buildFrom;
 import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.NaN;
 import static java.lang.Double.POSITIVE_INFINITY;
+import static java.lang.Double.max;
+import static java.lang.Double.min;
 
 @Test(singleThreaded = true)
 public class TestLogicalExpressionStatsCalculator
@@ -195,12 +199,130 @@ public class TestLogicalExpressionStatsCalculator
                                 .highValue(10.0)
                                 .distinctValuesCount(30.0)
                                 .nullsFraction((250.0 - 40.0) / 600.0) // 40 nulls in INNER and universe has 250 nulls. 600 is new row count
+                )
+                .symbolStats(new Symbol("y"), symbolAssert ->
+                        symbolAssert.averageRowSize(4.0)
+                                .nullsFraction(0.5)
+                                .lowValue(0.0)
+                                .highValue(5.0)
+                                .distinctValuesCount(20.0)
                 );
+    }
+
+    @Test
+    public void simpleDeMorganTest()
+    {
+        PlanNodeStatsEstimate leftStats =
+                standardInputStatistics.mapOutputRowCount(x -> x * 0.5)
+                        .mapSymbolColumnStatistics(new Symbol("x"),
+                                x ->
+                                        buildFrom(x).setAverageRowSize(4.0)
+                                                .setNullsFraction(0.1)
+                                                .setDistinctValuesCount(20.0)
+                                                .setLowValue(-5.0)
+                                                .setHighValue(5.0).build());
+
+        PlanNodeStatsEstimate rightStats =
+                standardInputStatistics.mapOutputRowCount(x -> x * 0.25)
+                        .mapSymbolColumnStatistics(new Symbol("x"),
+                                x ->
+                                        buildFrom(x).setAverageRowSize(4.0)
+                                                .setNullsFraction(0.1)
+                                                .setDistinctValuesCount(10.0)
+                                                .setLowValue(-10.0)
+                                                .setHighValue(-2.5).build());
+
+        PlanNodeStatsEstimate orStatistics = statsCalculator.unionStats(leftStats, rightStats);
+        assertOr(leftStats, rightStats)
+                .outputRowsCount(612.5)
+                .symbolStats(new Symbol("x"), symbolStatsAssertion ->
+                        symbolStatsAssertion.distinctValuesCount(26.6666666)
+                                .lowValue(-10.0)
+                                .highValue(5.0)
+                                .nullsFraction(50 / 612.5));
+
+        PlanNodeStatsEstimate andStatistics = statsCalculator.intersectStats(leftStats, rightStats);
+        assertAnd(leftStats, rightStats)
+                .outputRowsCount(137.5)
+                .symbolStats(new Symbol("x"), symbolStatsAssertion ->
+                        symbolStatsAssertion.distinctValuesCount(3.33333333)
+                                .lowValue(-5.0)
+                                .highValue(-2.5)
+                                .nullsFraction(25.0 / 137.5));
+
+        PlanNodeStatsEstimate notLeftStatistics = statsCalculator.negateStats(leftStats);
+        assertNot(leftStats)
+                .outputRowsCount(500.0)
+                .symbolStats(new Symbol("x"), symbolStatsAssertion ->
+                        symbolStatsAssertion.distinctValuesCount(20.0)
+                                .lowValue(-10.0)
+                                .highValue(10.0)
+                                .nullsFraction(200.0 / 500.0));
+
+        PlanNodeStatsEstimate notRightStatistics = statsCalculator.negateStats(rightStats);
+        assertNot(rightStats)
+                .outputRowsCount(750.0)
+                .symbolStats(new Symbol("x"), symbolStatsAssertion ->
+                        symbolStatsAssertion.distinctValuesCount(30.0)
+                                .lowValue(-2.5)
+                                .highValue(10.0)
+                                .nullsFraction(225.0 / 750.0));
+
+        PlanNodeStatsEstimate orOfNotStatistics = statsCalculator.unionStats(notLeftStatistics, notRightStatistics);
+        assertOr(notLeftStatistics, notRightStatistics)
+                .outputRowsCount(750.0)
+                .symbolStats(new Symbol("x"), symbolStatsAssertion ->
+                        symbolStatsAssertion.distinctValuesCount(37.5)
+                                .lowValue(-10.0)
+                                .highValue(10.0)
+                                .nullsFraction(300.0 / 750.0));
+
+        PlanNodeStatsEstimate andOfNotStatistics = statsCalculator.intersectStats(notLeftStatistics, notRightStatistics);
+
+        //assertNot(orStatistics).equalTo(andOfNotStatistics);
+        assertNot(andStatistics).equalTo(orOfNotStatistics);
     }
 
     @Test
     public void randomDeMorganTest()
     {
+        double TAU = Math.PI * 2; // Now this code is much better!
+        Random rand = new Random((long) (TAU * 100000000.0));
 
+        for (int i = 0; i < 1000; ++i) {
+            double lowOrHighLeft1 = rand.nextDouble() * -2.0 + 1.0;
+            double lowOrHighLeft2 = rand.nextDouble() * -2.0 + 1.0;
+            PlanNodeStatsEstimate leftStats =
+                    standardInputStatistics.mapOutputRowCount(x -> x * rand.nextDouble())
+                            .mapSymbolColumnStatistics(new Symbol("x"),
+                                    x ->
+                                            buildFrom(x).setAverageRowSize(rand.nextDouble() * 2.0 * 4.0)
+                                                    .setNullsFraction(rand.nextDouble())
+                                                    .setDistinctValuesCount(40.0 * rand.nextDouble())
+                                                    .setLowValue(min(lowOrHighLeft1, lowOrHighLeft2))
+                                                    .setHighValue(max(lowOrHighLeft1, lowOrHighLeft2)).build());
+
+            double lowOrHighRight1 = rand.nextDouble() * -2.0 + 1.0;
+            double lowOrHighRight2 = rand.nextDouble() * -2.0 + 1.0;
+            PlanNodeStatsEstimate rightStats =
+                    standardInputStatistics.mapOutputRowCount(x -> x * rand.nextDouble())
+                            .mapSymbolColumnStatistics(new Symbol("x"),
+                                    x ->
+                                            buildFrom(x).setAverageRowSize(rand.nextDouble() * 2.0 * 4.0)
+                                                    .setNullsFraction(rand.nextDouble())
+                                                    .setDistinctValuesCount(40.0 * rand.nextDouble())
+                                                    .setLowValue(min(lowOrHighRight1, lowOrHighRight2))
+                                                    .setHighValue(max(lowOrHighRight1, lowOrHighRight2)).build());
+
+            PlanNodeStatsEstimate orStatistics = statsCalculator.unionStats(leftStats, rightStats);
+            PlanNodeStatsEstimate andStatistics = statsCalculator.intersectStats(leftStats, rightStats);
+            PlanNodeStatsEstimate notLeftStatistics = statsCalculator.negateStats(leftStats);
+            PlanNodeStatsEstimate notRightStatistics = statsCalculator.negateStats(leftStats);
+            PlanNodeStatsEstimate orOfNotStatistics = statsCalculator.unionStats(notLeftStatistics, notRightStatistics);
+            PlanNodeStatsEstimate andOfNotStatistics = statsCalculator.intersectStats(notLeftStatistics, notRightStatistics);
+
+            assertNot(orStatistics).equalTo(andOfNotStatistics);
+            assertNot(andStatistics).equalTo(orOfNotStatistics);
+        }
     }
 }
