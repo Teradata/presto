@@ -113,12 +113,12 @@ public final class Metrics
         };
     }
 
-    public static Metric<Object> lowValue(String columnName)
+    public static Metric<Double> lowValue(String columnName)
     {
-        return new Metric<Object>()
+        return new Metric<Double>()
         {
             @Override
-            public Optional<Object> getValueFromPlanNodeEstimate(PlanNodeStatsEstimate planNodeStatsEstimate, StatsContext statsContext)
+            public Optional<Double> getValueFromPlanNodeEstimate(PlanNodeStatsEstimate planNodeStatsEstimate, StatsContext statsContext)
             {
                 double lowValue = getSymbolStatistics(planNodeStatsEstimate, columnName, statsContext).getLowValue();
                 if (isInfinite(lowValue)) {
@@ -130,7 +130,7 @@ public final class Metrics
             }
 
             @Override
-            public Optional<Object> getValueFromAggregationQuery(MaterializedRow aggregationQueryResult, int fieldId, StatsContext statsContext)
+            public Optional<Double> getValueFromAggregationQuery(MaterializedRow aggregationQueryResult, int fieldId, StatsContext statsContext)
             {
                 return Optional.ofNullable(aggregationQueryResult.getField(fieldId)).map(value -> ((Number) value).doubleValue());
             }
@@ -149,12 +149,12 @@ public final class Metrics
         };
     }
 
-    public static Metric<Object> highValue(String columnName)
+    public static Metric<Double> highValue(String columnName)
     {
-        return new Metric<Object>()
+        return new Metric<Double>()
         {
             @Override
-            public Optional<Object> getValueFromPlanNodeEstimate(PlanNodeStatsEstimate planNodeStatsEstimate, StatsContext statsContext)
+            public Optional<Double> getValueFromPlanNodeEstimate(PlanNodeStatsEstimate planNodeStatsEstimate, StatsContext statsContext)
             {
                 double highValue = getSymbolStatistics(planNodeStatsEstimate, columnName, statsContext).getHighValue();
                 if (isInfinite(highValue)) {
@@ -166,7 +166,7 @@ public final class Metrics
             }
 
             @Override
-            public Optional<Object> getValueFromAggregationQuery(MaterializedRow aggregationQueryResult, int fieldId, StatsContext statsContext)
+            public Optional<Double> getValueFromAggregationQuery(MaterializedRow aggregationQueryResult, int fieldId, StatsContext statsContext)
             {
                 return Optional.ofNullable(aggregationQueryResult.getField(fieldId)).map(value -> ((Number) value).doubleValue());
             }

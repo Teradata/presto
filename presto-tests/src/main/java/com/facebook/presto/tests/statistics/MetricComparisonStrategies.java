@@ -56,11 +56,6 @@ public class MetricComparisonStrategies
                 .contains(estimate);
     }
 
-    public static MetricComparisonStrategy<Object> isEqual()
-    {
-        return Object::equals;
-    }
-
     private static Range<Double> mapRange(Range<Double> range, Function<Double, Double> mappingFunction)
     {
         checkArgument(range.hasLowerBound() && range.hasUpperBound(), "Expected error range to have lower and upper bound");

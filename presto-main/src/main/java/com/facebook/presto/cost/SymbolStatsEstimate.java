@@ -56,6 +56,11 @@ public class SymbolStatsEstimate
         return nullsFraction;
     }
 
+    public double getNonNullsFraction()
+    {
+        return 1.0 - nullsFraction;
+    }
+
     public double getAverageRowSize()
     {
         return averageRowSize;
