@@ -80,7 +80,6 @@ public class TestQueues
         String dbConfigUrl = getDbConfigUrl();
         H2ResourceGroupsDao dao = getDao(dbConfigUrl);
         try (DistributedQueryRunner queryRunner = createQueryRunner(dbConfigUrl, dao)) {
-            QueryManager queryManager = queryRunner.getCoordinator().getQueryManager();
             // submit first "dashboard" query
             QueryId firstDashboardQuery = createQuery(queryRunner, newDashboardSession(), LONG_LASTING_QUERY);
 
@@ -129,7 +128,6 @@ public class TestQueues
             QueryId firstDashboardQuery = createQuery(queryRunner, newDashboardSession(), LONG_LASTING_QUERY);
             QueryId secondDashboardQuery = createQuery(queryRunner, newDashboardSession(), LONG_LASTING_QUERY);
 
-            ImmutableSet<QueryState> queuedOrRunning = ImmutableSet.of(QUEUED, RUNNING);
             waitForQueryState(queryRunner, firstDashboardQuery, RUNNING);
             waitForQueryState(queryRunner, secondDashboardQuery, QUEUED);
         }
