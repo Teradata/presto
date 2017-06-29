@@ -19,7 +19,7 @@ import static org.testng.Assert.assertTrue;
 
 public final class EstimateAssertion
 {
-    private static double TOLERANCE = 0.0000001;
+    private static final double TOLERANCE = 0.0000001;
 
     private EstimateAssertion()
     {
