@@ -51,7 +51,7 @@ public class TestOutputNodeStats
                                 .setNullsFraction(0.3)
                                 .setLowValue(1)
                                 .setHighValue(10)
-                                .setDistinctValuesCount(20)
+                                .setDistinctValuesCount(10)
                                 .build())
                 .addSymbolStatistics(
                         new Symbol("b"),

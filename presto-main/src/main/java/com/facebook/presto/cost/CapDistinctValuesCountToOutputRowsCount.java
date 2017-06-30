@@ -20,8 +20,8 @@ import com.facebook.presto.sql.planner.plan.PlanNode;
 
 import java.util.Map;
 
+import static com.facebook.presto.util.MoreMath.rangeMin;
 import static java.lang.Double.isNaN;
-import static java.lang.Math.min;
 import static java.util.Objects.requireNonNull;
 
 public class CapDistinctValuesCountToOutputRowsCount
@@ -41,7 +41,7 @@ public class CapDistinctValuesCountToOutputRowsCount
                     symbolStatsEstimate -> symbolStatsEstimate.mapDistinctValuesCount(
                             distinctValuesCount -> {
                                 if (!isNaN(distinctValuesCount)) {
-                                    return min(distinctValuesCount, outputRowCount);
+                                    return rangeMin(distinctValuesCount, outputRowCount);
                                 }
                                 return distinctValuesCount;
                             }));
