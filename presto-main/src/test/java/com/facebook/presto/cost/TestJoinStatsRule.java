@@ -78,7 +78,7 @@ public class TestJoinStatsRule
     {
         double innerJoinRowCount = LEFT_ROWS_COUNT * RIGHT_ROWS_COUNT / LEFT_JOIN_COLUMN_NDV * LEFT_JOIN_COLUMN_NON_NULLS * RIGHT_JOIN_COLUMN_NON_NULLS;
         PlanNodeStatsEstimate innerJoinStats = planNodeStats(innerJoinRowCount,
-                symbolStatistics(LEFT_JOIN_COLUMN, 0.0, 20.0, 0.0, RIGHT_JOIN_COLUMN_NDV),
+                symbolStatistics(LEFT_JOIN_COLUMN, 5.0, 20.0, 0.0, RIGHT_JOIN_COLUMN_NDV),
                 symbolStatistics(RIGHT_JOIN_COLUMN, 5.0, 20.0, 0.0, RIGHT_JOIN_COLUMN_NDV),
                 LEFT_OTHER_COLUMN_STATS, RIGHT_OTHER_COLUMN_STATS);
 
