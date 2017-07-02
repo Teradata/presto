@@ -17,7 +17,9 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static java.lang.Double.NEGATIVE_INFINITY;
 import static java.lang.Double.NaN;
+import static java.lang.Double.POSITIVE_INFINITY;
 import static java.lang.Double.isNaN;
 
 public class SymbolStatsEstimate
@@ -89,6 +91,14 @@ public class SymbolStatsEstimate
     public SymbolStatsEstimate mapDistinctValuesCount(Function<Double, Double> mappingFunction)
     {
         return buildFrom(this).setDistinctValuesCount(mappingFunction.apply(distinctValuesCount)).build();
+    }
+
+    public double getDomainLength()
+    {
+        if (lowValue == NEGATIVE_INFINITY || highValue == POSITIVE_INFINITY) {
+            return NaN;
+        }
+        return highValue - lowValue;
     }
 
     @Override
