@@ -15,6 +15,7 @@ package com.facebook.presto.util;
 
 import java.util.stream.DoubleStream;
 
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Double.isNaN;
 
 public final class MoreMath
@@ -79,6 +80,18 @@ public final class MoreMath
         return DoubleStream.of(values)
                 .max()
                 .getAsDouble();
+    }
+
+    public static double avg(double... values)
+    {
+        checkArgument(values.length > 0, "Unable to calculate average on empty set of values");
+        return sum(values) / values.length;
+    }
+
+    public static double sum(double... values)
+    {
+        return DoubleStream.of(values)
+                .sum();
     }
 
     public static double rangeMin(double left, double right)

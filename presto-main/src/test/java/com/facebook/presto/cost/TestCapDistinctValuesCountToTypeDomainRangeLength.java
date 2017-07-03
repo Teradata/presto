@@ -59,6 +59,7 @@ public class TestCapDistinctValuesCountToTypeDomainRangeLength
         Symbol decimal2 = new Symbol("decimal2");
         Symbol decimal3 = new Symbol("decimal3");
         Symbol double1 = new Symbol("double1");
+        Symbol double2 = new Symbol("double2");
 
         DecimalType decimalType = DecimalType.createDecimalType(10, 2);
         PlanNodeStatsEstimate estimate = PlanNodeStatsEstimate.builder()
@@ -121,6 +122,11 @@ public class TestCapDistinctValuesCountToTypeDomainRangeLength
                         .setHighValue(asStatsValue(10.2, DOUBLE))
                         .setDistinctValuesCount(10)
                         .build())
+                .addSymbolStatistics(double2, SymbolStatsEstimate.builder()
+                        .setLowValue(asStatsValue(10.0, DOUBLE))
+                        .setHighValue(asStatsValue(10.0, DOUBLE))
+                        .setDistinctValuesCount(10)
+                        .build())
                 .build();
 
         Map<Symbol, Type> types = ImmutableMap.<Symbol, Type>builder()
@@ -136,6 +142,7 @@ public class TestCapDistinctValuesCountToTypeDomainRangeLength
                 .put(decimal2, decimalType)
                 .put(decimal3, decimalType)
                 .put(double1, DOUBLE)
+                .put(double2, DOUBLE)
                 .build();
 
         ComposableStatsCalculator.Normalizer normalizer = new CapDistinctValuesCountToTypeDomainRangeLength();
@@ -154,6 +161,7 @@ public class TestCapDistinctValuesCountToTypeDomainRangeLength
         assertThat(normalized.getSymbolStatistics(decimal2)).distinctValuesCount(3);
         assertThat(normalized.getSymbolStatistics(decimal3)).distinctValuesCount(10);
         assertThat(normalized.getSymbolStatistics(double1)).distinctValuesCount(10);
+        assertThat(normalized.getSymbolStatistics(double2)).distinctValuesCount(1);
     }
 
     private double asStatsValue(Object value, Type type)

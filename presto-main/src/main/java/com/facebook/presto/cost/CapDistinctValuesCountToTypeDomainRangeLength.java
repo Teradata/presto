@@ -59,12 +59,17 @@ public class CapDistinctValuesCountToTypeDomainRangeLength
 
     private double calculateDomainLength(Symbol symbol, PlanNodeStatsEstimate estimate, Map<Symbol, Type> types)
     {
+        SymbolStatsEstimate symbolStatistics = estimate.getSymbolStatistics(symbol);
+
+        if (symbolStatistics.getDomainLength() == 0) {
+            return 1;
+        }
+
         Type type = types.get(symbol);
         if (!isDiscrete(type)) {
             return NaN;
         }
 
-        SymbolStatsEstimate symbolStatistics = estimate.getSymbolStatistics(symbol);
         double length = symbolStatistics.getHighValue() - symbolStatistics.getLowValue();
         if (type instanceof DecimalType) {
             length *= pow(10, ((DecimalType) type).getScale());

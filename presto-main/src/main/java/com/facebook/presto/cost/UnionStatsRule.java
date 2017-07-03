@@ -11,6 +11,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package com.facebook.presto.cost;
 
 import com.facebook.presto.Session;
@@ -18,22 +19,20 @@ import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Lookup;
-import com.facebook.presto.sql.planner.plan.ExchangeNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
+import com.facebook.presto.sql.planner.plan.UnionNode;
+import com.google.common.collect.ListMultimap;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static com.facebook.presto.cost.PlanNodeStatsEstimates.union;
-import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 
-// WIP
-public class ExchangeStatsRule
+public class UnionStatsRule
         implements ComposableStatsCalculator.Rule
 {
-    private static final Pattern PATTERN = Pattern.matchByClass(ExchangeNode.class);
+    private static final Pattern PATTERN = Pattern.matchByClass(UnionNode.class);
 
     @Override
     public Pattern getPattern()
@@ -44,15 +43,14 @@ public class ExchangeStatsRule
     @Override
     public Optional<PlanNodeStatsEstimate> calculate(PlanNode node, Lookup lookup, Session session, Map<Symbol, Type> types)
     {
-        ExchangeNode exchangeNode = (ExchangeNode) node;
-        // QUESTION should I check partitioning schema?
+        UnionNode unionNode = (UnionNode) node;
 
         Optional<PlanNodeStatsEstimate> estimate = Optional.empty();
         for (int i = 0; i < node.getSources().size(); i++) {
             PlanNode source = node.getSources().get(i);
             PlanNodeStatsEstimate sourceStats = lookup.getStats(source, session, types);
 
-            PlanNodeStatsEstimate sourceStatsWithMappedSymbols = mapToOutputSymbols(sourceStats, exchangeNode.getInputs().get(i), exchangeNode.getOutputSymbols());
+            PlanNodeStatsEstimate sourceStatsWithMappedSymbols = mapToOutputSymbols(sourceStats, unionNode.getSymbolMapping(), i);
 
             if (estimate.isPresent()) {
                 estimate = Optional.of(union(estimate.get(), sourceStatsWithMappedSymbols));
@@ -66,15 +64,13 @@ public class ExchangeStatsRule
         return estimate;
     }
 
-    private PlanNodeStatsEstimate mapToOutputSymbols(PlanNodeStatsEstimate estimate, List<Symbol> inputs, List<Symbol> outputs)
+    private PlanNodeStatsEstimate mapToOutputSymbols(PlanNodeStatsEstimate estimate, ListMultimap<Symbol, Symbol> mapping, int index)
     {
-        checkArgument(inputs.size() == outputs.size(), "Inputs does not match outputs");
         PlanNodeStatsEstimate.Builder mapped = PlanNodeStatsEstimate.builder()
                 .setOutputRowCount(estimate.getOutputRowCount());
 
-        for (int i = 0; i < inputs.size(); i++) {
-                mapped.addSymbolStatistics(outputs.get(i), estimate.getSymbolStatistics(inputs.get(i)));
-        }
+        mapping.keySet().stream()
+                .forEach(symbol -> mapped.addSymbolStatistics(symbol, estimate.getSymbolStatistics(mapping.get(symbol).get(index))));
 
         return mapped.build();
     }
