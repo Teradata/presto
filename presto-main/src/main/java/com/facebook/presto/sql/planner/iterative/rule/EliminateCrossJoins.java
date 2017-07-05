@@ -14,7 +14,6 @@
 package com.facebook.presto.sql.planner.iterative.rule;
 
 import com.facebook.presto.Session;
-import com.facebook.presto.SystemSessionProperties;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
@@ -41,6 +40,9 @@ import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.Set;
 
+import static com.facebook.presto.SystemSessionProperties.getJoinReorderingStrategy;
+import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.COST_BASED;
+import static com.facebook.presto.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.ELIMINATE_CROSS_JOINS;
 import static com.facebook.presto.sql.planner.iterative.rule.Util.restrictOutputs;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -65,7 +67,8 @@ public class EliminateCrossJoins
             return Optional.empty();
         }
 
-        if (!SystemSessionProperties.isJoinReorderingEnabled(session)) {
+        // we run this for cost_based reordering also for cases when some of the tables do not have statistics
+        if (getJoinReorderingStrategy(session) != ELIMINATE_CROSS_JOINS && getJoinReorderingStrategy(session) != COST_BASED) {
             return Optional.empty();
         }
 
