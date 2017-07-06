@@ -14,23 +14,13 @@
 
 package com.facebook.presto.cost;
 
-import com.facebook.presto.Session;
 import com.facebook.presto.matching.Pattern;
-import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.iterative.Lookup;
-import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.UnionNode;
-import com.google.common.collect.ListMultimap;
-
-import java.util.Map;
-import java.util.Optional;
 
 import static com.facebook.presto.cost.PlanNodeStatsEstimateMath.addStats;
-import static com.google.common.base.Preconditions.checkState;
 
 public class UnionStatsRule
-        implements ComposableStatsCalculator.Rule
+        extends AbstractSetOperationStatsRule
 {
     private static final Pattern PATTERN = Pattern.matchByClass(UnionNode.class);
 
@@ -41,37 +31,8 @@ public class UnionStatsRule
     }
 
     @Override
-    public Optional<PlanNodeStatsEstimate> calculate(PlanNode node, Lookup lookup, Session session, Map<Symbol, Type> types)
+    protected PlanNodeStatsEstimate operate(PlanNodeStatsEstimate first, PlanNodeStatsEstimate second)
     {
-        UnionNode unionNode = (UnionNode) node;
-
-        Optional<PlanNodeStatsEstimate> estimate = Optional.empty();
-        for (int i = 0; i < node.getSources().size(); i++) {
-            PlanNode source = node.getSources().get(i);
-            PlanNodeStatsEstimate sourceStats = lookup.getStats(source, session, types);
-
-            PlanNodeStatsEstimate sourceStatsWithMappedSymbols = mapToOutputSymbols(sourceStats, unionNode.getSymbolMapping(), i);
-
-            if (estimate.isPresent()) {
-                estimate = Optional.of(addStats(estimate.get(), sourceStatsWithMappedSymbols));
-            }
-            else {
-                estimate = Optional.of(sourceStatsWithMappedSymbols);
-            }
-        }
-
-        checkState(estimate.isPresent());
-        return estimate;
-    }
-
-    private PlanNodeStatsEstimate mapToOutputSymbols(PlanNodeStatsEstimate estimate, ListMultimap<Symbol, Symbol> mapping, int index)
-    {
-        PlanNodeStatsEstimate.Builder mapped = PlanNodeStatsEstimate.builder()
-                .setOutputRowCount(estimate.getOutputRowCount());
-
-        mapping.keySet().stream()
-                .forEach(symbol -> mapped.addSymbolStatistics(symbol, estimate.getSymbolStatistics(mapping.get(symbol).get(index))));
-
-        return mapped.build();
+        return addStats(first, second);
     }
 }
