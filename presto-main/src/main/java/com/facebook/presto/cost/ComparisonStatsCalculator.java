@@ -57,7 +57,7 @@ public class ComparisonStatsCalculator
     {
         SymbolStatsEstimate symbolStats = inputStatistics.getSymbolStatistics(symbol);
 
-        StatisticRange range = new StatisticRange(symbolStats.getLowValue(), symbolStats.getHighValue(), symbolStats.getDistinctValuesCount());
+        StatisticRange range = StatisticRange.from(symbolStats);
         StatisticRange intersectRange = range.intersect(literalRange);
 
         double filterFactor = range.overlapPercentWith(intersectRange);
@@ -84,7 +84,7 @@ public class ComparisonStatsCalculator
     {
         SymbolStatsEstimate symbolStats = inputStatistics.getSymbolStatistics(symbol);
 
-        StatisticRange range = new StatisticRange(symbolStats.getLowValue(), symbolStats.getHighValue(), symbolStats.getDistinctValuesCount());
+        StatisticRange range = StatisticRange.from(symbolStats);
         StatisticRange intersectRange = range.intersect(new StatisticRange(literal, literal, 1));
 
         double filterFactor = 1 - range.overlapPercentWith(intersectRange);
@@ -142,8 +142,8 @@ public class ComparisonStatsCalculator
             filterStatsForUnknownExpression(inputStatistics);
         }
 
-        StatisticRange leftRange = new StatisticRange(leftStats.getLowValue(), leftStats.getHighValue(), leftStats.getDistinctValuesCount());
-        StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
+        StatisticRange leftRange = StatisticRange.from(leftStats);
+        StatisticRange rightRange = StatisticRange.from(rightStats);
 
         StatisticRange intersect = leftRange.intersect(rightRange);
 

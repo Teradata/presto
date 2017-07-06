@@ -61,8 +61,8 @@ public class PlanNodeStatsEstimateMath
             double newRowCount,
             SubtractRangeStrategy strategy)
     {
-        StatisticRange leftRange = new StatisticRange(leftStats.getLowValue(), leftStats.getHighValue(), leftStats.getDistinctValuesCount());
-        StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
+        StatisticRange leftRange = StatisticRange.from(leftStats);
+        StatisticRange rightRange = StatisticRange.from(rightStats);
 
         double nullsCountLeft = leftStats.getNullsFraction() * leftRowCount;
         double nullsCountRight = rightStats.getNullsFraction() * rightRowCount;
@@ -98,8 +98,8 @@ public class PlanNodeStatsEstimateMath
 
     private static SymbolStatsEstimate addColumnStats(SymbolStatsEstimate leftStats, double leftRows, SymbolStatsEstimate rightStats, double rightRows, double newRowCount)
     {
-        StatisticRange leftRange = new StatisticRange(leftStats.getLowValue(), leftStats.getHighValue(), leftStats.getDistinctValuesCount());
-        StatisticRange rightRange = new StatisticRange(rightStats.getLowValue(), rightStats.getHighValue(), rightStats.getDistinctValuesCount());
+        StatisticRange leftRange = StatisticRange.from(leftStats);
+        StatisticRange rightRange = StatisticRange.from(rightStats);
 
         StatisticRange sum = leftRange.add(rightRange);
         double nullsCountRight = rightStats.getNullsFraction() * rightRows;
