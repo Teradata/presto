@@ -121,9 +121,9 @@ before_deploy:
     > /tmp/artifacts/travis_build.html
   - ls -lah /tmp/artifacts
   - |
-    ARTIFACTS_UPLOAD_PATH=${ARTIFACTS_UPLOAD_PATH_BRANCH}
-    if [ ${TRAVIS_PULL_REQUEST} -eq "true" ]; then
-      ARTIFACTS_UPLOAD_PATH=${ARTIFACTS_UPLOAD_PATH_PR}
+    export ARTIFACTS_UPLOAD_PATH=${ARTIFACTS_UPLOAD_PATH_BRANCH}
+    if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+      export ARTIFACTS_UPLOAD_PATH=${ARTIFACTS_UPLOAD_PATH_PR}
     fi
 
 deploy:
@@ -142,6 +142,14 @@ deploy:
 after_script:
 - |
   if [[ -v DEPLOY_S3_ACCESS_KEY ]]; then
+    export ARTIFACTS_UPLOAD_PATH=${ARTIFACTS_UPLOAD_PATH_BRANCH}
+    if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+      export ARTIFACTS_UPLOAD_PATH=${ARTIFACTS_UPLOAD_PATH_PR}
+    fi
+
+    echo "TRAVIS IS PR: $TRAVIS_PULL_REQUEST"
+    echo "PATH IS: $ARTIFACTS_UPLOAD_PATH"
+
     sudo pip install awscli
     export AWS_ACCESS_KEY_ID=${DEPLOY_S3_ACCESS_KEY}
     export AWS_SECRET_ACCESS_KEY=${DEPLOY_S3_SECRET_KEY}
