@@ -14,6 +14,7 @@
 package com.facebook.presto.spiller;
 
 import com.facebook.presto.RowPagesBuilder;
+import com.facebook.presto.SequencePageBuilder;
 import com.facebook.presto.block.BlockEncodingManager;
 import com.facebook.presto.memory.AggregatedMemoryContext;
 import com.facebook.presto.operator.PartitionFunction;
@@ -28,6 +29,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
+import java.io.UncheckedIOException;
+import java.util.Iterator;
 import java.util.List;
 import java.util.function.IntPredicate;
 
@@ -37,7 +40,9 @@ import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.google.common.io.Files.createTempDir;
+import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.fail;
 
 public class TestGenericPartitioningSpiller
 {
@@ -113,6 +118,35 @@ public class TestGenericPartitioningSpiller
                     TYPES,
                     spiller,
                     ImmutableList.of(ImmutableList.of(), secondPartition, thirdPartition, ImmutableList.of()));
+        }
+    }
+
+    @Test
+    public void testCloseDuringReading()
+            throws Exception
+    {
+        Iterator<Page> readingInProgress;
+        try (PartitioningSpiller spiller = factory.create(
+                TYPES,
+                POSITIVE_AND_NEGATIVE_PARTITIONS_HASH_GENERATOR,
+                mockSpillContext(),
+                mockMemoryContext())) {
+
+            Page page = SequencePageBuilder.createSequencePage(TYPES, 10, FIRST_PARTITION_START, 5, 10, 15);
+            PartitioningSpillResult spillResult = spiller.partitionAndSpill(page, i -> true);
+            assertEquals(spillResult.getRetained().getPositionCount(), 0);
+            getFutureValue(spillResult.getSpillingFuture());
+
+            // We get the iterator but we do not exhaust it, so that close happens during reading
+            readingInProgress = spiller.getSpilledPages(0);
+        }
+
+        try {
+            readingInProgress.hasNext();
+            fail("Iterator.hasNext() should fail since underlying resources are closed");
+        }
+        catch (UncheckedIOException ignored) {
+            // expected
         }
     }
 
