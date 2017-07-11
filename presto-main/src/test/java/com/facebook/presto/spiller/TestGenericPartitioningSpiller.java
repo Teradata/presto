@@ -21,6 +21,7 @@ import com.facebook.presto.operator.SpillContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.spiller.PartitioningSpiller.PartitioningSpillResult;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
@@ -28,7 +29,6 @@ import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.function.IntPredicate;
 
 import static com.facebook.presto.operator.PageAssertions.assertPageEquals;
@@ -64,63 +64,56 @@ public class TestGenericPartitioningSpiller
     public void testFileSpiller()
             throws Exception
     {
-        AggregatedMemoryContext memoryContext = new AggregatedMemoryContext();
-        SpillContext spillContext = bytes -> {
-        };
         try (PartitioningSpiller spiller = factory.create(
                 TYPES,
                 POSITIVE_AND_NEGATIVE_PARTITIONS_HASH_GENERATOR,
-                spillContext,
-                memoryContext)) {
-            testSimpleSpiller(spiller, ImmutableSet.of(1, 2)::contains);
+                mockSpillContext(),
+                mockMemoryContext())) {
+
+            RowPagesBuilder builder = RowPagesBuilder.rowPagesBuilder(TYPES);
+            builder.addSequencePage(10, SECOND_PARTITION_START, 5, 10, 15);
+            builder.addSequencePage(10, FIRST_PARTITION_START, -5, 0, 5);
+
+            List<Page> firstSpill = builder.build();
+
+            builder = RowPagesBuilder.rowPagesBuilder(TYPES);
+            builder.addSequencePage(10, THIRD_PARTITION_START, 15, 20, 25);
+            builder.addSequencePage(10, FOURTH_PARTITION_START, 25, 30, 35);
+
+            List<Page> secondSpill = builder.build();
+
+            IntPredicate spillPartitionMask = ImmutableSet.of(1, 2)::contains;
+            PartitioningSpillResult result = spiller.partitionAndSpill(firstSpill.get(0), spillPartitionMask);
+            result.getSpillingFuture().get();
+            assertEquals(result.getRetained().getPositionCount(), 0);
+
+            result = spiller.partitionAndSpill(firstSpill.get(1), spillPartitionMask);
+            result.getSpillingFuture().get();
+            assertEquals(result.getRetained().getPositionCount(), 10);
+
+            result = spiller.partitionAndSpill(secondSpill.get(0), spillPartitionMask);
+            result.getSpillingFuture().get();
+            assertEquals(result.getRetained().getPositionCount(), 0);
+
+            result = spiller.partitionAndSpill(secondSpill.get(1), spillPartitionMask);
+            result.getSpillingFuture().get();
+            assertEquals(result.getRetained().getPositionCount(), 10);
+
+            builder = RowPagesBuilder.rowPagesBuilder(TYPES);
+            builder.addSequencePage(10, SECOND_PARTITION_START, 5, 10, 15);
+
+            List<Page> secondPartition = builder.build();
+
+            builder = RowPagesBuilder.rowPagesBuilder(TYPES);
+            builder.addSequencePage(10, THIRD_PARTITION_START, 15, 20, 25);
+
+            List<Page> thirdPartition = builder.build();
+
+            assertSpilledPages(
+                    TYPES,
+                    spiller,
+                    ImmutableList.of(ImmutableList.of(), secondPartition, thirdPartition, ImmutableList.of()));
         }
-    }
-
-    private void testSimpleSpiller(PartitioningSpiller spiller, IntPredicate spillPartitionMask)
-            throws ExecutionException, InterruptedException
-    {
-        RowPagesBuilder builder = RowPagesBuilder.rowPagesBuilder(TYPES);
-        builder.addSequencePage(10, SECOND_PARTITION_START, 5, 10, 15);
-        builder.addSequencePage(10, FIRST_PARTITION_START, -5, 0, 5);
-
-        List<Page> firstSpill = builder.build();
-
-        builder = RowPagesBuilder.rowPagesBuilder(TYPES);
-        builder.addSequencePage(10, THIRD_PARTITION_START, 15, 20, 25);
-        builder.addSequencePage(10, FOURTH_PARTITION_START, 25, 30, 35);
-
-        List<Page> secondSpill = builder.build();
-
-        PartitioningSpiller.PartitioningSpillResult result = spiller.partitionAndSpill(firstSpill.get(0), spillPartitionMask);
-        result.getSpillingFuture().get();
-        assertEquals(result.getRetained().getPositionCount(), 0);
-
-        result = spiller.partitionAndSpill(firstSpill.get(1), spillPartitionMask);
-        result.getSpillingFuture().get();
-        assertEquals(result.getRetained().getPositionCount(), 10);
-
-        result = spiller.partitionAndSpill(secondSpill.get(0), spillPartitionMask);
-        result.getSpillingFuture().get();
-        assertEquals(result.getRetained().getPositionCount(), 0);
-
-        result = spiller.partitionAndSpill(secondSpill.get(1), spillPartitionMask);
-        result.getSpillingFuture().get();
-        assertEquals(result.getRetained().getPositionCount(), 10);
-
-        builder = RowPagesBuilder.rowPagesBuilder(TYPES);
-        builder.addSequencePage(10, SECOND_PARTITION_START, 5, 10, 15);
-
-        List<Page> secondPartition = builder.build();
-
-        builder = RowPagesBuilder.rowPagesBuilder(TYPES);
-        builder.addSequencePage(10, THIRD_PARTITION_START, 15, 20, 25);
-
-        List<Page> thirdPartition = builder.build();
-
-        assertSpilledPages(
-                TYPES,
-                spiller,
-                ImmutableList.of(ImmutableList.of(), secondPartition, thirdPartition, ImmutableList.of()));
     }
 
     private void assertSpilledPages(
@@ -137,6 +130,17 @@ public class TestGenericPartitioningSpiller
                 assertPageEquals(types, actualSpill.get(j), expectedSpill.get(j));
             }
         }
+    }
+
+    private static AggregatedMemoryContext mockMemoryContext()
+    {
+        return new AggregatedMemoryContext();
+    }
+
+    private static SpillContext mockSpillContext()
+    {
+        return bytes -> {
+        };
     }
 
     private static class FourPartitionsPartitionFunction
