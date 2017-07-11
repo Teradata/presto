@@ -68,6 +68,7 @@ public class FileSingleStreamSpillerFactory
     {
         this(
                 listeningDecorator(newFixedThreadPool(
+                        // TODO this executor needs to be shut down
                         requireNonNull(featuresConfig, "featuresConfig is null").getSpillerThreads(),
                         daemonThreadsNamed("binary-spiller-%s"))),
                 blockEncodingSerde,
