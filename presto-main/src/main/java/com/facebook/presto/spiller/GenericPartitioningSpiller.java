@@ -178,7 +178,7 @@ public class GenericPartitioningSpiller
                      * of memory allocated for pages. We can remove or leave--then we need to make it @ThreadSafe or provide synchronized wrapper (so that thread safety cost
                      * is paid only here).
                      */
-                    spillerFactory.create(types, spillContext.newLocalSpillContext(), memoryContext.newLocalMemoryContext())
+                    spillerFactory.create(types, spillContext, memoryContext.newLocalMemoryContext())
             ));
             spillers[partition] = spiller;
         }
