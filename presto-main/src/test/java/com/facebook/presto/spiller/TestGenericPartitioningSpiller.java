@@ -27,9 +27,12 @@ import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.type.TypeRegistry;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.IntPredicate;
@@ -39,8 +42,10 @@ import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
-import static com.google.common.io.Files.createTempDir;
+import static com.google.common.io.MoreFiles.deleteRecursively;
+import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
+import static java.nio.file.Files.createTempDirectory;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
 
@@ -54,16 +59,28 @@ public class TestGenericPartitioningSpiller
     private static final List<Type> TYPES = ImmutableList.of(BIGINT, VARCHAR, DOUBLE, BIGINT);
     private static final PartitionFunction POSITIVE_AND_NEGATIVE_PARTITIONS_HASH_GENERATOR = new FourPartitionsPartitionFunction(0);
     private final BlockEncodingSerde blockEncodingSerde = new BlockEncodingManager(new TypeRegistry(ImmutableSet.of(BIGINT, DOUBLE, VARBINARY)));
-    private final SingleStreamSpillerFactory singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(blockEncodingSerde, new SpillerStats(), getFeaturesConfig());
 
-    private FeaturesConfig getFeaturesConfig()
+    private Path tempDirectory;
+    private SingleStreamSpillerFactory singleStreamSpillerFactory;
+    private GenericPartitioningSpillerFactory factory;
+
+    @BeforeClass
+    public void setUp()
+            throws Exception
     {
+        tempDirectory = createTempDirectory(getClass().getSimpleName());
         FeaturesConfig featuresConfig = new FeaturesConfig();
-        featuresConfig.setSpillerSpillPaths(createTempDir().getAbsolutePath());
-        return featuresConfig;
+        featuresConfig.setSpillerSpillPaths(tempDirectory.toString());
+        singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(blockEncodingSerde, new SpillerStats(), featuresConfig);
+        factory = new GenericPartitioningSpillerFactory(singleStreamSpillerFactory);
     }
 
-    private final GenericPartitioningSpillerFactory factory = new GenericPartitioningSpillerFactory(singleStreamSpillerFactory);
+    @AfterClass(alwaysRun = true)
+    public void tearDown()
+            throws Exception
+    {
+        deleteRecursively(tempDirectory, ALLOW_INSECURE);
+    }
 
     @Test
     public void testFileSpiller()
