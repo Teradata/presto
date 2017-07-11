@@ -19,6 +19,7 @@ import com.facebook.presto.block.BlockEncodingManager;
 import com.facebook.presto.memory.AggregatedMemoryContext;
 import com.facebook.presto.operator.PartitionFunction;
 import com.facebook.presto.operator.SpillContext;
+import com.facebook.presto.operator.TestingOperatorContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.block.BlockEncodingSerde;
 import com.facebook.presto.spi.type.Type;
@@ -42,6 +43,7 @@ import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static com.facebook.presto.spi.type.VarbinaryType.VARBINARY;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
@@ -57,7 +59,6 @@ public class TestGenericPartitioningSpiller
     private static final int FOURTH_PARTITION_START = 20;
 
     private static final List<Type> TYPES = ImmutableList.of(BIGINT, VARCHAR, DOUBLE, BIGINT);
-    private static final PartitionFunction POSITIVE_AND_NEGATIVE_PARTITIONS_HASH_GENERATOR = new FourPartitionsPartitionFunction(0);
     private final BlockEncodingSerde blockEncodingSerde = new BlockEncodingManager(new TypeRegistry(ImmutableSet.of(BIGINT, DOUBLE, VARBINARY)));
 
     private Path tempDirectory;
@@ -71,6 +72,7 @@ public class TestGenericPartitioningSpiller
         tempDirectory = createTempDirectory(getClass().getSimpleName());
         FeaturesConfig featuresConfig = new FeaturesConfig();
         featuresConfig.setSpillerSpillPaths(tempDirectory.toString());
+        featuresConfig.setSpillerThreads(8);
         singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(blockEncodingSerde, new SpillerStats(), featuresConfig);
         factory = new GenericPartitioningSpillerFactory(singleStreamSpillerFactory);
     }
@@ -88,7 +90,7 @@ public class TestGenericPartitioningSpiller
     {
         try (PartitioningSpiller spiller = factory.create(
                 TYPES,
-                POSITIVE_AND_NEGATIVE_PARTITIONS_HASH_GENERATOR,
+                new FourFixedPartitionsPartitionFunction(0),
                 mockSpillContext(),
                 mockMemoryContext())) {
 
@@ -145,12 +147,12 @@ public class TestGenericPartitioningSpiller
         Iterator<Page> readingInProgress;
         try (PartitioningSpiller spiller = factory.create(
                 TYPES,
-                POSITIVE_AND_NEGATIVE_PARTITIONS_HASH_GENERATOR,
+                new ModuloPartitionFunction(0, 4),
                 mockSpillContext(),
                 mockMemoryContext())) {
 
             Page page = SequencePageBuilder.createSequencePage(TYPES, 10, FIRST_PARTITION_START, 5, 10, 15);
-            PartitioningSpillResult spillResult = spiller.partitionAndSpill(page, i -> true);
+            PartitioningSpillResult spillResult = spiller.partitionAndSpill(page, partition -> true);
             assertEquals(spillResult.getRetained().getPositionCount(), 0);
             getFutureValue(spillResult.getSpillingFuture());
 
@@ -164,6 +166,30 @@ public class TestGenericPartitioningSpiller
         }
         catch (UncheckedIOException ignored) {
             // expected
+        }
+    }
+
+    @Test
+    public void testWriteManyPartitions()
+            throws Exception
+    {
+        List<Type> types = ImmutableList.of(BIGINT);
+        int partitionCount = 4;
+        AggregatedMemoryContext memoryContext = mockMemoryContext();
+
+        try (GenericPartitioningSpiller spiller = (GenericPartitioningSpiller) factory.create(
+                types,
+                new ModuloPartitionFunction(0, partitionCount),
+                mockSpillContext(),
+                memoryContext)) {
+            for (int i = 0; i < 50_000; i++) {
+                Page page = SequencePageBuilder.createSequencePage(types, partitionCount, 0);
+                PartitioningSpillResult spillResult = spiller.partitionAndSpill(page, partition -> true);
+                assertEquals(spillResult.getRetained().getPositionCount(), 0);
+                getFutureValue(spillResult.getSpillingFuture());
+                getFutureValue(spiller.flush());
+                assertEquals(memoryContext.getBytes(), 0, "Reserved bytes should be zeroed after spill completes");
+            }
         }
     }
 
@@ -185,7 +211,10 @@ public class TestGenericPartitioningSpiller
 
     private static AggregatedMemoryContext mockMemoryContext()
     {
-        return new AggregatedMemoryContext();
+        // It's important to use OperatorContext's system memory context, because it does additional bookkeeping.
+        return TestingOperatorContext.create()
+                .getSystemMemoryContext()
+                .newAggregatedMemoryContext();
     }
 
     private static SpillContext mockSpillContext()
@@ -194,12 +223,12 @@ public class TestGenericPartitioningSpiller
         };
     }
 
-    private static class FourPartitionsPartitionFunction
+    private static class FourFixedPartitionsPartitionFunction
             implements PartitionFunction
     {
         private final int valueChannel;
 
-        public FourPartitionsPartitionFunction(int valueChannel)
+        public FourFixedPartitionsPartitionFunction(int valueChannel)
         {
             this.valueChannel = valueChannel;
         }
@@ -224,6 +253,33 @@ public class TestGenericPartitioningSpiller
                 return 1;
             }
             return 0;
+        }
+    }
+
+    private static class ModuloPartitionFunction
+            implements PartitionFunction
+    {
+        private final int valueChannel;
+        private final int partitionCount;
+
+        public ModuloPartitionFunction(int valueChannel, int partitionCount)
+        {
+            this.valueChannel = valueChannel;
+            checkArgument(partitionCount > 0);
+            this.partitionCount = partitionCount;
+        }
+
+        @Override
+        public int getPartitionCount()
+        {
+            return partitionCount;
+        }
+
+        @Override
+        public int getPartition(Page page, int position)
+        {
+            long value = page.getBlock(valueChannel).getLong(position, 0);
+            return Math.toIntExact(Math.abs(value) % partitionCount);
         }
     }
 }

@@ -14,11 +14,13 @@
 package com.facebook.presto.spiller;
 
 import com.facebook.presto.memory.AggregatedMemoryContext;
+import com.facebook.presto.memory.SynchronizedAggregatedMemoryContext;
 import com.facebook.presto.operator.PartitionFunction;
 import com.facebook.presto.operator.SpillContext;
 import com.facebook.presto.spi.Page;
 import com.facebook.presto.spi.PageBuilder;
 import com.facebook.presto.spi.type.Type;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.Closer;
 import com.google.common.util.concurrent.Futures;
@@ -34,7 +36,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.IntPredicate;
+import java.util.function.Predicate;
 
+import static com.facebook.presto.memory.SynchronizedAggregatedMemoryContext.synchronizedMemoryContext;
 import static com.facebook.presto.spi.Page.mask;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
@@ -51,7 +55,7 @@ public class GenericPartitioningSpiller
     private final Closer closer = Closer.create();
     private final SingleStreamSpillerFactory spillerFactory;
     private final SpillContext spillContext;
-    private final AggregatedMemoryContext memoryContext;
+    private final SynchronizedAggregatedMemoryContext memoryContext;
 
     private final PageBuilder[] pageBuilders;
     private final Optional<SingleStreamSpiller>[] spillers;
@@ -72,8 +76,10 @@ public class GenericPartitioningSpiller
         this.partitionFunction = requireNonNull(partitionFunction, "partitionFunction is null");
         this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
         this.spillContext = closer.register(requireNonNull(spillContext, "spillContext is null"));
-        this.memoryContext = requireNonNull(memoryContext, "memoryContext is null");
+
+        requireNonNull(memoryContext, "memoryContext is null");
         closer.register(memoryContext::close);
+        this.memoryContext = synchronizedMemoryContext(memoryContext);
 
         int partitionCount = partitionFunction.getPartitionCount();
         this.pageBuilders = new PageBuilder[partitionCount];
@@ -110,7 +116,7 @@ public class GenericPartitioningSpiller
 
         checkState(!readingStarted, "reading already started");
         IntArrayList unspilledPositions = partitionPage(page, spillPartitionMask);
-        ListenableFuture<?> future = flush();
+        ListenableFuture<?> future = flushFullBuilders();
 
         return new PartitioningSpillResult(future, mask(page, unspilledPositions.toIntArray()));
     }
@@ -139,13 +145,25 @@ public class GenericPartitioningSpiller
         return unspilledPositions;
     }
 
-    private synchronized ListenableFuture<?> flush()
+    private ListenableFuture<?> flushFullBuilders()
     {
+        return flush(PageBuilder::isFull);
+    }
+
+    @VisibleForTesting
+    ListenableFuture<?> flush()
+    {
+        return flush(pageBuilder -> true);
+    }
+
+    private synchronized ListenableFuture<?> flush(Predicate<PageBuilder> flushCondition)
+    {
+        requireNonNull(flushCondition, "flushCondition is null");
         ImmutableList.Builder<ListenableFuture<?>> futures = ImmutableList.builder();
 
         for (int partition = 0; partition < spillers.length; partition++) {
             PageBuilder pageBuilder = pageBuilders[partition];
-            if (pageBuilder.isFull()) {
+            if (flushCondition.test(pageBuilder)) {
                 futures.add(flush(partition));
             }
         }
