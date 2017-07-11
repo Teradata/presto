@@ -73,13 +73,6 @@ public class GenericPartitioningSpiller
         this.spillerFactory = requireNonNull(spillerFactory, "spillerFactory is null");
         this.spillContext = closer.register(requireNonNull(spillContext, "spillContext is null"));
         this.memoryContext = requireNonNull(memoryContext, "memoryContext is null");
-        /*
-         * TODO since com.facebook.presto.memory.AggregatedMemoryContext.updateBytes fails after close(), `closer.register(memoryContext::close)` should go after closing
-         * all the partitions' spillers. Otherwise their close()-s will fail WHEN they have some memory (e.g. if close() happens during reading, no
-         * concurrency required)
-         *
-         * Oh, this should be covered by tests of GenericPartitioningSpiller.
-         */
         closer.register(memoryContext::close);
 
         int partitionCount = partitionFunction.getPartitionCount();
