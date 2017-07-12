@@ -37,11 +37,6 @@ public final class SynchronizedAggregatedMemoryContext
     private final AbstractAggregatedMemoryContext delegate;
     private final Closer closer = Closer.create();
 
-    private SynchronizedAggregatedMemoryContext(AbstractAggregatedMemoryContext delegate)
-    {
-        this.delegate = requireNonNull(delegate, "delegate is null");
-    }
-
     private SynchronizedAggregatedMemoryContext(AggregatedMemoryContext delegate, boolean ownDelegate)
     {
         this(delegate);
@@ -49,6 +44,11 @@ public final class SynchronizedAggregatedMemoryContext
         if (ownDelegate) {
             closer.register(delegate::close);
         }
+    }
+
+    private SynchronizedAggregatedMemoryContext(AbstractAggregatedMemoryContext delegate)
+    {
+        this.delegate = requireNonNull(delegate, "delegate is null");
     }
 
     @Override
