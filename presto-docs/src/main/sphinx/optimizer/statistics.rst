@@ -126,6 +126,7 @@ If statistics are not updated automatically, the user needs to trigger a statist
 
 The following command can be used in the Hive CLI to update table statistics for non-partitioned table ``t``::
 
+        hive> ANALYZE TABLE t COMPUTE STATISTICS;
         hive> ANALYZE TABLE t COMPUTE STATISTICS FOR COLUMNS;
 
 For partitioned tables, partitioning information must be specified in the command.
