@@ -14,9 +14,11 @@
 package com.facebook.presto.cost;
 
 import java.util.Objects;
+import java.util.Optional;
 
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.NaN;
 import static java.lang.Double.POSITIVE_INFINITY;
 import static java.lang.Double.isNaN;
@@ -24,7 +26,7 @@ import static java.lang.Double.isNaN;
 public class PlanNodeCostEstimate
 {
     public static final PlanNodeCostEstimate INFINITE_COST = new PlanNodeCostEstimate(POSITIVE_INFINITY, POSITIVE_INFINITY, POSITIVE_INFINITY);
-    public static final PlanNodeCostEstimate UNKNOWN_COST = PlanNodeCostEstimate.builder().build();
+    public static final PlanNodeCostEstimate UNKNOWN_COST = new PlanNodeCostEstimate(NaN, NaN, NaN);
     public static final PlanNodeCostEstimate ZERO_COST = new PlanNodeCostEstimate(0, 0, 0);
 
     private final double cpuCost;
@@ -114,17 +116,17 @@ public class PlanNodeCostEstimate
 
     public static PlanNodeCostEstimate networkCost(double networkCost)
     {
-        return builder().setNetworkCost(networkCost).build();
+        return builder().setCpuCost(0).setMemoryCost(0).setNetworkCost(networkCost).build();
     }
 
     public static PlanNodeCostEstimate cpuCost(double cpuCost)
     {
-        return builder().setCpuCost(cpuCost).build();
+        return builder().setCpuCost(cpuCost).setMemoryCost(0).setNetworkCost(0).build();
     }
 
     public static PlanNodeCostEstimate memoryCost(double memoryCost)
     {
-        return builder().setMemoryCost(memoryCost).build();
+        return builder().setCpuCost(0).setMemoryCost(memoryCost).setNetworkCost(0).build();
     }
 
     public static Builder builder()
@@ -134,9 +136,9 @@ public class PlanNodeCostEstimate
 
     public static final class Builder
     {
-        private double cpuCost = NaN;
-        private double memoryCost = NaN;
-        private double networkCost = NaN;
+        private Optional<Double> cpuCost = Optional.empty();
+        private Optional<Double> memoryCost = Optional.empty();
+        private Optional<Double> networkCost = Optional.empty();
 
         public Builder setFrom(PlanNodeCostEstimate otherStatistics)
         {
@@ -147,25 +149,31 @@ public class PlanNodeCostEstimate
 
         public Builder setCpuCost(double cpuCost)
         {
-            this.cpuCost = cpuCost;
+            checkState(!this.cpuCost.isPresent(), "cpuCost already set");
+            this.cpuCost = Optional.of(cpuCost);
             return this;
         }
 
         public Builder setMemoryCost(double memoryCost)
         {
-            this.memoryCost = memoryCost;
+            checkState(!this.memoryCost.isPresent(), "memoryCost already set");
+            this.memoryCost = Optional.of(memoryCost);
             return this;
         }
 
         public Builder setNetworkCost(double networkCost)
         {
-            this.networkCost = networkCost;
+            checkState(!this.networkCost.isPresent(), "networkCost already set");
+            this.networkCost = Optional.of(networkCost);
             return this;
         }
 
         public PlanNodeCostEstimate build()
         {
-            return new PlanNodeCostEstimate(cpuCost, memoryCost, networkCost);
+            checkState(cpuCost.isPresent(), "cpuCost not set");
+            checkState(memoryCost.isPresent(), "memoryCost not set");
+            checkState(networkCost.isPresent(), "networkCost not set");
+            return new PlanNodeCostEstimate(cpuCost.get(), memoryCost.get(), networkCost.get());
         }
     }
 }

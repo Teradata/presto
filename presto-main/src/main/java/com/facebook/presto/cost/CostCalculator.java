@@ -48,11 +48,17 @@ public interface CostCalculator
             Session session,
             Map<Symbol, Type> types)
     {
-        PlanNodeCostEstimate childrenCost = planNode.getSources().stream()
-                .map(child -> lookup.getCumulativeCost(child, session, types))
-                .reduce(PlanNodeCostEstimate.ZERO_COST, PlanNodeCostEstimate::add);
+        PlanNodeCostEstimate cost = calculateCost(planNode, lookup, session, types);
 
-        return calculateCost(planNode, lookup, session, types).add(childrenCost);
+        if (!planNode.getSources().isEmpty()) {
+            PlanNodeCostEstimate childrenCost = planNode.getSources().stream()
+                    .map(child -> lookup.getCumulativeCost(child, session, types))
+                    .reduce(PlanNodeCostEstimate.ZERO_COST, PlanNodeCostEstimate::add);
+
+            return cost.add(childrenCost);
+        }
+
+        return cost;
     }
 
     @BindingAnnotation
