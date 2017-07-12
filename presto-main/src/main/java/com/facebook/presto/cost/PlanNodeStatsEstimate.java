@@ -29,7 +29,7 @@ import static java.lang.Double.isNaN;
 
 public class PlanNodeStatsEstimate
 {
-    public static final PlanNodeStatsEstimate UNKNOWN_STATS = PlanNodeStatsEstimate.builder().build();
+    public static final PlanNodeStatsEstimate UNKNOWN_STATS = builder().build();
     public static final double DEFAULT_DATA_SIZE_PER_COLUMN = 10;
 
     private final double outputRowCount;
