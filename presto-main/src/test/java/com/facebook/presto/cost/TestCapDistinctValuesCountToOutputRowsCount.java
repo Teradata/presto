@@ -33,20 +33,26 @@ public class TestCapDistinctValuesCountToOutputRowsCount
     private static final Symbol A = new Symbol("a");
     private static final Symbol B = new Symbol("b");
     private static final Symbol C = new Symbol("c");
+    private static final Symbol D = new Symbol("d");
+    private static final Symbol E = new Symbol("e");
 
     @Test
     public void tesOutputRowCountIsKnown()
     {
         PlanNodeStatsEstimate estimate = PlanNodeStatsEstimate.builder()
                 .setOutputRowCount(10)
-                .addSymbolStatistics(A, SymbolStatsEstimate.builder().setDistinctValuesCount(20).build())
-                .addSymbolStatistics(B, SymbolStatsEstimate.builder().setDistinctValuesCount(5).build())
-                .addSymbolStatistics(C, SymbolStatsEstimate.builder().build())
+                .addSymbolStatistics(A, SymbolStatsEstimate.builder().setNullsFraction(0).setDistinctValuesCount(20).build())
+                .addSymbolStatistics(B, SymbolStatsEstimate.builder().setNullsFraction(0).setDistinctValuesCount(5).build())
+                .addSymbolStatistics(C, SymbolStatsEstimate.builder().setNullsFraction(0.4).setDistinctValuesCount(20).build())
+                .addSymbolStatistics(D, SymbolStatsEstimate.builder().setNullsFraction(0.4).setDistinctValuesCount(5).build())
+                .addSymbolStatistics(E, SymbolStatsEstimate.builder().build())
                 .build();
 
         assertThat(normalize(estimate).getSymbolStatistics(A)).distinctValuesCount(10);
         assertThat(normalize(estimate).getSymbolStatistics(B)).distinctValuesCount(5);
-        assertThat(normalize(estimate).getSymbolStatistics(C)).distinctValuesCountUnknown();
+        assertThat(normalize(estimate).getSymbolStatistics(C)).distinctValuesCount(6);
+        assertThat(normalize(estimate).getSymbolStatistics(D)).distinctValuesCount(5);
+        assertThat(normalize(estimate).getSymbolStatistics(E)).distinctValuesCountUnknown();
     }
 
     @Test

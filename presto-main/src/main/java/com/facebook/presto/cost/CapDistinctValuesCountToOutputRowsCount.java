@@ -42,12 +42,7 @@ public class CapDistinctValuesCountToOutputRowsCount
             estimate = estimate.mapSymbolColumnStatistics(
                     symbol,
                     symbolStatsEstimate -> symbolStatsEstimate.mapDistinctValuesCount(
-                            distinctValuesCount -> {
-                                if (!isNaN(distinctValuesCount)) {
-                                    return min(distinctValuesCount, outputRowCount);
-                                }
-                                return distinctValuesCount;
-                            }));
+                            distinctValuesCount -> min(distinctValuesCount, outputRowCount * symbolStatsEstimate.getValuesFraction())));
         }
         return estimate;
     }
