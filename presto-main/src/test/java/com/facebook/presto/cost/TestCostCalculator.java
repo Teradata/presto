@@ -67,7 +67,7 @@ public class TestCostCalculator
 {
     private static final int NUMBER_OF_NODES = 10;
     private final CostCalculator costCalculatorUsingExchanges = new CostCalculatorUsingExchanges(NUMBER_OF_NODES);
-    private final CostCalculator costCalculatorWithEstimatedExchanges = new CostCalculatorWithEstimatedExchanges(costCalculatorUsingExchanges, NUMBER_OF_NODES);
+    private final CostCalculator costCalculatorWithEstimatedExchanges = new CostCalculatorWithEstimatedExchanges(costCalculatorUsingExchanges, () -> NUMBER_OF_NODES);
     private Session session = testSessionBuilder().build();
 
     @Test

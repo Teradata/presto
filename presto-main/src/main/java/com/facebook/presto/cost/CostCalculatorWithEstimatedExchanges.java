@@ -29,6 +29,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
 import java.util.Map;
+import java.util.function.IntSupplier;
 
 import static com.facebook.presto.cost.PlanNodeCostEstimate.ZERO_COST;
 import static com.facebook.presto.sql.planner.plan.ExchangeNode.Scope.REMOTE;
@@ -44,18 +45,19 @@ public class CostCalculatorWithEstimatedExchanges
         implements CostCalculator
 {
     private final CostCalculator costCalculator;
-    private final int numberOfNodes;
+    private final IntSupplier numberOfNodes;
 
     @Inject
     public CostCalculatorWithEstimatedExchanges(CostCalculator costCalculator, InternalNodeManager nodeManager)
     {
-        this(costCalculator, nodeManager.getAllNodes().getActiveNodes().size());
+        // TODO exclude coordinator unless node-scheduler.include-coordinator
+        this(costCalculator, () -> nodeManager.getAllNodes().getActiveNodes().size());
     }
 
-    public CostCalculatorWithEstimatedExchanges(CostCalculator costCalculator, int numberOfNodes)
+    public CostCalculatorWithEstimatedExchanges(CostCalculator costCalculator, IntSupplier numberOfNodes)
     {
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
-        this.numberOfNodes = numberOfNodes;
+        this.numberOfNodes = requireNonNull(numberOfNodes, "numberOfNodes is null");
     }
 
     @Override
@@ -65,7 +67,7 @@ public class CostCalculatorWithEstimatedExchanges
                 session,
                 types,
                 lookup,
-                numberOfNodes);
+                numberOfNodes.getAsInt());
         PlanNodeCostEstimate estimatedExchangeCost = planNode.accept(exchangeCostEstimator, null);
 
         return costCalculator.calculateCost(planNode, lookup, session, types).add(estimatedExchangeCost);
