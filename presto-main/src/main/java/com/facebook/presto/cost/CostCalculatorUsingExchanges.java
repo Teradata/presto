@@ -37,6 +37,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
 import java.util.Map;
+import java.util.function.IntSupplier;
 
 import static com.facebook.presto.cost.PlanNodeCostEstimate.UNKNOWN_COST;
 import static com.facebook.presto.cost.PlanNodeCostEstimate.ZERO_COST;
@@ -51,17 +52,17 @@ import static java.util.Objects.requireNonNull;
 public class CostCalculatorUsingExchanges
         implements CostCalculator
 {
-    private final int numberOfNodes;
+    private final IntSupplier numberOfNodes;
 
     @Inject
     public CostCalculatorUsingExchanges(InternalNodeManager nodeManager)
     {
-        this(nodeManager.getAllNodes().getActiveNodes().size());
+        this(() -> nodeManager.getAllNodes().getActiveNodes().size());
     }
 
-    public CostCalculatorUsingExchanges(int numberOfNodes)
+    public CostCalculatorUsingExchanges(IntSupplier numberOfNodes)
     {
-        this.numberOfNodes = numberOfNodes;
+        this.numberOfNodes = requireNonNull(numberOfNodes, "numberOfNodes is null");
     }
 
     @Override
@@ -71,7 +72,7 @@ public class CostCalculatorUsingExchanges
                 session,
                 types,
                 lookup,
-                numberOfNodes);
+                numberOfNodes.getAsInt());
 
         return planNode.accept(costEstimator, null);
     }
