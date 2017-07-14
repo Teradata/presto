@@ -47,6 +47,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.io.MoreFiles.deleteRecursively;
 import static com.google.common.io.RecursiveDeleteOption.ALLOW_INSECURE;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
+import static java.lang.Math.toIntExact;
 import static java.nio.file.Files.createTempDirectory;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.fail;
@@ -93,7 +94,6 @@ public class TestGenericPartitioningSpiller
                 new FourFixedPartitionsPartitionFunction(0),
                 mockSpillContext(),
                 mockMemoryContext())) {
-
             RowPagesBuilder builder = RowPagesBuilder.rowPagesBuilder(TYPES);
             builder.addSequencePage(10, SECOND_PARTITION_START, 5, 10, 15);
             builder.addSequencePage(10, FIRST_PARTITION_START, -5, 0, 5);
@@ -150,7 +150,6 @@ public class TestGenericPartitioningSpiller
                 new ModuloPartitionFunction(0, 4),
                 mockSpillContext(),
                 mockMemoryContext())) {
-
             Page page = SequencePageBuilder.createSequencePage(TYPES, 10, FIRST_PARTITION_START, 5, 10, 15);
             PartitioningSpillResult spillResult = spiller.partitionAndSpill(page, partition -> true);
             assertEquals(spillResult.getRetained().getPositionCount(), 0);
@@ -279,7 +278,7 @@ public class TestGenericPartitioningSpiller
         public int getPartition(Page page, int position)
         {
             long value = page.getBlock(valueChannel).getLong(position, 0);
-            return Math.toIntExact(Math.abs(value) % partitionCount);
+            return toIntExact(Math.abs(value) % partitionCount);
         }
     }
 }
