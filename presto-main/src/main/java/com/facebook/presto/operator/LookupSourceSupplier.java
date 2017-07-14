@@ -13,6 +13,8 @@
  */
 package com.facebook.presto.operator;
 
+import com.google.common.hash.HashCode;
+
 import java.util.function.Supplier;
 
 public interface LookupSourceSupplier
@@ -21,4 +23,9 @@ public interface LookupSourceSupplier
     long getHashCollisions();
 
     double getExpectedHashCollisions();
+
+    /**
+     * @return checksum of this entity for heuristic checking equivalence of two instances
+     */
+    HashCode checksum();
 }
