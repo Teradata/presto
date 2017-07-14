@@ -14,6 +14,7 @@
 package com.facebook.presto.operator;
 
 import com.facebook.presto.spi.Page;
+import com.google.common.hash.HashCode;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -147,12 +148,24 @@ public final class SortedPositionLinks
                 }
             }
 
-            return lessThanFunction -> {
-                checkState(lessThanFunction.isPresent(), "Using SortedPositionLinks without lessThanFunction");
-                return new SortedPositionLinks(
-                        arrayPositionLinksFactoryBuilder.build().create(Optional.empty()),
-                        sortedPositionLinks,
-                        lessThanFunction.get());
+            Factory arrayPositionLinksFactory = arrayPositionLinksFactoryBuilder.build();
+            return new Factory()
+            {
+                @Override
+                public PositionLinks create(Optional<JoinFilterFunction> lessThanFunction)
+                {
+                    checkState(lessThanFunction.isPresent(), "Using SortedPositionLinks without lessThanFunction");
+                    return new SortedPositionLinks(
+                            arrayPositionLinksFactory.create(Optional.empty()),
+                            sortedPositionLinks,
+                            lessThanFunction.get());
+                }
+
+                @Override
+                public HashCode checksum()
+                {
+                    return arrayPositionLinksFactory.checksum();
+                }
             };
         }
 
