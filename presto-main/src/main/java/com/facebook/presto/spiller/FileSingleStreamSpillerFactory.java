@@ -27,6 +27,7 @@ import com.google.inject.Inject;
 import io.airlift.log.Logger;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -101,7 +102,7 @@ public class FileSingleStreamSpillerFactory
                         format("spill path %s is not writable; adjust beta.spiller-spill-path config property or filesystem permissions", path));
             }
         });
-        this.maxUsedSpaceThreshold = requireNonNull(maxUsedSpaceThreshold, "maxUsedSpaceThreshold can not be null");
+        this.maxUsedSpaceThreshold = maxUsedSpaceThreshold;
         this.roundRobinIndex = 0;
     }
 
@@ -109,6 +110,12 @@ public class FileSingleStreamSpillerFactory
     public void cleanupOldSpillFiles()
     {
         spillPaths.forEach(FileSingleStreamSpillerFactory::cleanupOldSpillFiles);
+    }
+
+    @PreDestroy
+    public void destroy()
+    {
+        executor.shutdownNow();
     }
 
     private static void cleanupOldSpillFiles(Path path)
