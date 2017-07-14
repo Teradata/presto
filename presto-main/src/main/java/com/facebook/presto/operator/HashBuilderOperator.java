@@ -251,6 +251,8 @@ public class HashBuilderOperator
     private LookupSourceSupplier lookupSourceSupplier;
     private Optional<HashCode> lookupSourceChecksum = Optional.empty();
 
+    private Optional<Runnable> finishMemoryRevoke = Optional.empty();
+
     public HashBuilderOperator(
             OperatorContext operatorContext,
             PartitionedLookupSourceFactory lookupSourceFactory,
@@ -383,47 +385,50 @@ public class HashBuilderOperator
     {
         checkState(spillEnabled, "Spill not enabled, no revokable memory should be reserved");
 
-        if (state == State.CONSUMING_INPUT || state == State.LOOKUP_SOURCE_BUILT) {
-            createSpiller();
-            return getSpiller().spill(index.getPages());
+        if (state == State.CONSUMING_INPUT) {
+            finishMemoryRevoke = Optional.of(() -> {
+                index.clear();
+                operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
+                operatorContext.setRevocableMemoryReservation(0L);
+                state = State.SPILLING_INPUT;
+            });
+            return spillIndex();
         }
-
-        // Otherwise this is stale revoking request
-        long reservedRevocableBytes = operatorContext.getReservedRevocableBytes();
-        if (reservedRevocableBytes == 0) {
+        else if (state == State.LOOKUP_SOURCE_BUILT) {
+            finishMemoryRevoke = Optional.of(() -> {
+                lookupSourceFactory.setPartitionSpilledLookupSourceHandle(partitionIndex, spilledLookupSourceHandle);
+                lookupSourceNotNeeded = Optional.empty();
+                index.clear();
+                operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
+                operatorContext.setRevocableMemoryReservation(0L);
+                lookupSourceChecksum = Optional.of(lookupSourceSupplier.checksum());
+                lookupSourceSupplier = null;
+                state = State.LOOKUP_SOURCE_SPILLED;
+            });
+            return spillIndex();
+        }
+        else if (operatorContext.getReservedRevocableBytes() == 0) {
+            // Probably stale revoking request
+            finishMemoryRevoke = Optional.of(() -> {
+            });
             return immediateFuture(null);
         }
-        throw new IllegalStateException(format("Remaining %s revocable bytes which I don't know how to revoke", reservedRevocableBytes));
+
+        throw new IllegalStateException(format("Remaining %s revocable bytes which I don't know how to revoke", operatorContext.getReservedRevocableBytes()));
+    }
+
+    private ListenableFuture<?> spillIndex()
+    {
+        createSpiller();
+        return getSpiller().spill(index.getPages());
     }
 
     @Override
     public void finishMemoryRevoke()
     {
-        if (state == State.CONSUMING_INPUT) {
-            index.clear();
-            operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
-            operatorContext.setRevocableMemoryReservation(0L);
-            state = State.SPILLING_INPUT;
-            return;
-        }
-
-        if (state == State.LOOKUP_SOURCE_BUILT) {
-            lookupSourceFactory.setPartitionSpilledLookupSourceHandle(partitionIndex, spilledLookupSourceHandle);
-            lookupSourceNotNeeded = Optional.empty();
-            index.clear();
-            operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
-            operatorContext.setRevocableMemoryReservation(0L);
-            lookupSourceChecksum = Optional.of(lookupSourceSupplier.checksum());
-            lookupSourceSupplier = null;
-            state = State.LOOKUP_SOURCE_SPILLED;
-            return;
-        }
-
-        long reservedRevocableBytes = operatorContext.getReservedRevocableBytes();
-        if (reservedRevocableBytes == 0) {
-            return;
-        }
-        throw new IllegalStateException(format("Remaining %s revocable bytes which I don't know how to finish revoking", reservedRevocableBytes));
+        checkState(finishMemoryRevoke.isPresent(), "Cannot finish unknown revoking");
+        finishMemoryRevoke.get().run();
+        finishMemoryRevoke = Optional.empty();
     }
 
     @Override
@@ -437,6 +442,10 @@ public class HashBuilderOperator
     {
         if (lookupSourceFactoryDestroyed.isDone()) {
             close();
+            return;
+        }
+
+        if (finishMemoryRevoke.isPresent()) {
             return;
         }
 
@@ -631,6 +640,8 @@ public class HashBuilderOperator
 
         lookupSourceSupplier = null;
         state = State.DISPOSED;
+        finishMemoryRevoke = finishMemoryRevoke.map(ifPresent -> () -> {
+        });
 
         try (Closer closer = Closer.create()) {
             closer.register(index::clear);
