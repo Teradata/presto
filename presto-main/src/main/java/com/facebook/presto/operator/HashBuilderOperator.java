@@ -399,8 +399,8 @@ public class HashBuilderOperator
                 index.clear();
                 operatorContext.setMemoryReservation(index.getEstimatedSize().toBytes());
                 operatorContext.setRevocableMemoryReservation(0L);
+                lookupSourceFactory.setPartitionSpilledLookupSource(partitionIndex, spilledLookupSourceHandle);
                 state = State.SPILLING_INPUT;
-                // TODO we could immediately call lookupSourceFactory.setPartitionSpilledLookupSource
             });
             return spillIndex();
         }
@@ -535,8 +535,6 @@ public class HashBuilderOperator
             return;
         }
         checkSuccess(spillInProgress, "spilling failed");
-        lookupSourceFactory.setPartitionSpilledLookupSource(partitionIndex, spilledLookupSourceHandle);
-
         state = State.LOOKUP_SOURCE_SPILLED;
     }
 
