@@ -17,6 +17,7 @@ package com.facebook.presto.cost;
 import com.facebook.presto.Session;
 import com.facebook.presto.metadata.InternalNodeManager;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.planner.DependencyExtractor;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
@@ -32,16 +33,23 @@ import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.facebook.presto.sql.planner.plan.SemiJoinNode;
 import com.facebook.presto.sql.planner.plan.TableScanNode;
 import com.facebook.presto.sql.planner.plan.ValuesNode;
+import com.facebook.presto.sql.tree.Expression;
+import com.facebook.presto.sql.tree.Literal;
+import com.facebook.presto.sql.tree.SymbolReference;
+import com.google.common.collect.Sets;
 
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.IntSupplier;
 
 import static com.facebook.presto.cost.PlanNodeCostEstimate.UNKNOWN_COST;
 import static com.facebook.presto.cost.PlanNodeCostEstimate.ZERO_COST;
 import static com.facebook.presto.cost.PlanNodeCostEstimate.cpuCost;
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -108,13 +116,29 @@ public class CostCalculatorUsingExchanges
         @Override
         public PlanNodeCostEstimate visitFilter(FilterNode node, Void context)
         {
-            return cpuCost(getStats(node.getSource()).getOutputSizeInBytes());
+            // not accessed columns do not cost
+            Set<Symbol> usedSymbols = DependencyExtractor.extractUnique(node.getPredicate());
+            Set<Symbol> notUsedSymbols = Sets.difference(new HashSet<>(node.getSource().getOutputSymbols()), usedSymbols);
+
+            PlanNodeStatsEstimate filterStats = getStats(node.getSource());
+            PlanNodeStatsEstimate onlyUsedStats = PlanNodeStatsEstimate.buildFrom(filterStats).removeSymbolStatistics(notUsedSymbols).build();
+            return cpuCost(onlyUsedStats.getOutputSizeInBytes());
         }
 
         @Override
         public PlanNodeCostEstimate visitProject(ProjectNode node, Void context)
         {
-            return cpuCost(getStats(node).getOutputSizeInBytes());
+            // literal or identity projection do not cost
+            PlanNodeStatsEstimate projectStats = getStats(node);
+            Set<Symbol> notUsedSymbols = node.getAssignments().getSymbols().stream()
+                    .filter(symbol -> {
+                        Expression expression = node.getAssignments().get(symbol);
+                        return expression instanceof SymbolReference || expression instanceof Literal;
+                    })
+                    .collect(toImmutableSet());
+
+            PlanNodeStatsEstimate onlyUsedStats = PlanNodeStatsEstimate.buildFrom(projectStats).removeSymbolStatistics(notUsedSymbols).build();
+            return cpuCost(onlyUsedStats.getOutputSizeInBytes());
         }
 
         @Override
@@ -169,7 +193,15 @@ public class CostCalculatorUsingExchanges
         @Override
         public PlanNodeCostEstimate visitTableScan(TableScanNode node, Void context)
         {
-            return cpuCost(getStats(node).getOutputSizeInBytes()); // TODO: add network cost, based on input size in bytes?
+            // memory to cpu througput is about 10GB/s
+            // disk to memory is 100MB/s - 100 slower
+            // HDFS (network) to memory is 1GB/s - 10 slower
+            double outputSizeInBytes = getStats(node).getOutputSizeInBytes();
+            return PlanNodeCostEstimate.builder()
+                    .setCpuCost(outputSizeInBytes * 10)
+                    .setNetworkCost(outputSizeInBytes)
+                    .setMemoryCost(0.0)
+                    .build();
         }
 
         @Override

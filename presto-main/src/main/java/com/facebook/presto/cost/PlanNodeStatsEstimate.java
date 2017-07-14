@@ -17,6 +17,7 @@ import com.facebook.presto.sql.planner.Symbol;
 import org.pcollections.HashTreePMap;
 import org.pcollections.PMap;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -169,6 +170,12 @@ public class PlanNodeStatsEstimate
         public Builder addSymbolStatistics(Map<Symbol, SymbolStatsEstimate> symbolStatistics)
         {
             this.symbolStatistics = this.symbolStatistics.plusAll(symbolStatistics);
+            return this;
+        }
+
+        public Builder removeSymbolStatistics(Collection<Symbol> symbols)
+        {
+            this.symbolStatistics = this.symbolStatistics.minusAll(symbols);
             return this;
         }
 
