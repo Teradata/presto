@@ -31,6 +31,7 @@ public class CachingCostCalculator
 {
     private final CostCalculator costCalculator;
     private final Map<PlanNode, PlanNodeCostEstimate> costs = new HashMap<>();
+    private final Map<PlanNode, PlanNodeCostEstimate> cummulativeCosts = new HashMap<>();
 
     public CachingCostCalculator(CostCalculator costCalculator)
     {
@@ -42,10 +43,22 @@ public class CachingCostCalculator
     {
         if (!costs.containsKey(planNode)) {
             // cannot use Map.computeIfAbsent due to costs map modification in the mappingFunction callback
-            PlanNodeCostEstimate cost = costCalculator.calculateCumulativeCost(planNode, lookup, session, types);
+            PlanNodeCostEstimate cost = costCalculator.calculateCost(planNode, lookup, session, types);
             requireNonNull(costs, "computed cost can not be null");
             checkState(costs.put(planNode, cost) == null, "cost for " + planNode + " already computed");
         }
         return costs.get(planNode);
+    }
+
+    @Override
+    public PlanNodeCostEstimate calculateCumulativeCost(PlanNode planNode, Lookup lookup, Session session, Map<Symbol, Type> types)
+    {
+        if (!cummulativeCosts.containsKey(planNode)) {
+            // cannot use Map.computeIfAbsent due to costs map modification in the mappingFunction callback
+            PlanNodeCostEstimate cost = costCalculator.calculateCumulativeCost(planNode, lookup, session, types);
+            requireNonNull(cummulativeCosts, "computed cost can not be null");
+            checkState(cummulativeCosts.put(planNode, cost) == null, "cost for " + planNode + " already computed");
+        }
+        return cummulativeCosts.get(planNode);
     }
 }
