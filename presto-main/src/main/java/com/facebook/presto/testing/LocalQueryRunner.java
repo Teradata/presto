@@ -100,7 +100,6 @@ import com.facebook.presto.spiller.GenericPartitioningSpillerFactory;
 import com.facebook.presto.spiller.GenericSpillerFactory;
 import com.facebook.presto.spiller.NodeSpillConfig;
 import com.facebook.presto.spiller.PartitioningSpillerFactory;
-import com.facebook.presto.spiller.SingleStreamSpillerFactory;
 import com.facebook.presto.spiller.SpillerFactory;
 import com.facebook.presto.spiller.SpillerStats;
 import com.facebook.presto.split.PageSinkManager;
@@ -224,7 +223,7 @@ public class LocalQueryRunner
     private final PageSinkManager pageSinkManager;
     private final TransactionManager transactionManager;
     private final SpillerFactory spillerFactory;
-    private final SingleStreamSpillerFactory singleStreamSpillerFactory;
+    private final FileSingleStreamSpillerFactory singleStreamSpillerFactory;
     private final PartitioningSpillerFactory partitioningSpillerFactory;
 
     private final ExpressionCompiler expressionCompiler;
@@ -405,6 +404,7 @@ public class LocalQueryRunner
         transactionCheckExecutor.shutdownNow();
         connectorManager.stop();
         finalizerService.destroy();
+        singleStreamSpillerFactory.destroy();
     }
 
     @Override
