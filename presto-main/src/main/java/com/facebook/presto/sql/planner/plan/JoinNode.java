@@ -37,6 +37,7 @@ import static com.facebook.presto.sql.planner.plan.JoinNode.Type.INNER;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.LEFT;
 import static com.facebook.presto.sql.planner.plan.JoinNode.Type.RIGHT;
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.util.Objects.requireNonNull;
 
@@ -99,6 +100,11 @@ public class JoinNode
                 .build();
         checkArgument(inputSymbols.containsAll(outputSymbols), "Left and right join inputs do not contain all output symbols");
         checkArgument(!isCrossJoin() || inputSymbols.equals(outputSymbols), "Cross join does not support output symbols pruning or reordering");
+
+        // The implementation of full outer join only works if the data is hash partitioned. See LookupJoinOperators#buildSideOuterJoinUnvisitedPositions
+        if (distributionType.isPresent()) {
+            checkState(!((type == RIGHT || type == FULL) && distributionType.get() == DistributionType.REPLICATED), "Right or full outer join does not work with replicated distribution type");
+        }
     }
 
     public JoinNode flipChildren()
