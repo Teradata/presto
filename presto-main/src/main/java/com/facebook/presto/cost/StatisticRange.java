@@ -15,6 +15,7 @@ package com.facebook.presto.cost;
 
 import java.util.Objects;
 
+import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Double.NaN;
 import static java.lang.Double.isFinite;
@@ -22,6 +23,7 @@ import static java.lang.Double.isInfinite;
 import static java.lang.Double.isNaN;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
+import static java.lang.String.format;
 
 public class StatisticRange
 {
@@ -203,5 +205,14 @@ public class StatisticRange
     public int hashCode()
     {
         return Objects.hash(low, high, distinctValues);
+    }
+
+    @Override
+    public String toString()
+    {
+        return toStringHelper(this)
+                .add("range", format("[%s-%s]", low, high))
+                .add("ndv", distinctValues)
+                .toString();
     }
 }
