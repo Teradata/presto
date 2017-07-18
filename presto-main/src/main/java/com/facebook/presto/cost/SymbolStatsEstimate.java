@@ -16,9 +16,11 @@ package com.facebook.presto.cost;
 import java.util.Objects;
 import java.util.function.Function;
 
+import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Double.NaN;
 import static java.lang.Double.isNaN;
+import static java.lang.String.format;
 
 public class SymbolStatsEstimate
 {
@@ -135,6 +137,17 @@ public class SymbolStatsEstimate
     public int hashCode()
     {
         return Objects.hash(lowValue, highValue, nullsFraction, averageRowSize, distinctValuesCount);
+    }
+
+    @Override
+    public String toString()
+    {
+        return toStringHelper(this)
+                .add("range", format("[%s-%s]", lowValue, highValue))
+                .add("nulls", nullsFraction)
+                .add("ndv", distinctValuesCount)
+                .add("rowSize", averageRowSize)
+                .toString();
     }
 
     public static Builder builder()
