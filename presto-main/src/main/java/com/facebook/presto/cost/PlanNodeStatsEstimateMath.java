@@ -51,8 +51,10 @@ public class PlanNodeStatsEstimateMath
 
         Stream.concat(left.getSymbolsWithKnownStatistics().stream(), right.getSymbolsWithKnownStatistics().stream())
                 .forEach(symbol -> {
-                    statsBuilder.addSymbolStatistics(symbol,
-                            subtractColumnStats(left.getSymbolStatistics(symbol),
+                    statsBuilder.addSymbolStatistics(
+                            symbol,
+                            subtractColumnStats(
+                                    left.getSymbolStatistics(symbol),
                                     left.getOutputRowCount(),
                                     right.getSymbolStatistics(symbol),
                                     right.getOutputRowCount(),
