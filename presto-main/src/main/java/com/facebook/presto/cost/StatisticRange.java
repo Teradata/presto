@@ -15,7 +15,7 @@ package com.facebook.presto.cost;
 
 import java.util.Objects;
 
-import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.base.Preconditions.checkArgument;
 import static java.lang.Double.NaN;
 import static java.lang.Double.isFinite;
 import static java.lang.Double.isInfinite;
@@ -28,16 +28,22 @@ public class StatisticRange
     private static final double INFINITE_TO_FINITE_RANGE_INTERSECT_OVERLAP_HEURISTIC_FACTOR = 0.25;
     private static final double INFINITE_TO_INFINITE_RANGE_INTERSECT_OVERLAP_HEURISTIC_FACTOR = 0.5;
 
+    // TODO unify field and method names with SymbolStatsEstimate
     private final double low;
     private final double high;
     private final double distinctValues;
 
     public StatisticRange(double low, double high, double distinctValues)
     {
-        checkState(low <= high || (isNaN(low) && isNaN(high)), "Low must be smaller or equal to high or range must be empty (NaN, NaN)");
-        checkState(distinctValues >= 0 || isNaN(distinctValues), "Distinct values count cannot be negative");
+        checkArgument(
+                low <= high || (isNaN(low) && isNaN(high)),
+                "low value must be less than or equal to high value or both values have to be NaN, got %s and %s respectively",
+                low,
+                high);
         this.low = low;
         this.high = high;
+
+        checkArgument(distinctValues >= 0 || isNaN(distinctValues), "Distinct values count should be non-negative, got: %s", distinctValues);
         this.distinctValues = distinctValues;
     }
 
