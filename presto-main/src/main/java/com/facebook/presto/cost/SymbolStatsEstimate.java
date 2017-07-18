@@ -33,11 +33,21 @@ public class SymbolStatsEstimate
 
     public SymbolStatsEstimate(double lowValue, double highValue, double nullsFraction, double averageRowSize, double distinctValuesCount)
     {
-        checkArgument(lowValue <= highValue || (isNaN(lowValue) && isNaN(highValue)), "lowValue must be less than or equal to highValue or both values have to be NaN");
+        checkArgument(
+                lowValue <= highValue || (isNaN(lowValue) && isNaN(highValue)),
+                "low value must be less than or equal to high value or both values have to be NaN, got %s and %s respectively",
+                lowValue,
+                highValue);
         this.lowValue = lowValue;
         this.highValue = highValue;
+
+        checkArgument((0 <= nullsFraction && nullsFraction <= 1.) || isNaN(nullsFraction), "Nulls fraction should be within [0, 1] or NaN, got: %s", nullsFraction);
         this.nullsFraction = nullsFraction;
+
+        checkArgument(averageRowSize >= 0 || isNaN(averageRowSize), "Average row size should be non-negative or NaN, got: %s", averageRowSize);
         this.averageRowSize = averageRowSize;
+
+        checkArgument(distinctValuesCount >= 0 || isNaN(distinctValuesCount), "Distinct values count should be non-negative, got: %s", distinctValuesCount);
         this.distinctValuesCount = distinctValuesCount;
     }
 
@@ -66,7 +76,7 @@ public class SymbolStatsEstimate
 
     public StatisticRange statisticRange()
     {
-        return  new StatisticRange(lowValue, highValue, distinctValuesCount);
+        return new StatisticRange(lowValue, highValue, distinctValuesCount);
     }
 
     public double getValuesFraction()
