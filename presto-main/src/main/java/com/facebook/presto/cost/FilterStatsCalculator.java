@@ -47,7 +47,6 @@ import static com.facebook.presto.sql.ExpressionUtils.and;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN_OR_EQUAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.LESS_THAN_OR_EQUAL;
-import static com.google.common.base.Preconditions.checkState;
 import static java.lang.Double.NaN;
 import static java.lang.Double.isInfinite;
 import static java.lang.Double.min;
@@ -137,8 +136,7 @@ public class FilterStatsCalculator
                 case OR:
                     return differenceInNonRangeStats(addStats(leftStats, rightStats), andStats);
                 default:
-                    checkState(false, format("Unimplemented logical binary operator expression %s", node.getType()));
-                    return PlanNodeStatsEstimate.UNKNOWN_STATS;
+                    throw new IllegalStateException(format("Unimplemented logical binary operator expression %s", node.getType()));
             }
         }
 
