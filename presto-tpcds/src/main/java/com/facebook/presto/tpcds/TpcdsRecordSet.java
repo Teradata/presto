@@ -31,6 +31,7 @@ import java.time.LocalTime;
 import java.util.Iterator;
 import java.util.List;
 
+import static com.facebook.presto.spi.type.Chars.trimTrailingSpaces;
 import static com.facebook.presto.spi.type.Decimals.rescale;
 import static com.facebook.presto.tpcds.TpcdsMetadata.getPrestoType;
 import static com.google.common.base.Preconditions.checkState;
@@ -165,7 +166,12 @@ public class TpcdsRecordSet
             if (column.getType().getBase() == ColumnType.Base.DECIMAL) {
                 return (Slice) Decimals.parse(row.get(column.getPosition())).getObject();
             }
-            return Slices.utf8Slice(row.get(columns.get(field).getPosition()));
+
+            Slice characters = Slices.utf8Slice(row.get(columns.get(field).getPosition()));
+            if (column.getType().getBase() == ColumnType.Base.CHAR) {
+                characters = trimTrailingSpaces(characters);
+            }
+            return characters;
         }
 
         @Override
