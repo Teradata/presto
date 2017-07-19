@@ -40,7 +40,7 @@ public class ComparisonStatsCalculator
         return comparisonExpressionToLiteralStats(inputStatistics, Optional.of(symbol), inputStatistics.getSymbolStatistics(symbol), doubleLiteral, type);
     }
 
-    public static PlanNodeStatsEstimate comparisonSymbolToLiteralStats(
+    public static PlanNodeStatsEstimate comparisonExpressionToLiteralStats(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
             SymbolStatsEstimate symbolStats,
@@ -49,22 +49,22 @@ public class ComparisonStatsCalculator
     {
         switch (type) {
             case EQUAL:
-                return symbolToLiteralEquality(inputStatistics, symbol, symbolStats, doubleLiteral);
+                return expressionToLiteralEquality(inputStatistics, symbol, symbolStats, doubleLiteral);
             case NOT_EQUAL:
-                return symbolToLiteralNonEquality(inputStatistics, symbol, symbolStats, doubleLiteral);
+                return expressionToLiteralNonEquality(inputStatistics, symbol, symbolStats, doubleLiteral);
             case LESS_THAN:
             case LESS_THAN_OR_EQUAL:
-                return symbolToLiteralLessThan(inputStatistics, symbol, symbolStats, doubleLiteral);
+                return expressionToLiteralLessThan(inputStatistics, symbol, symbolStats, doubleLiteral);
             case GREATER_THAN:
             case GREATER_THAN_OR_EQUAL:
-                return symbolToLiteralGreaterThan(inputStatistics, symbol, symbolStats, doubleLiteral);
+                return expressionToLiteralGreaterThan(inputStatistics, symbol, symbolStats, doubleLiteral);
             case IS_DISTINCT_FROM:
             default:
                 return filterStatsForUnknownExpression(inputStatistics);
         }
     }
 
-    private static PlanNodeStatsEstimate symbolToLiteralRangeComparison(
+    private static PlanNodeStatsEstimate expressionToLiteralRangeComparison(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
             SymbolStatsEstimate symbolStats,
@@ -87,7 +87,7 @@ public class ComparisonStatsCalculator
         return estimate;
     }
 
-    private static PlanNodeStatsEstimate symbolToLiteralEquality(
+    private static PlanNodeStatsEstimate expressionToLiteralEquality(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
             SymbolStatsEstimate symbolStats,
@@ -100,10 +100,10 @@ public class ComparisonStatsCalculator
         else {
             literalRange = new StatisticRange(NEGATIVE_INFINITY, POSITIVE_INFINITY, 1);
         }
-        return symbolToLiteralRangeComparison(inputStatistics, symbol, symbolStats, literalRange);
+        return expressionToLiteralRangeComparison(inputStatistics, symbol, symbolStats, literalRange);
     }
 
-    private static PlanNodeStatsEstimate symbolToLiteralNonEquality(
+    private static PlanNodeStatsEstimate expressionToLiteralNonEquality(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
             SymbolStatsEstimate symbolStats,
@@ -132,22 +132,22 @@ public class ComparisonStatsCalculator
         return estimate;
     }
 
-    private static PlanNodeStatsEstimate symbolToLiteralLessThan(
+    private static PlanNodeStatsEstimate expressionToLiteralLessThan(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
             SymbolStatsEstimate symbolStats,
             OptionalDouble literal)
     {
-        return symbolToLiteralRangeComparison(inputStatistics, symbol, symbolStats, new StatisticRange(NEGATIVE_INFINITY, literal.orElse(POSITIVE_INFINITY), NaN));
+        return expressionToLiteralRangeComparison(inputStatistics, symbol, symbolStats, new StatisticRange(NEGATIVE_INFINITY, literal.orElse(POSITIVE_INFINITY), NaN));
     }
 
-    private static PlanNodeStatsEstimate symbolToLiteralGreaterThan(
+    private static PlanNodeStatsEstimate expressionToLiteralGreaterThan(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
             SymbolStatsEstimate symbolStats,
             OptionalDouble literal)
     {
-        return symbolToLiteralRangeComparison(inputStatistics, symbol, symbolStats, new StatisticRange(literal.orElse(NEGATIVE_INFINITY), POSITIVE_INFINITY, NaN));
+        return expressionToLiteralRangeComparison(inputStatistics, symbol, symbolStats, new StatisticRange(literal.orElse(NEGATIVE_INFINITY), POSITIVE_INFINITY, NaN));
     }
 
     public static PlanNodeStatsEstimate comparisonSymbolToSymbolStats(PlanNodeStatsEstimate inputStatistics,
