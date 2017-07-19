@@ -22,6 +22,7 @@ import com.facebook.presto.sql.tree.AstVisitor;
 import com.facebook.presto.sql.tree.BetweenPredicate;
 import com.facebook.presto.sql.tree.BooleanLiteral;
 import com.facebook.presto.sql.tree.ComparisonExpression;
+import com.facebook.presto.sql.tree.ComparisonExpressionType;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.InListExpression;
 import com.facebook.presto.sql.tree.InPredicate;
@@ -234,32 +235,29 @@ public class FilterStatsCalculator
         @Override
         protected PlanNodeStatsEstimate visitComparisonExpression(ComparisonExpression node, Void context)
         {
-            if (node.getLeft() instanceof SymbolReference && node.getRight() instanceof SymbolReference) {
-                return comparisonSymbolToSymbolStats(input,
-                        Symbol.from(node.getLeft()),
-                        Symbol.from(node.getRight()),
-                        node.getType()
-                );
+            // TODO: verify we eliminate Literal-Literal earlier or support them here
+
+            ComparisonExpressionType type = node.getType();
+            Expression left = node.getLeft();
+            Expression right = node.getRight();
+
+            if (!(left instanceof SymbolReference) && right instanceof SymbolReference) {
+                // normalize so that symbol is on the left
+                return process(new ComparisonExpression(type.flip(), right, left));
             }
-            else if (node.getLeft() instanceof SymbolReference && node.getRight() instanceof Literal) {
-                Symbol symbol = Symbol.from(node.getLeft());
-                return comparisonSymbolToLiteralStats(input,
-                        symbol,
-                        doubleValueFromLiteral(types.get(symbol), (Literal) node.getRight()),
-                        node.getType()
-                );
+
+            if (left instanceof SymbolReference && right instanceof Literal) {
+                Symbol symbol = Symbol.from(left);
+                OptionalDouble literal = doubleValueFromLiteral(types.get(symbol), (Literal) right);
+                return comparisonSymbolToLiteralStats(input, symbol, literal, type);
             }
-            else if (node.getLeft() instanceof Literal && node.getRight() instanceof SymbolReference) {
-                Symbol symbol = Symbol.from(node.getRight());
-                return comparisonSymbolToLiteralStats(input,
-                        symbol,
-                        doubleValueFromLiteral(types.get(symbol), (Literal) node.getLeft()),
-                        node.getType().flip()
-                );
+
+            if (right instanceof SymbolReference) {
+                // left is SymbolReference too
+                return comparisonSymbolToSymbolStats(input, Symbol.from(left), Symbol.from(right), type);
             }
-            else {
-                return filterStatsForUnknownExpression(input);
-            }
+
+            return filterStatsForUnknownExpression(input);
         }
 
         private OptionalDouble doubleValueFromLiteral(Type type, Literal literal)
