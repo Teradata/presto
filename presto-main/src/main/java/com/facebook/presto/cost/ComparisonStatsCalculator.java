@@ -147,11 +147,28 @@ public class ComparisonStatsCalculator
             Symbol right,
             ComparisonExpressionType type)
     {
+        return comparisonExpressionToExpressionStats(
+                inputStatistics,
+                Optional.of(left),
+                inputStatistics.getSymbolStatistics(left),
+                Optional.of(right),
+                inputStatistics.getSymbolStatistics(right),
+                type);
+    }
+
+    public static PlanNodeStatsEstimate comparisonExpressionToExpressionStats(
+            PlanNodeStatsEstimate inputStatistics,
+            Optional<Symbol> left,
+            SymbolStatsEstimate leftStats,
+            Optional<Symbol> right,
+            SymbolStatsEstimate rightStats,
+            ComparisonExpressionType type)
+    {
         switch (type) {
             case EQUAL:
-                return symbolToSymbolEquality(inputStatistics, left, right);
+                return expressionToExpressionEquality(inputStatistics, left, leftStats, right, rightStats);
             case NOT_EQUAL:
-                return symbolToSymbolNonEquality(inputStatistics, left, right);
+                return expressionToExpressionNonEquality(inputStatistics, left, leftStats, right, rightStats);
             case LESS_THAN:
             case LESS_THAN_OR_EQUAL:
             case GREATER_THAN:
@@ -162,13 +179,13 @@ public class ComparisonStatsCalculator
         }
     }
 
-    private static PlanNodeStatsEstimate symbolToSymbolEquality(PlanNodeStatsEstimate inputStatistics,
-            Symbol left,
-            Symbol right)
+    private static PlanNodeStatsEstimate expressionToExpressionEquality(
+            PlanNodeStatsEstimate inputStatistics,
+            Optional<Symbol> left,
+            SymbolStatsEstimate leftStats,
+            Optional<Symbol> right,
+            SymbolStatsEstimate rightStats)
     {
-        SymbolStatsEstimate leftStats = inputStatistics.getSymbolStatistics(left);
-        SymbolStatsEstimate rightStats = inputStatistics.getSymbolStatistics(right);
-
         if (isNaN(leftStats.getDistinctValuesCount()) || isNaN(rightStats.getDistinctValuesCount())) {
             filterStatsForUnknownExpression(inputStatistics);
         }
@@ -178,27 +195,34 @@ public class ComparisonStatsCalculator
 
         StatisticRange intersect = leftRange.intersect(rightRange);
 
-        SymbolStatsEstimate newRightStats = buildFrom(rightStats)
-                .setNullsFraction(0)
-                .setStatisticsRange(intersect)
-                .build();
-        SymbolStatsEstimate newLeftStats = buildFrom(leftStats)
-                .setNullsFraction(0)
-                .setStatisticsRange(intersect)
-                .build();
-
         double nullsFilterFactor = (1 - leftStats.getNullsFraction()) * (1 - rightStats.getNullsFraction());
         double filterFactor = 1 / max(leftRange.getDistinctValuesCount(), rightRange.getDistinctValuesCount());
 
-        return inputStatistics.mapOutputRowCount(size -> size * filterFactor * nullsFilterFactor)
-                .mapSymbolColumnStatistics(left, oldLeftStats -> newLeftStats)
-                .mapSymbolColumnStatistics(right, oldRightStats -> newRightStats);
+        PlanNodeStatsEstimate estimate = inputStatistics.mapOutputRowCount(size -> size * filterFactor * nullsFilterFactor);
+        if (left.isPresent()) {
+            SymbolStatsEstimate newLeftStats = buildFrom(leftStats)
+                    .setNullsFraction(0)
+                    .setStatisticsRange(intersect)
+                    .build();
+            estimate = estimate.mapSymbolColumnStatistics(left.get(), oldLeftStats -> newLeftStats);
+        }
+        if (right.isPresent()) {
+            SymbolStatsEstimate newRightStats = buildFrom(rightStats)
+                    .setNullsFraction(0)
+                    .setStatisticsRange(intersect)
+                    .build();
+            estimate = estimate.mapSymbolColumnStatistics(right.get(), oldRightStats -> newRightStats);
+        }
+        return estimate;
     }
 
-    private static PlanNodeStatsEstimate symbolToSymbolNonEquality(PlanNodeStatsEstimate inputStatistics,
-            Symbol left,
-            Symbol right)
+    private static PlanNodeStatsEstimate expressionToExpressionNonEquality(
+            PlanNodeStatsEstimate inputStatistics,
+            Optional<Symbol> left,
+            SymbolStatsEstimate leftStats,
+            Optional<Symbol> right,
+            SymbolStatsEstimate rightStats)
     {
-        return PlanNodeStatsEstimateMath.differenceInStats(inputStatistics, symbolToSymbolEquality(inputStatistics, left, right));
+        return PlanNodeStatsEstimateMath.differenceInStats(inputStatistics, expressionToExpressionEquality(inputStatistics, left, leftStats, right, rightStats));
     }
 }
