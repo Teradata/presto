@@ -43,21 +43,21 @@ public class ComparisonStatsCalculator
     public static PlanNodeStatsEstimate comparisonExpressionToLiteralStats(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
-            SymbolStatsEstimate symbolStats,
+            SymbolStatsEstimate expressionStats,
             OptionalDouble doubleLiteral,
             ComparisonExpressionType type)
     {
         switch (type) {
             case EQUAL:
-                return expressionToLiteralEquality(inputStatistics, symbol, symbolStats, doubleLiteral);
+                return expressionToLiteralEquality(inputStatistics, symbol, expressionStats, doubleLiteral);
             case NOT_EQUAL:
-                return expressionToLiteralNonEquality(inputStatistics, symbol, symbolStats, doubleLiteral);
+                return expressionToLiteralNonEquality(inputStatistics, symbol, expressionStats, doubleLiteral);
             case LESS_THAN:
             case LESS_THAN_OR_EQUAL:
-                return expressionToLiteralLessThan(inputStatistics, symbol, symbolStats, doubleLiteral);
+                return expressionToLiteralLessThan(inputStatistics, symbol, expressionStats, doubleLiteral);
             case GREATER_THAN:
             case GREATER_THAN_OR_EQUAL:
-                return expressionToLiteralGreaterThan(inputStatistics, symbol, symbolStats, doubleLiteral);
+                return expressionToLiteralGreaterThan(inputStatistics, symbol, expressionStats, doubleLiteral);
             case IS_DISTINCT_FROM:
             default:
                 return filterStatsForUnknownExpression(inputStatistics);
@@ -67,19 +67,19 @@ public class ComparisonStatsCalculator
     private static PlanNodeStatsEstimate expressionToLiteralRangeComparison(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
-            SymbolStatsEstimate symbolStats,
+            SymbolStatsEstimate expressionStats,
             StatisticRange literalRange)
     {
-        StatisticRange range = StatisticRange.from(symbolStats);
+        StatisticRange range = StatisticRange.from(expressionStats);
         StatisticRange intersectRange = range.intersect(literalRange);
 
         double filterFactor = range.overlapPercentWith(intersectRange);
 
-        PlanNodeStatsEstimate estimate = inputStatistics.mapOutputRowCount(rowCount -> filterFactor * (1 - symbolStats.getNullsFraction()) * rowCount);
+        PlanNodeStatsEstimate estimate = inputStatistics.mapOutputRowCount(rowCount -> filterFactor * (1 - expressionStats.getNullsFraction()) * rowCount);
         if (symbol.isPresent()) {
             SymbolStatsEstimate symbolNewEstimate =
                     SymbolStatsEstimate.builder()
-                            .setAverageRowSize(symbolStats.getAverageRowSize())
+                            .setAverageRowSize(expressionStats.getAverageRowSize())
                             .setStatisticsRange(intersectRange)
                             .setNullsFraction(0.0).build();
             estimate = estimate.mapSymbolColumnStatistics(symbol.get(), oldStats -> symbolNewEstimate);
@@ -90,7 +90,7 @@ public class ComparisonStatsCalculator
     private static PlanNodeStatsEstimate expressionToLiteralEquality(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
-            SymbolStatsEstimate symbolStats,
+            SymbolStatsEstimate expressionStats,
             OptionalDouble literal)
     {
         StatisticRange literalRange;
@@ -100,16 +100,16 @@ public class ComparisonStatsCalculator
         else {
             literalRange = new StatisticRange(NEGATIVE_INFINITY, POSITIVE_INFINITY, 1);
         }
-        return expressionToLiteralRangeComparison(inputStatistics, symbol, symbolStats, literalRange);
+        return expressionToLiteralRangeComparison(inputStatistics, symbol, expressionStats, literalRange);
     }
 
     private static PlanNodeStatsEstimate expressionToLiteralNonEquality(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
-            SymbolStatsEstimate symbolStats,
+            SymbolStatsEstimate expressionStats,
             OptionalDouble literal)
     {
-        StatisticRange range = StatisticRange.from(symbolStats);
+        StatisticRange range = StatisticRange.from(expressionStats);
 
         StatisticRange literalRange;
         if (literal.isPresent()) {
@@ -121,11 +121,11 @@ public class ComparisonStatsCalculator
         StatisticRange intersectRange = range.intersect(literalRange);
         double filterFactor = 1 - range.overlapPercentWith(intersectRange);
 
-        PlanNodeStatsEstimate estimate = inputStatistics.mapOutputRowCount(rowCount -> filterFactor * (1 - symbolStats.getNullsFraction()) * rowCount);
+        PlanNodeStatsEstimate estimate = inputStatistics.mapOutputRowCount(rowCount -> filterFactor * (1 - expressionStats.getNullsFraction()) * rowCount);
         if (symbol.isPresent()) {
-            SymbolStatsEstimate symbolNewEstimate = buildFrom(symbolStats)
+            SymbolStatsEstimate symbolNewEstimate = buildFrom(expressionStats)
                     .setNullsFraction(0.0)
-                    .setDistinctValuesCount(max(symbolStats.getDistinctValuesCount() - 1, 0))
+                    .setDistinctValuesCount(max(expressionStats.getDistinctValuesCount() - 1, 0))
                     .build();
             estimate = estimate.mapSymbolColumnStatistics(symbol.get(), oldStats -> symbolNewEstimate);
         }
@@ -135,19 +135,19 @@ public class ComparisonStatsCalculator
     private static PlanNodeStatsEstimate expressionToLiteralLessThan(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
-            SymbolStatsEstimate symbolStats,
+            SymbolStatsEstimate expressionStats,
             OptionalDouble literal)
     {
-        return expressionToLiteralRangeComparison(inputStatistics, symbol, symbolStats, new StatisticRange(NEGATIVE_INFINITY, literal.orElse(POSITIVE_INFINITY), NaN));
+        return expressionToLiteralRangeComparison(inputStatistics, symbol, expressionStats, new StatisticRange(NEGATIVE_INFINITY, literal.orElse(POSITIVE_INFINITY), NaN));
     }
 
     private static PlanNodeStatsEstimate expressionToLiteralGreaterThan(
             PlanNodeStatsEstimate inputStatistics,
             Optional<Symbol> symbol,
-            SymbolStatsEstimate symbolStats,
+            SymbolStatsEstimate expressionStats,
             OptionalDouble literal)
     {
-        return expressionToLiteralRangeComparison(inputStatistics, symbol, symbolStats, new StatisticRange(literal.orElse(NEGATIVE_INFINITY), POSITIVE_INFINITY, NaN));
+        return expressionToLiteralRangeComparison(inputStatistics, symbol, expressionStats, new StatisticRange(literal.orElse(NEGATIVE_INFINITY), POSITIVE_INFINITY, NaN));
     }
 
     public static PlanNodeStatsEstimate comparisonSymbolToSymbolStats(PlanNodeStatsEstimate inputStatistics,
