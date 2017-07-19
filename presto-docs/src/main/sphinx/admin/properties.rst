@@ -208,6 +208,7 @@ communication issues or improve network utilization.
     improve network throughput for data transferred between stages if the
     network has high latency or if there are many nodes in the cluster.
 
+.. _task-properties:
 
 Task Properties
 ---------------
