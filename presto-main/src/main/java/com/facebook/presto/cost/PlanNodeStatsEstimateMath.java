@@ -123,6 +123,7 @@ public class PlanNodeStatsEstimateMath
                 .setStatisticsRange(sum)
                 .setAverageRowSize((totalSizeLeft + totalSizeRight) / newRowCount) // FIXME, weights to average. left and right should be equal in most cases anyway
                 .setNullsFraction((nullsCountLeft + nullsCountRight) / newRowCount)
+                .setDistinctValuesCount(leftStats.getDistinctValuesCount() + rightStats.getDistinctValuesCount())
                 .build();
     }
 
