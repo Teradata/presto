@@ -54,7 +54,7 @@ import static java.lang.String.format;
 
 public class FilterStatsCalculator
 {
-    private static final double UNKNOWN_FILTER_COEFFICIENT = 0.5;
+    private static final double UNKNOWN_FILTER_COEFFICIENT = 0.9;
 
     private final Metadata metadata;
 
