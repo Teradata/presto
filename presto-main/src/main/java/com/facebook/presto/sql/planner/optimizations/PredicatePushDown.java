@@ -181,7 +181,6 @@ public class PredicatePushDown
                         node.getPartitioningScheme(),
                         builder.build(),
                         node.getInputs(),
-                        node.isOrderSensitive(),
                         node.getOrderingScheme());
             }
 
