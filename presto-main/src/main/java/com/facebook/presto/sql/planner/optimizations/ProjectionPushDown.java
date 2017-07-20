@@ -188,7 +188,6 @@ public class ProjectionPushDown
                     partitioningScheme,
                     newSourceBuilder.build(),
                     inputsBuilder.build(),
-                    exchange.isOrderSensitive(),
                     exchange.getOrderingScheme());
         }
     }
