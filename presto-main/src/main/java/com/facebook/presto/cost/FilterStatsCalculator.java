@@ -54,6 +54,8 @@ import static java.lang.String.format;
 
 public class FilterStatsCalculator
 {
+    private static final double UNKNOWN_FILTER_COEFFICIENT = 0.5;
+
     private final Metadata metadata;
 
     @Inject
@@ -73,7 +75,7 @@ public class FilterStatsCalculator
 
     public static PlanNodeStatsEstimate filterStatsForUnknownExpression(PlanNodeStatsEstimate inputStatistics)
     {
-        return inputStatistics.mapOutputRowCount(size -> size * 0.5);
+        return inputStatistics.mapOutputRowCount(size -> size * UNKNOWN_FILTER_COEFFICIENT);
     }
 
     private class FilterExpressionStatsCalculatingVisitor
