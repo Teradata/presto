@@ -209,6 +209,18 @@ public class TestFilterStatsCalculator
                                 .distinctValuesCount(2.0)
                                 .nullsFraction(0.0)
                 );
+
+        assertExpression(or(
+                new ComparisonExpression(ComparisonExpressionType.EQUAL, new SymbolReference("x"), new DoubleLiteral("1")),
+                new ComparisonExpression(ComparisonExpressionType.EQUAL, new SymbolReference("x"), new DoubleLiteral("3"))))
+                .outputRowsCount(37.5)
+                .symbolStats(new Symbol("x"), symbolAssert ->
+                        symbolAssert.averageRowSize(4.0)
+                                .lowValue(1)
+                                .highValue(3)
+                                .distinctValuesCount(2)
+                                .nullsFraction(0)
+                );
     }
 
     @Test
@@ -226,6 +238,14 @@ public class TestFilterStatsCalculator
                                 .distinctValuesCount(15.0)
                                 .nullsFraction(0.0)
                 );
+
+        // Impossible, with symbol-to-literal comparisons
+        assertExpression(and(
+                new ComparisonExpression(ComparisonExpressionType.EQUAL, new SymbolReference("x"), new DoubleLiteral("1")),
+                new ComparisonExpression(ComparisonExpressionType.EQUAL, new SymbolReference("x"), new DoubleLiteral("3"))))
+                .outputRowsCount(0)
+                .symbolStats(new Symbol("x"), SymbolStatsAssertion::emptyRange);
+        // TODO .symbolStats(new Symbol("y"), SymbolStatsAssertion::emptyRange);
     }
 
     @Test
