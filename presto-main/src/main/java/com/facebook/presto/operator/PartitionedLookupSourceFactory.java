@@ -381,15 +381,18 @@ public final class PartitionedLookupSourceFactory
     private class SpillAwareLookupSourceProvider
             implements LookupSourceProvider
     {
+        private LookupSource lookupSource;
+
         @Override
         public <R> R withLease(Function<LookupSourceLease, R> action)
         {
             rwLock.readLock().lock();
             try {
-                try (LookupSource lookupSource = lookupSourceSupplier.getLookupSource()) {
-                    LookupSourceLease lease = new SpillAwareLookupSourceLease(lookupSource, spillingInfo);
-                    return action.apply(lease);
+                if (lookupSource == null) {
+                    lookupSource = lookupSourceSupplier.getLookupSource();
                 }
+                LookupSourceLease lease = new SpillAwareLookupSourceLease(lookupSource, spillingInfo);
+                return action.apply(lease);
             }
             finally {
                 rwLock.readLock().unlock();
@@ -399,6 +402,10 @@ public final class PartitionedLookupSourceFactory
         @Override
         public void close()
         {
+            if (lookupSource != null) {
+                lookupSource.close();
+                lookupSource = null;
+            }
         }
     }
 
