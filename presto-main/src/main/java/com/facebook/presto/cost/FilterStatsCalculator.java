@@ -222,8 +222,7 @@ public class FilterStatsCalculator
             InListExpression inList = (InListExpression) node.getValueList();
             PlanNodeStatsEstimate statsSum = inList.getValues().stream()
                     .map(inValue -> process(new ComparisonExpression(EQUAL, node.getValue(), inValue)))
-                    .reduce(filterForFalseExpression(),
-                            PlanNodeStatsEstimateMath::addStats);
+                    .reduce(filterForFalseExpression(), PlanNodeStatsEstimateMath::addStats);
 
             Symbol inValueSymbol = Symbol.from(node.getValue());
             SymbolStatsEstimate symbolStat = input.getSymbolStatistics(inValueSymbol);
