@@ -16,12 +16,15 @@ package com.facebook.presto.cost;
 import com.facebook.presto.Session;
 import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.analyzer.ExpressionAnalyzer;
+import com.facebook.presto.sql.analyzer.Scope;
 import com.facebook.presto.sql.planner.LiteralInterpreter;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.tree.AstVisitor;
 import com.facebook.presto.sql.tree.BetweenPredicate;
 import com.facebook.presto.sql.tree.BooleanLiteral;
 import com.facebook.presto.sql.tree.ComparisonExpression;
+import com.facebook.presto.sql.tree.ComparisonExpressionType;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.InListExpression;
 import com.facebook.presto.sql.tree.InPredicate;
@@ -31,14 +34,16 @@ import com.facebook.presto.sql.tree.Literal;
 import com.facebook.presto.sql.tree.LogicalBinaryExpression;
 import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.SymbolReference;
+import com.google.common.collect.ImmutableList;
 
 import javax.inject.Inject;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalDouble;
 
-import static com.facebook.presto.cost.ComparisonStatsCalculator.comparisonSymbolToLiteralStats;
-import static com.facebook.presto.cost.ComparisonStatsCalculator.comparisonSymbolToSymbolStats;
+import static com.facebook.presto.cost.ComparisonStatsCalculator.comparisonExpressionToExpressionStats;
+import static com.facebook.presto.cost.ComparisonStatsCalculator.comparisonExpressionToLiteralStats;
 import static com.facebook.presto.cost.PlanNodeStatsEstimateMath.addStats;
 import static com.facebook.presto.cost.PlanNodeStatsEstimateMath.differenceInNonRangeStats;
 import static com.facebook.presto.cost.PlanNodeStatsEstimateMath.differenceInStats;
@@ -49,11 +54,15 @@ import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.LESS_THAN_OR_EQUAL;
 import static java.lang.Double.NaN;
 import static java.lang.Double.isInfinite;
+import static java.lang.Double.isNaN;
 import static java.lang.Double.min;
 import static java.lang.String.format;
+import static java.util.Objects.requireNonNull;
 
 public class FilterStatsCalculator
 {
+    private static final double UNKNOWN_FILTER_COEFFICIENT = 0.9;
+
     private final Metadata metadata;
 
     @Inject
@@ -73,7 +82,7 @@ public class FilterStatsCalculator
 
     public static PlanNodeStatsEstimate filterStatsForUnknownExpression(PlanNodeStatsEstimate inputStatistics)
     {
-        return inputStatistics.mapOutputRowCount(size -> size * 0.5);
+        return inputStatistics.mapOutputRowCount(size -> size * UNKNOWN_FILTER_COEFFICIENT);
     }
 
     private class FilterExpressionStatsCalculatingVisitor
@@ -127,14 +136,15 @@ public class FilterStatsCalculator
         protected PlanNodeStatsEstimate visitLogicalBinaryExpression(LogicalBinaryExpression node, Void context)
         {
             PlanNodeStatsEstimate leftStats = process(node.getLeft());
-            PlanNodeStatsEstimate rightStats = process(node.getRight());
             PlanNodeStatsEstimate andStats = new FilterExpressionStatsCalculatingVisitor(leftStats, session, types).process(node.getRight());
 
             switch (node.getType()) {
                 case AND:
                     return andStats;
                 case OR:
-                    return differenceInNonRangeStats(addStats(leftStats, rightStats), andStats);
+                    PlanNodeStatsEstimate rightStats = process(node.getRight());
+                    PlanNodeStatsEstimate sumStats = addStats(leftStats, rightStats);
+                    return differenceInNonRangeStats(sumStats, andStats);
                 default:
                     throw new IllegalStateException(format("Unimplemented logical binary operator expression %s", node.getType()));
             }
@@ -214,50 +224,89 @@ public class FilterStatsCalculator
             InListExpression inList = (InListExpression) node.getValueList();
             PlanNodeStatsEstimate statsSum = inList.getValues().stream()
                     .map(inValue -> process(new ComparisonExpression(EQUAL, node.getValue(), inValue)))
-                    .reduce(filterForFalseExpression(),
-                            PlanNodeStatsEstimateMath::addStats);
+                    .reduce(filterForFalseExpression(), PlanNodeStatsEstimateMath::addStats);
+
+            if (isNaN(statsSum.getOutputRowCount())) {
+                return visitExpression(node, context);
+            }
 
             Symbol inValueSymbol = Symbol.from(node.getValue());
-            SymbolStatsEstimate symbolStat = input.getSymbolStatistics(inValueSymbol);
-            double notNullValuesBeforeIn = input.getOutputRowCount() * (1 - symbolStat.getNullsFraction());
+            SymbolStatsEstimate symbolStats = input.getSymbolStatistics(inValueSymbol);
+            double notNullValuesBeforeIn = input.getOutputRowCount() * (1 - symbolStats.getNullsFraction());
 
-            return statsSum.mapOutputRowCount(rowCount -> min(rowCount, notNullValuesBeforeIn))
-                    .mapSymbolColumnStatistics(inValueSymbol,
-                            symbolStats ->
-                                    symbolStats.mapNullsFraction(x -> 0.0)
-                                            .mapDistinctValuesCount(distinctValues ->
-                                                    min(distinctValues, input.getSymbolStatistics(inValueSymbol).getDistinctValuesCount())));
+            SymbolStatsEstimate newSymbolStats = statsSum.getSymbolStatistics(inValueSymbol)
+                    .mapDistinctValuesCount(newDistinctValuesCount -> min(newDistinctValuesCount, symbolStats.getDistinctValuesCount()));
+
+            return input.mapOutputRowCount(rowCount -> min(statsSum.getOutputRowCount(), notNullValuesBeforeIn))
+                    .mapSymbolColumnStatistics(inValueSymbol, oldSymbolStats -> newSymbolStats);
         }
 
         @Override
         protected PlanNodeStatsEstimate visitComparisonExpression(ComparisonExpression node, Void context)
         {
-            if (node.getLeft() instanceof SymbolReference && node.getRight() instanceof SymbolReference) {
-                return comparisonSymbolToSymbolStats(input,
-                        Symbol.from(node.getLeft()),
-                        Symbol.from(node.getRight()),
-                        node.getType()
-                );
+            // TODO: verify we eliminate Literal-Literal earlier or support them here
+
+            ComparisonExpressionType type = node.getType();
+            Expression left = node.getLeft();
+            Expression right = node.getRight();
+
+            if (!(left instanceof SymbolReference) && right instanceof SymbolReference) {
+                // normalize so that symbol is on the left
+                return process(new ComparisonExpression(type.flip(), right, left));
             }
-            else if (node.getLeft() instanceof SymbolReference && node.getRight() instanceof Literal) {
-                Symbol symbol = Symbol.from(node.getLeft());
-                return comparisonSymbolToLiteralStats(input,
-                        symbol,
-                        doubleValueFromLiteral(types.get(symbol), (Literal) node.getRight()),
-                        node.getType()
-                );
+
+            if (left instanceof Literal && !(right instanceof Literal)) {
+                // normalize so that literal is on the right
+                return process(new ComparisonExpression(type.flip(), right, left));
             }
-            else if (node.getLeft() instanceof Literal && node.getRight() instanceof SymbolReference) {
-                Symbol symbol = Symbol.from(node.getRight());
-                return comparisonSymbolToLiteralStats(input,
-                        symbol,
-                        doubleValueFromLiteral(types.get(symbol), (Literal) node.getLeft()),
-                        node.getType().flip()
-                );
+
+            Optional<Symbol> leftSymbol = asSymbol(left);
+            SymbolStatsEstimate leftStats = getSymbolStatsEstimate(left);
+
+            if (right instanceof Literal) {
+                // TODO support Cast(Literal) same way as Literal (nested Casts too)
+                OptionalDouble literal = doubleValueFromLiteral(getType(left), (Literal) right);
+                return comparisonExpressionToLiteralStats(input, leftSymbol, leftStats, literal, type);
             }
-            else {
-                return filterStatsForUnknownExpression(input);
+
+            Optional<Symbol> rightSymbol = asSymbol(right);
+            SymbolStatsEstimate rightStats = getSymbolStatsEstimate(right);
+
+            return comparisonExpressionToExpressionStats(input, leftSymbol, leftStats, rightSymbol, rightStats, type);
+        }
+
+        private Optional<Symbol> asSymbol(Expression expression)
+        {
+            if (expression instanceof SymbolReference) {
+                return Optional.of(Symbol.from(expression));
             }
+            return Optional.empty();
+        }
+
+        private Type getType(Expression expression)
+        {
+            return asSymbol(expression)
+                    .map(symbol -> requireNonNull(types.get(symbol), () -> format("No type for symbol %s", symbol)))
+                    .orElseGet(() -> {
+                        ExpressionAnalyzer expressionAnalyzer = ExpressionAnalyzer.createWithoutSubqueries(
+                                metadata.getFunctionRegistry(),
+                                metadata.getTypeManager(),
+                                session,
+                                types,
+                                ImmutableList.of(),
+                                // At this stage, there should be no subqueries in the plan.
+                                node -> new IllegalStateException("Unexpected Subquery"),
+                                false);
+                        Type type = expressionAnalyzer.analyze(expression, Scope.create());
+                        return type;
+                    });
+        }
+
+        private SymbolStatsEstimate getSymbolStatsEstimate(Expression expression)
+        {
+            return asSymbol(expression)
+                    .map(symbol -> requireNonNull(input.getSymbolStatistics(symbol), () -> format("No statistics for symbol %s", symbol)))
+                    .orElseGet(() -> new ScalarStatsCalculator(metadata).calculate(expression, input, session, types));
         }
 
         private OptionalDouble doubleValueFromLiteral(Type type, Literal literal)

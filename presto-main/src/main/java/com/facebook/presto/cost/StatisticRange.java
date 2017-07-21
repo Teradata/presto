@@ -102,7 +102,7 @@ public class StatisticRange
             return INFINITE_TO_INFINITE_RANGE_INTERSECT_OVERLAP_HEURISTIC_FACTOR;
         }
         if (lengthOfIntersect == 0) {
-            return 1 / distinctValues;
+            return 1 / max(distinctValues, 1);
         }
         if (lengthOfIntersect < 0) {
             return 0;
