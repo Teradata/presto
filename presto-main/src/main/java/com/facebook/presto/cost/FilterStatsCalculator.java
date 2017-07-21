@@ -136,14 +136,15 @@ public class FilterStatsCalculator
         protected PlanNodeStatsEstimate visitLogicalBinaryExpression(LogicalBinaryExpression node, Void context)
         {
             PlanNodeStatsEstimate leftStats = process(node.getLeft());
-            PlanNodeStatsEstimate rightStats = process(node.getRight());
             PlanNodeStatsEstimate andStats = new FilterExpressionStatsCalculatingVisitor(leftStats, session, types).process(node.getRight());
 
             switch (node.getType()) {
                 case AND:
                     return andStats;
                 case OR:
-                    return differenceInNonRangeStats(addStats(leftStats, rightStats), andStats);
+                    PlanNodeStatsEstimate rightStats = process(node.getRight());
+                    PlanNodeStatsEstimate sumStats = addStats(leftStats, rightStats);
+                    return differenceInNonRangeStats(sumStats, andStats);
                 default:
                     throw new IllegalStateException(format("Unimplemented logical binary operator expression %s", node.getType()));
             }
