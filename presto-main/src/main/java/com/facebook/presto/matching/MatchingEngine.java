@@ -14,12 +14,15 @@
 
 package com.facebook.presto.matching;
 
+import com.facebook.presto.matching.v2.pattern.TypeOfPattern;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ListMultimap;
 import com.google.common.reflect.TypeToken;
 
 import java.util.Set;
 import java.util.stream.Stream;
+
+import static com.google.common.base.Preconditions.checkArgument;
 
 public class MatchingEngine<T extends Matchable>
 {
@@ -63,10 +66,25 @@ public class MatchingEngine<T extends Matchable>
             if (pattern instanceof Pattern.TypeOf) {
                 matchablesByClass.put(((Pattern.TypeOf) pattern).getType(), matchable);
             }
+            else if (pattern instanceof Pattern.V2Adapter) {
+                Pattern.V2Adapter adapter = (Pattern.V2Adapter) pattern;
+                com.facebook.presto.matching.v2.Pattern<?> firstPattern = getFirstPattern(adapter.getPattern());
+                checkArgument(firstPattern instanceof TypeOfPattern,
+                        "Unsupported v2 pattern, expected a TypeOfPattern, got " + firstPattern);
+                matchablesByClass.put(((TypeOfPattern<?>) firstPattern).expectedClass(), matchable);
+            }
             else {
                 throw new IllegalArgumentException("Unexpected Pattern: " + pattern);
             }
             return this;
+        }
+
+        private com.facebook.presto.matching.v2.Pattern<?> getFirstPattern(com.facebook.presto.matching.v2.Pattern<?> pattern)
+        {
+            while (pattern.previous() != null) {
+                pattern = pattern.previous();
+            }
+            return pattern;
         }
 
         public MatchingEngine<T> build()

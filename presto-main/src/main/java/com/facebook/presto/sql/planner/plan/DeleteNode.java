@@ -28,7 +28,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class DeleteNode
-        extends PlanNode
+        extends SingleSourcePlanNode
 {
     private final PlanNode source;
     private final DeleteHandle target;
@@ -74,12 +74,6 @@ public class DeleteNode
     public List<Symbol> getOutputSymbols()
     {
         return outputs;
-    }
-
-    @Override
-    public List<PlanNode> getSources()
-    {
-        return ImmutableList.of(source);
     }
 
     @Override

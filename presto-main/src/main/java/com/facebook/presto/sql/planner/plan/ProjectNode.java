@@ -18,7 +18,6 @@ import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.SymbolReference;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 
 import javax.annotation.concurrent.Immutable;
@@ -30,7 +29,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class ProjectNode
-        extends PlanNode
+        extends SingleSourcePlanNode
 {
     private final PlanNode source;
     private final Assignments assignments;
@@ -60,12 +59,6 @@ public class ProjectNode
     public Assignments getAssignments()
     {
         return assignments;
-    }
-
-    @Override
-    public List<PlanNode> getSources()
-    {
-        return ImmutableList.of(source);
     }
 
     @JsonProperty

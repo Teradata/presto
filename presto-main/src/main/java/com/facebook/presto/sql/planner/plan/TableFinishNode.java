@@ -29,7 +29,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class TableFinishNode
-        extends PlanNode
+        extends SingleSourcePlanNode
 {
     private final PlanNode source;
     private final WriterTarget target;
@@ -67,12 +67,6 @@ public class TableFinishNode
     public List<Symbol> getOutputSymbols()
     {
         return outputs;
-    }
-
-    @Override
-    public List<PlanNode> getSources()
-    {
-        return ImmutableList.of(source);
     }
 
     @Override

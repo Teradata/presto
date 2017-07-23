@@ -22,6 +22,8 @@ import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.StatsRecorder;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolAllocator;
+import com.facebook.presto.sql.planner.iterative.rule.PatternRule;
+import com.facebook.presto.sql.planner.iterative.rule.PrestoMatcher;
 import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.google.common.collect.ImmutableList;
@@ -121,7 +123,7 @@ public class IterativeOptimizer
                 Rule rule = possiblyMatchingRules.next();
                 Optional<PlanNode> transformed;
 
-                if (!rule.getPattern().matches(node)) {
+                if (!matches(node, rule, context.getLookup())) {
                     continue;
                 }
 
@@ -147,6 +149,16 @@ public class IterativeOptimizer
         }
 
         return progress;
+    }
+
+    private boolean matches(PlanNode node, Rule rule, Lookup lookup)
+    {
+        if (rule instanceof PatternRule) {
+            return new PrestoMatcher(lookup).match(((PatternRule) rule).pattern(), node).isPresent();
+        }
+        else {
+            return rule.getPattern().matches(node);
+        }
     }
 
     private boolean isTimeLimitExhausted(Context context)

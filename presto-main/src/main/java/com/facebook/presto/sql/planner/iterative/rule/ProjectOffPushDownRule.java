@@ -13,10 +13,11 @@
  */
 package com.facebook.presto.sql.planner.iterative.rule;
 
-import com.facebook.presto.matching.Pattern;
+import com.facebook.presto.matching.v2.Capture;
+import com.facebook.presto.matching.v2.Captures;
+import com.facebook.presto.matching.v2.Pattern;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.iterative.Rule;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.google.common.collect.ImmutableList;
@@ -24,7 +25,10 @@ import com.google.common.collect.ImmutableList;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.facebook.presto.matching.v2.Capture.newCapture;
 import static com.facebook.presto.sql.planner.iterative.rule.Util.pruneInputs;
+import static com.facebook.presto.sql.planner.plan.Patterns.project;
+import static com.facebook.presto.sql.planner.plan.Patterns.source;
 
 /**
  * @param <N> The node type to look for under the ProjectNode
@@ -32,35 +36,28 @@ import static com.facebook.presto.sql.planner.iterative.rule.Util.pruneInputs;
  * Given that situation, invokes the pushDownProjectOff helper to possibly rewrite the child to produce fewer outputs.
  */
 public abstract class ProjectOffPushDownRule<N extends PlanNode>
-    implements Rule
+        implements PatternRule<ProjectNode>
 {
-    private static final Pattern PATTERN = Pattern.typeOf(ProjectNode.class);
-    private final Class<N> targetNodeClass;
+    private final Capture<N> targetCapture = newCapture();
+    private final Pattern<N> targetNodePattern;
 
-    protected ProjectOffPushDownRule(Class<N> targetNodeClass)
+    protected ProjectOffPushDownRule(Pattern<N> targetNodePattern)
     {
-        this.targetNodeClass = targetNodeClass;
+        this.targetNodePattern = targetNodePattern;
     }
 
     @Override
-    public Pattern getPattern()
+    public final Pattern<ProjectNode> pattern()
     {
-        return PATTERN;
+        return project()
+                .with(source().matching(targetNodePattern.capturedAs(targetCapture)));
     }
 
     @Override
-    public Optional<PlanNode> apply(PlanNode node, Context context)
+    public final Optional<PlanNode> apply(ProjectNode parent, Captures captures, Context context)
     {
-        ProjectNode parent = (ProjectNode) node;
-
-        PlanNode child = context.getLookup().resolve(parent.getSource());
-        if (!targetNodeClass.isInstance(child)) {
-            return Optional.empty();
-        }
-
-        N targetNode = targetNodeClass.cast(child);
-
-        return pruneInputs(child.getOutputSymbols(), parent.getAssignments().getExpressions())
+        N targetNode = captures.get(targetCapture);
+        return pruneInputs(targetNode.getOutputSymbols(), parent.getAssignments().getExpressions())
                 .flatMap(prunedOutputs -> this.pushDownProjectOff(context.getIdAllocator(), targetNode, prunedOutputs))
                 .map(newChild -> parent.replaceChildren(ImmutableList.of(newChild)));
     }

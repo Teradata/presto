@@ -40,7 +40,7 @@ import static java.util.Objects.requireNonNull;
 
 @Immutable
 public class AggregationNode
-        extends PlanNode
+        extends SingleSourcePlanNode
 {
     private final PlanNode source;
     private final Map<Symbol, Aggregation> aggregations;
@@ -134,12 +134,6 @@ public class AggregationNode
         outputs.addAll(aggregations.keySet());
 
         this.outputs = outputs.build();
-    }
-
-    @Override
-    public List<PlanNode> getSources()
-    {
-        return ImmutableList.of(source);
     }
 
     @Override

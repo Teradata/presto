@@ -13,8 +13,8 @@
  */
 package com.facebook.presto.sql.planner.iterative.rule;
 
-import com.facebook.presto.matching.Pattern;
-import com.facebook.presto.sql.planner.iterative.Rule;
+import com.facebook.presto.matching.v2.Captures;
+import com.facebook.presto.matching.v2.Pattern;
 import com.facebook.presto.sql.planner.plan.FilterNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.tree.Expression;
@@ -22,29 +22,28 @@ import com.facebook.presto.sql.tree.Expression;
 import java.util.Optional;
 
 import static com.facebook.presto.sql.planner.optimizations.CanonicalizeExpressions.canonicalizeExpression;
+import static com.facebook.presto.sql.planner.plan.Patterns.filter;
 
 public class CanonicalizeFilterExpressions
-        implements Rule
+        implements PatternRule<FilterNode>
 {
-    private static final Pattern PATTERN = Pattern.typeOf(FilterNode.class);
+    private static final Pattern<FilterNode> PATTERN = filter();
 
     @Override
-    public Pattern getPattern()
+    public Pattern<FilterNode> pattern()
     {
         return PATTERN;
     }
 
     @Override
-    public Optional<PlanNode> apply(PlanNode node, Context context)
+    public Optional<PlanNode> apply(FilterNode filterNode, Captures captures, Context context)
     {
-        FilterNode filterNode = (FilterNode) node;
-
         Expression canonicalized = canonicalizeExpression(filterNode.getPredicate());
 
         if (canonicalized.equals(filterNode.getPredicate())) {
             return Optional.empty();
         }
 
-        return Optional.of(new FilterNode(node.getId(), filterNode.getSource(), canonicalized));
+        return Optional.of(new FilterNode(filterNode.getId(), filterNode.getSource(), canonicalized));
     }
 }

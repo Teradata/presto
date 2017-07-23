@@ -35,6 +35,12 @@ public abstract class Pattern
         return new TypeOf(objectClass);
     }
 
+    //TODO remove this Pattern class along with this method once the migration is complete
+    public static Pattern v2Adapter(com.facebook.presto.matching.v2.Pattern<?> pattern)
+    {
+        return new V2Adapter(pattern);
+    }
+
     static class TypeOf<T>
             extends Pattern
     {
@@ -62,6 +68,28 @@ public abstract class Pattern
             return toStringHelper(this)
                     .add("type", type)
                     .toString();
+        }
+    }
+
+    static class V2Adapter
+            extends Pattern
+    {
+        V2Adapter(com.facebook.presto.matching.v2.Pattern<?> pattern)
+        {
+            this.pattern = pattern;
+        }
+
+        private com.facebook.presto.matching.v2.Pattern<?> pattern;
+
+        @Override
+        public boolean matches(Object object)
+        {
+            throw new UnsupportedOperationException("a matcher should be used for matching the v2 pattern");
+        }
+
+        public com.facebook.presto.matching.v2.Pattern<?> getPattern()
+        {
+            return pattern;
         }
     }
 }
