@@ -15,6 +15,8 @@ package com.facebook.presto.sql.planner.plan;
 
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.matching.Property;
+import com.facebook.presto.sql.planner.Symbol;
+import com.facebook.presto.sql.tree.Expression;
 
 import java.util.List;
 import java.util.Optional;
@@ -138,15 +140,86 @@ public class Patterns
         return typeOf(WindowNode.class);
     }
 
-    public static Property<PlanNode, PlanNode> source()
+    public static Property<HasSource, PlanNode> source()
     {
-        return optionalProperty(node -> node.getSources().size() == 1 ?
+        return property("source", HasSource::getSource);
+    }
+
+    public static Property<PlanNode, PlanNode> onlySource()
+    {
+        return optionalProperty("onlySource", node -> node.getSources().size() == 1 ?
                 Optional.of(node.getSources().get(0)) :
                 empty());
     }
 
     public static Property<PlanNode, List<PlanNode>> sources()
     {
-        return property(PlanNode::getSources);
+        return property("sources", PlanNode::getSources);
+    }
+
+    public static class Aggregation
+    {
+        public static Property<AggregationNode, List<Symbol>> groupingKeys()
+        {
+            return property("groupingKeys", AggregationNode::getGroupingKeys);
+        }
+
+        public static Property<AggregationNode, AggregationNode.Step> step()
+        {
+            return property("step", AggregationNode::getStep);
+        }
+    }
+
+    public static class Apply
+    {
+        public static Property<ApplyNode, List<Symbol>> correlation()
+        {
+            return property("correlation", ApplyNode::getCorrelation);
+        }
+    }
+
+    public static class LateralJoin
+    {
+        public static Property<LateralJoinNode, List<Symbol>> correlation()
+        {
+            return property("correlation", LateralJoinNode::getCorrelation);
+        }
+    }
+
+    public static class Limit
+    {
+        public static Property<LimitNode, Long> count()
+        {
+            return property("count", LimitNode::getCount);
+        }
+    }
+
+    public static class Sample
+    {
+        public static Property<SampleNode, Double> sampleRatio()
+        {
+            return property("sampleRatio", SampleNode::getSampleRatio);
+        }
+
+        public static Property<SampleNode, SampleNode.Type> sampleType()
+        {
+            return property("sampleType", SampleNode::getSampleType);
+        }
+    }
+
+    public static class TopN
+    {
+        public static Property<TopNNode, TopNNode.Step> step()
+        {
+            return property("step", TopNNode::getStep);
+        }
+    }
+
+    public static class Values
+    {
+        public static Property<ValuesNode, List<List<Expression>>> rows()
+        {
+            return property("rows", ValuesNode::getRows);
+        }
     }
 }

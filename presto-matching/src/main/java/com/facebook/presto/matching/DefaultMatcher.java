@@ -14,6 +14,9 @@
 package com.facebook.presto.matching;
 
 import com.facebook.presto.matching.pattern.CapturePattern;
+import com.facebook.presto.matching.pattern.EqualsPattern;
+import com.facebook.presto.matching.pattern.ExtractPattern;
+import com.facebook.presto.matching.pattern.FilterPattern;
 import com.facebook.presto.matching.pattern.TypeOfPattern;
 import com.facebook.presto.matching.pattern.WithPattern;
 
@@ -52,7 +55,7 @@ public class DefaultMatcher
     @Override
     public <T> Match<T> matchWith(WithPattern<T> withPattern, Object object, Captures captures)
     {
-        Function<? super T, Optional<?>> property = withPattern.getProperty();
+        Function<? super T, Optional<?>> property = withPattern.getProperty().getFunction();
         Optional<?> propValue = property.apply((T) object);
         Match<?> propertyMatch = propValue
                 .map(value -> match(withPattern.getPattern(), value, captures))
@@ -64,5 +67,26 @@ public class DefaultMatcher
     public <T> Match<T> matchCapture(CapturePattern<T> capturePattern, Object object, Captures captures)
     {
         return Match.of((T) object, captures.addAll(Captures.ofNullable(capturePattern.capture(), (T) object)));
+    }
+
+    @Override
+    public <T> Match<T> matchEquals(EqualsPattern<T> equalsPattern, Object object, Captures captures)
+    {
+        return Match.of((T) object, captures).filter(equalsPattern.expectedValue()::equals);
+    }
+
+    @Override
+    public <T> Match<T> matchFilter(FilterPattern<T> filterPattern, Object object, Captures captures)
+    {
+        return Match.of((T) object, captures).filter(filterPattern.predicate());
+    }
+
+    @Override
+    public <T, R> Match<R> matchExtract(ExtractPattern<T, R> extractPattern, Object object, Captures captures)
+    {
+        Extractor<? super T, R> extractor = extractPattern.extractor();
+        return extractor.apply((T) object, captures)
+                .map(v -> Match.of(v, captures))
+                .orElse(Match.empty());
     }
 }

@@ -34,7 +34,7 @@ public class PlanNodeMatcher
     @Override
     public <T> Match<T> matchWith(WithPattern<T> withPattern, Object object, Captures captures)
     {
-        Function<? super T, Optional<?>> property = withPattern.getProperty();
+        Function<? super T, Optional<?>> property = withPattern.getProperty().getFunction();
         Optional<?> propValue = property.apply((T) object);
 
         Optional<?> resolvedValue = propValue

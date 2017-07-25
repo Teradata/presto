@@ -18,39 +18,35 @@ import com.facebook.presto.matching.Match;
 import com.facebook.presto.matching.Matcher;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.matching.PatternVisitor;
-import com.facebook.presto.matching.Property;
-import com.facebook.presto.matching.PropertyPattern;
 
-public class WithPattern<T>
+import static java.util.Objects.requireNonNull;
+
+public class EqualsPattern<T>
         extends Pattern<T>
 {
-    private final PropertyPattern<? super T, ?> propertyPattern;
+    private final T expectedValue;
 
-    public WithPattern(PropertyPattern<? super T, ?> propertyPattern, Pattern<T> previous)
+    public EqualsPattern(T expectedValue, Pattern<?> previous)
     {
         super(previous);
-        this.propertyPattern = propertyPattern;
+        this.expectedValue = requireNonNull(expectedValue,
+                "expectedValue can't be null. Use isNull() pattern instead.");
     }
 
-    public Pattern<?> getPattern()
+    public T expectedValue()
     {
-        return propertyPattern.getPattern();
-    }
-
-    public Property<? super T, ?> getProperty()
-    {
-        return propertyPattern.getProperty();
+        return expectedValue;
     }
 
     @Override
     public Match<T> accept(Matcher matcher, Object object, Captures captures)
     {
-        return matcher.matchWith(this, object, captures);
+        return matcher.matchEquals(this, object, captures);
     }
 
     @Override
     public void accept(PatternVisitor patternVisitor)
     {
-        patternVisitor.visitWith(this);
+        patternVisitor.visitEquals(this);
     }
 }

@@ -18,39 +18,49 @@ import com.facebook.presto.matching.Match;
 import com.facebook.presto.matching.Matcher;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.matching.PatternVisitor;
-import com.facebook.presto.matching.Property;
-import com.facebook.presto.matching.PropertyPattern;
+import com.facebook.presto.matching.UsageCallSite;
 
-public class WithPattern<T>
+import java.util.function.Predicate;
+
+public class FilterPattern<T>
         extends Pattern<T>
 {
-    private final PropertyPattern<? super T, ?> propertyPattern;
+    private final String description;
+    private final UsageCallSite usageCallSite;
+    private final Predicate<? super T> predicate;
 
-    public WithPattern(PropertyPattern<? super T, ?> propertyPattern, Pattern<T> previous)
+    public FilterPattern(String description, UsageCallSite usageCallSite, Predicate<? super T> predicate, Pattern<T> previous)
     {
         super(previous);
-        this.propertyPattern = propertyPattern;
+        this.description = description;
+        this.usageCallSite = usageCallSite;
+        this.predicate = predicate;
     }
 
-    public Pattern<?> getPattern()
+    public String description()
     {
-        return propertyPattern.getPattern();
+        return description;
     }
 
-    public Property<? super T, ?> getProperty()
+    public UsageCallSite usageCallSite()
     {
-        return propertyPattern.getProperty();
+        return usageCallSite;
+    }
+
+    public Predicate<? super T> predicate()
+    {
+        return predicate;
     }
 
     @Override
     public Match<T> accept(Matcher matcher, Object object, Captures captures)
     {
-        return matcher.matchWith(this, object, captures);
+        return matcher.matchFilter(this, object, captures);
     }
 
     @Override
     public void accept(PatternVisitor patternVisitor)
     {
-        patternVisitor.visitWith(this);
+        patternVisitor.visitFilter(this);
     }
 }

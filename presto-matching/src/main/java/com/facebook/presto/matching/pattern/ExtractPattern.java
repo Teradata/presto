@@ -14,43 +14,52 @@
 package com.facebook.presto.matching.pattern;
 
 import com.facebook.presto.matching.Captures;
+import com.facebook.presto.matching.Extractor;
 import com.facebook.presto.matching.Match;
 import com.facebook.presto.matching.Matcher;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.matching.PatternVisitor;
-import com.facebook.presto.matching.Property;
-import com.facebook.presto.matching.PropertyPattern;
+import com.facebook.presto.matching.UsageCallSite;
 
-public class WithPattern<T>
-        extends Pattern<T>
+public class ExtractPattern<T, R>
+        extends Pattern<R>
 {
-    private final PropertyPattern<? super T, ?> propertyPattern;
+    private final String description;
+    private final UsageCallSite usageCallSite;
+    private final Extractor<? super T, R> extractor;
 
-    public WithPattern(PropertyPattern<? super T, ?> propertyPattern, Pattern<T> previous)
+    public ExtractPattern(String description, UsageCallSite usageCallSite, Extractor<? super T, R> extractor, Pattern<T> pattern)
     {
-        super(previous);
-        this.propertyPattern = propertyPattern;
+        super(pattern);
+        this.description = description;
+        this.usageCallSite = usageCallSite;
+        this.extractor = extractor;
     }
 
-    public Pattern<?> getPattern()
+    public String description()
     {
-        return propertyPattern.getPattern();
+        return description;
     }
 
-    public Property<? super T, ?> getProperty()
+    public UsageCallSite usageCallSite()
     {
-        return propertyPattern.getProperty();
+        return usageCallSite;
+    }
+
+    public Extractor<? super T, R> extractor()
+    {
+        return extractor;
     }
 
     @Override
-    public Match<T> accept(Matcher matcher, Object object, Captures captures)
+    public Match<R> accept(Matcher matcher, Object object, Captures captures)
     {
-        return matcher.matchWith(this, object, captures);
+        return matcher.matchExtract(this, object, captures);
     }
 
     @Override
     public void accept(PatternVisitor patternVisitor)
     {
-        patternVisitor.visitWith(this);
+        patternVisitor.visitExtract(this);
     }
 }

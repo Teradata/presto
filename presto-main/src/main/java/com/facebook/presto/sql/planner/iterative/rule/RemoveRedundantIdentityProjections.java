@@ -16,6 +16,7 @@ package com.facebook.presto.sql.planner.iterative.rule;
 import com.facebook.presto.matching.Captures;
 import com.facebook.presto.matching.Pattern;
 import com.facebook.presto.sql.planner.iterative.Rule;
+import com.facebook.presto.sql.planner.plan.HasSource;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.ProjectNode;
 import com.google.common.collect.ImmutableSet;
@@ -30,7 +31,16 @@ import static com.facebook.presto.sql.planner.plan.Patterns.project;
 public class RemoveRedundantIdentityProjections
         implements Rule<ProjectNode>
 {
-    private static final Pattern<ProjectNode> PATTERN = project();
+    private static final Pattern<ProjectNode> PATTERN = project()
+            .matching(ProjectNode::isIdentity)
+            // only drop this projection if it does not constrain the outputs
+            // of its child
+            .matching(project -> outputsSameAsSource(project));
+
+    private static <T extends PlanNode & HasSource> boolean outputsSameAsSource(T node)
+    {
+        return ImmutableSet.copyOf(node.getOutputSymbols()).equals(ImmutableSet.copyOf(node.getSource().getOutputSymbols()));
+    }
 
     @Override
     public Pattern<ProjectNode> getPattern()
@@ -41,16 +51,6 @@ public class RemoveRedundantIdentityProjections
     @Override
     public Optional<PlanNode> apply(ProjectNode project, Captures captures, Context context)
     {
-        if (!project.isIdentity()) {
-            return Optional.empty();
-        }
-
-        // only drop this projection if it does not constrain the outputs
-        // of its child
-        if (!ImmutableSet.copyOf(project.getOutputSymbols()).equals(ImmutableSet.copyOf(project.getSource().getOutputSymbols()))) {
-            return Optional.empty();
-        }
-
         return Optional.of(project.getSource());
     }
 }

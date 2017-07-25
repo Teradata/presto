@@ -28,7 +28,8 @@ import static com.facebook.presto.sql.planner.plan.Patterns.join;
 public class CanonicalizeJoinExpressions
         implements Rule<JoinNode>
 {
-    private static final Pattern<JoinNode> PATTERN = join();
+    private static final Pattern<JoinNode> PATTERN = join()
+            .matching(join -> join.getFilter().isPresent());
 
     @Override
     public Pattern<JoinNode> getPattern()
@@ -39,10 +40,6 @@ public class CanonicalizeJoinExpressions
     @Override
     public Optional<PlanNode> apply(JoinNode joinNode, Captures captures, Context context)
     {
-        if (!joinNode.getFilter().isPresent()) {
-            return Optional.empty();
-        }
-
         Expression canonicalizedExpression = canonicalizeExpression(joinNode.getFilter().get());
         if (canonicalizedExpression.equals(joinNode.getFilter().get())) {
             return Optional.empty();

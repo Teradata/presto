@@ -39,6 +39,12 @@ public class PushTableWriteThroughUnion
     private static final Capture<UnionNode> CHILD = newCapture();
 
     private static final Pattern<TableWriterNode> PATTERN = tableWriterNode()
+            // The primary incentive of this optimizer is to increase the parallelism for table
+            // write. For a table with partitioning scheme, parallelism for table writing is
+            // guaranteed regardless of this optimizer. The level of local parallelism will be
+            // determined by LocalExecutionPlanner separately, and shouldn't be a concern of
+            // this optimizer.
+            .matching(tableWriter -> !tableWriter.getPartitioningScheme().isPresent())
             .with(source().matching(union().capturedAs(CHILD)));
 
     @Override
@@ -51,15 +57,6 @@ public class PushTableWriteThroughUnion
     public Optional<PlanNode> apply(TableWriterNode tableWriterNode, Captures captures, Context context)
     {
         if (!isPushTableWriteThroughUnion(context.getSession())) {
-            return Optional.empty();
-        }
-
-        if (tableWriterNode.getPartitioningScheme().isPresent()) {
-            // The primary incentive of this optimizer is to increase the parallelism for table
-            // write. For a table with partitioning scheme, parallelism for table writing is
-            // guaranteed regardless of this optimizer. The level of local parallelism will be
-            // determined by LocalExecutionPlanner separately, and shouldn't be a concern of
-            // this optimizer.
             return Optional.empty();
         }
 
