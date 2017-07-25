@@ -196,7 +196,7 @@ public final class LiteralInterpreter
         }
 
         if (type.equals(DATE)) {
-            return new GenericLiteral("DATE", new SqlDate(Math.toIntExact((Long) object)).toString());
+            return new GenericLiteral("DATE", new SqlDate(toIntExact((Long) object)).toString());
         }
 
         if (object instanceof Block) {
