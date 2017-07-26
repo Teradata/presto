@@ -68,6 +68,7 @@ import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.testing.MaterializedResult.resultBuilder;
 import static com.facebook.presto.testing.TestingTaskContext.createTaskContext;
 import static com.google.common.base.Strings.nullToEmpty;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
@@ -77,6 +78,7 @@ import static io.airlift.testing.Assertions.assertEqualsIgnoreOrder;
 import static io.airlift.units.DataSize.Unit.KILOBYTE;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.airlift.units.DataSize.succinctBytes;
+import static java.lang.String.format;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
@@ -95,13 +97,14 @@ public class TestHashAggregationOperator
             new Signature("count", AGGREGATE, BIGINT.getTypeSignature()));
 
     private ExecutorService executor;
-    private SpillerFactory spillerFactory = new DummySpillerFactory();
     private JoinCompiler joinCompiler = new JoinCompiler();
+    private DummySpillerFactory spillerFactory;
 
     @BeforeMethod
     public void setUp()
     {
         executor = newCachedThreadPool(daemonThreadsNamed("test-%s"));
+        spillerFactory = new DummySpillerFactory();
     }
 
     @DataProvider(name = "hashEnabled")
@@ -123,6 +126,7 @@ public class TestHashAggregationOperator
     @AfterMethod
     public void tearDown()
     {
+        spillerFactory = null;
         executor.shutdownNow();
     }
 
@@ -145,6 +149,7 @@ public class TestHashAggregationOperator
                 .addSequencePage(10, 100, 0, 300, 0, 500)
                 .build();
 
+        boolean spillEnabled = memoryLimitBeforeSpill > 0;
         HashAggregationOperatorFactory operatorFactory = new HashAggregationOperatorFactory(
                 0,
                 new PlanNodeId("test"),
@@ -163,7 +168,7 @@ public class TestHashAggregationOperator
                 Optional.empty(),
                 100_000,
                 new DataSize(16, MEGABYTE),
-                memoryLimitBeforeSpill > 0,
+                spillEnabled,
                 succinctBytes(memoryLimitBeforeSpill),
                 succinctBytes(memoryLimitForMergeWithMemory),
                 spillerFactory,
@@ -185,6 +190,7 @@ public class TestHashAggregationOperator
                 .build();
 
         assertOperatorEqualsIgnoreOrder(operatorFactory, driverContext, input, expected, hashEnabled, Optional.of(hashChannels.size()));
+        assertTrue(spillEnabled == (spillerFactory.getSpillsCount() > 0), format("Spill state mismatch. Expected spill: %s, spill count: %s", spillEnabled, spillerFactory.getSpillsCount()));
     }
 
     @Test(dataProvider = "hashEnabledAndMemoryLimitBeforeSpillValues")
@@ -585,24 +591,29 @@ public class TestHashAggregationOperator
     private static class DummySpillerFactory
             implements SpillerFactory
     {
+        private long spillsCount;
+
         @Override
         public Spiller create(List<Type> types, SpillContext spillContext, AggregatedMemoryContext memoryContext)
         {
             return new Spiller()
             {
-                private final List<Iterator<Page>> spills = new ArrayList<>();
+                private final List<Iterable<Page>> spills = new ArrayList<>();
 
                 @Override
                 public ListenableFuture<?> spill(Iterator<Page> pageIterator)
                 {
-                    spills.add(pageIterator);
+                    spillsCount++;
+                    spills.add(ImmutableList.copyOf(pageIterator));
                     return immediateFuture(null);
                 }
 
                 @Override
                 public List<Iterator<Page>> getSpills()
                 {
-                    return spills;
+                    return spills.stream()
+                            .map(Iterable::iterator)
+                            .collect(toImmutableList());
                 }
 
                 @Override
@@ -610,6 +621,11 @@ public class TestHashAggregationOperator
                 {
                 }
             };
+        }
+
+        public long getSpillsCount()
+        {
+            return spillsCount;
         }
     }
 
