@@ -42,6 +42,7 @@ import org.testng.annotations.AfterMethod;
 import org.testng.annotations.Test;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
@@ -98,7 +99,8 @@ public class TestMemoryPools
     {
         // query will reserve all memory in the user pool and discard the output
         setUp(() -> {
-            OutputFactory outputFactory = new PageConsumerOutputFactory(types -> (page -> { }));
+            OutputFactory outputFactory = new PageConsumerOutputFactory(types -> (page -> {
+            }));
             return localQueryRunner.createDrivers("SELECT COUNT(*) FROM orders JOIN lineitem USING (orderkey)", outputFactory, taskContext);
         });
     }
@@ -113,7 +115,8 @@ public class TestMemoryPools
                     new PlanNodeId("revokable_operator"),
                     TableScanOperator.class.getSimpleName());
 
-            OutputFactory outputFactory = new PageConsumerOutputFactory(types -> (page -> { }));
+            OutputFactory outputFactory = new PageConsumerOutputFactory(types -> (page -> {
+            }));
             Operator outputOperator = outputFactory.createOutputOperator(2, new PlanNodeId("output"), ImmutableList.of(), Function.identity(), new TestingPagesSerdeFactory()).createOperator(driverContext);
             RevocableMemoryOperator revocableMemoryOperator = new RevocableMemoryOperator(revokableOperatorContext, reservedPerPage, numberOfPages);
             createOperator.set(revocableMemoryOperator);
@@ -143,6 +146,22 @@ public class TestMemoryPools
         assertTrue(userPool.getFreeBytes() <= 0, String.format("Expected empty pool but got [%d]", userPool.getFreeBytes()));
         userPool.free(fakeQueryId, TEN_MEGABYTES.toBytes());
         assertDriversProgress(waitingForUserMemory());
+    }
+
+    @Test
+    public void testNotifyListenerOnMemoryReserved()
+    {
+        setupConsumeRevocableMemory(ONE_BYTE, 10);
+        AtomicReference<MemoryPool> notifiedPool = new AtomicReference<>();
+        AtomicLong notifiedBytes = new AtomicLong();
+        userPool.addListener(MemoryPoolListener.onMemoryReserved(pool -> {
+            notifiedPool.set(pool);
+            notifiedBytes.set(pool.getReservedBytes());
+        }));
+
+        userPool.reserve(fakeQueryId, 3);
+        assertEquals(notifiedPool.get(), userPool);
+        assertEquals(notifiedBytes.get(), 3L);
     }
 
     @Test
