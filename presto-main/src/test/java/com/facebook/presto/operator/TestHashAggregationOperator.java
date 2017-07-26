@@ -67,6 +67,7 @@ import static com.facebook.presto.spi.type.TypeSignature.parseTypeSignature;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.testing.MaterializedResult.resultBuilder;
 import static com.facebook.presto.testing.TestingTaskContext.createTaskContext;
+import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
@@ -79,6 +80,7 @@ import static io.airlift.units.DataSize.succinctBytes;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 @Test(singleThreaded = true)
 public class TestHashAggregationOperator
@@ -503,7 +505,7 @@ public class TestHashAggregationOperator
         assertOperatorEqualsIgnoreOrder(operatorFactory, driverContext, input, resultBuilder.build(), false, Optional.of(hashChannels.size()));
     }
 
-    @Test(expectedExceptions = RuntimeException.class, expectedExceptionsMessageRegExp = ".* Failed to spill", enabled = false)
+    @Test
     public void testSpillerFailure()
     {
         MetadataManager metadata = MetadataManager.createTestMetadataManager();
@@ -520,7 +522,7 @@ public class TestHashAggregationOperator
                 .build();
 
         DriverContext driverContext = TestingTaskContext.builder(executor, TEST_SESSION)
-                .setQueryMaxMemory(DataSize.valueOf("10B"))
+                .setQueryMaxMemory(DataSize.valueOf("7MB"))
                 .setMemoryPoolSize(DataSize.valueOf("1GB"))
                 .setSystemMemoryPoolSize(DataSize.valueOf("10B"))
                 .build()
@@ -549,7 +551,15 @@ public class TestHashAggregationOperator
                 new FailingSpillerFactory(),
                 joinCompiler);
 
-        toPages(operatorFactory, driverContext, input);
+        try {
+            toPages(operatorFactory, driverContext, input);
+            fail("An exception was expected");
+        }
+        catch (RuntimeException expected) {
+            if (!nullToEmpty(expected.getMessage()).matches(".* Failed to spill")) {
+                fail("Exception other than expected was thrown", expected);
+            }
+        }
     }
 
     private DriverContext createDriverContext()
