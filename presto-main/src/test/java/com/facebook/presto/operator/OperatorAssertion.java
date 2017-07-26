@@ -121,7 +121,7 @@ public final class OperatorAssertion
 
     private static void handleMemoryRevoking(Operator operator)
     {
-        if (operator.getOperatorContext().getMemoryRevokingRequestedFuture().isDone()) {
+        if (operator.getOperatorContext().getReservedRevocableBytes() > 0) {
             getFutureValue(operator.startMemoryRevoke());
             operator.finishMemoryRevoke();
         }
