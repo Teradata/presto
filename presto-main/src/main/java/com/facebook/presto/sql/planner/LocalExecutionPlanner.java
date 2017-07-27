@@ -1631,8 +1631,6 @@ public class LocalExecutionPlanner
             Optional<Expression> rewrittenSortExpression = sortExpression.map(
                     expression -> new SymbolToInputRewriter(buildLayout).rewrite(expression));
 
-            Optional<SortExpression> sortChannel = rewrittenSortExpression.map(SortExpression::fromExpression);
-
             Map<NodeRef<Expression>, Type> expressionTypes = getExpressionTypesFromInput(
                     session,
                     metadata,
@@ -1642,6 +1640,11 @@ public class LocalExecutionPlanner
                     emptyList() /* parameters have already been replaced */);
 
             RowExpression translatedFilter = toRowExpression(rewrittenFilter, expressionTypes);
+
+            Optional<Integer> sortFieldIndex = rewrittenSortExpression.map(SortExpression::fieldReferenceIndex);
+            Optional<SortExpression> sortChannel = sortFieldIndex.map(index -> new SortExpression(index, SortExpression.inequalityJoinFilterConjuncts(rewrittenFilter).stream()
+                    .map(p -> toRowExpression(p, expressionTypes))
+                    .collect(ImmutableList.toImmutableList())));
             return joinFilterFunctionCompiler.compileJoinFilterFunction(translatedFilter, buildLayout.size(), sortChannel);
         }
 

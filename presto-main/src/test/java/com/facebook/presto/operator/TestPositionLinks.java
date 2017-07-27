@@ -43,7 +43,7 @@ public class TestPositionLinks
         assertEquals(factoryBuilder.link(11, 10), 11);
         assertEquals(factoryBuilder.link(12, 11), 12);
 
-        PositionLinks positionLinks = factoryBuilder.build().create(Optional.empty());
+        PositionLinks positionLinks = factoryBuilder.build().create(ImmutableList.of());
 
         assertEquals(positionLinks.start(3, 0, TEST_PAGE), 3);
         assertEquals(positionLinks.next(3, 0, TEST_PAGE), 2);
@@ -68,16 +68,10 @@ public class TestPositionLinks
             {
                 return BIGINT.getLong(rightPage.getBlock(0), leftAddress) > 4;
             }
-
-            @Override
-            public Optional<Integer> getSortChannel()
-            {
-                throw new UnsupportedOperationException();
-            }
         };
 
         PositionLinks.FactoryBuilder factoryBuilder = buildSortedPositionLinks();
-        PositionLinks positionLinks = factoryBuilder.build().create(Optional.of(filterFunction));
+        PositionLinks positionLinks = factoryBuilder.build().create(ImmutableList.of(filterFunction));
 
         assertEquals(positionLinks.start(0, 0, TEST_PAGE), 5);
         assertEquals(positionLinks.next(5, 0, TEST_PAGE), 6);
@@ -86,6 +80,27 @@ public class TestPositionLinks
         assertEquals(positionLinks.start(10, 0, TEST_PAGE), 10);
         assertEquals(positionLinks.next(10, 0, TEST_PAGE), 11);
         assertEquals(positionLinks.next(11, 0, TEST_PAGE), 12);
+        assertEquals(positionLinks.next(12, 0, TEST_PAGE), -1);
+    }
+
+    @Test
+    public void testSortedPositionLinksForRangePredicates()
+    {
+        JoinFilterFunction filterFunctionOne = (leftAddress, rightPosition, rightPage) -> BIGINT.getLong(rightPage.getBlock(0), leftAddress) > 4;
+
+        JoinFilterFunction filterFunctionTwo = (leftAddress, rightPosition, rightPage) -> BIGINT.getLong(rightPage.getBlock(0), leftAddress) <= 11;
+
+        PositionLinks.FactoryBuilder factoryBuilder = buildSortedPositionLinks();
+        PositionLinks positionLinks = factoryBuilder.build().create(ImmutableList.of(filterFunctionOne, filterFunctionTwo));
+
+        assertEquals(positionLinks.start(0, 0, TEST_PAGE), 5);
+        assertEquals(positionLinks.next(4, 0, TEST_PAGE), 5);
+        assertEquals(positionLinks.next(5, 0, TEST_PAGE), 6);
+        assertEquals(positionLinks.next(6, 0, TEST_PAGE), -1);
+
+        assertEquals(positionLinks.start(10, 0, TEST_PAGE), 10);
+        assertEquals(positionLinks.next(10, 0, TEST_PAGE), 11);
+        assertEquals(positionLinks.next(11, 0, TEST_PAGE), -1);
         assertEquals(positionLinks.next(12, 0, TEST_PAGE), -1);
     }
 
@@ -99,16 +114,10 @@ public class TestPositionLinks
             {
                 return BIGINT.getLong(rightPage.getBlock(0), leftAddress) < 4;
             }
-
-            @Override
-            public Optional<Integer> getSortChannel()
-            {
-                throw new UnsupportedOperationException();
-            }
         };
 
         PositionLinks.FactoryBuilder factoryBuilder = buildSortedPositionLinks();
-        PositionLinks positionLinks = factoryBuilder.build().create(Optional.of(filterFunction));
+        PositionLinks positionLinks = factoryBuilder.build().create(ImmutableList.of(filterFunction));
 
         assertEquals(positionLinks.start(0, 0, TEST_PAGE), 0);
         assertEquals(positionLinks.next(0, 0, TEST_PAGE), 1);
@@ -147,7 +156,7 @@ public class TestPositionLinks
                 ImmutableList.of(ImmutableList.of(TEST_PAGE.getBlock(0))),
                 ImmutableList.of(),
                 Optional.empty(),
-                Optional.of(new SortExpression(0)));
+                Optional.of(new SortExpression(0, ImmutableList.of())));
     }
 
     private static LongArrayList addresses()

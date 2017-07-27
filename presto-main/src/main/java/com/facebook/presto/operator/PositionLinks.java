@@ -15,7 +15,7 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.spi.Page;
 
-import java.util.Optional;
+import java.util.List;
 
 /**
  * This class is responsible for iterating over build rows, which have
@@ -66,9 +66,9 @@ public interface PositionLinks
     interface Factory
     {
         /**
-         * JoinFilterFunction has to be created and supplied for each thread using PositionLinks
+         * JoinFilterFunctions has to be created and supplied for each thread using PositionLinks
          * since JoinFilterFunction is not thread safe...
          */
-        PositionLinks create(Optional<JoinFilterFunction> joinFilterFunction);
+        PositionLinks create(List<JoinFilterFunction> inequalityJoinFilterConjuncts);
     }
 }

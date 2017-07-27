@@ -71,6 +71,7 @@ import static com.facebook.presto.sql.gen.LambdaAndTryExpressionExtractor.extrac
 import static com.facebook.presto.sql.gen.TryCodeGenerator.defineTryMethod;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Verify.verify;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 
@@ -112,7 +113,13 @@ public class JoinFilterFunctionCompiler
     private JoinFilterFunctionFactory internalCompileFilterFunctionFactory(RowExpression filterExpression, int leftBlocksSize, Optional<SortExpression> sortChannel)
     {
         Class<? extends InternalJoinFilterFunction> internalJoinFilterFunction = compileInternalJoinFilterFunction(filterExpression, leftBlocksSize);
-        return new IsolatedJoinFilterFunctionFactory(internalJoinFilterFunction, sortChannel);
+
+        List<? extends Class<? extends InternalJoinFilterFunction>> internalInequalityJoinFilterConjuncts = sortChannel.map(channel -> channel.getInequalityJoinFilterConjuncts().stream()
+                        .map(rowExpression -> compileInternalJoinFilterFunction(rowExpression, leftBlocksSize))
+                        .collect(toImmutableList()))
+                .orElse(ImmutableList.of());
+
+        return new IsolatedJoinFilterFunctionFactory(internalJoinFilterFunction, internalInequalityJoinFilterConjuncts, sortChannel);
     }
 
     private Class<? extends InternalJoinFilterFunction> compileInternalJoinFilterFunction(RowExpression filterExpression, int leftBlocksSize)
@@ -316,6 +323,11 @@ public class JoinFilterFunctionCompiler
         {
             return Optional.empty();
         }
+
+        default List<JoinFilterFunction> inequalityJoinFilterConjuncts(ConnectorSession session, LongArrayList addresses, List<List<Block>> channels)
+        {
+            return ImmutableList.of();
+        }
     }
 
     private static RowExpressionVisitor<BytecodeNode, Scope> fieldReferenceCompiler(
@@ -371,13 +383,14 @@ public class JoinFilterFunctionCompiler
             }
             JoinFilterCacheKey that = (JoinFilterCacheKey) o;
             return leftBlocksSize == that.leftBlocksSize &&
-                    Objects.equals(filter, that.filter);
+                    Objects.equals(filter, that.filter) &&
+                    Objects.equals(sortChannel, that.sortChannel);
         }
 
         @Override
         public int hashCode()
         {
-            return Objects.hash(filter, leftBlocksSize);
+            return Objects.hash(filter, leftBlocksSize, sortChannel);
         }
 
         @Override
@@ -386,6 +399,7 @@ public class JoinFilterFunctionCompiler
             return toStringHelper(this)
                     .add("filter", filter)
                     .add("leftBlocksSize", leftBlocksSize)
+                    .add("sortChannel", sortChannel)
                     .toString();
         }
     }
@@ -395,9 +409,13 @@ public class JoinFilterFunctionCompiler
     {
         private final Constructor<? extends InternalJoinFilterFunction> internalJoinFilterFunctionConstructor;
         private final Constructor<? extends JoinFilterFunction> isolatedJoinFilterFunctionConstructor;
+        private final List<Constructor<? extends InternalJoinFilterFunction>> internalInequalityJoinFilterConjunctsConstructor;
         private final Optional<SortExpression> sortChannel;
 
-        public IsolatedJoinFilterFunctionFactory(Class<? extends InternalJoinFilterFunction> internalJoinFilterFunction, Optional<SortExpression> sortChannel)
+        public IsolatedJoinFilterFunctionFactory(
+                Class<? extends InternalJoinFilterFunction> internalJoinFilterFunction,
+                List<? extends Class<? extends InternalJoinFilterFunction>> internalInequalityJoinFilterConjuncts,
+                Optional<SortExpression> sortChannel)
         {
             this.sortChannel = sortChannel;
             try {
@@ -408,7 +426,17 @@ public class JoinFilterFunctionCompiler
                         new DynamicClassLoader(getClass().getClassLoader()),
                         JoinFilterFunction.class,
                         StandardJoinFilterFunction.class);
-                isolatedJoinFilterFunctionConstructor = isolatedJoinFilterFunction.getConstructor(InternalJoinFilterFunction.class, LongArrayList.class, List.class, Optional.class);
+                isolatedJoinFilterFunctionConstructor = isolatedJoinFilterFunction.getConstructor(InternalJoinFilterFunction.class, LongArrayList.class, List.class);
+                internalInequalityJoinFilterConjunctsConstructor = internalInequalityJoinFilterConjuncts.stream()
+                        .map(filter -> {
+                            try {
+                                return filter.getConstructor(ConnectorSession.class);
+                            }
+                            catch (NoSuchMethodException e) {
+                                throw Throwables.propagate(e);
+                            }
+                        })
+                        .collect(toImmutableList());
             }
             catch (NoSuchMethodException e) {
                 throw Throwables.propagate(e);
@@ -420,7 +448,7 @@ public class JoinFilterFunctionCompiler
         {
             try {
                 InternalJoinFilterFunction internalJoinFilterFunction = internalJoinFilterFunctionConstructor.newInstance(session);
-                return isolatedJoinFilterFunctionConstructor.newInstance(internalJoinFilterFunction, addresses, channels, sortChannel);
+                return isolatedJoinFilterFunctionConstructor.newInstance(internalJoinFilterFunction, addresses, channels);
             }
             catch (ReflectiveOperationException e) {
                 throw Throwables.propagate(e);
@@ -431,6 +459,21 @@ public class JoinFilterFunctionCompiler
         public Optional<SortExpression> getSortChannel()
         {
             return sortChannel;
+        }
+
+        @Override
+        public List<JoinFilterFunction> inequalityJoinFilterConjuncts(ConnectorSession session, LongArrayList addresses, List<List<Block>> channels)
+        {
+            return internalInequalityJoinFilterConjunctsConstructor.stream()
+                    .map(constructor -> {
+                        try {
+                            return isolatedJoinFilterFunctionConstructor.newInstance(constructor.newInstance(session), addresses, channels);
+                        }
+                        catch (ReflectiveOperationException e) {
+                            throw Throwables.propagate(e);
+                        }
+                    })
+                    .collect(toImmutableList());
         }
     }
 }

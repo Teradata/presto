@@ -14,6 +14,7 @@
 package com.facebook.presto.operator;
 
 import com.facebook.presto.spi.Page;
+import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -22,7 +23,6 @@ import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.openjdk.jol.info.ClassLayout;
 
 import java.util.List;
-import java.util.Optional;
 
 import static com.facebook.presto.operator.SyntheticAddress.decodePosition;
 import static com.facebook.presto.operator.SyntheticAddress.decodeSliceIndex;
@@ -31,9 +31,9 @@ import static io.airlift.slice.SizeOf.sizeOf;
 import static java.util.Objects.requireNonNull;
 
 /**
- * This class assumes that lessThanFunction is a superset of the whole filtering
- * condition used in a join. In other words, we can use SortedPositionLinks
- * with following join condition:
+ * This class keeps a list of non-equi filter conditions in a join. We can use
+ * SortedPositionLinks with following join condition:
+ *
  * <p>
  * {@code filterFunction_1(...) AND filterFunction_2(....) AND ... AND filterFunction_n(...)}
  * <p>
@@ -42,14 +42,19 @@ import static java.util.Objects.requireNonNull;
  * <p>
  * {@code filterFunction_1(...) OR filterFunction_2(....) OR ... OR filterFunction_n(...)}
  * <p>
- * To use lessThanFunction in this class, it must be an expression in form of:
+ * To use the elements in the list of filters inequalityJoinFilterConjuncts in this class,
+ * it must be an expression in form of:
  * <p>
- * {@code f(probeColumn1, probeColumn2, ..., probeColumnN) COMPARE g(buildColumn1, ..., buildColumnN)}
+ * {@code f(probeColumn1, probeColumn2, ..., probeColumnN) COMPARE buildSymbolRef1, ..., buildSymbolRefN}
  * <p>
  * where {@code COMPARE} is one of: {@code < <= > >=}
  * <p>
+ * and buildSymbolRef is a symbol reference on the buildColumn which has been pushed to
+ * the underlying Scan node. Eg: a column or expression which appears in the ON clause of a join
+ * and whose result appears in one of the join channel data blocks.
+ *
  * That allows us to define an order of the elements in positionLinks (this defining which
- * element is smaller) using {@code g(...)} function and to perform a binary search using
+ * element is smaller) using {@code buildSymbplRef} and to perform a binary search using
  * {@code f(probePosition)} value.
  */
 public final class SortedPositionLinks
@@ -147,13 +152,10 @@ public final class SortedPositionLinks
                 }
             }
 
-            return lessThanFunction -> {
-                checkState(lessThanFunction.isPresent(), "Using SortedPositionLinks without lessThanFunction");
-                return new SortedPositionLinks(
-                        arrayPositionLinksFactoryBuilder.build().create(Optional.empty()),
-                        sortedPositionLinks,
-                        lessThanFunction.get());
-            };
+            return inequalityJoinFilterConjuncts -> new SortedPositionLinks(
+                    arrayPositionLinksFactoryBuilder.build().create(ImmutableList.of()),
+                    sortedPositionLinks,
+                    inequalityJoinFilterConjuncts);
         }
 
         @Override
@@ -165,15 +167,16 @@ public final class SortedPositionLinks
 
     private final PositionLinks positionLinks;
     private final int[][] sortedPositionLinks;
-    private final JoinFilterFunction lessThanFunction;
     private final long sizeInBytes;
+    private final List<JoinFilterFunction> inequalityJoinFilterConjuncts;
 
-    private SortedPositionLinks(PositionLinks positionLinks, int[][] sortedPositionLinks, JoinFilterFunction lessThanFunction)
+    private SortedPositionLinks(PositionLinks positionLinks, int[][] sortedPositionLinks, List<JoinFilterFunction> inequalityJoinFilterConjuncts)
     {
         this.positionLinks = requireNonNull(positionLinks, "positionLinks is null");
         this.sortedPositionLinks = requireNonNull(sortedPositionLinks, "sortedPositionLinks is null");
-        this.lessThanFunction = requireNonNull(lessThanFunction, "lessThanFunction is null");
         this.sizeInBytes = INSTANCE_SIZE + positionLinks.getSizeInBytes() + sizeOfPositionLinks(sortedPositionLinks);
+        this.inequalityJoinFilterConjuncts = requireNonNull(inequalityJoinFilterConjuncts, "inequalityJoinFilterConjuncts is null");
+        checkState(!inequalityJoinFilterConjuncts.isEmpty(), "Using sortedPositionLinks with no join filter conjuncts");
     }
 
     private long sizeOfPositionLinks(int[][] sortedPositionLinks)
@@ -198,17 +201,32 @@ public final class SortedPositionLinks
             return -1;
         }
         // break a position links chain if next position should be filtered out
-        if (applyLessThanFunction(nextPosition, probePosition, allProbeChannelsPage)) {
-            return nextPosition;
+        for (JoinFilterFunction conjunct : inequalityJoinFilterConjuncts) {
+            // return if any of the filter conjuncts is false
+            if (!applyLessThanFunction(conjunct, nextPosition, probePosition, allProbeChannelsPage)) {
+                return -1;
+            }
         }
-        return -1;
+        return nextPosition;
     }
 
     @Override
     public int start(int startingPosition, int probePosition, Page allProbeChannelsPage)
     {
+        for (JoinFilterFunction conjunct : inequalityJoinFilterConjuncts) {
+            startingPosition = findStartPositionForFunction(conjunct, startingPosition, probePosition, allProbeChannelsPage);
+            // return as soon as a mismatch is found, since we are handling only AND predicates (conjuncts)
+            if (startingPosition == -1) {
+                return -1;
+            }
+        }
+        return startingPosition;
+    }
+
+    private int findStartPositionForFunction(JoinFilterFunction filterFunction, int startingPosition, int probePosition, Page allProbeChannelsPage)
+    {
         // check if filtering function to startingPosition
-        if (applyLessThanFunction(startingPosition, probePosition, allProbeChannelsPage)) {
+        if (applyLessThanFunction(filterFunction, startingPosition, probePosition, allProbeChannelsPage)) {
             return startingPosition;
         }
 
@@ -220,11 +238,11 @@ public final class SortedPositionLinks
         int right = sortedPositionLinks[startingPosition].length - 1;
 
         // do a binary search for the first position for which filter function applies
-        int offset = lowerBound(startingPosition, left, right, probePosition, allProbeChannelsPage);
+        int offset = lowerBound(filterFunction, startingPosition, left, right, probePosition, allProbeChannelsPage);
         if (offset < 0) {
             return -1;
         }
-        if (!applyLessThanFunction(startingPosition, offset, probePosition, allProbeChannelsPage)) {
+        if (!applyLessThanFunction(filterFunction, startingPosition, offset, probePosition, allProbeChannelsPage)) {
             return -1;
         }
         return sortedPositionLinks[startingPosition][offset];
@@ -233,7 +251,7 @@ public final class SortedPositionLinks
     /**
      * Find the first element in position links that is NOT smaller than probePosition
      */
-    private int lowerBound(int startingPosition, int first, int last, int probePosition, Page allProbeChannelsPage)
+    private int lowerBound(JoinFilterFunction function, int startingPosition, int first, int last, int probePosition, Page allProbeChannelsPage)
     {
         int middle;
         int step;
@@ -241,7 +259,7 @@ public final class SortedPositionLinks
         while (count > 0) {
             step = count / 2;
             middle = first + step;
-            if (!applyLessThanFunction(startingPosition, middle, probePosition, allProbeChannelsPage)) {
+            if (!applyLessThanFunction(function, startingPosition, middle, probePosition, allProbeChannelsPage)) {
                 first = ++middle;
                 count -= step + 1;
             }
@@ -258,14 +276,14 @@ public final class SortedPositionLinks
         return sizeInBytes;
     }
 
-    private boolean applyLessThanFunction(int leftPosition, int leftOffset, int rightPosition, Page rightPage)
+    private boolean applyLessThanFunction(JoinFilterFunction function, int leftPosition, int leftOffset, int rightPosition, Page rightPage)
     {
-        return applyLessThanFunction(sortedPositionLinks[leftPosition][leftOffset], rightPosition, rightPage);
+        return applyLessThanFunction(function, sortedPositionLinks[leftPosition][leftOffset], rightPosition, rightPage);
     }
 
-    private boolean applyLessThanFunction(long leftPosition, int rightPosition, Page rightPage)
+    private boolean applyLessThanFunction(JoinFilterFunction function, long leftPosition, int rightPosition, Page rightPage)
     {
-        return lessThanFunction.filter((int) leftPosition, rightPosition, rightPage);
+        return function.filter((int) leftPosition, rightPosition, rightPage);
     }
 
     private static class PositionComparator

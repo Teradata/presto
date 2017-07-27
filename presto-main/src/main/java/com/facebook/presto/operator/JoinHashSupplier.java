@@ -16,6 +16,7 @@ package com.facebook.presto.operator;
 import com.facebook.presto.Session;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.sql.gen.JoinFilterFunctionCompiler.JoinFilterFunctionFactory;
+import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 import java.util.List;
@@ -83,9 +84,13 @@ public class JoinHashSupplier
         // are not thread safe...
         Optional<JoinFilterFunction> filterFunction =
                 filterFunctionFactory.map(factory -> factory.create(session.toConnectorSession(), addresses, channels));
+        List<JoinFilterFunction> inequalityJoinFilterConjuncts = filterFunctionFactory
+                .map(factory -> factory.inequalityJoinFilterConjuncts(session.toConnectorSession(), addresses, channels))
+                .orElse(ImmutableList.of());
+
         return new JoinHash(
                 pagesHash,
                 filterFunction,
-                positionLinks.map(links -> links.create(filterFunction)));
+                positionLinks.map(links -> links.create(inequalityJoinFilterConjuncts)));
     }
 }

@@ -13,20 +13,16 @@
  */
 package com.facebook.presto.sql.planner;
 
-import com.facebook.presto.sql.tree.ArithmeticBinaryExpression;
-import com.facebook.presto.sql.tree.ComparisonExpression;
-import com.facebook.presto.sql.tree.ComparisonExpressionType;
+import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.tree.Expression;
-import com.facebook.presto.sql.tree.FunctionCall;
-import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.SymbolReference;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import org.testng.annotations.Test;
 
 import java.util.Optional;
 import java.util.Set;
 
+import static com.facebook.presto.sql.ExpressionUtils.rewriteIdentifiersToSymbolReferences;
 import static org.testng.AssertJUnit.assertEquals;
 
 public class TestSortExpressionExtractor
@@ -36,51 +32,32 @@ public class TestSortExpressionExtractor
     @Test
     public void testGetSortExpression()
     {
-        assertGetSortExpression(
-                new ComparisonExpression(
-                        ComparisonExpressionType.GREATER_THAN,
-                        new SymbolReference("p1"),
-                        new SymbolReference("b1")),
-                "b1");
+        assertGetSortExpression(expression("p1 > b1"), "b1");
 
-        assertGetSortExpression(
-                new ComparisonExpression(
-                        ComparisonExpressionType.LESS_THAN_OR_EQUAL,
-                        new SymbolReference("b2"),
-                        new SymbolReference("p1")),
-                "b2");
+        assertGetSortExpression(expression("b2 <= p1"), "b2");
 
-        assertGetSortExpression(
-                new ComparisonExpression(
-                        ComparisonExpressionType.GREATER_THAN,
-                        new SymbolReference("b2"),
-                        new SymbolReference("p1")),
-                "b2");
+        assertGetSortExpression(expression("b2 > p1"), "b2");
 
-        assertGetSortExpression(
-                new ComparisonExpression(
-                        ComparisonExpressionType.GREATER_THAN,
-                        new SymbolReference("b2"),
-                        new FunctionCall(QualifiedName.of("sin"), ImmutableList.of(new SymbolReference("p1")))),
-                "b2");
+        assertGetSortExpression(expression("b2 > sin(p1)"), "b2");
 
-        assertGetSortExpression(
-                new ComparisonExpression(
-                        ComparisonExpressionType.GREATER_THAN,
-                        new SymbolReference("b2"),
-                        new FunctionCall(QualifiedName.of("random"), ImmutableList.of(new SymbolReference("p1")))));
+        assertGetSortExpression(expression("b2 > random(p1)"));
 
-        assertGetSortExpression(
-                new ComparisonExpression(
-                        ComparisonExpressionType.GREATER_THAN,
-                        new SymbolReference("b1"),
-                        new ArithmeticBinaryExpression(ArithmeticBinaryExpression.Type.ADD, new SymbolReference("b2"), new SymbolReference("p1"))));
+        assertGetSortExpression(expression("b1 > p1 + b2"));
 
-        assertGetSortExpression(
-                new ComparisonExpression(
-                        ComparisonExpressionType.GREATER_THAN,
-                        new FunctionCall(QualifiedName.of("sin"), ImmutableList.of(new SymbolReference("b1"))),
-                        new SymbolReference("p1")));
+        assertGetSortExpression(expression("sin(b1) > p1"));
+
+        assertGetSortExpression(expression("b1 <= p1 OR b2 <= p1"));
+
+        assertGetSortExpression(expression("sin(b2) > p1 AND (b2 <= p1 OR b2 <= p1 + 10)"));
+
+        assertGetSortExpression(expression("sin(b2) > p1 AND (b2 <= p1 AND b2 <= p1 + 10)"));
+
+        assertGetSortExpression(expression("b1 > p1 AND b1 <= p1"), "b1");
+    }
+
+    private Expression expression(String sql)
+    {
+        return rewriteIdentifiersToSymbolReferences(new SqlParser().createExpression(sql));
     }
 
     private static void assertGetSortExpression(Expression expression)

@@ -13,26 +13,40 @@
  */
 package com.facebook.presto.sql.planner;
 
+import com.facebook.presto.sql.relational.RowExpression;
 import com.facebook.presto.sql.tree.AstVisitor;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FieldReference;
+import com.facebook.presto.sql.tree.LogicalBinaryExpression;
 import com.facebook.presto.sql.tree.Node;
 import com.facebook.presto.sql.tree.SymbolReference;
+import com.google.common.collect.ImmutableList;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
+import static com.facebook.presto.sql.ExpressionUtils.extractConjuncts;
+import static com.facebook.presto.sql.tree.LogicalBinaryExpression.Type.AND;
 import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkState;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static java.util.Objects.requireNonNull;
 
 /**
- * Currently this class handles only simple expressions like:
+ * Currently this class handles simple expressions like:
  * <p>
  * A.a < B.x
+ * and queries with range predicates involving a single build symbol
+ * reference (A.a) like:
+ * <p>
+ * A.a < B.x + 20 AND A.a > B.x + 10
+ * <p>
+ * where a is the build side symbol reference mapping to any expression
+ * which has been pushed down to the corresponding Scan node.
  * <p>
  * It could be extended to handle any expressions like:
  * <p>
@@ -56,8 +70,43 @@ public final class SortExpressionExtractor
             return Optional.empty();
         }
 
-        if (filter instanceof ComparisonExpression) {
-            ComparisonExpression comparison = (ComparisonExpression) filter;
+        return new SortExpressionVisitor(buildSymbols).process(filter);
+    }
+
+    private static class SortExpressionVisitor
+            extends AstVisitor<Optional<Expression>, Void>
+    {
+        private final Set<Symbol> buildSymbols;
+
+        public SortExpressionVisitor(Set<Symbol> buildSymbols)
+        {
+            this.buildSymbols = buildSymbols;
+        }
+
+        @Override
+        protected Optional<Expression> visitExpression(Expression expression, Void context)
+        {
+            return Optional.empty();
+        }
+
+        @Override
+        protected Optional<Expression> visitLogicalBinaryExpression(LogicalBinaryExpression binaryExpression, Void context)
+        {
+            if (binaryExpression.getType() != AND) {
+                return Optional.empty();
+            }
+            Optional<Expression> leftProcessed = process(binaryExpression.getLeft());
+            Optional<Expression> rightProcessed = process(binaryExpression.getRight());
+
+            if (!leftProcessed.isPresent() || !rightProcessed.isPresent() || !leftProcessed.get().equals(rightProcessed.get())) {
+                return Optional.empty();
+            }
+            return leftProcessed;
+        }
+
+        @Override
+        protected Optional<Expression> visitComparisonExpression(ComparisonExpression comparison, Void context)
+        {
             switch (comparison.getType()) {
                 case GREATER_THAN:
                 case GREATER_THAN_OR_EQUAL:
@@ -77,12 +126,11 @@ public final class SortExpressionExtractor
                     return Optional.empty();
             }
         }
-
-        return Optional.empty();
     }
 
     private static Optional<SymbolReference> asBuildSymbolReference(Set<Symbol> buildLayout, Expression expression)
     {
+        // this is required to make sure the expression is pushed down (sort channel has the expression result)
         if (expression instanceof SymbolReference) {
             SymbolReference symbolReference = (SymbolReference) expression;
             if (buildLayout.contains(new Symbol(symbolReference.getName()))) {
@@ -130,15 +178,22 @@ public final class SortExpressionExtractor
     public static class SortExpression
     {
         private final int channel;
+        private List<RowExpression> inequalityJoinFilterConjuncts;
 
-        public SortExpression(int channel)
+        public SortExpression(int channel, List<RowExpression> inequalityJoinFilterConjuncts)
         {
             this.channel = channel;
+            this.inequalityJoinFilterConjuncts = inequalityJoinFilterConjuncts;
         }
 
         public int getChannel()
         {
             return channel;
+        }
+
+        public List<RowExpression> getInequalityJoinFilterConjuncts()
+        {
+            return inequalityJoinFilterConjuncts;
         }
 
         @Override
@@ -151,26 +206,57 @@ public final class SortExpressionExtractor
                 return false;
             }
             SortExpression other = (SortExpression) obj;
-            return Objects.equals(this.channel, other.channel);
+            return Objects.equals(channel, other.channel) &&
+                    Objects.equals(inequalityJoinFilterConjuncts, other.inequalityJoinFilterConjuncts);
         }
 
         @Override
         public int hashCode()
         {
-            return Objects.hash(channel);
+            return Objects.hash(channel, inequalityJoinFilterConjuncts);
         }
 
         public String toString()
         {
             return toStringHelper(this)
                     .add("channel", channel)
+                    .add("inequalityJoinFilterConjuncts", inequalityJoinFilterConjuncts)
                     .toString();
         }
 
-        public static SortExpression fromExpression(Expression expression)
+        public static int fieldReferenceIndex(Expression expression)
         {
             checkState(expression instanceof FieldReference, "Unsupported expression type [%s]", expression);
-            return new SortExpression(((FieldReference) expression).getFieldIndex());
+            return ((FieldReference) expression).getFieldIndex();
+        }
+
+        public static List<Expression> inequalityJoinFilterConjuncts(Expression expression)
+        {
+            return new FilterExpressionsVisitor().process(expression);
+        }
+
+        private static class FilterExpressionsVisitor
+                extends AstVisitor<List<Expression>, Void>
+        {
+            @Override
+            protected List<Expression> visitExpression(Expression expression, Void context)
+            {
+                return expression.getChildren().stream()
+                    .flatMap(child -> process(child).stream())
+                    .collect(toImmutableList());
+            }
+
+            @Override
+            protected List<Expression> visitLogicalBinaryExpression(LogicalBinaryExpression expression, Void context)
+            {
+                return extractConjuncts(expression);
+            }
+
+            @Override
+            protected List<Expression> visitComparisonExpression(ComparisonExpression expression, Void context)
+            {
+                return ImmutableList.of(expression);
+            }
         }
     }
 }
