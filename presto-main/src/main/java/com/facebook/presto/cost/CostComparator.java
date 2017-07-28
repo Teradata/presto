@@ -14,6 +14,7 @@
 package com.facebook.presto.cost;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.memory.NodeMemoryConfig;
 import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.google.common.annotations.VisibleForTesting;
 
@@ -21,6 +22,8 @@ import javax.inject.Inject;
 
 import java.util.Comparator;
 
+import static com.facebook.presto.SystemSessionProperties.getHashPartitionCount;
+import static com.facebook.presto.SystemSessionProperties.getQueryMaxMemory;
 import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
@@ -29,15 +32,16 @@ public class CostComparator
     private final double cpuWeight;
     private final double memoryWeight;
     private final double networkWeight;
+    private NodeMemoryConfig nodeMemoryConfig;
 
     @Inject
-    public CostComparator(FeaturesConfig featuresConfig)
+    public CostComparator(FeaturesConfig featuresConfig, NodeMemoryConfig nodeMemoryConfig)
     {
-        this(featuresConfig.getCpuCostWeight(), featuresConfig.getMemoryCostWeight(), featuresConfig.getNetworkCostWeight());
+        this(featuresConfig.getCpuCostWeight(), featuresConfig.getMemoryCostWeight(), featuresConfig.getNetworkCostWeight(), nodeMemoryConfig);
     }
 
     @VisibleForTesting
-    public CostComparator(double cpuWeight, double memoryWeight, double networkWeight)
+    public CostComparator(double cpuWeight, double memoryWeight, double networkWeight, NodeMemoryConfig nodeMemoryConfig)
     {
         checkArgument(cpuWeight >= 0, "cpuWeight can not be negative");
         checkArgument(memoryWeight >= 0, "memoryWeight can not be negative");
@@ -45,6 +49,7 @@ public class CostComparator
         this.cpuWeight = cpuWeight;
         this.memoryWeight = memoryWeight;
         this.networkWeight = networkWeight;
+        this.nodeMemoryConfig = nodeMemoryConfig;
     }
 
     public Comparator<PlanNodeCostEstimate> forSession(Session session)
@@ -58,6 +63,16 @@ public class CostComparator
         requireNonNull(left, "left can not be null");
         requireNonNull(right, "right can not be null");
         checkArgument(!left.isUnknown() && !right.isUnknown(), "cannot compare unknown costs");
+
+        long memoryLimit = getMemoryLimit(session);
+
+        if (memoryLimit < left.getMemoryCost() && memoryLimit >= right.getMemoryCost())  {
+            return 1;
+        }
+        else if (memoryLimit < right.getMemoryCost() && memoryLimit >= left.getMemoryCost()) {
+            return -1;
+        }
+
         double leftCost = left.getCpuCost() * cpuWeight
                 + left.getMemoryCost() * memoryWeight
                 + left.getNetworkCost() * networkWeight;
@@ -67,5 +82,13 @@ public class CostComparator
                 + right.getNetworkCost() * networkWeight;
 
         return Double.compare(leftCost, rightCost);
+    }
+
+    private long getMemoryLimit(Session session)
+    {
+        long maxQueryMemoryPerNode = nodeMemoryConfig.getMaxQueryMemoryPerNode().toBytes();
+        long maxQueryMemoryPerHashPartition = getQueryMaxMemory(session).toBytes() / getHashPartitionCount(session);
+
+        return maxQueryMemoryPerHashPartition > maxQueryMemoryPerNode ?  maxQueryMemoryPerNode : maxQueryMemoryPerHashPartition;
     }
 }

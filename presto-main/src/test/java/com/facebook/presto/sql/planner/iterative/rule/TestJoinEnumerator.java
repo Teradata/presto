@@ -15,6 +15,7 @@
 package com.facebook.presto.sql.planner.iterative.rule;
 
 import com.facebook.presto.cost.CostComparator;
+import com.facebook.presto.memory.NodeMemoryConfig;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolAllocator;
@@ -23,6 +24,7 @@ import com.facebook.presto.sql.planner.iterative.rule.test.PlanBuilder;
 import com.facebook.presto.testing.LocalQueryRunner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.units.DataSize;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -94,7 +96,8 @@ public class TestJoinEnumerator
                 queryRunner.getDefaultSession(),
                 queryRunner.getLookup(),
                 multiJoinNode.getFilter(),
-                new CostComparator(1, 1, 1));
+                new CostComparator(1, 1, 1,
+                        new NodeMemoryConfig().setMaxQueryMemoryPerNode(new DataSize(4, DataSize.Unit.GIGABYTE))));
         JoinEnumerationResult actual = joinEnumerator.createJoinAccordingToPartitioning(multiJoinNode.getSources(), multiJoinNode.getOutputSymbols(), ImmutableSet.of(0));
         assertFalse(actual.getPlanNode().isPresent());
     }

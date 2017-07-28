@@ -19,6 +19,7 @@ import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.cost.SymbolStatsEstimate;
+import com.facebook.presto.memory.NodeMemoryConfig;
 import com.facebook.presto.spi.TestingColumnHandle;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.Symbol;
@@ -35,6 +36,7 @@ import com.facebook.presto.testing.LocalQueryRunner;
 import com.facebook.presto.testing.TestingStatsCalculator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.units.DataSize;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -60,6 +62,7 @@ public class TestReorderJoins
     private RuleTester tester;
     private StatsCalculator statsCalculator;
     private CostCalculator costCalculator;
+    private NodeMemoryConfig nodeMemoryConfig;
 
     @BeforeClass
     public void setUp()
@@ -74,6 +77,7 @@ public class TestReorderJoins
         statsCalculator = queryRunner.getStatsCalculator();
         costCalculator = queryRunner.getEstimatedExchangesCostCalculator();
         tester = new RuleTester(queryRunner);
+        nodeMemoryConfig = new NodeMemoryConfig().setMaxQueryMemoryPerNode(new DataSize(8, DataSize.Unit.GIGABYTE));
     }
 
     @AfterClass(alwaysRun = true)
@@ -98,7 +102,7 @@ public class TestReorderJoins
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 100, 100)))
                         .build()));
 
-        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1), testingStatsCalculator, costCalculator))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1, nodeMemoryConfig), testingStatsCalculator, costCalculator))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -131,7 +135,7 @@ public class TestReorderJoins
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1), testingStatsCalculator, costCalculator))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1, nodeMemoryConfig), testingStatsCalculator, costCalculator))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -164,7 +168,7 @@ public class TestReorderJoins
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1), testingStatsCalculator, costCalculator))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1, nodeMemoryConfig), testingStatsCalculator, costCalculator))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -198,7 +202,7 @@ public class TestReorderJoins
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1), testingStatsCalculator, costCalculator))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1, nodeMemoryConfig), testingStatsCalculator, costCalculator))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -231,7 +235,7 @@ public class TestReorderJoins
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1), testingStatsCalculator, costCalculator))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1, nodeMemoryConfig), testingStatsCalculator, costCalculator))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -265,7 +269,7 @@ public class TestReorderJoins
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1), testingStatsCalculator, costCalculator))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1, nodeMemoryConfig), testingStatsCalculator, costCalculator))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -282,7 +286,7 @@ public class TestReorderJoins
     public void testDoesNotFireWithNoStats()
     {
         StatsCalculator testingStatsCalculator = new UnknownStatsCalculator();
-        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1), testingStatsCalculator, costCalculator))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1, nodeMemoryConfig), testingStatsCalculator, costCalculator))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -298,7 +302,7 @@ public class TestReorderJoins
     @Test
     public void testDoesNotFireForNonDeterministicFilter()
     {
-        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1), statsCalculator, costCalculator))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1, nodeMemoryConfig), statsCalculator, costCalculator))
                 .on(p ->
                         p.join(
                                 INNER,
@@ -332,7 +336,7 @@ public class TestReorderJoins
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("C1"), new SymbolStatsEstimate(0, 100, 0, 100, 100)))
                         .build()));
 
-        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1), testingStatsCalculator, costCalculator))
+        tester.assertThat(new ReorderJoins(new CostComparator(1, 1, 1, nodeMemoryConfig), testingStatsCalculator, costCalculator))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(

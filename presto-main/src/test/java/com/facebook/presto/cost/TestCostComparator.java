@@ -14,20 +14,28 @@
 package com.facebook.presto.cost;
 
 import com.facebook.presto.Session;
+import com.facebook.presto.memory.NodeMemoryConfig;
+import io.airlift.units.DataSize;
 import org.testng.annotations.Test;
 
+import static com.facebook.presto.SystemSessionProperties.HASH_PARTITION_COUNT;
+import static com.facebook.presto.SystemSessionProperties.QUERY_MAX_MEMORY;
 import static com.facebook.presto.cost.PlanNodeCostEstimate.UNKNOWN_COST;
 import static com.facebook.presto.cost.PlanNodeCostEstimate.ZERO_COST;
 import static com.facebook.presto.testing.TestingSession.testSessionBuilder;
+import static io.airlift.units.DataSize.Unit.BYTE;
+import static io.airlift.units.DataSize.Unit.GIGABYTE;
 import static org.testng.Assert.assertThrows;
 import static org.testng.Assert.assertTrue;
 
 public class TestCostComparator
 {
+    private final NodeMemoryConfig nodeMemoryConfig = new NodeMemoryConfig().setMaxQueryMemoryPerNode(new DataSize(8, GIGABYTE));
+
     @Test
     public void testCpuWeight()
     {
-        new CostComparisonAssertion(1.0, 0.0, 0.0)
+        new CostComparisonAssertion(1.0, 0.0, 0.0, nodeMemoryConfig)
                 .smaller(200, 200, 200)
                 .larger(1000, 100, 100)
                 .assertCompare();
@@ -36,7 +44,7 @@ public class TestCostComparator
     @Test
     public void testMemoryWeight()
     {
-        new CostComparisonAssertion(0.0, 1.0, 0.0)
+        new CostComparisonAssertion(0.0, 1.0, 0.0, nodeMemoryConfig)
                 .smaller(200, 200, 200)
                 .larger(100, 1000, 100)
                 .assertCompare();
@@ -45,7 +53,7 @@ public class TestCostComparator
     @Test
     public void testNetworkWeight()
     {
-        new CostComparisonAssertion(0.0, 0.0, 1.0)
+        new CostComparisonAssertion(0.0, 0.0, 1.0, nodeMemoryConfig)
                 .smaller(200, 200, 200)
                 .larger(100, 100, 1000)
                 .assertCompare();
@@ -54,21 +62,45 @@ public class TestCostComparator
     @Test
     public void testAllWeights()
     {
-        new CostComparisonAssertion(1.0, 1.0, 1.0)
+        new CostComparisonAssertion(1.0, 1.0, 1.0, nodeMemoryConfig)
                 .smaller(333, 333, 333)
                 .larger(200, 300, 500)
                 .assertCompare();
 
-        new CostComparisonAssertion(1.0, 1000.0, 1.0)
+        new CostComparisonAssertion(1.0, 1000.0, 1.0, nodeMemoryConfig)
                 .smaller(300, 299, 300)
                 .larger(100, 300, 100)
                 .assertCompare();
     }
 
     @Test
+    public void testMemoryHigherThanLimit()
+    {
+        new CostComparisonAssertion(1.0, 1.0, 1.0, new NodeMemoryConfig().setMaxQueryMemoryPerNode(new DataSize(60, BYTE)))
+                .smaller(1000, 50, 1000)
+                .larger(1, 400, 1)
+                .assertCompare();
+    }
+
+    @Test
+    public void testMemoryHigherThanGlobalLimit()
+    {
+        Session session = testSessionBuilder()
+                .setSystemProperty(HASH_PARTITION_COUNT, "10")
+                .setSystemProperty(QUERY_MAX_MEMORY, "1MB")
+                .build();
+
+        new CostComparisonAssertion(1.0, 1.0, 1.0, nodeMemoryConfig)
+                .session(session)
+                .smaller(1000, 50, 50000)
+                .larger(1, 200000, 4)
+                .assertCompare();
+    }
+
+    @Test
     public void testUnknownCost()
     {
-        CostComparator costComparator = new CostComparator(1.0, 1.0, 1.0);
+        CostComparator costComparator = new CostComparator(1.0, 1.0, 1.0, nodeMemoryConfig);
         Session session = testSessionBuilder().build();
         assertThrows(IllegalArgumentException.class, () -> costComparator.compare(session, ZERO_COST, UNKNOWN_COST));
         assertThrows(IllegalArgumentException.class, () -> costComparator.compare(session, UNKNOWN_COST, ZERO_COST));
@@ -82,9 +114,9 @@ public class TestCostComparator
         private final CostComparator costComparator;
         private Session session = testSessionBuilder().build();
 
-        public CostComparisonAssertion(double cpuWeight, double memoryWeight, double networkWeight)
+        public CostComparisonAssertion(double cpuWeight, double memoryWeight, double networkWeight, NodeMemoryConfig nodeMemoryConfig)
         {
-            costComparator = new CostComparator(cpuWeight, memoryWeight, networkWeight);
+            costComparator = new CostComparator(cpuWeight, memoryWeight, networkWeight, nodeMemoryConfig);
         }
 
         public void assertCompare()
@@ -105,6 +137,12 @@ public class TestCostComparator
         public CostComparisonAssertion larger(double cpu, double memory, double network)
         {
             larger.setCpuCost(cpu).setMemoryCost(memory).setNetworkCost(network);
+            return this;
+        }
+
+        public CostComparisonAssertion session(Session session)
+        {
+            this.session = session;
             return this;
         }
     }
