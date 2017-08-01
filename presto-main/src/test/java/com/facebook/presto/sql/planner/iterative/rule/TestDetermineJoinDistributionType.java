@@ -18,6 +18,7 @@ import com.facebook.presto.cost.CostComparator;
 import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.cost.StatsCalculator;
 import com.facebook.presto.cost.SymbolStatsEstimate;
+import com.facebook.presto.memory.NodeMemoryConfig;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.iterative.rule.test.RuleTester;
 import com.facebook.presto.sql.planner.plan.JoinNode;
@@ -26,6 +27,7 @@ import com.facebook.presto.testing.LocalQueryRunner;
 import com.facebook.presto.testing.TestingStatsCalculator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.units.DataSize;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
@@ -49,6 +51,7 @@ public class TestDetermineJoinDistributionType
 {
     private RuleTester tester;
     private StatsCalculator statsCalculator;
+    private NodeMemoryConfig nodeMemoryConfig;
 
     @BeforeClass
     public void setUp()
@@ -61,6 +64,7 @@ public class TestDetermineJoinDistributionType
         LocalQueryRunner queryRunner = queryRunnerWithFakeNodeCountForStats(session, 4);
         tester = new RuleTester(queryRunner);
         statsCalculator = queryRunner.getStatsCalculator();
+        nodeMemoryConfig = new NodeMemoryConfig().setMaxQueryMemoryPerNode(new DataSize(12, DataSize.Unit.GIGABYTE));
     }
 
     @Test
@@ -76,7 +80,7 @@ public class TestDetermineJoinDistributionType
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1)))
+        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1, nodeMemoryConfig)))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -109,7 +113,7 @@ public class TestDetermineJoinDistributionType
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1)))
+        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1, nodeMemoryConfig)))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -143,7 +147,7 @@ public class TestDetermineJoinDistributionType
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1)))
+        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1, nodeMemoryConfig)))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -176,7 +180,7 @@ public class TestDetermineJoinDistributionType
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1)))
+        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1, nodeMemoryConfig)))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -210,7 +214,7 @@ public class TestDetermineJoinDistributionType
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1)))
+        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1, nodeMemoryConfig)))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -243,7 +247,7 @@ public class TestDetermineJoinDistributionType
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1)))
+        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(1, 1, 1, nodeMemoryConfig)))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -276,7 +280,7 @@ public class TestDetermineJoinDistributionType
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(75, 10, 15)))
+        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(75, 10, 15, nodeMemoryConfig)))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
@@ -305,11 +309,11 @@ public class TestDetermineJoinDistributionType
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("A1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build(),
                 new PlanNodeId("valuesB"), PlanNodeStatsEstimate.builder()
-                        .setOutputRowCount(1000000)
+                        .setOutputRowCount(10000)
                         .addSymbolStatistics(ImmutableMap.of(new Symbol("B1"), new SymbolStatsEstimate(0, 100, 0, 640000, 100)))
                         .build()));
 
-        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(75, 10, 15)))
+        tester.assertThat(new DetermineJoinDistributionType(new CostComparator(75, 10, 15, nodeMemoryConfig)))
                 .withStatsCalculator(testingStatsCalculator)
                 .on(p ->
                         p.join(
