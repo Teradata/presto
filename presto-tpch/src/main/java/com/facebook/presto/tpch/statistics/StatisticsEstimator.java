@@ -31,9 +31,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
-import static com.facebook.presto.tpch.util.Optionals.checkPresent;
-import static com.facebook.presto.tpch.util.Optionals.combine;
-import static com.facebook.presto.tpch.util.Optionals.withBoth;
+import static com.facebook.presto.util.Optionals.checkPresent;
+import static com.facebook.presto.util.Optionals.combine;
+import static com.facebook.presto.util.Optionals.withBoth;
 import static com.facebook.presto.util.Types.checkSameType;
 import static com.facebook.presto.util.Types.checkType;
 import static com.google.common.base.Preconditions.checkArgument;
@@ -52,8 +52,7 @@ public class StatisticsEstimator
             OrderColumn.TOTAL_PRICE,
             PartColumn.RETAIL_PRICE,
             PartSupplierColumn.AVAILABLE_QUANTITY,
-            SupplierColumn.ACCOUNT_BALANCE
-    );
+            SupplierColumn.ACCOUNT_BALANCE);
 
     private final TableStatisticsDataRepository tableStatisticsDataRepository;
 
@@ -69,8 +68,7 @@ public class StatisticsEstimator
         double rescalingFactor = smallStatistics.getRowCount() == bigStatistics.getRowCount() ? 1 : scaleFactor;
         return new TableStatisticsData(
                 (long) (bigStatistics.getRowCount() * rescalingFactor),
-                rescale(tpchTable, bigStatistics, smallStatistics, scaleFactor)
-        );
+                rescale(tpchTable, bigStatistics, smallStatistics, scaleFactor));
     }
 
     private Map<String, ColumnStatisticsData> rescale(TpchTable<?> table, TableStatisticsData bigStatistics, TableStatisticsData smallStatistics, double scaleFactor)
@@ -83,8 +81,7 @@ public class StatisticsEstimator
                     ColumnStatisticsData bigColumnStatistics = entry.getValue();
                     ColumnStatisticsData smallColumnStatistics = smallStatistics.getColumns().get(columnName);
                     return rescale(column, bigColumnStatistics, smallColumnStatistics, scaleFactor);
-                }
-        ));
+                }));
     }
 
     private ColumnStatisticsData rescale(TpchColumn<?> column, ColumnStatisticsData big, ColumnStatisticsData small, double scaleFactor)
@@ -92,20 +89,12 @@ public class StatisticsEstimator
         if (UNSUPPORTED_COLUMNS.contains(column)) {
             return ColumnStatisticsData.empty();
         }
-        else {
-            return rescale(big, small, scaleFactor);
-        }
-    }
-
-    private ColumnStatisticsData rescale(ColumnStatisticsData big, ColumnStatisticsData small, double scaleFactor)
-    {
-        if (columnDoesNotScale(big, small)) {
+        else if (columnDoesNotScale(big, small)) {
             return new ColumnStatisticsData(
                     big.getDistinctValuesCount(),
                     big.getNullsCount(),
                     checkPresent(withBoth(big.getMin(), small.getMin(), this::checkClose)),
-                    checkPresent(withBoth(big.getMax(), small.getMax(), this::checkClose))
-            );
+                    checkPresent(withBoth(big.getMax(), small.getMax(), this::checkClose)));
         }
         else {
             Function<Number, Double> rescale = value -> value.doubleValue() * scaleFactor;
@@ -179,8 +168,7 @@ public class StatisticsEstimator
     {
         return new TableStatisticsData(
                 left.getRowCount() + right.getRowCount(),
-                addPartitionStats(left.getColumns(), right.getColumns(), partitionColumn)
-        );
+                addPartitionStats(left.getColumns(), right.getColumns(), partitionColumn));
     }
 
     private Map<String, ColumnStatisticsData> addPartitionStats(Map<String, ColumnStatisticsData> leftColumns, Map<String, ColumnStatisticsData> rightColumns, TpchColumn<?> partitionColumn)
@@ -195,8 +183,7 @@ public class StatisticsEstimator
                             combineUniqueValuesCount(partitionColumn, columnName, leftStats, rightStats),
                             combine(leftStats.getNullsCount(), rightStats.getNullsCount(), (a, b) -> a + b),
                             combine(leftStats.getMin(), rightStats.getMin(), this::min),
-                            combine(leftStats.getMax(), rightStats.getMax(), this::max)
-                    );
+                            combine(leftStats.getMax(), rightStats.getMax(), this::max));
                 }));
     }
 
@@ -230,7 +217,6 @@ public class StatisticsEstimator
     {
         return new TableStatisticsData(0, table.getColumns().stream().collect(toImmutableMap(
                 TpchColumn::getColumnName,
-                column -> ColumnStatisticsData.zero()
-        )));
+                column -> ColumnStatisticsData.zero())));
     }
 }

@@ -20,7 +20,6 @@ import io.airlift.tpch.TpchColumn;
 import io.airlift.tpch.TpchEntity;
 import io.airlift.tpch.TpchTable;
 
-import java.io.IOException;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -50,7 +49,6 @@ public class RecordTpchTableStatsTool
     }
 
     public static void main(String[] args)
-            throws IOException
     {
         RecordTpchTableStatsTool tool = new RecordTpchTableStatsTool(new TableStatisticsRecorder(), new TableStatisticsDataRepository(createObjectMapper()));
 
