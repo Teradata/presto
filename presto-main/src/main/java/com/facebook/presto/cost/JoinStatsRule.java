@@ -231,12 +231,11 @@ public class JoinStatsRule
         StatisticRange antiRange = StatisticRange.from(leftColumnStats)
                 .subtract(rightRange);
 
-        // TODO: use NDVs from left and right StatisticRange when they are fixed
         double leftNDV = leftColumnStats.getDistinctValuesCount();
-        double rightNDV = rightColumnStats.getDistinctValuesCount();
+        double antiNDV = antiRange.getDistinctValuesCount();
 
-        if (leftNDV > rightNDV) {
-            double selectedRangeFraction = leftColumnStats.getValuesFraction() * (leftNDV - rightNDV) / leftNDV;
+        if (antiNDV > 0) {
+            double selectedRangeFraction = leftColumnStats.getValuesFraction() * antiNDV / leftNDV;
             double scaleFactor = selectedRangeFraction + leftColumnStats.getNullsFraction();
             double newLeftNullsFraction = leftColumnStats.getNullsFraction() / scaleFactor;
             result = result.mapSymbolColumnStatistics(drivingClause.getLeft(), columnStats ->
@@ -244,11 +243,11 @@ public class JoinStatsRule
                             .setLowValue(antiRange.getLow())
                             .setHighValue(antiRange.getHigh())
                             .setNullsFraction(newLeftNullsFraction)
-                            .setDistinctValuesCount(leftNDV - rightNDV)
+                            .setDistinctValuesCount(antiNDV)
                             .build());
             result = result.mapOutputRowCount(rowCount -> rowCount * scaleFactor);
         }
-        else if (leftNDV <= rightNDV) {
+        else if (antiNDV == 0) {
             // only null values are left
             result = result.mapSymbolColumnStatistics(drivingClause.getLeft(), columnStats ->
                     SymbolStatsEstimate.buildFrom(columnStats)
@@ -260,7 +259,7 @@ public class JoinStatsRule
             result = result.mapOutputRowCount(rowCount -> rowCount * leftColumnStats.getNullsFraction());
         }
         else {
-            // either leftNDV or rightNDV is NaN
+            // antiNDV is NaN
             return new AntiJoinStats(UNKNOWN_STATS, Optional.empty());
         }
 

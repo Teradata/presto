@@ -160,20 +160,35 @@ public class StatisticRange
     public StatisticRange subtract(StatisticRange rightRange)
     {
         StatisticRange intersect = intersect(rightRange);
-        double newLow = getLow();
-        double newHigh = getHigh();
-        if (intersect.getLow() == getLow()) {
-            newLow = intersect.getHigh();
-        }
-        if (intersect.getHigh() == getHigh()) {
-            newHigh = intersect.getLow();
-        }
-        if (newLow > newHigh) {
-            newLow = NaN;
-            newHigh = NaN;
-        }
 
-        return new StatisticRange(newLow, newHigh, max(getDistinctValuesCount(), rightRange.getDistinctValuesCount()) - intersect.getDistinctValuesCount());
+        double overlapPercentOfThis = overlapPercentWith(rightRange);
+        double overlapDistinctValuesThis = overlapPercentOfThis * distinctValues;
+
+        if (intersect.getDistinctValuesCount() >= overlapDistinctValuesThis) {
+            // all NDVs from intersection are subtracted
+            double newLow = getLow();
+            double newHigh = getHigh();
+            if (intersect.getLow() == getLow()) {
+                newLow = intersect.getHigh();
+            }
+            if (intersect.getHigh() == getHigh()) {
+                newHigh = intersect.getLow();
+            }
+            if (newLow > newHigh) {
+                newLow = NaN;
+                newHigh = NaN;
+            }
+
+            return new StatisticRange(newLow, newHigh, distinctValues - overlapDistinctValuesThis);
+        }
+        else if (intersect.getDistinctValuesCount() < overlapDistinctValuesThis) {
+            // some NDVs from intersection are subtracted
+            return new StatisticRange(getLow(), getHigh(), distinctValues - intersect.getDistinctValuesCount());
+        }
+        else {
+            // either intersect.getDistinctValuesCount() or overlapDistinctValuesThis is NaN
+            return new StatisticRange(getLow(), getHigh(), NaN);
+        }
     }
 
     private static double minExcludeNaN(double v1, double v2)

@@ -72,7 +72,7 @@ public class TestJoinStatsRule
     private static final SymbolStatistics RIGHT_JOIN_COLUMN_2_STATS =
             symbolStatistics(RIGHT_JOIN_COLUMN_2, 100.0, 200.0, RIGHT_JOIN_COLUMN_2_NULLS, RIGHT_JOIN_COLUMN_2_NDV);
     private static final SymbolStatistics RIGHT_OTHER_COLUMN_STATS =
-            symbolStatistics(RIGHT_OTHER_COLUMN, 24, 24, 0.24, 1);
+            symbolStatistics(RIGHT_OTHER_COLUMN, 42, 42, 0.24, 1);
     private static final PlanNodeStatsEstimate LEFT_STATS = planNodeStats(LEFT_ROWS_COUNT,
             LEFT_JOIN_COLUMN_STATS,
             LEFT_OTHER_COLUMN_STATS);
@@ -248,7 +248,7 @@ public class TestJoinStatsRule
                 symbolStatistics(LEFT_JOIN_COLUMN, 0.0, 20.0, antiJoinColumnNulls * antiJoinRowCount / totalRowCount, LEFT_JOIN_COLUMN_NDV),
                 LEFT_OTHER_COLUMN_STATS,
                 symbolStatistics(RIGHT_JOIN_COLUMN, 5.0, 20.0, antiJoinRowCount / totalRowCount, RIGHT_JOIN_COLUMN_NDV),
-                symbolStatistics(RIGHT_OTHER_COLUMN, 24, 24, (0.24 * innerJoinRowCount + antiJoinRowCount) / totalRowCount, 1));
+                symbolStatistics(RIGHT_OTHER_COLUMN, 42, 42, (0.24 * innerJoinRowCount + antiJoinRowCount) / totalRowCount, 1));
 
         assertJoinStats(LEFT, LEFT_STATS, RIGHT_STATS, leftJoinStats);
         assertJoinStats(RIGHT, RIGHT_JOIN_COLUMN, RIGHT_OTHER_COLUMN, LEFT_JOIN_COLUMN, LEFT_OTHER_COLUMN, RIGHT_STATS, LEFT_STATS, leftJoinStats);
@@ -269,7 +269,7 @@ public class TestJoinStatsRule
                 symbolStatistics(LEFT_JOIN_COLUMN, 0.0, 20.0, (leftAntiJoinColumnNulls * leftAntiJoinRowCount + rightAntiJoinRowCount) / totalRowCount, LEFT_JOIN_COLUMN_NDV),
                 symbolStatistics(LEFT_OTHER_COLUMN, 42, 42, (0.42 * (innerJoinRowCount + leftAntiJoinRowCount) + rightAntiJoinRowCount) / totalRowCount, 1),
                 symbolStatistics(RIGHT_JOIN_COLUMN, 5.0, 20.0, (rightAntiJoinColumnNulls * rightAntiJoinRowCount + leftAntiJoinRowCount) / totalRowCount, RIGHT_JOIN_COLUMN_NDV),
-                symbolStatistics(RIGHT_OTHER_COLUMN, 24, 24, (0.24 * (innerJoinRowCount + rightAntiJoinRowCount) + leftAntiJoinRowCount) / totalRowCount, 1));
+                symbolStatistics(RIGHT_OTHER_COLUMN, 42, 42, (0.24 * (innerJoinRowCount + rightAntiJoinRowCount) + leftAntiJoinRowCount) / totalRowCount, 1));
 
         assertJoinStats(FULL, LEFT_STATS, RIGHT_STATS, leftJoinStats);
     }
