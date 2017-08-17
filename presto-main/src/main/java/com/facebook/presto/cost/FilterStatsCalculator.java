@@ -18,7 +18,8 @@ import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.analyzer.ExpressionAnalyzer;
 import com.facebook.presto.sql.analyzer.Scope;
-import com.facebook.presto.sql.planner.LiteralInterpreter;
+import com.facebook.presto.sql.planner.ExpressionInterpreter;
+import com.facebook.presto.sql.planner.NoOpSymbolResolver;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.tree.AstVisitor;
 import com.facebook.presto.sql.tree.BetweenPredicate;
@@ -32,6 +33,7 @@ import com.facebook.presto.sql.tree.IsNotNullPredicate;
 import com.facebook.presto.sql.tree.IsNullPredicate;
 import com.facebook.presto.sql.tree.Literal;
 import com.facebook.presto.sql.tree.LogicalBinaryExpression;
+import com.facebook.presto.sql.tree.NodeRef;
 import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.SymbolReference;
 import com.google.common.collect.ImmutableList;
@@ -59,6 +61,7 @@ import static java.lang.Double.isInfinite;
 import static java.lang.Double.isNaN;
 import static java.lang.Double.min;
 import static java.lang.String.format;
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 public class FilterStatsCalculator
@@ -279,45 +282,36 @@ public class FilterStatsCalculator
         @Override
         protected Optional<PlanNodeStatsEstimate> visitComparisonExpression(ComparisonExpression node, Void context)
         {
-            // TODO: verify we eliminate Literal-Literal earlier or support them here
-
             ComparisonExpressionType type = node.getType();
             Expression left = node.getLeft();
-            Expression right = node.getRight();
-
-            if (!(left instanceof SymbolReference) && right instanceof SymbolReference) {
-                // normalize so that symbol is on the left
-                return process(new ComparisonExpression(type.flip(), right, left));
-            }
-
-            if (left instanceof Literal && !(right instanceof Literal)) {
-                // normalize so that literal is on the right
-                return process(new ComparisonExpression(type.flip(), right, left));
-            }
-
             Optional<Symbol> leftSymbol = asSymbol(left);
             Optional<SymbolStatsEstimate> leftStats = getSymbolStatsEstimate(left);
-            if (!leftStats.isPresent()) {
-                return visitExpression(node, context);
-            }
+            Optional<Object> leftConstant = tryEvaluateConstantExpression(left);
 
-            if (right instanceof Literal) {
-                // TODO support Cast(Literal) same way as Literal (nested Casts too)
-                OptionalDouble literal = doubleValueFromLiteral(getType(left), (Literal) right);
-                return comparisonExpressionToLiteralStats(input, leftSymbol, leftStats.get(), literal, type);
-            }
-
+            Expression right = node.getRight();
             Optional<Symbol> rightSymbol = asSymbol(right);
             Optional<SymbolStatsEstimate> rightStats = getSymbolStatsEstimate(right);
-            if (!rightStats.isPresent()) {
-                return visitExpression(node, context);
-            }
+            Optional<Object> rightConstant = tryEvaluateConstantExpression(right);
 
             if (left instanceof SymbolReference && right instanceof SymbolReference && left.equals(right)) {
                 return process(new IsNotNullPredicate(left));
             }
 
-            return comparisonExpressionToExpressionStats(input, leftSymbol, leftStats.get(), rightSymbol, rightStats.get(), type);
+            if (leftStats.isPresent() && rightConstant.isPresent()) {
+                OptionalDouble literal = doubleValueFromConstant(getType(left), rightConstant.get());
+                return comparisonExpressionToLiteralStats(input, leftSymbol, leftStats.get(), literal, type);
+            }
+
+            if (rightStats.isPresent() && leftConstant.isPresent()) {
+                OptionalDouble literal = doubleValueFromConstant(getType(right), leftConstant.get());
+                return comparisonExpressionToLiteralStats(input, rightSymbol, rightStats.get(), literal, type);
+            }
+
+            if (leftStats.isPresent() && rightStats.isPresent()) {
+                return comparisonExpressionToExpressionStats(input, leftSymbol, leftStats.get(), rightSymbol, rightStats.get(), type);
+            }
+
+            return Optional.empty();
         }
 
         private Optional<Symbol> asSymbol(Expression expression)
@@ -361,11 +355,45 @@ public class FilterStatsCalculator
             }
         }
 
-        private OptionalDouble doubleValueFromLiteral(Type type, Literal literal)
+        /**
+         * Returns expression value if the expression is constant, empty result otherwise.
+         */
+        private Optional<Object> tryEvaluateConstantExpression(Expression expression)
         {
-            Object literalValue = LiteralInterpreter.evaluate(metadata, session.toConnectorSession(), literal);
+            Map<NodeRef<Expression>, Type> expressionTypes = getExpressionTypes(expression);
+            ExpressionInterpreter interpreter = ExpressionInterpreter.expressionOptimizer(expression, metadata, session, expressionTypes);
+            Object value = interpreter.optimize(NoOpSymbolResolver.INSTANCE);
+
+            if (value instanceof Expression) {
+                // expression is not constant
+                return Optional.empty();
+            }
+            if (value == null) {
+                // expression evaluates to SQL null, which is unsupported here (expression should have been simplified not to be comparison expression earlier)
+                return Optional.empty();
+            }
+
+            return Optional.of(value);
+        }
+
+        private OptionalDouble doubleValueFromConstant(Type type, Object constantValue)
+        {
             DomainConverter domainConverter = new DomainConverter(type, metadata.getFunctionRegistry(), session.toConnectorSession());
-            return domainConverter.translateToDouble(literalValue);
+            return domainConverter.translateToDouble(constantValue);
+        }
+
+        private Map<NodeRef<Expression>, Type> getExpressionTypes(Expression expression)
+        {
+            ExpressionAnalyzer expressionAnalyzer = ExpressionAnalyzer.createWithoutSubqueries(
+                    metadata.getFunctionRegistry(),
+                    metadata.getTypeManager(),
+                    session,
+                    types,
+                    emptyList(),
+                    node -> new IllegalStateException("Expected node: %s" + node),
+                    false);
+            expressionAnalyzer.analyze(expression, Scope.create());
+            return expressionAnalyzer.getExpressionTypes();
         }
     }
 }

@@ -184,6 +184,11 @@ public class TestComparisonStatsCalculator
         return symbolStats;
     }
 
+    private SymbolStatsEstimate adjustNDV(SymbolStatsEstimate symbolStats, double ndvAdjustment)
+    {
+        return symbolStats.mapDistinctValuesCount(ndv -> ndv + ndvAdjustment);
+    }
+
     private SymbolStatsEstimate zeroNullsFraction(SymbolStatsEstimate symbolStats)
     {
         return symbolStats.mapNullsFraction(fraction -> 0.0);
@@ -689,7 +694,7 @@ public class TestComparisonStatsCalculator
         rowCount = 897.0;
         assertCalculate(new ComparisonExpression(NOT_EQUAL, new SymbolReference("u"), new Cast(new LongLiteral("10"), DOUBLE)))
                 .outputRowsCount(rowCount)
-                .symbolStats("u", equalTo(capNDV(zeroNullsFraction(uStats), rowCount)))
+                .symbolStats("u", equalTo(capNDV(adjustNDV(zeroNullsFraction(uStats), -1 /* value of 10 assumed to be filtered out */), rowCount)))
                 .symbolStats("z", equalTo(capNDV(zStats, rowCount)));
     }
 }
