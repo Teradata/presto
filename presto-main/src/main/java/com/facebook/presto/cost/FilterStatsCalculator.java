@@ -313,10 +313,6 @@ public class FilterStatsCalculator
                 return visitExpression(node, context);
             }
 
-            if (leftStats.equals(UNKNOWN_STATS) || rightStats.equals(UNKNOWN_STATS)) {
-                return Optional.empty();
-            }
-
             if (left instanceof SymbolReference && right instanceof SymbolReference && left.equals(right)) {
                 return process(new IsNotNullPredicate(left));
             }
