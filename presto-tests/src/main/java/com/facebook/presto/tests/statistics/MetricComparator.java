@@ -65,9 +65,11 @@ public class MetricComparator
 
     private Set<MetricComparison<?>> getMetricComparisonsLocal(String query, LocalQueryRunner runner, Set<Metric<?>> metrics)
     {
-        Plan queryPlan = inTransaction(runner, (session) -> runner.createPlan(session, query));
-        OutputNode outputNode = (OutputNode) queryPlan.getRoot();
-        return getMetricComparisons(query, runner, queryPlan, outputNode, metrics);
+        return inTransaction(runner, (session) -> {
+            Plan queryPlan = runner.createPlan(session, query);
+            OutputNode outputNode = (OutputNode) queryPlan.getRoot();
+            return getMetricComparisons(query, runner, queryPlan, outputNode, metrics);
+        });
     }
 
     private <T> T inTransaction(QueryRunner runner, Function<Session, T> transactionSessionConsumer)
