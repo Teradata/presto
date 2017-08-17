@@ -85,6 +85,14 @@ public class StatisticsAssertion
             return this;
         }
 
+        public Checks verifyCharacterColumnStatistics(String columnName, MetricComparisonStrategy<Double> strategy)
+        {
+            estimate(nullsFraction(columnName), strategy);
+            estimate(distinctValuesCount(columnName), strategy);
+            // currently we do not support low/high values for char/varchar in stats calculations
+            return this;
+        }
+
         public Checks verifyNoColumnStatistics(String columnName)
         {
             noEstimate(nullsFraction(columnName));
