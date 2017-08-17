@@ -240,6 +240,14 @@ public class TestTpchLocalStats
     }
 
     @Test
+    public void testVarcharComparisons()
+    {
+        statisticsAssertion.check("SELECT * FROM orders WHERE o_comment = 'requests above the furiously even instructions use alw'",
+                checks -> checks
+                        .estimate(OUTPUT_ROW_COUNT, defaultTolerance()));
+    }
+
+    @Test
     public void testInSubquery()
     {
         statisticsAssertion.check("select * from lineitem where l_orderkey in (select o_orderkey from orders where o_orderdate >= DATE '1993-10-01')",

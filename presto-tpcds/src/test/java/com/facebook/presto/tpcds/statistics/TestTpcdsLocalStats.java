@@ -27,6 +27,7 @@ import static com.facebook.presto.tests.statistics.MetricComparisonStrategies.ab
 import static com.facebook.presto.tests.statistics.MetricComparisonStrategies.defaultTolerance;
 import static com.facebook.presto.tests.statistics.MetricComparisonStrategies.noError;
 import static com.facebook.presto.tests.statistics.Metrics.OUTPUT_ROW_COUNT;
+import static com.facebook.presto.tests.statistics.Metrics.distinctValuesCount;
 import static java.util.Collections.emptyMap;
 
 public class TestTpcdsLocalStats
@@ -69,5 +70,27 @@ public class TestTpcdsLocalStats
                         .verifyColumnStatistics("i_brand_id", absoluteError(0.01)) // nulls fraction estimated as 0
                         .verifyCharacterColumnStatistics("i_color", absoluteError(0.01)) // nulls fraction estimated as 0
         );
+    }
+
+    @Test
+    public void testCharComparison()
+    {
+        // cd_marital_status is char(1)
+        statisticsAssertion.check("SELECT * FROM customer_demographics WHERE cd_marital_status = 'D'",
+                checks -> checks
+                        .estimate(OUTPUT_ROW_COUNT, defaultTolerance())
+                        .estimate(distinctValuesCount("cd_marital_status"), noError()));
+        statisticsAssertion.check("SELECT * FROM customer_demographics WHERE 'D' = cd_marital_status",
+                checks -> checks
+                        .estimate(OUTPUT_ROW_COUNT, defaultTolerance())
+                        .estimate(distinctValuesCount("cd_marital_status"), noError()));
+
+        // i_category is char(50)
+        statisticsAssertion.check("SELECT * FROM item WHERE i_category = 'Women                                             '",
+                checks -> checks.estimate(OUTPUT_ROW_COUNT, defaultTolerance()));
+        statisticsAssertion.check("SELECT * FROM item WHERE 'Women                                             ' = i_category",
+                checks -> checks.estimate(OUTPUT_ROW_COUNT, defaultTolerance()));
+        statisticsAssertion.check("SELECT * FROM item WHERE i_category = cast('Women' as char(50))",
+                checks -> checks.estimate(OUTPUT_ROW_COUNT, defaultTolerance()));
     }
 }
