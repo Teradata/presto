@@ -35,6 +35,7 @@ import java.util.function.Function;
 
 import static com.facebook.presto.transaction.TransactionBuilder.transaction;
 import static com.google.common.collect.Iterables.getOnlyElement;
+import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
@@ -116,13 +117,18 @@ public class MetricComparator
                 + metrics.stream().map(Metric::getComputingAggregationSql).collect(joining(","))
                 + " FROM (" + query + ")";
 
-        MaterializedRow actualValuesRow = getOnlyElement(runner.execute(statsQuery).getMaterializedRows());
+        try {
+            MaterializedRow actualValuesRow = getOnlyElement(runner.execute(statsQuery).getMaterializedRows());
 
-        ImmutableList.Builder<Optional<?>> actualValues = ImmutableList.builder();
-        for (int i = 0; i < metrics.size(); ++i) {
-            actualValues.add(metrics.get(i).getValueFromAggregationQuery(actualValuesRow, i, statsContext));
+            ImmutableList.Builder<Optional<?>> actualValues = ImmutableList.builder();
+            for (int i = 0; i < metrics.size(); ++i) {
+                actualValues.add(metrics.get(i).getValueFromAggregationQuery(actualValuesRow, i, statsContext));
+            }
+            return actualValues.build();
         }
-        return actualValues.build();
+        catch (RuntimeException e) {
+            throw new RuntimeException(format("Failed to execute query to compute actual values: %s", statsQuery), e);
+        }
     }
 
     private List<Optional<?>> getEstimatedValues(List<Metric<?>> metrics, PlanNodeStatsEstimate outputNodeStatisticsEstimates, StatsContext statsContext)
