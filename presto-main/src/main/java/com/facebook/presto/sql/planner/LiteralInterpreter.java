@@ -20,6 +20,7 @@ import com.facebook.presto.metadata.Signature;
 import com.facebook.presto.operator.scalar.VarbinaryFunctions;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.type.CharType;
 import com.facebook.presto.spi.type.Decimals;
 import com.facebook.presto.spi.type.SqlDate;
 import com.facebook.presto.spi.type.StandardTypes;
@@ -171,15 +172,18 @@ public final class LiteralInterpreter
             }
         }
 
-        if (type instanceof VarcharType) {
+        if (type instanceof VarcharType || type instanceof CharType) {
             Slice value = (Slice) object;
-            int length = SliceUtf8.countCodePoints(value);
 
-            if (length == ((VarcharType) type).getLength()) {
-                return new StringLiteral(value.toStringUtf8());
+            StringLiteral stringLiteral = new StringLiteral(value.toStringUtf8());
+            if (type instanceof VarcharType) {
+                VarcharType varcharType = (VarcharType) type;
+                if (!varcharType.isUnbounded() && varcharType.getLengthSafe() == SliceUtf8.countCodePoints(value)) {
+                    return stringLiteral;
+                }
             }
 
-            return new Cast(new StringLiteral(value.toStringUtf8()), type.getDisplayName(), false, true);
+            return new Cast(stringLiteral, type.getDisplayName(), false, true);
         }
 
         if (type.equals(BOOLEAN)) {
