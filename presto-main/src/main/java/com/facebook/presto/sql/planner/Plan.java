@@ -19,6 +19,7 @@ import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.iterative.Lookup;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 
 import java.util.List;
@@ -32,7 +33,8 @@ public class Plan
 {
     private final PlanNode root;
     private final Map<Symbol, Type> types;
-    private final Map<PlanNodeId, PlanNodeStatsEstimate> planNodeStats;
+    private final Lookup lookup;
+    private final Session session;
 
     public Plan(PlanNode root, Map<Symbol, Type> types, Lookup lookup, Session session)
     {
@@ -42,9 +44,8 @@ public class Plan
 
         this.root = root;
         this.types = ImmutableMap.copyOf(types);
-        this.planNodeStats = getPlanNodes(root)
-                .stream()
-                .collect(toImmutableMap(PlanNode::getId, node -> lookup.getStats(node, session, types)));
+        this.lookup = requireNonNull(lookup, "lookup is null");
+        this.session = requireNonNull(session, "session is null");
     }
 
     public PlanNode getRoot()
@@ -57,9 +58,12 @@ public class Plan
         return types;
     }
 
+    @VisibleForTesting
     public Map<PlanNodeId, PlanNodeStatsEstimate> getPlanNodeStats()
     {
-        return planNodeStats;
+        return getPlanNodes(root)
+                .stream()
+                .collect(toImmutableMap(PlanNode::getId, node -> lookup.getStats(node, session, types)));
     }
 
     private List<PlanNode> getPlanNodes(PlanNode root)
