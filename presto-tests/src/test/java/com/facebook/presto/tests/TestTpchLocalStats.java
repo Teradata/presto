@@ -78,7 +78,7 @@ public class TestTpchLocalStats
     }
 
     @Test
-    void testInnerJoinStats()
+    public void testInnerJoinStats()
     {
         // cross join
         statisticsAssertion.check("SELECT * FROM supplier, nation",
@@ -132,7 +132,7 @@ public class TestTpchLocalStats
     }
 
     @Test
-    void testLeftJoinStats()
+    public void testLeftJoinStats()
     {
         // simple equi join
         statisticsAssertion.check("SELECT * FROM supplier left join nation on s_nationkey = n_nationkey",
@@ -155,7 +155,7 @@ public class TestTpchLocalStats
     }
 
     @Test
-    void testRightJoinStats()
+    public void testRightJoinStats()
     {
         // simple equi join
         statisticsAssertion.check("SELECT * FROM nation right join supplier on s_nationkey = n_nationkey",
@@ -178,7 +178,7 @@ public class TestTpchLocalStats
     }
 
     @Test
-    void testFullJoinStats()
+    public void testFullJoinStats()
     {
         // simple equi join
         statisticsAssertion.check("SELECT * FROM nation full join supplier on s_nationkey = n_nationkey",
