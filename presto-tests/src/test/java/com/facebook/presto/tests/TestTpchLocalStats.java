@@ -66,7 +66,7 @@ public class TestTpchLocalStats
     }
 
     @Test
-    void testTableScanStats()
+    public void testTableScanStats()
     {
         statisticsAssertion.check("SELECT * FROM nation",
                 checks -> checks
