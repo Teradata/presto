@@ -49,12 +49,21 @@ public class JoinStatsRule
         implements ComposableStatsCalculator.Rule
 {
     private static final Pattern PATTERN = Pattern.typeOf(JoinNode.class);
+    private static final double DEFAULT_UNMATCHED_JOIN_COMPLEMENT_NDVS_COEFFICIENT = 0.5;
 
     private final FilterStatsCalculator filterStatsCalculator;
+    private final double unmatchedJoinComplementNdvsCoefficient;
 
     public JoinStatsRule(FilterStatsCalculator filterStatsCalculator)
     {
+        this(filterStatsCalculator, DEFAULT_UNMATCHED_JOIN_COMPLEMENT_NDVS_COEFFICIENT);
+    }
+
+    @VisibleForTesting
+    JoinStatsRule(FilterStatsCalculator filterStatsCalculator, double unmatchedJoinComplementNdvsCoefficient)
+    {
         this.filterStatsCalculator = filterStatsCalculator;
+        this.unmatchedJoinComplementNdvsCoefficient = unmatchedJoinComplementNdvsCoefficient;
     }
 
     @Override
@@ -87,22 +96,27 @@ public class JoinStatsRule
 
     private PlanNodeStatsEstimate computeFullJoinStats(JoinNode node, PlanNodeStatsEstimate leftStats, PlanNodeStatsEstimate rightStats, Session session, Map<Symbol, Type> types)
     {
-        AntiJoinStats rightAntiJoinStats = calculateAntiJoinStats(node.getFilter(), flippedCriteria(node), rightStats, leftStats);
-        return addAntiJoinStats(computeLeftJoinStats(node, leftStats, rightStats, session, types), rightAntiJoinStats.getStats(), rightAntiJoinStats.getSelectedClauseSymbol());
+        JoinComplementStats rightJoinComplementStats = calculateJoinComplementStats(node.getFilter(), flippedCriteria(node), rightStats, leftStats);
+        return addJoinComplementStats(computeLeftJoinStats(node, leftStats, rightStats, session, types), rightJoinComplementStats, getSelectedClauseSymbolMaxNdvs(rightJoinComplementStats, rightStats));
     }
 
     private PlanNodeStatsEstimate computeLeftJoinStats(JoinNode node, PlanNodeStatsEstimate leftStats, PlanNodeStatsEstimate rightStats, Session session, Map<Symbol, Type> types)
     {
         PlanNodeStatsEstimate innerJoinStats = computeInnerJoinStats(node, leftStats, rightStats, session, types);
-        AntiJoinStats leftAntiJoinStats = calculateAntiJoinStats(node.getFilter(), node.getCriteria(), leftStats, rightStats);
-        return addAntiJoinStats(innerJoinStats, leftAntiJoinStats.getStats(), leftAntiJoinStats.getSelectedClauseSymbol());
+        JoinComplementStats leftJoinComplementStats = calculateJoinComplementStats(node.getFilter(), node.getCriteria(), leftStats, rightStats);
+        return addJoinComplementStats(innerJoinStats, leftJoinComplementStats, getSelectedClauseSymbolMaxNdvs(leftJoinComplementStats, leftStats));
     }
 
     private PlanNodeStatsEstimate computeRightJoinStats(JoinNode node, PlanNodeStatsEstimate leftStats, PlanNodeStatsEstimate rightStats, Session session, Map<Symbol, Type> types)
     {
         PlanNodeStatsEstimate innerJoinStats = computeInnerJoinStats(node, leftStats, rightStats, session, types);
-        AntiJoinStats rightAntiJoinStats = calculateAntiJoinStats(node.getFilter(), flippedCriteria(node), rightStats, leftStats);
-        return addAntiJoinStats(innerJoinStats, rightAntiJoinStats.getStats(), rightAntiJoinStats.getSelectedClauseSymbol());
+        JoinComplementStats rightJoinComplementStats = calculateJoinComplementStats(node.getFilter(), flippedCriteria(node), rightStats, leftStats);
+        return addJoinComplementStats(innerJoinStats, rightJoinComplementStats, getSelectedClauseSymbolMaxNdvs(rightJoinComplementStats, rightStats));
+    }
+
+    private double getSelectedClauseSymbolMaxNdvs(JoinComplementStats joinComplementStats, PlanNodeStatsEstimate stats)
+    {
+        return joinComplementStats.getSelectedClauseSymbol().map(symbol -> stats.getSymbolStatistics(symbol).getDistinctValuesCount()).orElse(NaN);
     }
 
     private PlanNodeStatsEstimate computeInnerJoinStats(JoinNode node, PlanNodeStatsEstimate leftStats, PlanNodeStatsEstimate rightStats, Session session, Map<Symbol, Type> types)
@@ -186,41 +200,41 @@ public class JoinStatsRule
     }
 
     @VisibleForTesting
-    AntiJoinStats calculateAntiJoinStats(Optional<Expression> filter, List<JoinNode.EquiJoinClause> criteria, PlanNodeStatsEstimate leftStats, PlanNodeStatsEstimate rightStats)
+    JoinComplementStats calculateJoinComplementStats(Optional<Expression> filter, List<JoinNode.EquiJoinClause> criteria, PlanNodeStatsEstimate leftStats, PlanNodeStatsEstimate rightStats)
     {
         // TODO: add support for non-equality conditions (e.g: <=, !=, >)
         if (filter.isPresent()) {
             // non-equi filters are not supported
-            return new AntiJoinStats(UNKNOWN_STATS, Optional.empty());
+            return new JoinComplementStats(UNKNOWN_STATS, Optional.empty());
         }
 
         if (criteria.isEmpty()) {
             if (rightStats.getOutputRowCount() > 0) {
                 // all left side rows are matched
-                return new AntiJoinStats(leftStats.mapOutputRowCount(rowCount -> 0.0), Optional.empty());
+                return new JoinComplementStats(leftStats.mapOutputRowCount(rowCount -> 0.0), Optional.empty());
             }
             else if (rightStats.getOutputRowCount() == 0) {
                 // none left side rows are matched
-                return new AntiJoinStats(leftStats, Optional.empty());
+                return new JoinComplementStats(leftStats, Optional.empty());
             }
             else {
                 // right stats row count is NaN
-                return new AntiJoinStats(UNKNOWN_STATS, Optional.empty());
+                return new JoinComplementStats(UNKNOWN_STATS, Optional.empty());
             }
         }
 
-        // heuristics: select the most selective criteria for anti join clause
+        // heuristics: select the most selective criteria for join complement clause
         return IntStream.range(0, criteria.size())
                 .mapToObj(drivingClauseId -> {
                     EquiJoinClause drivingClause = criteria.get(drivingClauseId);
                     List<EquiJoinClause> remainingClauses = copyWithout(criteria, drivingClauseId);
-                    return calculateAntiJoinStats(leftStats, rightStats, drivingClause, remainingClauses);
+                    return calculateJoinComplementStats(leftStats, rightStats, drivingClause, remainingClauses);
                 })
-                .max(comparingDouble(antiJoinStats -> antiJoinStats.getStats().getOutputRowCount()))
+                .max(comparingDouble(joinComplementStats -> joinComplementStats.getStats().getOutputRowCount()))
                 .get();
     }
 
-    private AntiJoinStats calculateAntiJoinStats(PlanNodeStatsEstimate leftStats, PlanNodeStatsEstimate rightStats, EquiJoinClause drivingClause, List<EquiJoinClause> remainingClauses)
+    private JoinComplementStats calculateJoinComplementStats(PlanNodeStatsEstimate leftStats, PlanNodeStatsEstimate rightStats, EquiJoinClause drivingClause, List<EquiJoinClause> remainingClauses)
     {
         PlanNodeStatsEstimate result = leftStats;
 
@@ -229,10 +243,10 @@ public class JoinStatsRule
 
         // TODO: use range methods when they have defined (and consistent) semantics
         double leftNDV = leftColumnStats.getDistinctValuesCount();
-        double rightNDV = rightColumnStats.getDistinctValuesCount();
+        double matchingRightNDV = rightColumnStats.getDistinctValuesCount() * unmatchedJoinComplementNdvsCoefficient;
 
-        if (leftNDV > rightNDV) {
-            double selectedRangeFraction = leftColumnStats.getValuesFraction() * (leftNDV - rightNDV) / leftNDV;
+        if (leftNDV > matchingRightNDV) {
+            double selectedRangeFraction = leftColumnStats.getValuesFraction() * (leftNDV - matchingRightNDV) / leftNDV;
             double scaleFactor = selectedRangeFraction + leftColumnStats.getNullsFraction();
             double newLeftNullsFraction = leftColumnStats.getNullsFraction() / scaleFactor;
             result = result.mapSymbolColumnStatistics(drivingClause.getLeft(), columnStats ->
@@ -240,11 +254,11 @@ public class JoinStatsRule
                             .setLowValue(leftColumnStats.getLowValue())
                             .setHighValue(leftColumnStats.getHighValue())
                             .setNullsFraction(newLeftNullsFraction)
-                            .setDistinctValuesCount(leftNDV - rightNDV)
+                            .setDistinctValuesCount(leftNDV - matchingRightNDV)
                             .build());
             result = result.mapOutputRowCount(rowCount -> rowCount * scaleFactor);
         }
-        else if (leftNDV <= rightNDV) {
+        else if (leftNDV <= matchingRightNDV) {
             // only null values are left
             result = result.mapSymbolColumnStatistics(drivingClause.getLeft(), columnStats ->
                     SymbolStatsEstimate.buildFrom(columnStats)
@@ -257,7 +271,7 @@ public class JoinStatsRule
         }
         else {
             // either leftNDV or rightNDV is NaN
-            return new AntiJoinStats(UNKNOWN_STATS, Optional.empty());
+            return new JoinComplementStats(UNKNOWN_STATS, Optional.empty());
         }
 
         // account for remaining clauses
@@ -265,34 +279,34 @@ public class JoinStatsRule
             result = result.mapOutputRowCount(rowCount -> min(leftStats.getOutputRowCount(), rowCount / UNKNOWN_FILTER_COEFFICIENT));
         }
 
-        return new AntiJoinStats(result, Optional.of(drivingClause.getLeft()));
+        return new JoinComplementStats(result, Optional.of(drivingClause.getLeft()));
     }
 
     @VisibleForTesting
-    PlanNodeStatsEstimate addAntiJoinStats(PlanNodeStatsEstimate joinStats, PlanNodeStatsEstimate antiJoinStats, Optional<Symbol> joinSymbol)
+    PlanNodeStatsEstimate addJoinComplementStats(PlanNodeStatsEstimate innerJoinStats, JoinComplementStats joinComplementStats, double selectedClauseSymbolMaxNdv)
     {
-        checkState(joinStats.getSymbolsWithKnownStatistics().containsAll(antiJoinStats.getSymbolsWithKnownStatistics()));
+        checkState(innerJoinStats.getSymbolsWithKnownStatistics().containsAll(joinComplementStats.getStats().getSymbolsWithKnownStatistics()));
 
-        double joinOutputRowCount = joinStats.getOutputRowCount();
-        double antiJoinOutputRowCount = antiJoinStats.getOutputRowCount();
-        double totalRowCount = joinOutputRowCount + antiJoinOutputRowCount;
-        PlanNodeStatsEstimate outputStats = joinStats.mapOutputRowCount(rowCount -> rowCount + antiJoinOutputRowCount);
+        double joinOutputRowCount = innerJoinStats.getOutputRowCount();
+        double joinComplementOutputRowCount = joinComplementStats.getStats().getOutputRowCount();
+        double totalRowCount = joinOutputRowCount + joinComplementOutputRowCount;
+        PlanNodeStatsEstimate outputStats = innerJoinStats.mapOutputRowCount(rowCount -> rowCount + joinComplementOutputRowCount);
 
-        for (Symbol symbol : antiJoinStats.getSymbolsWithKnownStatistics()) {
+        for (Symbol symbol : joinComplementStats.getStats().getSymbolsWithKnownStatistics()) {
             outputStats = outputStats.mapSymbolColumnStatistics(symbol, joinColumnStats -> {
-                SymbolStatsEstimate antiJoinColumnStats = antiJoinStats.getSymbolStatistics(symbol);
+                SymbolStatsEstimate joinComplementColumnStats = joinComplementStats.getStats().getSymbolStatistics(symbol);
                 // weighted average
-                double newNullsFraction = (joinColumnStats.getNullsFraction() * joinOutputRowCount + antiJoinColumnStats.getNullsFraction() * antiJoinOutputRowCount) / totalRowCount;
+                double newNullsFraction = (joinColumnStats.getNullsFraction() * joinOutputRowCount + joinComplementColumnStats.getNullsFraction() * joinComplementOutputRowCount) / totalRowCount;
                 double distinctValues;
-                if (joinSymbol.isPresent() && joinSymbol.get().equals(symbol)) {
-                    distinctValues = joinColumnStats.getDistinctValuesCount() + antiJoinColumnStats.getDistinctValuesCount();
+                if (joinComplementStats.getSelectedClauseSymbol().isPresent() && joinComplementStats.getSelectedClauseSymbol().get().equals(symbol)) {
+                    distinctValues = min(joinColumnStats.getDistinctValuesCount() + joinComplementColumnStats.getDistinctValuesCount(), selectedClauseSymbolMaxNdv);
                 }
                 else {
                     distinctValues = joinColumnStats.getDistinctValuesCount();
                 }
                 return SymbolStatsEstimate.buildFrom(joinColumnStats)
-                        .setLowValue(rangeMin(joinColumnStats.getLowValue(), antiJoinColumnStats.getLowValue()))
-                        .setHighValue(rangeMax(joinColumnStats.getHighValue(), antiJoinColumnStats.getHighValue()))
+                        .setLowValue(rangeMin(joinColumnStats.getLowValue(), joinComplementColumnStats.getLowValue()))
+                        .setHighValue(rangeMax(joinColumnStats.getHighValue(), joinComplementColumnStats.getHighValue()))
                         .setDistinctValuesCount(distinctValues)
                         .setNullsFraction(newNullsFraction)
                         .build();
@@ -300,9 +314,9 @@ public class JoinStatsRule
         }
 
         // add nulls to columns that don't exist in right stats
-        for (Symbol symbol : difference(joinStats.getSymbolsWithKnownStatistics(), antiJoinStats.getSymbolsWithKnownStatistics())) {
+        for (Symbol symbol : difference(innerJoinStats.getSymbolsWithKnownStatistics(), joinComplementStats.getStats().getSymbolsWithKnownStatistics())) {
             outputStats = outputStats.mapSymbolColumnStatistics(symbol, joinColumnStats ->
-                    joinColumnStats.mapNullsFraction(nullsFraction -> (nullsFraction * joinOutputRowCount + antiJoinOutputRowCount) / totalRowCount));
+                    joinColumnStats.mapNullsFraction(nullsFraction -> (nullsFraction * joinOutputRowCount + joinComplementOutputRowCount) / totalRowCount));
         }
 
         return outputStats;
@@ -327,12 +341,12 @@ public class JoinStatsRule
     }
 
     @VisibleForTesting
-    static class AntiJoinStats
+    static class JoinComplementStats
     {
         private final PlanNodeStatsEstimate stats;
         private final Optional<Symbol> selectedClauseSymbol;
 
-        public AntiJoinStats(PlanNodeStatsEstimate stats, Optional<Symbol> selectedClauseSymbol)
+        public JoinComplementStats(PlanNodeStatsEstimate stats, Optional<Symbol> selectedClauseSymbol)
         {
             this.stats = stats;
             this.selectedClauseSymbol = selectedClauseSymbol;
