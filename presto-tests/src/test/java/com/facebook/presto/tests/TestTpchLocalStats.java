@@ -19,6 +19,8 @@ import com.facebook.presto.tests.statistics.StatisticsAssertion;
 import com.facebook.presto.tpch.ColumnNaming;
 import com.facebook.presto.tpch.TpchConnectorFactory;
 import com.google.common.collect.ImmutableMap;
+import org.testng.annotations.AfterClass;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import static com.facebook.presto.SystemSessionProperties.PUSH_PARTIAL_AGGREGATION_THROUGH_JOIN;
@@ -33,10 +35,11 @@ import static com.google.common.collect.Range.closed;
 
 public class TestTpchLocalStats
 {
-    private final StatisticsAssertion statisticsAssertion;
+    private LocalQueryRunner queryRunner;
+    private StatisticsAssertion statisticsAssertion;
 
-    public TestTpchLocalStats()
-            throws Exception
+    @BeforeClass
+    public void setUp()
     {
         Session defaultSession = testSessionBuilder()
                 .setCatalog("tpch")
@@ -45,11 +48,21 @@ public class TestTpchLocalStats
                 .setSystemProperty(USE_NEW_STATS_CALCULATOR, "true")
                 .build();
 
-        LocalQueryRunner runner = new LocalQueryRunner(defaultSession);
-        runner.createCatalog("tpch", new TpchConnectorFactory(1),
+        queryRunner = new LocalQueryRunner(defaultSession);
+        queryRunner.createCatalog("tpch", new TpchConnectorFactory(1),
                 ImmutableMap.of("tpch.column-naming", ColumnNaming.STANDARD.name()
                 ));
-        statisticsAssertion = new StatisticsAssertion(runner);
+        statisticsAssertion = new StatisticsAssertion(queryRunner);
+    }
+
+    @AfterClass(alwaysRun = true)
+    public void tearDown()
+    {
+        statisticsAssertion = null;
+        if (queryRunner != null) {
+            queryRunner.close();
+            queryRunner = null;
+        }
     }
 
     @Test
