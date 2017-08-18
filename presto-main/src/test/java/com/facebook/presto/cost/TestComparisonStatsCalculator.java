@@ -34,7 +34,7 @@ import org.testng.annotations.Test;
 import java.util.Map;
 import java.util.function.Consumer;
 
-import static com.facebook.presto.spi.type.StandardTypes.DOUBLE;
+import static com.facebook.presto.spi.type.StandardTypes.BIGINT;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.EQUAL;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.GREATER_THAN;
 import static com.facebook.presto.sql.tree.ComparisonExpressionType.LESS_THAN;
@@ -685,14 +685,14 @@ public class TestComparisonStatsCalculator
     public void symbolToCastExpressionlNotEqual()
     {
         double rowCount = 807.3;
-        assertCalculate(new ComparisonExpression(NOT_EQUAL, new SymbolReference("u"), new Cast(new SymbolReference("w"), DOUBLE)))
+        assertCalculate(new ComparisonExpression(NOT_EQUAL, new SymbolReference("u"), new Cast(new SymbolReference("w"), BIGINT)))
                 .outputRowsCount(rowCount)
                 .symbolStats("u", equalTo(capNDV(zeroNullsFraction(uStats), rowCount)))
                 .symbolStats("w", equalTo(capNDV(wStats, rowCount)))
                 .symbolStats("z", equalTo(capNDV(zStats, rowCount)));
 
         rowCount = 897.0;
-        assertCalculate(new ComparisonExpression(NOT_EQUAL, new SymbolReference("u"), new Cast(new LongLiteral("10"), DOUBLE)))
+        assertCalculate(new ComparisonExpression(NOT_EQUAL, new SymbolReference("u"), new Cast(new LongLiteral("10"), BIGINT)))
                 .outputRowsCount(rowCount)
                 .symbolStats("u", equalTo(capNDV(adjustNDV(zeroNullsFraction(uStats), -1 /* value of 10 assumed to be filtered out */), rowCount)))
                 .symbolStats("z", equalTo(capNDV(zStats, rowCount)));
