@@ -21,6 +21,7 @@ import com.teradata.tempto.ProductTest;
 import com.teradata.tempto.Requirement;
 import com.teradata.tempto.RequirementsProvider;
 import com.teradata.tempto.Requires;
+import com.teradata.tempto.assertions.QueryAssert;
 import com.teradata.tempto.configuration.Configuration;
 import com.teradata.tempto.fulfillment.table.hive.tpch.ImmutableTpchTablesRequirements.ImmutableNationTable;
 import com.teradata.tempto.query.QueryResult;
@@ -51,7 +52,6 @@ import static com.teradata.tempto.fulfillment.table.MutableTablesState.mutableTa
 import static com.teradata.tempto.fulfillment.table.TableRequirements.immutableTable;
 import static com.teradata.tempto.fulfillment.table.TableRequirements.mutableTable;
 import static com.teradata.tempto.fulfillment.table.hive.tpch.TpchTableDefinitions.NATION;
-import static com.teradata.tempto.internal.convention.SqlResultDescriptor.sqlResultDescriptorForResource;
 import static com.teradata.tempto.query.QueryExecutor.defaultQueryExecutor;
 import static com.teradata.tempto.query.QueryExecutor.query;
 import static java.lang.Boolean.FALSE;
@@ -184,19 +184,103 @@ public class JdbcTests
     {
         // The JDBC spec is vague on what values getColumns() should return, so accept the values that Facebook or Simba return.
 
-        QueryResult result = QueryResult.forResultSet(metaData().getColumns("hive", schema, "nation", null));
+        String catalog = "hive";
+        String table = "nation";
+
+        QueryResult result = QueryResult.forResultSet(metaData().getColumns(catalog, schema, table, null));
+        /*
+        This is the list of columns in the result set. Retrieved from https://docs.oracle.com/javase/7/docs/api/java/sql/DatabaseMetaData.html
+            TABLE_CAT String => table catalog (may be null)
+            TABLE_SCHEM String => table schema (may be null)
+            TABLE_NAME String => table name
+            COLUMN_NAME String => column name
+            DATA_TYPE int => SQL type from java.sql.Types
+            TYPE_NAME String => Data source dependent type name, for a UDT the type name is fully qualified
+            COLUMN_SIZE int => column size.
+            BUFFER_LENGTH is not used.
+            DECIMAL_DIGITS int => the number of fractional digits. Null is returned for data types where DECIMAL_DIGITS is not applicable.
+            NUM_PREC_RADIX int => Radix (typically either 10 or 2)
+            NULLABLE int => is NULL allowed.
+                columnNoNulls - might not allow NULL values
+                columnNullable - definitely allows NULL values
+                columnNullableUnknown - nullability unknown
+            REMARKS String => comment describing column (may be null)
+            COLUMN_DEF String => default value for the column, which should be interpreted as a string when the value is enclosed in single quotes (may be null)
+            SQL_DATA_TYPE int => unused
+            SQL_DATETIME_SUB int => unused
+            CHAR_OCTET_LENGTH int => for char types the maximum number of bytes in the column
+            ORDINAL_POSITION int => index of column in table (starting at 1)
+            IS_NULLABLE String => ISO rules are used to determine the nullability for a column.
+                YES --- if the column can include NULLs
+                NO --- if the column cannot include NULLs
+                empty string --- if the nullability for the column is unknown
+            SCOPE_CATALOG String => catalog of table that is the scope of a reference attribute (null if DATA_TYPE isn't REF)
+            SCOPE_SCHEMA String => schema of table that is the scope of a reference attribute (null if the DATA_TYPE isn't REF)
+            SCOPE_TABLE String => table name that this the scope of a reference attribute (null if the DATA_TYPE isn't REF)
+            SOURCE_DATA_TYPE short => source type of a distinct type or user-generated Ref type, SQL type from java.sql.Types (null if DATA_TYPE isn't DISTINCT or user-generated REF)
+            IS_AUTOINCREMENT String => Indicates whether this column is auto incremented
+                YES --- if the column is auto incremented
+                NO --- if the column is not auto incremented
+                empty string --- if it cannot be determined whether the column is auto incremented
+            IS_GENERATEDCOLUMN String => Indicates whether this is a generated column
+                YES --- if this a generated column
+                NO --- if this not a generated column
+                empty string --- if it cannot be determined whether this is a generated column
+         */
+
+        int bigintBufferLength = 0;
+        int nameBufferLength = 0;
+        int commentBufferLength = 0;
+        String isNullable = "";
+        Integer bigintDecimalDigits = null;
+        int nullable = 2;
+        int varcharDataType = -16;
+        Integer varcharNumPrecRadix = null;
+        int nameCharOctetLength = 25;
+        int commentCharOctetLength = 152;
+
+        QueryAssert.Row nationkey = null;
+        QueryAssert.Row name = null;
+        QueryAssert.Row regionkey = null;
+        QueryAssert.Row comment = null;
+
         if (usingPrestoJdbcDriver(connection)) {
-            assertThat(result).matches(sqlResultDescriptorForResource("com/facebook/presto/tests/jdbc/get_nation_columns.result"));
-        }
-        else if (usingTeradataJdbc4Driver(connection)) {
-            assertThat(result).matches(sqlResultDescriptorForResource("com/facebook/presto/tests/jdbc/get_nation_columns_simba4.result"));
+            nationkey = row(catalog, schema, table, "n_nationkey", -5, "bigint", 19, bigintBufferLength, bigintDecimalDigits, 10, nullable, null, null, null, null, null, 1, isNullable, null, null, null, null, null, null);
+            name = row(catalog, schema, table, "n_name", varcharDataType, "varchar(25)", 25, nameBufferLength, null, varcharNumPrecRadix, nullable, null, null, null, null, nameCharOctetLength, 2, isNullable, null, null, null, null, null, null);
+            regionkey = row(catalog, schema, table, "n_regionkey", -5, "bigint", 19, bigintBufferLength, bigintDecimalDigits, 10, nullable, null, null, null, null, null, 3, isNullable, null, null, null, null, null, null);
+            comment = row(catalog, schema, table, "n_comment", varcharDataType, "varchar(152)", 152, commentBufferLength, null, varcharNumPrecRadix, nullable, null, null, null, null, commentCharOctetLength, 4, isNullable, null, null, null, null, null, null);
         }
         else if (usingTeradataJdbcDriver(connection)) {
-            assertThat(result).matches(sqlResultDescriptorForResource("com/facebook/presto/tests/jdbc/get_nation_columns_simba.result"));
+            bigintBufferLength = 8;
+            nameBufferLength = 25;
+            commentBufferLength = 152;
+            isNullable = "YES";
+            bigintDecimalDigits = Integer.valueOf(0);
+            nullable = 1;
+            varcharDataType = 12;
+            varcharNumPrecRadix = Integer.valueOf(10);
+            nameCharOctetLength = 2048;
+            commentCharOctetLength = 2048;
+
+            if (usingTeradataJdbc4Driver(connection)) {
+                // JDBC4 does not have the IS_GENERATEDCOLUMN column
+                nationkey = row(catalog, schema, table, "n_nationkey", -5, "bigint", 19, bigintBufferLength, bigintDecimalDigits, 10, nullable, null, null, null, null, null, 1, isNullable, null, null, null, null, null);
+                name = row(catalog, schema, table, "n_name", varcharDataType, "varchar(25)", 25, nameBufferLength, null, varcharNumPrecRadix, nullable, null, null, null, null, nameCharOctetLength, 2, isNullable, null, null, null, null, null);
+                regionkey = row(catalog, schema, table, "n_regionkey", -5, "bigint", 19, bigintBufferLength, bigintDecimalDigits, 10, nullable, null, null, null, null, null, 3, isNullable, null, null, null, null, null);
+                comment = row(catalog, schema, table, "n_comment", varcharDataType, "varchar(152)", 152, commentBufferLength, null, varcharNumPrecRadix, nullable, null, null, null, null, commentCharOctetLength, 4, isNullable, null, null, null, null, null);
+            }
+            else {
+                nationkey = row(catalog, schema, table, "n_nationkey", -5, "bigint", 19, bigintBufferLength, bigintDecimalDigits, 10, nullable, null, null, null, null, null, 1, isNullable, null, null, null, null, null, null);
+                name = row(catalog, schema, table, "n_name", varcharDataType, "varchar(25)", 25, nameBufferLength, null, varcharNumPrecRadix, nullable, null, null, null, null, nameCharOctetLength, 2, isNullable, null, null, null, null, null, null);
+                regionkey = row(catalog, schema, table, "n_regionkey", -5, "bigint", 19, bigintBufferLength, bigintDecimalDigits, 10, nullable, null, null, null, null, null, 3, isNullable, null, null, null, null, null, null);
+                comment = row(catalog, schema, table, "n_comment", varcharDataType, "varchar(152)", 152, commentBufferLength, null, varcharNumPrecRadix, nullable, null, null, null, null, commentCharOctetLength, 4, isNullable, null, null, null, null, null, null);
+            }
         }
         else {
             throw new IllegalStateException();
         }
+
+        assertThat(result).containsOnly(nationkey, name, regionkey, comment);
     }
 
     @Test(groups = JDBC)
