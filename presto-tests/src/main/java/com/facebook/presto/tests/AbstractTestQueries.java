@@ -62,6 +62,7 @@ import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.BooleanType.BOOLEAN;
 import static com.facebook.presto.spi.type.DateType.DATE;
 import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
+import static com.facebook.presto.spi.type.IntegerType.INTEGER;
 import static com.facebook.presto.spi.type.TimeType.TIME;
 import static com.facebook.presto.spi.type.TimeWithTimeZoneType.TIME_WITH_TIME_ZONE;
 import static com.facebook.presto.spi.type.TimestampType.TIMESTAMP;
@@ -4075,6 +4076,21 @@ public abstract class AbstractTestQueries
                 .row(5.0, 0.0)
                 .row(5.0, 0.0)
                 .row(5.0, 0.0)
+                .build();
+
+        assertEquals(actual, expected);
+    }
+
+    @Test
+    public void testWindowsOrderingOnTheSameSymbolTwice()
+            throws Exception
+    {
+        MaterializedResult actual = computeActual("SELECT x, row_number() OVER(ORDER BY x ASC, x DESC) FROM (VALUES (INTEGER '1'), (INTEGER '2'), (INTEGER '3')) t(x)");
+
+        MaterializedResult expected = resultBuilder(getSession(), INTEGER, BIGINT)
+                .row(1, 1L)
+                .row(2, 2L)
+                .row(3, 3L)
                 .build();
 
         assertEquals(actual, expected);
