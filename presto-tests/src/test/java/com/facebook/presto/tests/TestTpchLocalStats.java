@@ -155,24 +155,7 @@ public class TestTpchLocalStats
     @Test
     public void testRightJoinStats()
     {
-        // simple equi join
-        statisticsAssertion.check("SELECT * FROM nation right join supplier on s_nationkey = n_nationkey",
-                checks -> checks
-                        .estimate(OUTPUT_ROW_COUNT, relativeError(0.70))
-                        .verifyColumnStatistics("s_nationkey", absoluteError(0.40))
-                        .verifyColumnStatistics("n_nationkey", absoluteError(0.40))
-                        .verifyColumnStatistics("s_suppkey", absoluteError(0.40)));
-        statisticsAssertion.check("SELECT * FROM nation right join supplier on s_nationkey = n_nationkey AND n_nationkey <= 12",
-                checks -> checks
-                        .estimate(OUTPUT_ROW_COUNT, relativeError(0.70))
-                        .verifyColumnStatistics("s_nationkey", absoluteError(0.40))
-                        .verifyColumnStatistics("n_nationkey", relativeError(0.40))
-                        .verifyColumnStatistics("s_suppkey", absoluteError(0.40)));
-        statisticsAssertion.check("SELECT * FROM nation right JOIN (SELECT * FROM supplier WHERE s_nationkey <= 12) on s_nationkey = n_nationkey",
-                checks -> checks
-                        .estimate(OUTPUT_ROW_COUNT, relativeError(0.70))
-                        .verifyColumnStatistics("s_nationkey", absoluteError(2.0))
-                        .verifyColumnStatistics("n_nationkey", absoluteError(2.0)));
+        throw new RuntimeException("do something loud");
     }
 
     @Test
