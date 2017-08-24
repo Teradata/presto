@@ -15,6 +15,8 @@ package com.facebook.presto.operator;
 
 import com.facebook.presto.ExceededMemoryLimitException;
 import com.facebook.presto.RowPagesBuilder;
+import com.facebook.presto.execution.TaskId;
+import com.facebook.presto.execution.TaskStateMachine;
 import com.facebook.presto.memory.LocalMemoryContext;
 import com.facebook.presto.operator.HashBuilderOperator.HashBuilderOperatorFactory;
 import com.facebook.presto.operator.ValuesOperator.ValuesOperatorFactory;
@@ -22,7 +24,10 @@ import com.facebook.presto.operator.exchange.LocalExchange;
 import com.facebook.presto.operator.exchange.LocalExchange.LocalExchangeSinkFactory;
 import com.facebook.presto.operator.exchange.LocalExchangeSinkOperator.LocalExchangeSinkOperatorFactory;
 import com.facebook.presto.operator.exchange.LocalExchangeSourceOperator.LocalExchangeSourceOperatorFactory;
+import com.facebook.presto.operator.index.PageBuffer;
+import com.facebook.presto.operator.index.PageBufferOperator.PageBufferOperatorFactory;
 import com.facebook.presto.spi.Page;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.block.Block;
 import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.spiller.GenericPartitioningSpillerFactory;
@@ -48,6 +53,7 @@ import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -63,9 +69,8 @@ import static com.facebook.presto.RowPagesBuilder.rowPagesBuilder;
 import static com.facebook.presto.SessionTestUtils.TEST_SESSION;
 import static com.facebook.presto.operator.OperatorAssertion.assertOperatorEquals;
 import static com.facebook.presto.operator.OperatorAssertion.dropChannel;
-import static com.facebook.presto.operator.OperatorAssertion.toPages;
-import static com.facebook.presto.operator.OperatorAssertion.toPagesPartial;
 import static com.facebook.presto.operator.OperatorAssertion.without;
+import static com.facebook.presto.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static com.facebook.presto.spi.type.BigintType.BIGINT;
 import static com.facebook.presto.spi.type.VarcharType.VARCHAR;
 import static com.facebook.presto.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
@@ -73,8 +78,8 @@ import static com.facebook.presto.testing.assertions.Assert.assertEquals;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.collect.Iterators.singletonIterator;
 import static com.google.common.collect.Iterators.unmodifiableIterator;
+import static com.google.common.util.concurrent.Futures.immediateFailedFuture;
 import static com.google.common.util.concurrent.Futures.immediateFuture;
 import static io.airlift.concurrent.MoreFutures.getFutureValue;
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
@@ -87,16 +92,18 @@ import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toList;
 import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 
 @Test(singleThreaded = true)
 public class TestHashJoinOperator
 {
     private static final int PARTITION_COUNT = 4;
     private static final LookupJoinOperators LOOKUP_JOIN_OPERATORS = new LookupJoinOperators(new JoinProbeCompiler());
-    private static final DummySpillerFactory SINGLE_STREAM_SPILLER_FACTORY = new DummySpillerFactory();
+    private static final SingleStreamSpillerFactory SINGLE_STREAM_SPILLER_FACTORY = new DummySpillerFactory();
     private static final PartitioningSpillerFactory PARTITIONING_SPILLER_FACTORY = new GenericPartitioningSpillerFactory(SINGLE_STREAM_SPILLER_FACTORY);
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
@@ -231,9 +238,55 @@ public class TestHashJoinOperator
 
     @Test(dataProvider = "testInnerJoinWithSpillDataProvider")
     public void testInnerJoinWithSpill(boolean probeHashEnabled, List<WhenSpill> whenSpill)
-            throws Exception
+            throws Throwable
     {
-        TaskContext taskContext = createTaskContext();
+        innerJoinWithSpill(probeHashEnabled, whenSpill, SINGLE_STREAM_SPILLER_FACTORY, PARTITIONING_SPILLER_FACTORY);
+    }
+
+    @Test(dataProvider = "testInnerJoinWithFailingSpillDataProvider")
+    public void testInnerJoinWithFailingSpill(boolean probeHashEnabled, List<WhenSpill> whenSpill, WhenSpillFails whenSpillFails)
+            throws Throwable
+    {
+        DummySpillerFactory buildSpillerFactory = new DummySpillerFactory();
+        DummySpillerFactory joinSpillerFactory = new DummySpillerFactory();
+        PartitioningSpillerFactory partitioningSpillerFactory = new GenericPartitioningSpillerFactory(joinSpillerFactory);
+
+        switch (whenSpillFails) {
+            case SPILL_HBO:
+                buildSpillerFactory.failSpill();
+                break;
+            case SPILL_LJO:
+                joinSpillerFactory.failSpill();
+                break;
+            case UNSPILL_HBO:
+                buildSpillerFactory.failUnspill();
+                break;
+            case UNSPILL_LJO:
+                joinSpillerFactory.failUnspill();
+        }
+        try {
+            innerJoinWithSpill(probeHashEnabled, whenSpill, buildSpillerFactory, partitioningSpillerFactory);
+            fail("Exception not thrown");
+        }
+        catch (PrestoException exception) {
+            String expectedMessage;
+            switch (whenSpillFails) {
+                case SPILL_HBO:
+                case SPILL_LJO:
+                    expectedMessage = "Spill failed";
+                    break;
+                default:
+                    expectedMessage = "Unspill failed";
+            }
+            assertEquals(exception.getMessage(), expectedMessage);
+        }
+    }
+
+    private void innerJoinWithSpill(boolean probeHashEnabled, List<WhenSpill> whenSpill, SingleStreamSpillerFactory buildSpillerFactory, PartitioningSpillerFactory joinSpillerFactory)
+            throws Throwable
+    {
+        TaskStateMachine taskStateMachine = new TaskStateMachine(new TaskId("query", 0, 0), executor);
+        TaskContext taskContext = TestingTaskContext.createTaskContext(executor, scheduledExecutor, TEST_SESSION, taskStateMachine);
 
         // build
         RowPagesBuilder buildPages = rowPagesBuilder(ImmutableList.of(VARCHAR, BIGINT))
@@ -241,7 +294,7 @@ public class TestHashJoinOperator
                 .addSequencePage(4, 30, 300)
                 .addSequencePage(4, 40, 400);
 
-        BuildSideSetup buildSideSetup = setupBuildSide(true, taskContext, Ints.asList(0), buildPages, Optional.empty(), true);
+        BuildSideSetup buildSideSetup = setupBuildSide(true, taskContext, Ints.asList(0), buildPages, Optional.empty(), true, buildSpillerFactory);
         List<Driver> buildDrivers = buildSideSetup.buildDrivers;
         int buildOperatorCount = buildDrivers.size();
         checkState(buildOperatorCount == whenSpill.size());
@@ -252,7 +305,7 @@ public class TestHashJoinOperator
                 .addSequencePage(30, 0, 123_000)
                 .addSequencePage(10, 30, 123_000);
 
-        try (OperatorFactory joinOperatorFactory = innerJoinOperatorFactory(lookupSourceFactory, probePages, PARTITIONING_SPILLER_FACTORY);
+        try (OperatorFactory joinOperatorFactory = innerJoinOperatorFactory(lookupSourceFactory, probePages, joinSpillerFactory);
                 Operator joinOperator = joinOperatorFactory.createOperator(taskContext.addPipelineContext(0, true, true).addDriverContext())) {
             // build LookupSource
 
@@ -260,6 +313,7 @@ public class TestHashJoinOperator
             List<Boolean> revoked = new ArrayList<>(nCopies(buildOperatorCount, false));
             while (!lookupSourceProvider.isDone()) {
                 for (int i = 0; i < buildOperatorCount; i++) {
+                    checkErrors(taskStateMachine);
                     buildDrivers.get(i).process();
                     Operator buildOperator = buildSideSetup.buildOperators.get(i);
                     if (whenSpill.get(i) == WhenSpill.DURING_BUILD && buildOperator.getOperatorContext().getReservedRevocableBytes() > 0) {
@@ -283,18 +337,38 @@ public class TestHashJoinOperator
             }
 
             // process join
-            Iterator<Page> input = probePages.build().iterator();
             List<Page> actualPages = new ArrayList<>();
-            actualPages.addAll(toPagesPartial(joinOperator, singletonIterator(input.next())));
+
+            DriverContext ljoDriverContext = buildDrivers.get(0).getDriverContext().getPipelineContext().addDriverContext();
+
+            ValuesOperatorFactory valuesOperatorFactory = new ValuesOperatorFactory(17, new PlanNodeId("values"), probePages.getTypes(), probePages.build());
+
+            PageBuffer pageBuffer = new PageBuffer(10);
+            PageBufferOperatorFactory pageBufferOperatorFactory = new PageBufferOperatorFactory(18, new PlanNodeId("pageBuffer"), pageBuffer);
+
+            Driver ljoDriver = new Driver(ljoDriverContext,
+                                          valuesOperatorFactory.createOperator(ljoDriverContext),
+                                          joinOperator,
+                                          pageBufferOperatorFactory.createOperator(ljoDriverContext));
 
             for (int i = 0; i < buildOperatorCount; i++) {
                 if (whenSpill.get(i) == WhenSpill.DURING_USAGE) {
-                    checkState(input.hasNext(), "spill requested DURING_USAGE, but input is kind of exhausted");
-                    triggerMemoryRevokingAndWait(buildSideSetup.buildOperators.get(i));
+                    buildSideSetup.buildOperators.get(i).getOperatorContext().requestMemoryRevoking();
+//                    triggerMemoryRevokingAndWait(buildSideSetup.buildOperators.get(i), taskStateMachine);
                 }
             }
+            runDriver(executor, ljoDriver);
 
-            actualPages.addAll(toPages(joinOperator, input));
+            while (!ljoDriver.isFinished()) {
+                Thread.sleep(100);
+            }
+            checkErrors(taskStateMachine);
+
+            Page page = pageBuffer.poll();
+            while (page != null) {
+                actualPages.add(page);
+                page = pageBuffer.poll();
+            }
 
             // expected
             MaterializedResult expected = MaterializedResult.resultBuilder(taskContext.getSession(), concat(probePages.getTypesWithoutHash(), buildPages.getTypesWithoutHash()))
@@ -320,31 +394,57 @@ public class TestHashJoinOperator
         }
     }
 
+    private static void checkErrors(final TaskStateMachine taskStateMachine)
+            throws Throwable
+    {
+        if (taskStateMachine.getFailureCauses().size() > 0) {
+            throw taskStateMachine.getFailureCauses().peek();
+        }
+    }
+
     private enum WhenSpill
     {
         DURING_BUILD, AFTER_BUILD, DURING_USAGE, NEVER
     }
 
+    private enum WhenSpillFails
+    {
+        NEVER, SPILL_HBO, SPILL_LJO, UNSPILL_HBO, UNSPILL_LJO
+    }
+
     @DataProvider
     public Object[][] testInnerJoinWithSpillDataProvider()
     {
-        List<Object[]> result = new ArrayList<>();
+        return joinWithSpillParameters(true).stream().map(List::toArray).toArray(Object[][]::new);
+    }
+
+    private static List<List<Object>> joinWithSpillParameters(boolean allowNoSpill)
+    {
+        List<List<Object>> result = new ArrayList<>();
         for (boolean probeHashEnabled : ImmutableList.of(false, true)) {
             for (WhenSpill whenSpill : WhenSpill.values()) {
                 // spill all
-                result.add(new Object[] {probeHashEnabled, nCopies(PARTITION_COUNT, whenSpill)});
+                if (!(!allowNoSpill && whenSpill == WhenSpill.NEVER)) {
+                    result.add(ImmutableList.of(probeHashEnabled, nCopies(PARTITION_COUNT, whenSpill)));
+                }
 
                 if (whenSpill != WhenSpill.NEVER) {
                     // spill one
-                    result.add(new Object[] {probeHashEnabled, concat(singletonList(whenSpill), nCopies(PARTITION_COUNT - 1, WhenSpill.NEVER))});
+                    result.add(ImmutableList.of(probeHashEnabled, concat(singletonList(whenSpill), nCopies(PARTITION_COUNT - 1, WhenSpill.NEVER))));
                 }
             }
 
-            result.add(new Object[] {probeHashEnabled, concat(asList(WhenSpill.DURING_BUILD, WhenSpill.AFTER_BUILD), nCopies(PARTITION_COUNT - 2, WhenSpill.NEVER))});
-            result.add(new Object[] {probeHashEnabled, concat(asList(WhenSpill.DURING_BUILD, WhenSpill.DURING_USAGE), nCopies(PARTITION_COUNT - 2, WhenSpill.NEVER))});
+            result.add(ImmutableList.of(probeHashEnabled, concat(asList(WhenSpill.DURING_BUILD, WhenSpill.AFTER_BUILD), nCopies(PARTITION_COUNT - 2, WhenSpill.NEVER))));
+            result.add(ImmutableList.of(probeHashEnabled, concat(asList(WhenSpill.DURING_BUILD, WhenSpill.DURING_USAGE), nCopies(PARTITION_COUNT - 2, WhenSpill.NEVER))));
         }
+        return result;
+    }
 
-        return result.stream().toArray(Object[][]::new);
+    @DataProvider
+    public Object[][] testInnerJoinWithFailingSpillDataProvider()
+    {
+        List<List<Object>> spillFailValues = Arrays.stream(WhenSpillFails.values()).filter(x -> !WhenSpillFails.NEVER.equals(x)).map(ImmutableList::<Object>of).collect(toList());
+        return product(joinWithSpillParameters(false), spillFailValues).stream().map(List::toArray).toArray(Object[][]::new);
     }
 
     private static void revokeMemory(Operator operator)
@@ -353,19 +453,20 @@ public class TestHashJoinOperator
         operator.finishMemoryRevoke();
     }
 
-    private static void triggerMemoryRevokingAndWait(Operator operator)
-            throws InterruptedException
-    {
-        // When there is background thread running Driver, we must delegate memory revoking to that thread
-        operator.getOperatorContext().requestMemoryRevoking();
-        while (operator.getOperatorContext().isMemoryRevokingRequested()) {
-            Thread.sleep(10);
-        }
-    }
-
     private static <T> List<T> concat(List<T> initialElements, List<T> moreElements)
     {
         return ImmutableList.copyOf(Iterables.concat(initialElements, moreElements));
+    }
+
+    private static <T> List<List<T>> product(List<List<T>> left, List<List<T>> right)
+    {
+        List<List<T>> result = new ArrayList<>();
+        for (List<T> l : left) {
+            for (List<T> r : right) {
+                result.add(concat(l, r));
+            }
+        }
+        return result;
     }
 
     @Test(dataProvider = "hashEnabledValues")
@@ -874,7 +975,8 @@ public class TestHashJoinOperator
             List<Integer> hashChannels,
             RowPagesBuilder buildPages,
             Optional<InternalJoinFilterFunction> filterFunction,
-            boolean spillEnabled)
+            boolean spillEnabled,
+            SingleStreamSpillerFactory singleStreamSpillerFactory)
     {
         Optional<JoinFilterFunctionFactory> filterFunctionFactory = filterFunction
                 .map(function -> (session, addresses, channels) -> new StandardJoinFilterFunction(function, addresses, channels, Optional.empty()));
@@ -914,7 +1016,7 @@ public class TestHashJoinOperator
                 partitionCount,
                 new PagesIndex.TestingFactory(),
                 spillEnabled,
-                SINGLE_STREAM_SPILLER_FACTORY);
+                singleStreamSpillerFactory);
         PipelineContext buildPipeline = taskContext.addPipelineContext(1, true, true);
 
         List<Driver> buildDrivers = new ArrayList<>();
@@ -940,7 +1042,7 @@ public class TestHashJoinOperator
             RowPagesBuilder buildPages,
             Optional<InternalJoinFilterFunction> filterFunction)
     {
-        BuildSideSetup buildSideSetup = setupBuildSide(parallelBuild, taskContext, hashChannels, buildPages, filterFunction, false);
+        BuildSideSetup buildSideSetup = setupBuildSide(parallelBuild, taskContext, hashChannels, buildPages, filterFunction, false, SINGLE_STREAM_SPILLER_FACTORY);
         buildLookupSource(buildSideSetup);
         return buildSideSetup.lookupSourceFactory;
     }
@@ -971,7 +1073,13 @@ public class TestHashJoinOperator
     {
         executor.execute(() -> {
             if (!driver.isFinished()) {
-                driver.process();
+                try {
+                    driver.process();
+                }
+                catch (PrestoException e) {
+                    driver.getDriverContext().failed(e);
+                    throw e;
+                }
                 runDriver(executor, driver);
             }
         });
@@ -1024,6 +1132,19 @@ public class TestHashJoinOperator
     private static class DummySpillerFactory
             implements SingleStreamSpillerFactory
     {
+        private volatile boolean failSpill = false;
+        private volatile boolean failUnspill = false;
+
+        public void failSpill()
+        {
+            failSpill = true;
+        }
+
+        public void failUnspill()
+        {
+            failUnspill = true;
+        }
+
         @Override
         public SingleStreamSpiller create(List<Type> types, SpillContext spillContext, LocalMemoryContext memoryContext)
         {
@@ -1036,6 +1157,9 @@ public class TestHashJoinOperator
                 public ListenableFuture<?> spill(Iterator<Page> pageIterator)
                 {
                     checkState(writing, "writing already finished");
+                    if (failSpill) {
+                        return immediateFailedFuture(new PrestoException(GENERIC_INTERNAL_ERROR, "Spill failed"));
+                    }
                     Iterators.addAll(spills, pageIterator);
                     return immediateFuture(null);
                 }
@@ -1043,6 +1167,9 @@ public class TestHashJoinOperator
                 @Override
                 public Iterator<Page> getSpilledPages()
                 {
+                    if (failUnspill) {
+                        throw new PrestoException(GENERIC_INTERNAL_ERROR, "Unspill failed");
+                    }
                     writing = false;
                     return unmodifiableIterator(spills.iterator());
                 }
@@ -1058,6 +1185,9 @@ public class TestHashJoinOperator
                 @Override
                 public ListenableFuture<List<Page>> getAllSpilledPages()
                 {
+                    if (failUnspill) {
+                        return immediateFailedFuture(new PrestoException(GENERIC_INTERNAL_ERROR, "Unspill failed"));
+                    }
                     writing = false;
                     return immediateFuture(ImmutableList.copyOf(spills));
                 }
