@@ -46,10 +46,25 @@ public final class TestingTaskContext
                 .build();
     }
 
+    public static TaskContext createTaskContext(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session, TaskStateMachine taskStateMachine)
+    {
+        return builder(notificationExecutor, yieldExecutor, session, taskStateMachine)
+                .build();
+    }
+
     public static TaskContext createTaskContext(QueryContext queryContext, Executor executor, Session session)
     {
         return queryContext.addTaskContext(
                 new TaskStateMachine(new TaskId("query", 0, 0), executor),
+                session,
+                true,
+                true);
+    }
+
+    private static TaskContext createTaskContext(QueryContext queryContext, Session session, TaskStateMachine taskStateMachine)
+    {
+        return queryContext.addTaskContext(
+                taskStateMachine,
                 session,
                 true,
                 true);
@@ -60,11 +75,17 @@ public final class TestingTaskContext
         return new Builder(notificationExecutor, yieldExecutor, session);
     }
 
+    public static Builder builder(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session, TaskStateMachine taskStateMachine)
+    {
+        return new Builder(notificationExecutor, yieldExecutor, session, taskStateMachine);
+    }
+
     public static class Builder
     {
         private final Executor notificationExecutor;
         private final ScheduledExecutorService yieldExecutor;
         private final Session session;
+        private TaskStateMachine taskStateMachine;
         private DataSize queryMaxMemory = new DataSize(256, MEGABYTE);
         private DataSize memoryPoolSize = new DataSize(1, GIGABYTE);
         private DataSize systemMemoryPoolSize = new DataSize(1, GIGABYTE);
@@ -76,6 +97,14 @@ public final class TestingTaskContext
             this.notificationExecutor = notificationExecutor;
             this.yieldExecutor = yieldExecutor;
             this.session = session;
+        }
+
+        public Builder(Executor notificationExecutor, ScheduledExecutorService yieldExecutor, Session session, TaskStateMachine taskStateMachine)
+        {
+            this.notificationExecutor = notificationExecutor;
+            this.yieldExecutor = yieldExecutor;
+            this.session = session;
+            this.taskStateMachine = taskStateMachine;
         }
 
         public Builder setQueryMaxMemory(DataSize queryMaxMemory)
@@ -123,7 +152,12 @@ public final class TestingTaskContext
                     queryMaxSpillSize,
                     spillSpaceTracker);
 
-            return createTaskContext(queryContext, notificationExecutor, session);
+            if (taskStateMachine == null) {
+                return createTaskContext(queryContext, notificationExecutor, session);
+            }
+            else {
+                return createTaskContext(queryContext, session, taskStateMachine);
+            }
         }
     }
 }
