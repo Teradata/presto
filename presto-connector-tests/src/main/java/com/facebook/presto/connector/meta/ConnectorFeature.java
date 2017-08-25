@@ -25,5 +25,6 @@ public enum ConnectorFeature
     DROP_TABLE,
     RENAME_TABLE,
     ADD_COLUMN,
-    RENAME_COLUMN;
+    RENAME_COLUMN,
+    RECORD_SET_PROVIDER;
 }

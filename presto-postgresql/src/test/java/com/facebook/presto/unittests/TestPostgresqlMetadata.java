@@ -17,6 +17,7 @@ import com.facebook.presto.connector.meta.SupportedFeatures;
 import com.facebook.presto.connector.unittest.BaseMetadataTest;
 import com.facebook.presto.connector.unittest.MetadataSchemaTest;
 import com.facebook.presto.connector.unittest.MetadataTableTest;
+import com.facebook.presto.connector.unittest.RecordSetDataTest;
 import com.facebook.presto.plugin.postgresql.PostgreSqlPlugin;
 import com.facebook.presto.spi.ConnectorSession;
 import com.facebook.presto.spi.SchemaTableName;
@@ -37,14 +38,16 @@ import java.util.concurrent.Callable;
 
 import static com.facebook.presto.connector.meta.ConnectorFeature.CREATE_TABLE_AS;
 import static com.facebook.presto.connector.meta.ConnectorFeature.DROP_TABLE;
+import static com.facebook.presto.connector.meta.ConnectorFeature.RECORD_SET_PROVIDER;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
 
 @SupportedFeatures({
         CREATE_TABLE_AS,
-        DROP_TABLE})
+        DROP_TABLE,
+        RECORD_SET_PROVIDER})
 public class TestPostgresqlMetadata
-        implements BaseMetadataTest, MetadataTableTest, MetadataSchemaTest
+        implements BaseMetadataTest, MetadataTableTest, MetadataSchemaTest, RecordSetDataTest
 {
     private static final String PUBLIC = "public";
     private TestingPostgreSqlServer server;
