@@ -101,7 +101,7 @@ public class CoefficientBasedStatsCalculator
         protected PlanNodeStatsEstimate visitPlan(PlanNode node, Void context)
         {
             // TODO: Explicitly visit GroupReference and throw an IllegalArgumentException
-            // this can only be done once we get rid of the StatelessLookup
+            // this can only be done once we get rid of the StatsAndCostCalculators
             return UNKNOWN_STATS;
         }
 

@@ -137,8 +137,7 @@ import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.PlanOptimizers;
 import com.facebook.presto.sql.planner.SubPlan;
 import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.iterative.Lookup;
-import com.facebook.presto.sql.planner.iterative.StatelessLookup;
+import com.facebook.presto.sql.planner.iterative.StatsAndCostCalculators;
 import com.facebook.presto.sql.planner.optimizations.HashGenerationOptimizer;
 import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.facebook.presto.sql.planner.plan.PlanNode;
@@ -242,7 +241,7 @@ public class LocalQueryRunner
     private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
     private final CostCalculator estimatedExchangesCostCalculator;
-    private final StatelessLookup statelessLookup;
+    private final StatsAndCostCalculators statsAndCostCalculators;
     private final SingleStreamSpillerFactory singleStreamSpillerFactory;
     private final PartitioningSpillerFactory partitioningSpillerFactory;
 
@@ -412,7 +411,7 @@ public class LocalQueryRunner
                 ServerMainModule.createNewStatsCalculator(metadata, new FilterStatsCalculator(metadata), new ScalarStatsCalculator(metadata)));
         this.costCalculator = new CostCalculatorUsingExchanges(this::getNodeCount);
         this.estimatedExchangesCostCalculator = new CostCalculatorWithEstimatedExchanges(costCalculator, () -> nodeCountForStats);
-        this.statelessLookup = new StatelessLookup(statsCalculator, costCalculator);
+        this.statsAndCostCalculators = new StatsAndCostCalculators(statsCalculator, costCalculator);
         this.singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(blockEncodingSerde, spillerStats, featuresConfig);
         this.partitioningSpillerFactory = new GenericPartitioningSpillerFactory(this.singleStreamSpillerFactory);
         this.spillerFactory = new GenericSpillerFactory(singleStreamSpillerFactory);
@@ -462,9 +461,9 @@ public class LocalQueryRunner
     }
 
     @Override
-    public StatelessLookup getStatelessLookup()
+    public StatsAndCostCalculators getStatsAndCostCalculators()
     {
-        return statelessLookup;
+        return statsAndCostCalculators;
     }
 
     public StatsCalculator getStatsCalculator()
@@ -648,7 +647,7 @@ public class LocalQueryRunner
         Plan plan = createPlan(session, sql);
 
         if (printPlan) {
-            System.out.println(PlanPrinter.textLogicalPlan(plan.getRoot(), plan.getTypes(), metadata, statelessLookup.createCachingNonResolvingLookup(), session));
+            System.out.println(PlanPrinter.textLogicalPlan(plan.getRoot(), plan.getTypes(), metadata, statsAndCostCalculators.createCachingNonResolvingLookup(), session));
         }
 
         SubPlan subplan = PlanFragmenter.createSubPlans(session, metadata, plan);
@@ -807,11 +806,11 @@ public class LocalQueryRunner
                 metadata,
                 accessControl,
                 sqlParser,
-                statelessLookup,
+                statsAndCostCalculators,
                 dataDefinitionTask);
         Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(queryExplainer), parameters);
 
-        LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, idAllocator, metadata, sqlParser, statelessLookup);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, idAllocator, metadata, sqlParser, statsAndCostCalculators);
 
         Analysis analysis = analyzer.analyze(statement);
         return logicalPlanner.plan(analysis, stage);

@@ -18,7 +18,7 @@ import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.metadata.QualifiedObjectName;
 import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.sql.planner.iterative.Lookup;
-import com.facebook.presto.sql.planner.iterative.StatelessLookup;
+import com.facebook.presto.sql.planner.iterative.StatsAndCostCalculators;
 import com.facebook.presto.transaction.TransactionManager;
 import org.intellij.lang.annotations.Language;
 
@@ -46,10 +46,10 @@ public interface QueryRunner
      */
     default Lookup getLookup()
     {
-        return getStatelessLookup().createCachingNonResolvingLookup();
+        return getStatsAndCostCalculators().createCachingNonResolvingLookup();
     }
 
-    StatelessLookup getStatelessLookup();
+    StatsAndCostCalculators getStatsAndCostCalculators();
 
     TestingAccessControlManager getAccessControl();
 

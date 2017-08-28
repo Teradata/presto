@@ -36,7 +36,7 @@ import com.facebook.presto.spi.Node;
 import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.split.SplitManager;
 import com.facebook.presto.sql.parser.SqlParserOptions;
-import com.facebook.presto.sql.planner.iterative.StatelessLookup;
+import com.facebook.presto.sql.planner.iterative.StatsAndCostCalculators;
 import com.facebook.presto.testing.ProcedureTester;
 import com.facebook.presto.testing.TestingAccessControlManager;
 import com.facebook.presto.testing.TestingEventListenerManager;
@@ -101,7 +101,7 @@ public class TestingPrestoServer
     private final CatalogManager catalogManager;
     private final TransactionManager transactionManager;
     private final Metadata metadata;
-    private final StatelessLookup statelessLookup;
+    private final StatsAndCostCalculators statsAndCostCalculators;
     private final TestingAccessControlManager accessControl;
     private final ProcedureTester procedureTester;
     private final Optional<InternalResourceGroupManager> resourceGroupManager;
@@ -252,7 +252,7 @@ public class TestingPrestoServer
         catalogManager = injector.getInstance(CatalogManager.class);
         transactionManager = injector.getInstance(TransactionManager.class);
         metadata = injector.getInstance(Metadata.class);
-        statelessLookup = injector.getInstance(StatelessLookup.class);
+        statsAndCostCalculators = injector.getInstance(StatsAndCostCalculators.class);
         accessControl = injector.getInstance(TestingAccessControlManager.class);
         procedureTester = injector.getInstance(ProcedureTester.class);
         splitManager = injector.getInstance(SplitManager.class);
@@ -350,9 +350,9 @@ public class TestingPrestoServer
         return metadata;
     }
 
-    public StatelessLookup getLookup()
+    public StatsAndCostCalculators getStatsAndCostCalculators()
     {
-        return statelessLookup;
+        return statsAndCostCalculators;
     }
 
     public TestingAccessControlManager getAccessControl()

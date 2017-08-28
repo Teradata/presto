@@ -144,7 +144,7 @@ import com.facebook.presto.sql.planner.CompilerConfig;
 import com.facebook.presto.sql.planner.LocalExecutionPlanner;
 import com.facebook.presto.sql.planner.NodePartitioningManager;
 import com.facebook.presto.sql.planner.PlanOptimizers;
-import com.facebook.presto.sql.planner.iterative.StatelessLookup;
+import com.facebook.presto.sql.planner.iterative.StatsAndCostCalculators;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.transaction.ForTransactionManager;
@@ -427,7 +427,7 @@ public class ServerMainModule
         binder.bind(CostCalculator.class)
                 .annotatedWith(EstimatedExchanges.class)
                 .to(CostCalculatorWithEstimatedExchanges.class).in(Scopes.SINGLETON);
-        binder.bind(StatelessLookup.class).in(Scopes.SINGLETON);
+        binder.bind(StatsAndCostCalculators.class).in(Scopes.SINGLETON);
         binder.bind(StatsCalculator.class).annotatedWith(SelectingStatsCalculator.Old.class).to(CoefficientBasedStatsCalculator.class).in(Scopes.SINGLETON);
         binder.bind(StatsCalculator.class).to(SelectingStatsCalculator.class).in(Scopes.SINGLETON);
         binder.bind(FilterStatsCalculator.class).in(Scopes.SINGLETON);

@@ -30,7 +30,7 @@ import com.facebook.presto.sql.analyzer.RelationId;
 import com.facebook.presto.sql.analyzer.RelationType;
 import com.facebook.presto.sql.analyzer.Scope;
 import com.facebook.presto.sql.parser.SqlParser;
-import com.facebook.presto.sql.planner.iterative.StatelessLookup;
+import com.facebook.presto.sql.planner.iterative.StatsAndCostCalculators;
 import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.facebook.presto.sql.planner.plan.Assignments;
 import com.facebook.presto.sql.planner.plan.DeleteNode;
@@ -90,14 +90,14 @@ public class LogicalPlanner
     private final SymbolAllocator symbolAllocator = new SymbolAllocator();
     private final Metadata metadata;
     private final SqlParser sqlParser;
-    private final StatelessLookup statelessLookup;
+    private final StatsAndCostCalculators statsAndCostCalculators;
 
     public LogicalPlanner(Session session,
             List<PlanOptimizer> planOptimizers,
             PlanNodeIdAllocator idAllocator,
             Metadata metadata,
             SqlParser sqlParser,
-            StatelessLookup statelessLookup)
+            StatsAndCostCalculators statsAndCostCalculators)
     {
         requireNonNull(session, "session is null");
         requireNonNull(planOptimizers, "planOptimizers is null");
@@ -110,7 +110,7 @@ public class LogicalPlanner
         this.idAllocator = idAllocator;
         this.metadata = metadata;
         this.sqlParser = sqlParser;
-        this.statelessLookup = requireNonNull(statelessLookup, "statelessLookup is null");
+        this.statsAndCostCalculators = requireNonNull(statsAndCostCalculators, "statsAndCostCalculators is null");
     }
 
     public Plan plan(Analysis analysis)
@@ -134,7 +134,7 @@ public class LogicalPlanner
             PlanSanityChecker.validate(root, session, metadata, sqlParser, symbolAllocator.getTypes());
         }
 
-        return new Plan(root, symbolAllocator.getTypes(), statelessLookup.createCachingNonResolvingLookup(), session);
+        return new Plan(root, symbolAllocator.getTypes(), statsAndCostCalculators.createCachingNonResolvingLookup(), session);
     }
 
     public PlanNode planStatement(Analysis analysis, Statement statement)

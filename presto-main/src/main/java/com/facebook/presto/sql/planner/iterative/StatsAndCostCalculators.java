@@ -24,13 +24,13 @@ import static java.util.Objects.requireNonNull;
 
 // TODO: remove.
 @ThreadSafe
-public class StatelessLookup
+public class StatsAndCostCalculators
 {
     private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
 
     @Inject
-    public StatelessLookup(StatsCalculator statsCalculator, CostCalculator costCalculator)
+    public StatsAndCostCalculators(StatsCalculator statsCalculator, CostCalculator costCalculator)
     {
         this.statsCalculator = requireNonNull(statsCalculator, "statsCalculator is null");
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
