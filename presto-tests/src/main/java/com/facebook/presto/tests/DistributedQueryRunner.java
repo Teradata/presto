@@ -28,7 +28,7 @@ import com.facebook.presto.spi.Plugin;
 import com.facebook.presto.spi.QueryId;
 import com.facebook.presto.sql.parser.SqlParserOptions;
 import com.facebook.presto.sql.planner.Plan;
-import com.facebook.presto.sql.planner.iterative.Lookup;
+import com.facebook.presto.sql.planner.iterative.StatelessLookup;
 import com.facebook.presto.testing.MaterializedResult;
 import com.facebook.presto.testing.QueryRunner;
 import com.facebook.presto.testing.TestingAccessControlManager;
@@ -230,7 +230,7 @@ public class DistributedQueryRunner
     }
 
     @Override
-    public Lookup getLookup()
+    public StatelessLookup getStatelessLookup()
     {
         return coordinator.getLookup();
     }

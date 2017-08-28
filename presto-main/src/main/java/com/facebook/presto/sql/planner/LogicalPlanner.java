@@ -30,7 +30,7 @@ import com.facebook.presto.sql.analyzer.RelationId;
 import com.facebook.presto.sql.analyzer.RelationType;
 import com.facebook.presto.sql.analyzer.Scope;
 import com.facebook.presto.sql.parser.SqlParser;
-import com.facebook.presto.sql.planner.iterative.Lookup;
+import com.facebook.presto.sql.planner.iterative.StatelessLookup;
 import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.facebook.presto.sql.planner.plan.Assignments;
 import com.facebook.presto.sql.planner.plan.DeleteNode;
@@ -90,28 +90,27 @@ public class LogicalPlanner
     private final SymbolAllocator symbolAllocator = new SymbolAllocator();
     private final Metadata metadata;
     private final SqlParser sqlParser;
-    private final Lookup lookup;
+    private final StatelessLookup statelessLookup;
 
     public LogicalPlanner(Session session,
             List<PlanOptimizer> planOptimizers,
             PlanNodeIdAllocator idAllocator,
             Metadata metadata,
             SqlParser sqlParser,
-            Lookup lookup)
+            StatelessLookup statelessLookup)
     {
         requireNonNull(session, "session is null");
         requireNonNull(planOptimizers, "planOptimizers is null");
         requireNonNull(idAllocator, "idAllocator is null");
         requireNonNull(metadata, "metadata is null");
         requireNonNull(sqlParser, "sqlParser is null");
-        requireNonNull(lookup, "lookup is null");
 
         this.session = session;
         this.planOptimizers = planOptimizers;
         this.idAllocator = idAllocator;
         this.metadata = metadata;
         this.sqlParser = sqlParser;
-        this.lookup = lookup;
+        this.statelessLookup = requireNonNull(statelessLookup, "statelessLookup is null");
     }
 
     public Plan plan(Analysis analysis)
@@ -135,7 +134,7 @@ public class LogicalPlanner
             PlanSanityChecker.validate(root, session, metadata, sqlParser, symbolAllocator.getTypes());
         }
 
-        return new Plan(root, symbolAllocator.getTypes(), lookup, session);
+        return new Plan(root, symbolAllocator.getTypes(), statelessLookup.createCachingNonResolvingLookup(), session);
     }
 
     public PlanNode planStatement(Analysis analysis, Statement statement)

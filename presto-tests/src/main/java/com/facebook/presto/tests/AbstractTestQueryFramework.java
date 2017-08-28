@@ -325,7 +325,7 @@ public abstract class AbstractTestQueryFramework
                 metadata,
                 queryRunner.getAccessControl(),
                 sqlParser,
-                queryRunner.getLookup(),
+                queryRunner.getStatelessLookup(),
                 ImmutableMap.of());
     }
 

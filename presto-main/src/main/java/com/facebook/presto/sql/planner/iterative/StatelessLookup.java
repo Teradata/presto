@@ -14,27 +14,17 @@
 
 package com.facebook.presto.sql.planner.iterative;
 
-import com.facebook.presto.Session;
 import com.facebook.presto.cost.CostCalculator;
-import com.facebook.presto.cost.PlanNodeCostEstimate;
-import com.facebook.presto.cost.PlanNodeStatsEstimate;
 import com.facebook.presto.cost.StatsCalculator;
-import com.facebook.presto.spi.type.Type;
-import com.facebook.presto.sql.planner.Symbol;
-import com.facebook.presto.sql.planner.plan.PlanNode;
 
 import javax.annotation.concurrent.ThreadSafe;
 import javax.inject.Inject;
 
-import java.util.Map;
-
-import static com.google.common.base.Verify.verify;
 import static java.util.Objects.requireNonNull;
 
-// TODO: remove.  Eventually all uses of StatelessLookup should be replaced with the Lookup specific to the plan
+// TODO: remove.
 @ThreadSafe
 public class StatelessLookup
-        implements Lookup
 {
     private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
@@ -46,30 +36,8 @@ public class StatelessLookup
         this.costCalculator = requireNonNull(costCalculator, "costCalculator is null");
     }
 
-    @Override
-    public PlanNode resolve(PlanNode node)
+    public Lookup createCachingNonResolvingLookup()
     {
-        verify(!(node instanceof GroupReference), "Unexpected GroupReference");
-        return node;
-    }
-
-    @Override
-    public PlanNodeStatsEstimate getStats(PlanNode planNode, Session session, Map<Symbol, Type> types)
-    {
-        return statsCalculator.calculateStats(
-                planNode,
-                this,
-                session,
-                types);
-    }
-
-    @Override
-    public PlanNodeCostEstimate getCumulativeCost(PlanNode planNode, Session session, Map<Symbol, Type> types)
-    {
-        return costCalculator.calculateCumulativeCost(
-                planNode,
-                this,
-                session,
-                types);
+        return new NonResolvingCachingLookup(statsCalculator, costCalculator);
     }
 }

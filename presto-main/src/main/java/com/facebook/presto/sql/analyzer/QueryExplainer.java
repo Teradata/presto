@@ -24,7 +24,7 @@ import com.facebook.presto.sql.planner.PlanFragmenter;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.PlanOptimizers;
 import com.facebook.presto.sql.planner.SubPlan;
-import com.facebook.presto.sql.planner.iterative.Lookup;
+import com.facebook.presto.sql.planner.iterative.StatelessLookup;
 import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.facebook.presto.sql.planner.planPrinter.PlanPrinter;
 import com.facebook.presto.sql.tree.ExplainType.Type;
@@ -46,7 +46,7 @@ public class QueryExplainer
     private final Metadata metadata;
     private final AccessControl accessControl;
     private final SqlParser sqlParser;
-    private final Lookup lookup;
+    private final StatelessLookup statelessLookup;
     private final Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask;
 
     @Inject
@@ -55,14 +55,14 @@ public class QueryExplainer
             Metadata metadata,
             AccessControl accessControl,
             SqlParser sqlParser,
-            Lookup lookup,
+            StatelessLookup statelessLookup,
             Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask)
     {
         this(planOptimizers.get(),
                 metadata,
                 accessControl,
                 sqlParser,
-                lookup,
+                statelessLookup,
                 dataDefinitionTask);
     }
 
@@ -71,14 +71,14 @@ public class QueryExplainer
             Metadata metadata,
             AccessControl accessControl,
             SqlParser sqlParser,
-            Lookup lookup,
+            StatelessLookup statelessLookup,
             Map<Class<? extends Statement>, DataDefinitionTask<?>> dataDefinitionTask)
     {
         this.planOptimizers = requireNonNull(planOptimizers, "planOptimizers is null");
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.accessControl = requireNonNull(accessControl, "accessControl is null");
         this.sqlParser = requireNonNull(sqlParser, "sqlParser is null");
-        this.lookup = requireNonNull(lookup, "lookup is null");
+        this.statelessLookup = requireNonNull(statelessLookup, "statelessLookup is null");
         this.dataDefinitionTask = ImmutableMap.copyOf(requireNonNull(dataDefinitionTask, "dataDefinitionTask is null"));
     }
 
@@ -98,10 +98,10 @@ public class QueryExplainer
         switch (planType) {
             case LOGICAL:
                 Plan plan = getLogicalPlan(session, statement, parameters);
-                return PlanPrinter.textLogicalPlan(plan.getRoot(), plan.getTypes(), metadata, lookup, session);
+                return PlanPrinter.textLogicalPlan(plan.getRoot(), plan.getTypes(), metadata, statelessLookup.createCachingNonResolvingLookup(), session);
             case DISTRIBUTED:
                 SubPlan subPlan = getDistributedPlan(session, statement, parameters);
-                return PlanPrinter.textDistributedPlan(subPlan, metadata, lookup, session);
+                return PlanPrinter.textDistributedPlan(subPlan, metadata, statelessLookup.createCachingNonResolvingLookup(), session);
         }
         throw new IllegalArgumentException("Unhandled plan type: " + planType);
     }
@@ -138,7 +138,7 @@ public class QueryExplainer
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
 
         // plan statement
-        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, sqlParser, lookup);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(session, planOptimizers, idAllocator, metadata, sqlParser, statelessLookup);
         return logicalPlanner.plan(analysis);
     }
 

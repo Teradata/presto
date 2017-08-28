@@ -50,7 +50,7 @@ import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.PlanOptimizers;
 import com.facebook.presto.sql.planner.StageExecutionPlan;
 import com.facebook.presto.sql.planner.SubPlan;
-import com.facebook.presto.sql.planner.iterative.Lookup;
+import com.facebook.presto.sql.planner.iterative.StatelessLookup;
 import com.facebook.presto.sql.planner.optimizations.PlanOptimizer;
 import com.facebook.presto.sql.tree.Explain;
 import com.facebook.presto.sql.tree.Expression;
@@ -105,7 +105,7 @@ public final class SqlQueryExecution
     private final FailureDetector failureDetector;
 
     private final QueryExplainer queryExplainer;
-    private final Lookup lookup;
+    private final StatelessLookup statelessLookup;
     private final AtomicReference<SqlQueryScheduler> queryScheduler = new AtomicReference<>();
     private final AtomicReference<Plan> queryPlan = new AtomicReference<>();
     private final NodeTaskMap nodeTaskMap;
@@ -125,7 +125,7 @@ public final class SqlQueryExecution
             SplitManager splitManager,
             NodePartitioningManager nodePartitioningManager,
             NodeScheduler nodeScheduler,
-            Lookup lookup,
+            StatelessLookup statelessLookup,
             List<PlanOptimizer> planOptimizers,
             RemoteTaskFactory remoteTaskFactory,
             LocationFactory locationFactory,
@@ -146,7 +146,7 @@ public final class SqlQueryExecution
             this.splitManager = requireNonNull(splitManager, "splitManager is null");
             this.nodePartitioningManager = requireNonNull(nodePartitioningManager, "nodePartitioningManager is null");
             this.nodeScheduler = requireNonNull(nodeScheduler, "nodeScheduler is null");
-            this.lookup = requireNonNull(lookup, "lookup is null");
+            this.statelessLookup = requireNonNull(statelessLookup, "statelessLookup is null");
             this.planOptimizers = requireNonNull(planOptimizers, "planOptimizers is null");
             this.locationFactory = requireNonNull(locationFactory, "locationFactory is null");
             this.queryExecutor = requireNonNull(queryExecutor, "queryExecutor is null");
@@ -308,7 +308,7 @@ public final class SqlQueryExecution
 
         // plan query
         PlanNodeIdAllocator idAllocator = new PlanNodeIdAllocator();
-        LogicalPlanner logicalPlanner = new LogicalPlanner(stateMachine.getSession(), planOptimizers, idAllocator, metadata, sqlParser, lookup);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(stateMachine.getSession(), planOptimizers, idAllocator, metadata, sqlParser, statelessLookup);
         Plan plan = logicalPlanner.plan(analysis);
         queryPlan.set(plan);
 
@@ -571,7 +571,7 @@ public final class SqlQueryExecution
         private final SplitManager splitManager;
         private final NodePartitioningManager nodePartitioningManager;
         private final NodeScheduler nodeScheduler;
-        private final Lookup lookup;
+        private final StatelessLookup statelessLookup;
         private final List<PlanOptimizer> planOptimizers;
         private final RemoteTaskFactory remoteTaskFactory;
         private final TransactionManager transactionManager;
@@ -592,7 +592,7 @@ public final class SqlQueryExecution
                 SplitManager splitManager,
                 NodePartitioningManager nodePartitioningManager,
                 NodeScheduler nodeScheduler,
-                Lookup lookup,
+                StatelessLookup statelessLookup,
                 PlanOptimizers planOptimizers,
                 RemoteTaskFactory remoteTaskFactory,
                 TransactionManager transactionManager,
@@ -623,7 +623,7 @@ public final class SqlQueryExecution
             this.queryExplainer = requireNonNull(queryExplainer, "queryExplainer is null");
 
             this.executionPolicies = requireNonNull(executionPolicies, "schedulerPolicies is null");
-            this.lookup = requireNonNull(lookup, "lookup is null");
+            this.statelessLookup = requireNonNull(statelessLookup, "statelessLookup is null");
             this.planOptimizers = planOptimizers.get();
         }
 
@@ -647,7 +647,7 @@ public final class SqlQueryExecution
                     splitManager,
                     nodePartitioningManager,
                     nodeScheduler,
-                    lookup,
+                    statelessLookup,
                     planOptimizers,
                     remoteTaskFactory,
                     locationFactory,

@@ -242,7 +242,7 @@ public class LocalQueryRunner
     private final StatsCalculator statsCalculator;
     private final CostCalculator costCalculator;
     private final CostCalculator estimatedExchangesCostCalculator;
-    private final Lookup lookup;
+    private final StatelessLookup statelessLookup;
     private final SingleStreamSpillerFactory singleStreamSpillerFactory;
     private final PartitioningSpillerFactory partitioningSpillerFactory;
 
@@ -412,7 +412,7 @@ public class LocalQueryRunner
                 ServerMainModule.createNewStatsCalculator(metadata, new FilterStatsCalculator(metadata), new ScalarStatsCalculator(metadata)));
         this.costCalculator = new CostCalculatorUsingExchanges(this::getNodeCount);
         this.estimatedExchangesCostCalculator = new CostCalculatorWithEstimatedExchanges(costCalculator, () -> nodeCountForStats);
-        this.lookup = new StatelessLookup(statsCalculator, costCalculator);
+        this.statelessLookup = new StatelessLookup(statsCalculator, costCalculator);
         this.singleStreamSpillerFactory = new FileSingleStreamSpillerFactory(blockEncodingSerde, spillerStats, featuresConfig);
         this.partitioningSpillerFactory = new GenericPartitioningSpillerFactory(this.singleStreamSpillerFactory);
         this.spillerFactory = new GenericSpillerFactory(singleStreamSpillerFactory);
@@ -462,9 +462,9 @@ public class LocalQueryRunner
     }
 
     @Override
-    public Lookup getLookup()
+    public StatelessLookup getStatelessLookup()
     {
-        return lookup;
+        return statelessLookup;
     }
 
     public StatsCalculator getStatsCalculator()
@@ -648,7 +648,7 @@ public class LocalQueryRunner
         Plan plan = createPlan(session, sql);
 
         if (printPlan) {
-            System.out.println(PlanPrinter.textLogicalPlan(plan.getRoot(), plan.getTypes(), metadata, lookup, session));
+            System.out.println(PlanPrinter.textLogicalPlan(plan.getRoot(), plan.getTypes(), metadata, statelessLookup.createCachingNonResolvingLookup(), session));
         }
 
         SubPlan subplan = PlanFragmenter.createSubPlans(session, metadata, plan);
@@ -807,11 +807,11 @@ public class LocalQueryRunner
                 metadata,
                 accessControl,
                 sqlParser,
-                lookup,
+                statelessLookup,
                 dataDefinitionTask);
         Analyzer analyzer = new Analyzer(session, metadata, sqlParser, accessControl, Optional.of(queryExplainer), parameters);
 
-        LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, idAllocator, metadata, sqlParser, lookup);
+        LogicalPlanner logicalPlanner = new LogicalPlanner(session, optimizers, idAllocator, metadata, sqlParser, statelessLookup);
 
         Analysis analysis = analyzer.analyze(statement);
         return logicalPlanner.plan(analysis, stage);

@@ -111,7 +111,7 @@ import com.facebook.presto.sql.gen.OrderingCompiler;
 import com.facebook.presto.sql.parser.SqlParser;
 import com.facebook.presto.sql.planner.Partitioning.ArgumentBinding;
 import com.facebook.presto.sql.planner.SortExpressionExtractor.SortExpression;
-import com.facebook.presto.sql.planner.iterative.StatelessLookup;
+import com.facebook.presto.sql.planner.iterative.NonResolvingCachingLookup;
 import com.facebook.presto.sql.planner.optimizations.IndexJoinOptimizer;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.AggregationNode.Aggregation;
@@ -678,7 +678,7 @@ public class LocalExecutionPlanner
                     node.getId(),
                     queryPerformanceFetcher.get(),
                     metadata,
-                    new StatelessLookup(statsCalculator, costCalculator),
+                    new NonResolvingCachingLookup(statsCalculator, costCalculator),
                     node.isVerbose());
             return new PhysicalOperation(operatorFactory, makeLayout(node), source);
         }
