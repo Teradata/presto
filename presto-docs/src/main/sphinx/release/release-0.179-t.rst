@@ -52,6 +52,8 @@ Bug Fixes
 * Fix execution of several window functions on array and map types. Without this patch, some window functions taking array or map types (e.g. approx_percentile) were failing.
 * Fix incorrect empty results for tables filtered on ``CHAR(x)``, ``DECIMAL``, ``DATE``, or ``TIMESTAMP`` partition columns.
 * Fix incorrect results when ``optimizer.optimize-metadata-queries`` is enabled for queries involving aggregation over ``TopN`` and ``Filter``.
+* Skip unknown costs in ``EXPLAIN`` output.
+* Fix query failure when ``ORDER BY`` expressions reference columns that are used in the ``GROUP BY`` clause by their fully-qualified name.
 
 Security Changes
 ----------------
@@ -83,12 +85,9 @@ CLI Changes
 * Fix an issue that would sometimes prevent queries from being cancelled when
   exiting from the pager.
 
-Additional Documentation
--------------------------
-
-* Query Optimizer
-* CLI options
-* Spill to Disk
+SPI Changes
+-----------
+* Fix regression that broke serialization of SchemaTableName.
 
 Data Types
 ----------
