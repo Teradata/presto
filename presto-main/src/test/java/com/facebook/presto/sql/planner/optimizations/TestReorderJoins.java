@@ -37,6 +37,14 @@ import static java.lang.String.format;
 import static java.util.Objects.requireNonNull;
 import static org.testng.Assert.assertEquals;
 
+/**
+ * This tests verify joins order in plans generated for TPC-H queries using
+ * cost-based optimizer. They are intended to signal that a code change results
+ * in a change of generated plans.
+ *
+ * Most of the plans are currently suboptimal, so the tests results will likely
+ * change. They should be changed with care.
+ */
 public class TestReorderJoins
         extends BasePlanTest
 {
