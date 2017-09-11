@@ -10,7 +10,7 @@ Cost-Based Optimizer
 * Replace the ``distributed_joins`` property with the ``join_distribution_type`` session property or ``join-distribution-type`` config property.  Options are ``AUTOMATIC``, ``REPARTITIONED``, and ``REPLICATED``.
 * Replace the ``reorder_joins`` property with the ``join_reordering_strategy`` session property or ``optimizer.join-reordering-strategy`` config property.  Options are ``NONE``, ``ELIMINATE_CROSS_JOINS``, and ``COST_BASED``.
 * Determine join distribution type based on statistics when ``join_distribution_type`` is set to ``AUTOMATIC``.
-* Statistics calculated by Presto for each stage of the query plan can be seen in ``EXPLAIN`` results.
+* Show estimated statistics for each stage of the query plan in ``EXPLAIN`` results.
 
 Spill to Disk
 --------------
@@ -21,7 +21,7 @@ Spill to Disk
 * Allow configuring the amount of memory that can be used for merging
   spilled aggregation data from disk using the ``experimental.aggregation-operator-unspill-memory-limit`` config property
   or the ``aggregation_operator_unspill_memory_limit`` session property.
-* Change spilling for aggregations to only occur when the cluster runs out of memory.
+* Only spill to disk for aggregations when the cluster runs out of memory.
 * Add spilled data size to ``EXPLAIN ANALYZE``.
 * Add spilled data size to the Presto CLI when run with the ``--debug`` flag.
 * Add spilled data size to the Presto WebUI on the Query Details and Live Plan pages.
@@ -38,7 +38,7 @@ General Changes
 * Avoid potentially expensive computation on coordinator by offloading certain plan fragments to worker nodes.
 * Make ``DECIMAL`` the default literal for non-integral numbers.
 * Add support for sorting data on all workers of the cluster, instead of just one node. This feature is disabled by default and can be enabled with the config property ``experimental.distributed-sort`` and the session property ``distributed_sort``. 
-* Improve performance for selective filters by merging pages. This feature can be disabled by setting the config property ``experimental.filter-and-project-min-output-page-row-count`` or the session property ``filter_and_project_min_output_page_row_count`` to 0.
+* Improve performance for selective filters by merging pages with few output rows. This feature can be disabled by setting the config property ``experimental.filter-and-project-min-output-page-row-count`` or the session property ``filter_and_project_min_output_page_row_count`` to 0. The default value is 256.
 
 Bug Fixes
 ---------
@@ -63,7 +63,7 @@ Security Changes
 * Support secure internal communication between Presto nodes via Kerberos.
 * ``ROLE`` support for the Hive connector, including ``CREATE ROLE``,
   ``DROP ROLE``, ``GRANT ROLE``, ``REVOKE ROLE``, ``SET ROLE``, ``SHOW CURRENT ROLES``,
-  ``SHOW ROLES`` and ``SHOW ROLE GRANTS`` commands. #todo add links
+  ``SHOW ROLES`` and ``SHOW ROLE GRANTS`` commands.
 
 Hive Changes
 ------------
