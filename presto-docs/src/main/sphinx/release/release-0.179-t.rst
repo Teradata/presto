@@ -54,6 +54,7 @@ Bug Fixes
 * Fix incorrect results when ``optimizer.optimize-metadata-queries`` is enabled for queries involving aggregation over ``TopN`` and ``Filter``.
 * Skip unknown costs in ``EXPLAIN`` output.
 * Fix query failure when ``ORDER BY`` expressions reference columns that are used in the ``GROUP BY`` clause by their fully-qualified name.
+* Handle ``GROUPING`` when aggregation expressions require implicit coercions.
 
 Security Changes
 ----------------
@@ -68,9 +69,8 @@ Security Changes
 Hive Changes
 ------------
 * Allow partitions without files for bucketed tables (via ``hive.empty-bucketed-partitions.enabled``)
-* Allow multiple files per bucket for bucketed tables (via 
-  ``hive.multi-file-bucketing.enabled``). There must be one or more files per
-  bucket. File names must match the Hive naming convention.
+* Allow multiple files per bucket for bucketed tables (via ``hive.multi-file-bucketing.enabled``). There must be one or more files per bucket. File names must match the Hive naming convention.
+* Ignore partition bucketing if table is not bucketed. This allows dropping the bucketing from table metadata but leaving it for old partitions.
 * Fix potential native memory leak when writing tables using RCFile.
 * Fix query failure when computing statistics on an unpartitioned table in CDH 5.11.
 * Add a configuration option ``hive.create-non-managed-table-enabled`` that can disable creating external Hive tables (default value is ``true``).
